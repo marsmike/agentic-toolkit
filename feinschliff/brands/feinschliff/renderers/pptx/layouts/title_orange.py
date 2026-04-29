@@ -16,7 +16,7 @@ NAME = "Feinschliff · Title · Accent"
 def build(layout):
     set_layout_name(layout, NAME)
     set_layout_background(layout, T.HEX["accent"])
-    paint_chrome(layout, variant="light", pgmeta="Feinschliff Design System · 2026")
+    paint_chrome(layout, variant="light", pgmeta="Feinschliff. Design System · 2026")
 
     # HTML opener-stack has bottom:180px. Work upwards:
     #   display = 160px × 2 lines × 0.95 lh = 304px → top = 1080 - 180 - 304 = 596

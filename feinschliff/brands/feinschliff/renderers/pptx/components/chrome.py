@@ -10,6 +10,7 @@ from pathlib import Path
 
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Emu
+from pptx.dml.color import RGBColor
 from lxml import etree
 from pptx.oxml.ns import qn
 
@@ -19,7 +20,12 @@ from components.primitives import add_text, _shapes
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
-WORDMARK_TEXT = "Feinschliff"
+WORDMARK_TEXT = "FEINSCHLIFF."
+
+# Gem silhouette polygon, viewBox 0..200, matches assets/gem.svg.
+_GEM_VB_POINTS = [(100, 20), (60, 85), (40, 105), (100, 180), (160, 105), (140, 85)]
+_GEM_VB_SIZE = 200
+_GEM_PX = 32  # Render size on the slide.
 
 
 def _sp_name(sp) -> str:
@@ -31,28 +37,43 @@ def _sp_name(sp) -> str:
     return ""
 
 
-def add_logo(target, *, variant: str = "light"):
-    """Place the Feinschliff wordmark (text) at top-left.
+def _add_gem(target, *, x_px: float, y_px: float, size_px: float, color: RGBColor):
+    """Draw the Feinschliff gem silhouette as a vector freeform shape."""
+    s = size_px / _GEM_VB_SIZE
+    pts = [(x_px + p[0] * s, y_px + p[1] * s) for p in _GEM_VB_POINTS]
+    head, *tail = pts
+    builder = _shapes(target).build_freeform(px(head[0]), px(head[1]), scale=1)
+    builder.add_line_segments([(px(x), px(y)) for x, y in tail], close=True)
+    shape = builder.convert_to_shape()
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = color
+    shape.line.fill.background()
+    return shape
 
-    Variant 'light' = ink wordmark on light bg, 'dark' = white wordmark on
-    dark bg. Feinschliff ships without raster logos — the wordmark is rendered
-    in the display font directly so the brand pack stays OSS-only.
+
+def add_logo(target, *, variant: str = "light"):
+    """Place the Feinschliff. lockup (gem + wordmark) at top-left.
+
+    Variant 'light' = ink mark on warm paper, 'dark' = off-white mark on navy.
+    The gem is a single vector freeform — fully editable in PowerPoint, no
+    raster assets required.
     """
     color = T.WHITE if variant == "dark" else T.INK
+    _add_gem(target, x_px=LOGO_X_PX, y_px=LOGO_Y_PX + 4, size_px=_GEM_PX, color=color)
     return add_text(
         target,
-        LOGO_X_PX, LOGO_Y_PX,
-        # Generous width — wordmark is short, the box is just a layout slot.
-        220, max(LOGO_H_PX, 28),
+        LOGO_X_PX + _GEM_PX + 10, LOGO_Y_PX + 8,
+        260, max(LOGO_H_PX, 28),
         WORDMARK_TEXT,
-        size_px=22,
-        font=T.FONT_DISPLAY + " Medium",
+        size_px=18,
+        weight="medium",
+        font=T.FONT_DISPLAY,
         color=color,
-        tracking_em=-0.01,
+        tracking_em=0.18,
     )
 
 
-def add_pgmeta(master_or_slide, text: str = "Feinschliff Design System · 2026", *, color=T.BLACK):
+def add_pgmeta(master_or_slide, text: str = "Feinschliff. Design System · 2026", *, color=T.BLACK):
     """Page-meta stamp at top-right."""
     return add_text(
         master_or_slide, 1420, 70, 400, 30, text,
@@ -61,7 +82,7 @@ def add_pgmeta(master_or_slide, text: str = "Feinschliff Design System · 2026",
     )
 
 
-def add_footer_left(master_or_slide, text: str = "Jan 2026 · Internal", *, color=T.BLACK):
+def add_footer_left(master_or_slide, text: str = "Jan 2026 · Showcase", *, color=T.BLACK):
     """Footer-left — date / classification."""
     return add_text(
         master_or_slide, 100, 1030, 600, 24, text,
@@ -80,8 +101,8 @@ def add_footer_right(master_or_slide, text: str, *, color=T.BLACK):
 
 
 def paint_chrome(target, *, variant: str = "light",
-                 pgmeta: str = "Feinschliff Design System · 2026",
-                 footer_left: str = "Jan 2026 · Internal",
+                 pgmeta: str = "Feinschliff. Design System · 2026",
+                 footer_left: str = "Jan 2026 · Showcase",
                  total: int | None = None):
     """Paint full chrome (logo + pgmeta + footer) onto a layout or slide.
 

@@ -64,3 +64,26 @@ jobs:
             echo "::error::Template suspiciously small: ${size} bytes"
             exit 1
           fi
+      - name: Render template to PNG (visual smoke check)
+        working-directory: feinschliff/brands/feinschliff/renderers/pptx
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libreoffice-impress poppler-utils
+          mkdir -p out/render
+          soffice --headless --convert-to pdf --outdir out/render out/Feinschliff-Template.pptx
+          pdftoppm -r 96 -png out/render/Feinschliff-Template.pdf out/render/slide
+          rendered=$(ls out/render/slide-*.png | wc -l | tr -d ' ')
+          echo "Rendered ${rendered} slides to PNG."
+          if [ "$rendered" -lt 30 ]; then
+            echo "::error::Expected ≥30 rendered slides, got ${rendered}"
+            exit 1
+          fi
+      - name: Upload template + rendered PNGs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: feinschliff-template-${{ github.sha }}
+          path: |
+            feinschliff/brands/feinschliff/renderers/pptx/out/Feinschliff-Template.pptx
+            feinschliff/brands/feinschliff/renderers/pptx/out/render/slide-*.png
+          if-no-files-found: error
+          retention-days: 30

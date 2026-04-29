@@ -28,7 +28,7 @@ def build(layout):
     add_text_placeholder(
         layout, idx=10, name="Attribution", ph_type="body",
         x_px=100, y_px=900, w_px=1720, h_px=30,
-        prompt_text="Feinschliff Design System · Voice guideline",
+        prompt_text="Feinschliff. Design System · Voice guideline",
         size_px=T.SIZE_PX["quote_attr"], font=T.FONT_MONO,
         color=T.BLACK, uppercase=True, tracking_em=0.12,
     )

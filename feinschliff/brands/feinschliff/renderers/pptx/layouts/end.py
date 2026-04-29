@@ -28,7 +28,7 @@ def build(layout):
     add_text_placeholder(
         layout, idx=10, name="Caption", ph_type="body",
         x_px=100, y_px=720, w_px=1720, h_px=40,
-        prompt_text="Feinschliff Design System · v1.0 · 2026",
+        prompt_text="Feinschliff. Design System · v1.0 · 2026",
         size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
         color=T.BLACK, uppercase=True, tracking_em=0.12,
         align="c",

@@ -13,7 +13,7 @@ NAME = "Feinschliff · Title · Ink"
 def build(layout):
     set_layout_name(layout, NAME)
     set_layout_background(layout, T.HEX["ink"])
-    paint_chrome(layout, variant="dark", pgmeta="Feinschliff Design System · 2026")
+    paint_chrome(layout, variant="dark", pgmeta="Feinschliff. Design System · 2026")
 
     add_rule(layout, 100, 498, width_px=80, height_px=4, color=T.ACCENT)
 
