@@ -1,0 +1,8 @@
+Q1 2026 update for the leadership team. Three customers shipped on the new
+plan, $4.2M ARR, churn down to 2.1%. Two product launches landed: the
+public API in February and the OAuth2 hardening in March. Two open risks:
+the AWS bill is up 18% YoY (new analytics workload), and we're still
+hiring for the platform staff role we opened in January.
+
+Audience: CEO + 4 VPs. ~6 minutes total. End with the two risks framed
+as decisions we want their input on.

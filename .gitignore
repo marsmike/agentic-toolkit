@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.env
+.env.local
+out/
+*.pptx
+node_modules/
+.DS_Store
+
+# Intermediate per-slide PNGs from scripts/generate_showcase_visuals.py.
+# Only the composed hero-grid.png and showcase.gif are committed.
+feinschliff/docs/images/slides/

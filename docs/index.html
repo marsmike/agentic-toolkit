@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>agentic-toolkit · Open-source Claude Code plugins</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Open-source Claude Code plugins — released one at a time. The marketplace I run my own work on.">
+<style>
+  :root {
+    color-scheme: light;
+    --accent: #2C5FE8;
+    --accent-hover: #1E47B8;
+    --ink: #1A1F2E;
+    --graphite: #5C6470;
+    --paper: #F2F4F8;
+    --fog: #DDE1E8;
+    --white: #FFF;
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 80px 32px 120px; }
+  header { margin-bottom: 56px; }
+  h1 { font-size: 56px; line-height: 1.05; margin: 0 0 12px; letter-spacing: -0.02em; }
+  .tagline { font-size: 22px; color: var(--graphite); margin: 0 0 32px; }
+  .badges img { height: 22px; margin-right: 6px; vertical-align: middle; }
+  h2 { font-size: 28px; margin: 56px 0 16px; letter-spacing: -0.01em; }
+  p, ul { font-size: 17px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-hover); text-decoration: underline; }
+  pre {
+    background: var(--white);
+    border: 1px solid var(--fog);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  code { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; font-size: 0.95em; }
+  pre code { font-size: 1em; }
+  .cta {
+    display: inline-block;
+    background: var(--accent);
+    color: var(--white);
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 500;
+    margin-top: 8px;
+    margin-right: 12px;
+  }
+  .cta:hover { background: var(--accent-hover); color: var(--white); text-decoration: none; }
+  .cta.secondary { background: var(--white); color: var(--accent); border: 1px solid var(--fog); }
+  .cta.secondary:hover { background: var(--fog); }
+  hr { border: 0; border-top: 1px solid var(--fog); margin: 64px 0; }
+  footer { color: var(--graphite); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>agentic-toolkit</h1>
+    <p class="tagline">Open-source Claude Code plugins, released one at a time. The marketplace I run my own work on.</p>
+    <p class="badges">
+      <a href="https://github.com/marsmike/agentic-toolkit"><img src="https://img.shields.io/github/v/release/marsmike/agentic-toolkit?include_prereleases&label=release" alt="release"></a>
+      <a href="https://github.com/marsmike/agentic-toolkit"><img src="https://img.shields.io/github/stars/marsmike/agentic-toolkit?style=social" alt="stars"></a>
+      <a href="https://github.com/marsmike/agentic-toolkit/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT license"></a>
+    </p>
+    <p>
+      <a class="cta" href="https://github.com/marsmike/agentic-toolkit">View on GitHub →</a>
+      <a class="cta secondary" href="showcase/">Live Feinschliff showcase →</a>
+    </p>
+  </header>
+
+  <h2>Install</h2>
+  <pre><code># In Claude Code
+/plugin marketplace add marsmike/agentic-toolkit</code></pre>
+
+  <h2>Plugins</h2>
+  <p>
+    <strong><code>feinschliff</code></strong> — brand-pluggable design system that turns Claude Design HTML into brand-perfect PowerPoint decks. Three skills: <code>/deck</code>, <code>/extend</code>, <code>/compile</code>.
+    <a href="https://github.com/marsmike/agentic-toolkit/tree/main/feinschliff">README →</a>
+  </p>
+  <p><a href="showcase/">Open the live showcase deck</a> to see what feinschliff produces.</p>
+
+  <h2>How it works</h2>
+  <p>
+    Five phases, one approval gate, one verify-iterate loop. The verify pass runs 11 defect classes in parallel — five visual (overflow, empty placeholder, layout mismatch, brand violation, density) and six rhetorical (claim-title, one-idea, bullet-dump, audience-mismatch, red-line-break, curse-of-knowledge). The deck only ships when all eleven are green.
+  </p>
+  <p>
+    <a class="cta secondary" href="https://github.com/marsmike/agentic-toolkit/blob/main/feinschliff/docs/architecture.md">Read the full architecture →</a>
+  </p>
+
+  <p>More plugins released step-by-step. Watch the repo or follow <a href="https://x.com/marsmike">@marsmike</a> for the next launch.</p>
+
+  <hr>
+  <footer>
+    <p>Built by <a href="https://marsmike.com">Mike Mueller</a>. MIT licensed.<br>
+    Repository: <a href="https://github.com/marsmike/agentic-toolkit">github.com/marsmike/agentic-toolkit</a>
+    </p>
+  </footer>
+</div>
+</body>
+</html>

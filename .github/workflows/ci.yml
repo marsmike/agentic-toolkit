@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    name: DCO sign-off
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify Signed-off-by on every commit
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          missing=()
+          while read -r sha; do
+            if ! git log -1 --format=%B "$sha" | grep -qE "^Signed-off-by: "; then
+              missing+=("$sha $(git log -1 --format=%s "$sha")")
+            fi
+          done < <(git rev-list "$BASE_SHA..$HEAD_SHA")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Commits missing Signed-off-by line:"
+            printf '  %s\n' "${missing[@]}"
+            echo
+            echo "Add a sign-off to every commit:"
+            echo "  git commit -s -m \"your message\""
+            echo "Or amend an existing commit:"
+            echo "  git commit --amend --signoff"
+            exit 1
+          fi
+          echo "✓ All commits have DCO sign-off."
+
+  feinschliff:
+    name: feinschliff brand pack build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - name: Install feinschliff brand pack deps
+        working-directory: feinschliff/brands/feinschliff/renderers/pptx
+        run: uv sync
+      - name: Build feinschliff template
+        working-directory: feinschliff/brands/feinschliff/renderers/pptx
+        run: |
+          uv run python build.py
+          test -f out/Feinschliff-Template.pptx
+          size=$(stat -c%s out/Feinschliff-Template.pptx)
+          echo "Built Feinschliff-Template.pptx (${size} bytes)"
+          if [ "$size" -lt 100000 ]; then
+            echo "::error::Template suspiciously small: ${size} bytes"
+            exit 1
+          fi
