@@ -17,9 +17,9 @@ Layout inside the bounding box (CSS px, top-left origin):
     ...
 
 RAG palette (overridable via kwargs):
-  - "r" / "red"   → #CC3333           (at risk / off track)
-  - "a" / "amber" → T.HIGHLIGHT (#FBAE40) (caution)
-  - "g" / "green" → #228855           (on track)
+  - "r" / "red"   → #A04848           (muted terra — at risk / off track)
+  - "a" / "amber" → T.HIGHLIGHT (#E4C27A) (caution)
+  - "g" / "green" → #8FB888           (sage — on track)
 """
 from __future__ import annotations
 
@@ -32,11 +32,11 @@ from geometry import px
 
 
 # ─── RAG palette ─────────────────────────────────────────────────────────
-# Red + green are hard-coded because the Feinschliff palette has no dedicated
-# semantic hues (orange is the brand accent, amber exists natively).
-RAG_RED   = RGBColor(0xCC, 0x33, 0x33)
+# Status hues are the one place the brand admits a non-gold third colour.
+# Muted register (sage / terra) so they don't fight the gold-on-navy system.
+RAG_RED   = RGBColor(0xA0, 0x48, 0x48)
 RAG_AMBER = T.HIGHLIGHT
-RAG_GREEN = RGBColor(0x22, 0x88, 0x55)
+RAG_GREEN = RGBColor(0x8F, 0xB8, 0x88)
 
 RAG_MAP = {
     "r": RAG_RED, "red": RAG_RED, "off": RAG_RED,
