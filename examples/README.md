@@ -8,7 +8,8 @@ Each subdirectory pairs an **input** (a brief, a DESIGN.md, a screenshot) with t
 
 | Example | What's inside | Plugin command |
 |---|---|---|
-| [`feinschliff/template-preview/`](feinschliff/template-preview/) | Pre-built `.pptx` with all 36 brand-pack layouts | `build.py` |
+| [`feinschliff/template-preview/`](feinschliff/template-preview/) | Pre-built `.pptx` for the eponymous Feinschliff brand (gold + navy, Bauhaus) | `build.py` |
+| [`feinschliff/template-preview-claude/`](feinschliff/template-preview-claude/) | Pre-built `.pptx` for the Claude brand (coral + cream, editorial serif) | `build.py` |
 | [`feinschliff/brief-to-deck/`](feinschliff/brief-to-deck/) | One-paragraph brief → 8-slide branded deck | `/deck "..."` |
 | [`feinschliff/design-md-to-tokens/`](feinschliff/design-md-to-tokens/) | A DESIGN.md + the brand pack it expanded into (v0.2 preview) | `/compile` |
 

@@ -1,0 +1,26 @@
+[project]
+name = "feinschliff-template"
+version = "0.1.0"
+description = "Claude PowerPoint template generator (Baukasten)."
+requires-python = ">=3.11"
+dependencies = [
+    "python-pptx>=0.6.23",
+    "lxml>=4.9",
+    "Pillow>=10.0",
+    "playwright>=1.40.0",
+    "jsonschema>=4.21",
+]
+
+# Optional integration: slides.add_radar() can render a tech-radar visualization
+# slide via the marsmike/agentic-toolkit-private tech-radar plugin. The import
+# is lazy — installing tech-radar is not required for build.py or any demo
+# layout. Users who want add_radar can place a tech-radar checkout adjacent to
+# this brand pack and the runtime sys.path injection in slides.py will pick it up.
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
