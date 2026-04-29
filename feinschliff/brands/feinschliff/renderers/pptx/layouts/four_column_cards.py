@@ -15,7 +15,7 @@ CARDS = [
      "Finalise priorities, staff crews, lock budget."),
     ("Q2 · Build", "Ship the platform foundations and first feature set.",
      "New OS core, updated Platform SDK."),
-    ("Q3 · Pilot", "Field-test with 2,000 households across DACH.",
+    ("Q3 · Pilot", "Field-test with 2,000 customers across three regions.",
      "Instrument, measure, iterate weekly."),
     ("Q4 · Scale", "Roll out globally with phased regional launches.",
      "EMEA, then NAM, then APAC."),

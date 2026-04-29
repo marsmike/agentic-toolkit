@@ -30,9 +30,9 @@ from layouts._shared import content_header
 NAME = "Feinschliff · Line Chart"
 BG = "white"
 PGMETA = "Line Chart"
-EYEBROW_PROMPT = "Per-household metrics, FY21–FY25"
+EYEBROW_PROMPT = "Per-account metrics, FY21–FY25"
 TITLE_PROMPT = (
-    "Per-household active time grew 43% while cloud cost per household "
+    "Per-account active time grew 43% while cloud cost per account "
     "declined — platform economics are turning."
 )
 
@@ -101,8 +101,8 @@ SLOTS_SCHEMA = {
 # (cloud cost). y_max = 200 chosen so both lines occupy the same band.
 X_LABELS = ["FY21", "FY22", "FY23", "FY24", "FY25"]
 SERIES = [
-    {"name": "Active time per household", "values": [128, 138, 162, 175, 184]},
-    {"name": "Cloud cost per household", "values": [180, 168, 140, 105, 70]},
+    {"name": "Active time per account", "values": [128, 138, 162, 175, 184]},
+    {"name": "Cloud cost per account", "values": [180, 168, 140, 105, 70]},
 ]
 Y_MAX = 200
 
@@ -190,7 +190,7 @@ def build(layout):
     add_text_placeholder(
         layout, idx=40, name="Source / caption", ph_type="body",
         x_px=100, y_px=995, w_px=1720, h_px=24,
-        prompt_text="Source · Feinschliff analytics, n = 2.4M HH",
+        prompt_text="Source · Feinschliff analytics, n = 2.4M accounts",
         size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
         uppercase=True, tracking_em=0.1,
     )

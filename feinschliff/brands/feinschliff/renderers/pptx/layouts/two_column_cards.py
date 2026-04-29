@@ -12,8 +12,8 @@ NAME = "Feinschliff · 2-Column Cards"
 
 CARDS = [
     ("01 · Consumer",
-     "Products designed around daily cooking, not corner-case specs.",
-     "Ship features users actually touch — induction presets, one-pot modes, and a quieter dishwasher."),
+     "Products designed around daily use, not corner-case specs.",
+     "Ship features users actually touch — fewer modes, sharper defaults, faster onboarding."),
     ("02 · Platform",
      "A shared software backbone across every product we build.",
      "One OS means one update path, one data contract, and one place to measure real-world usage."),

@@ -110,10 +110,10 @@ SAMPLE_STAGES = [
 ]
 
 SAMPLE_DROPOFFS = [
-    {"pct": "−22 pt", "label": "Install → pair",
-     "body": "Pairing fails on mixed-SSID routers and Wi-Fi 6 backward compatibility. Fix is scoped for Q1 firmware."},
+    {"pct": "−22 pt", "label": "Trial → activate",
+     "body": "Activation fails on mixed-SSID routers and Wi-Fi 6 backward compatibility. Fix is scoped for Q1."},
     {"pct": "−14 pt", "label": "Feature → 90d active",
-     "body": "Households try one cycle then default to the panel. Cadence nudges in-app are live in Q2."},
+     "body": "Users try one session then default to the panel. Cadence nudges in-app are live in Q2."},
     {"pct": "",       "label": "",
      "body": ""},
 ]

@@ -43,7 +43,7 @@ BG = "white"
 PGMETA = "MCK · Action title"
 EYEBROW_PROMPT = "Action-title layout"
 TITLE_PROMPT = (
-    "Adopting the new platform will lift per-household active time "
+    "Adopting the new platform will lift per-account active time "
     "by ~18% within two release cycles."
 )
 
@@ -161,8 +161,8 @@ def build(layout):
         layout, idx=11, name="Supporting Body", ph_type="body",
         x_px=_BODY_X, y_px=_BOTTOM_Y, w_px=_BODY_W, h_px=_BOTTOM_H,
         prompt_text=(
-            "In the DACH pilot, households on the updated firmware "
-            "opened the app 2.3× more often and ran guided cycles 41% "
+            "In the regional pilot, accounts on the updated platform "
+            "opened the app 2.3× more often and ran guided sessions 41% "
             "more per week."
         ),
         size_px=T.SIZE_PX["body"], color=T.GRAPHITE, line_height=1.5,
@@ -170,7 +170,7 @@ def build(layout):
 
     # ── KPIs (right strip, up to 2 cells) ───────────────────────────────
     kpi_samples = [
-        ("+18", "%",  "Active time / week", "vs. prior firmware"),
+        ("+18", "%",  "Active time / week", "vs. prior platform"),
         ("2.3", "×",  "App open rate",      "trailing 30 days"),
     ]
     for i, (value, unit, key, delta) in enumerate(kpi_samples):
@@ -218,7 +218,7 @@ def build(layout):
         x_px=_CONTENT_X, y_px=_SOURCE_Y, w_px=_CONTENT_W, h_px=24,
         prompt_text=(
             "Source · Platform telemetry, Jun–Dec 2025 · "
-            "N = 142k households"
+            "N = 142k accounts"
         ),
         size_px=14, font=T.FONT_MONO,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,

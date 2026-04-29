@@ -103,7 +103,7 @@ SLOTS_SCHEMA = {
 
 # Prompt samples — populate the layout preview in PowerPoint's New Slide menu.
 SAMPLE_LEDE = (
-    "Platform economics turned in FY25 — active use per household grew while "
+    "Platform economics turned in FY25 — active use per account grew while "
     "cloud cost fell. Convert that signal into the 2026 commitments below."
 )
 

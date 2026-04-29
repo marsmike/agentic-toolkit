@@ -40,7 +40,7 @@ BG = "white"
 PGMETA = "Table"
 EYEBROW_PROMPT = "FY25 preliminary"
 TITLE_PROMPT = (
-    "Across five product lines, only dishwashers and ovens beat both "
+    "Across five product lines, only the two flagship lines beat both "
     "revenue and margin plan."
 )
 
@@ -133,11 +133,11 @@ HEADER_PROMPTS = [
 
 # Each row: (row label, [body cell values])
 ROWS = [
-    ("Dishwashers",       ["3,240", "+3.8%", "14.2%", "+0.6 pt"]),
-    ("Ovens",             ["2,910", "+2.2%", "13.5%", "+0.4 pt"]),
-    ("Refrigeration",     ["3,480", "+0.3%", "11.1%", "−0.2 pt"]),
-    ("Laundry",           ["2,610", "−0.9%", "10.4%", "−0.3 pt"]),
-    ("Category 4",  ["1,860", "−1.4%", "9.2%",  "−0.7 pt"]),
+    ("Flagship A",        ["3,240", "+3.8%", "14.2%", "+0.6 pt"]),
+    ("Pro line",          ["2,910", "+2.2%", "13.5%", "+0.4 pt"]),
+    ("Standard line",     ["3,480", "+0.3%", "11.1%", "−0.2 pt"]),
+    ("Compact line",      ["2,610", "−0.9%", "10.4%", "−0.3 pt"]),
+    ("Accessories",       ["1,860", "−1.4%", "9.2%",  "−0.7 pt"]),
 ]
 
 SOURCE_PROMPT = (

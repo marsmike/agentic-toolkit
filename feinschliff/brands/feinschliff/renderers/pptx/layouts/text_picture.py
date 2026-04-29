@@ -16,7 +16,7 @@ def build(layout):
 
     # Right picture — fixed rect.
     add_image_placeholder(
-        layout, 1040, 200, 780, 720, label="Induction hob",
+        layout, 1040, 200, 780, 720, label="Product hero",
     )
 
     paint_chrome(layout, variant="light", pgmeta="Layout · text + picture")
@@ -26,14 +26,14 @@ def build(layout):
     add_text_placeholder(
         layout, idx=10, name="Eyebrow", ph_type="body",
         x_px=100, y_px=240, w_px=760, h_px=30,
-        prompt_text="Induction · 2026",
+        prompt_text="Flagship · 2026",
         size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
         color=T.BLACK, uppercase=True, tracking_em=0.12,
     )
     add_text_placeholder(
         layout, idx=0, name="Title", ph_type="title",
         x_px=100, y_px=280, w_px=760, h_px=380,
-        prompt_text="Induction that\nlearns your\ncooking.",
+        prompt_text="A flagship that\nlearns the\nuser.",
         size_px=T.SIZE_PX["huge"], weight="light",
         color=T.BLACK, tracking_em=-0.03, line_height=1.0,
     )

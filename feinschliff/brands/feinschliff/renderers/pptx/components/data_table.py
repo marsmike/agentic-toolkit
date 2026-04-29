@@ -20,9 +20,9 @@ Layout inside the bounding box (CSS px, top-left origin):
     +--------------+--------+--------+--------+--------+
     | PRODUCT LINE | HEADER | HEADER | HEADER | HEADER |   header band
     +==============+========+========+========+========+   2 px ink rule
-    | Dishwashers  | 3,240  | +3.8%  | 14.2%  | Ahead  |
+    | Flagship A   | 3,240  | +3.8%  | 14.2%  | Ahead  |
     +--------------+--------+--------+--------+--------+   1 px FOG
-    | Ovens        | 2,910  | +2.2%  | 13.5%  | Ahead  |
+    | Pro line     | 2,910  | +2.2%  | 13.5%  | Ahead  |
     +--------------+--------+--------+--------+--------+   1 px FOG
     ...
 """

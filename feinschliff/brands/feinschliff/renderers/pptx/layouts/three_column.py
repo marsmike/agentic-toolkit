@@ -11,7 +11,7 @@ CARDS = [
     ("01", "Consumer.",
      "Brand A, Brand B, Brand C, Brand D — placeholder column copy."),
     ("02", "Commercial.",
-     "Products engineered for the commercial sector — hotels, kitchens, laundries, retail."),
+     "Products engineered for the commercial sector — hotels, retail, services, multi-site."),
     ("03", "Platform.",
      "Platform — the software layer shared across all of it."),
 ]

@@ -23,8 +23,8 @@ BG = "white"
 PGMETA = "Pyramid"
 EYEBROW_PROMPT = "Customer value"
 TITLE_PROMPT = (
-    "Three tiers of value: a durable machine, an honest relationship, "
-    "a calm home."
+    "Three tiers of value: a solid product, an honest relationship, "
+    "a measured experience."
 )
 
 # ─── Canvas geometry (CSS px) ────────────────────────────────────────────
@@ -81,8 +81,8 @@ SLOTS_SCHEMA = {
 SAMPLE_TIERS = [
     {
         "counter": "Tier 03 · Meaning",
-        "label": "A calm home.",
-        "body": "Time given back; one less thing to think about on a Tuesday evening.",
+        "label": "A measured experience.",
+        "body": "Time given back; one less thing to think about.",
     },
     {
         "counter": "Tier 02 · Trust",
@@ -91,8 +91,8 @@ SAMPLE_TIERS = [
     },
     {
         "counter": "Tier 01 · Foundation",
-        "label": "A durable machine.",
-        "body": "Things that work, for ten years, in any kitchen — quiet, safe, and repairable.",
+        "label": "A solid product.",
+        "body": "Things that work, for years, in any context — solid, reliable, supportable.",
     },
 ]
 

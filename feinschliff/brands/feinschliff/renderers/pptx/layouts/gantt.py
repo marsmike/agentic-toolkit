@@ -73,7 +73,7 @@ SAMPLE_LANES = [
         ],
     },
     {
-        "name":  "DACH pilot · 2,000 HH",
+        "name":  "Regional pilot · 2,000 customers",
         "owner": "Owner · Consumer",
         "bars": [
             {"period": 1, "span": 1, "style": "ghost",  "label": ""},

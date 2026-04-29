@@ -93,7 +93,7 @@ CELL_PAD = 28            # inner padding inside each cell
 DEMO_CELLS = [
     {  # TL — high y, low x
         "tag": "Q1 · High impact · low lift",
-        "heading": "Guided cycles on induction.",
+        "heading": "Guided sessions on the flagship line.",
         "body": "Ships on existing hardware; telemetry already collected; known user need.",
         "focus": True,
     },

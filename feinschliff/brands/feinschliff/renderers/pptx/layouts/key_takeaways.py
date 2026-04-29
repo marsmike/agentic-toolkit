@@ -64,7 +64,7 @@ _CARDS = [
     ("01", "Platform first.",
      "Every new SKU ships on the unified OS core from the first production run. No line-specific forks after Q2.",
      "Owner · Platform VP"),
-    ("02", "Measure the home.",
+    ("02", "Measure the experience.",
      "Telemetry is the product, not an add-on. Every feature must ship with the metric that proves it worked.",
      "Owner · Data lead"),
     ("03", "Write plainly.",
@@ -94,7 +94,7 @@ def build(layout):
     add_text_placeholder(
         layout, idx=0, name="Action Title", ph_type="title",
         x_px=100, y_px=272, w_px=1720, h_px=160,
-        prompt_text="Three things to remember: platform first, measure the home, write plainly.",
+        prompt_text="Three things to remember: platform first, measure the experience, write plainly.",
         size_px=T.SIZE_PX["slide_title"], weight="bold",
         color=T.WHITE, tracking_em=-0.015, line_height=1.15,
     )
