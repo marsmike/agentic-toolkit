@@ -1,10 +1,10 @@
 # Example — Claude brand-pack template
 
-Pre-built `.pptx` for the Claude brand pack — coral primary, warm cream canvas, dark navy product surfaces, serif/sans editorial pairing.
+Pre-rendered PDF for the Claude brand pack — coral primary, warm cream canvas, dark navy product surfaces, serif/sans editorial pairing.
 
 ## Use
 
-Same as the Feinschliff preview: open in PowerPoint / Keynote / LibreOffice to browse the layouts before authoring. To run `/deck` against the Claude brand:
+Same as the Feinschliff preview: open `Claude-Template.pdf` in any browser or PDF reader to browse the layouts before authoring. To run `/deck` against the Claude brand:
 
 ```bash
 FEINSCHLIFF_BRAND=claude /deck "your brief..."
@@ -22,5 +22,6 @@ FEINSCHLIFF_BRAND=claude /deck "your brief..."
 cd feinschliff/brands/claude/renderers/pptx
 uv sync
 uv run python build.py
-# out/Claude-Template.pptx — copy here when tokens change.
+# out/Claude-Template.pptx is the editable source.
+soffice --headless --convert-to pdf --outdir ../../../../../examples/feinschliff/template-preview-claude out/Claude-Template.pptx
 ```

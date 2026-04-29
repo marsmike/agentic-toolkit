@@ -5,9 +5,8 @@ __pycache__/
 .env
 .env.local
 out/
-# Build artefacts; the example template-preview pptx is allow-listed below.
+# .pptx are build artefacts — not committed. Examples ship rendered .pdf instead.
 *.pptx
-!examples/**/*.pptx
 node_modules/
 .DS_Store
 

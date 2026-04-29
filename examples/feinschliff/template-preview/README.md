@@ -1,10 +1,10 @@
 # Example — Feinschliff brand-pack template
 
-Pre-built `.pptx` containing all 36 layouts of the Feinschliff brand pack. Open it in PowerPoint / Keynote / LibreOffice to browse the available slide styles before you author.
+Pre-rendered PDF showing all 36 layouts of the Feinschliff brand pack. Open it in any browser, PDF reader, or directly on GitHub to browse the available slide styles before you author.
 
 ## What's inside
 
-`Feinschliff-Template.pptx` (≈150 KB) — built from `feinschliff/brands/feinschliff/renderers/pptx/build.py`. Each layout appears once as a demo slide with placeholder content:
+`Feinschliff-Template.pdf` — rendered from `feinschliff/brands/feinschliff/renderers/pptx/build.py` → LibreOffice headless. Each layout appears once as a demo slide with placeholder content:
 
 - title-orange / title-ink / title-picture · cover variants
 - chapter-orange / chapter-ink · section openers
@@ -28,7 +28,8 @@ This is a **read-only reference**. To produce your own deck, run `/deck "<brief>
 cd feinschliff/brands/feinschliff/renderers/pptx
 uv sync
 uv run python build.py
-# out/Feinschliff-Template.pptx — copy here when the design system changes.
+# out/Feinschliff-Template.pptx is the editable source.
+soffice --headless --convert-to pdf --outdir ../../../../examples/feinschliff/template-preview out/Feinschliff-Template.pptx
 ```
 
-CI also rebuilds this template on every push and uploads it as a workflow artifact (see `.github/workflows/ci.yml` → "feinschliff brand pack build"). The committed copy here is a stable point-in-time reference; the CI artifact is the always-fresh build.
+CI also rebuilds + renders this template on every push and uploads both the .pptx (editable) and per-slide PNGs as a workflow artifact (see `.github/workflows/ci.yml` → "feinschliff brand pack build"). The committed PDF here is a stable point-in-time reference; the CI artifact is the always-fresh build.
