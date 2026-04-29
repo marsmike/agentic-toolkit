@@ -62,7 +62,7 @@ def build(layout):
     add_text_placeholder(
         layout, idx=40, name="Figure caption", ph_type="body",
         x_px=100, y_px=920, w_px=1720, h_px=30,
-        prompt_text="Figure 01 · Internal finance, Q3 2025 · N = €14.1 bn",
+        prompt_text="Figure 01 · Sample data, Q3 FY25 · N = €14.1 bn",
         size_px=16, font=T.FONT_MONO,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )

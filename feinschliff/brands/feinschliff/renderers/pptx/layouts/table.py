@@ -141,7 +141,7 @@ ROWS = [
 ]
 
 SOURCE_PROMPT = (
-    "Source · Internal finance, FY25 preliminary · EUR m · plan set Oct 2024"
+    "Source · Sample data, FY25 preliminary · EUR m · plan set Oct 2024"
 )
 
 

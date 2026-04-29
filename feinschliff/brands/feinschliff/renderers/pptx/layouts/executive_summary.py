@@ -135,7 +135,7 @@ SAMPLE_KPIS = [
     ("95",  "%",   "Telemetry opt-in"),
 ]
 
-SAMPLE_SOURCE = "Source · Internal finance + connected-home analytics, preliminary FY25"
+SAMPLE_SOURCE = "Source · Sample data, FY25 preliminary"
 
 # Layout geometry — canvas 1920 × 1080, content area x=100..1820 (1720 wide).
 CONTENT_X = 100

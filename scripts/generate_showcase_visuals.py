@@ -2,7 +2,7 @@
 """Generate hero grid + animated GIF from the Feinschliff showcase HTML.
 
 Run via:
-    cd /Users/mike/work/agentic-toolkit-public/scripts
+    cd scripts/
     uv venv && source .venv/bin/activate
     uv pip install playwright pillow
     playwright install chromium

@@ -163,7 +163,7 @@ def build(layout):
     add_text_placeholder(
         layout, idx=60, name="Source", ph_type="body",
         x_px=_CHART_X, y_px=_SOURCE_Y, w_px=_CHART_W, h_px=24,
-        prompt_text="Source · Internal finance · EUR bn",
+        prompt_text="Source · Sample data · EUR bn",
         size_px=14, font=T.FONT_MONO,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )
