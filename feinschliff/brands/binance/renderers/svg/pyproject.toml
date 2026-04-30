@@ -1,0 +1,15 @@
+[project]
+name = "claude-svg"
+version = "0.1.0"
+description = "Claude-branded SVG renderer (Baukasten, web/dashboards substrate)."
+requires-python = ">=3.11"
+# Pure stdlib — SVG is just XML + strings. No third-party runtime deps.
+dependencies = []
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

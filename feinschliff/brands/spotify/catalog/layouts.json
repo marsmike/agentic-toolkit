@@ -1,0 +1,2661 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0",
+  "brand": "feinschliff",
+  "layouts": [
+    {
+      "id": "title-orange",
+      "html_label": "Title Orange",
+      "name": "Feinschliff · Title · Accent",
+      "role": "title-primary",
+      "concepts": [
+        "cover",
+        "headline",
+        "full-slide-statement"
+      ],
+      "when_to_use": "Deck cover, chapter opener, or a strong single-statement slide where the headline IS the content. The headline should be a complete phrase under 8 words.",
+      "when_not_to_use": "Any slide with supporting detail, numbers, or imagery. For those, prefer 'title-picture', 'chapter-orange', or a data layout.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true,
+          "description": "Mono uppercase label above the title"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "2-line display headline — use \\n for line break"
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_orange",
+          "layout_name": "Feinschliff · Title · Accent",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "title-ink",
+      "html_label": "Title Ink",
+      "name": "Feinschliff · Title · Ink",
+      "role": "title-primary",
+      "concepts": [
+        "cover",
+        "headline",
+        "dark-mode"
+      ],
+      "when_to_use": "Same as title-orange but on dark ink background — use for serious/formal contexts (earnings, safety, compliance).",
+      "when_not_to_use": "Light-hearted topics. Any slide with substantial detail.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 60
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_ink",
+          "layout_name": "Feinschliff · Title · Ink",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "title-picture",
+      "html_label": "Title + Picture",
+      "name": "Feinschliff · Title + Picture",
+      "role": "title-with-visual",
+      "concepts": [
+        "cover",
+        "product-intro",
+        "headline-plus-context"
+      ],
+      "when_to_use": "Product-led openers, section intros where a single hero image reinforces the title. The right-half image frame is a fixed shape — users replace it via right-click → Format Shape → Fill → Picture.",
+      "when_not_to_use": "Data-heavy slides or when multiple visuals/columns are required — prefer kpi-grid, text-picture, or a column layout instead.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 220,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_picture",
+          "layout_name": "Feinschliff · Title + Picture",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0,
+            "body": 11
+          },
+          "image_fill_mode": "format-shape"
+        }
+      }
+    },
+    {
+      "id": "agenda",
+      "html_label": "Agenda",
+      "name": "Feinschliff · Agenda",
+      "role": "agenda",
+      "concepts": [
+        "agenda",
+        "table-of-contents",
+        "section-list"
+      ],
+      "when_to_use": "Deck agenda with 3-6 items. Each item has a short title + one-line description.",
+      "when_not_to_use": "Fewer than 3 items (use title-orange) or more than 6 (use 3-column or 4-column).",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "'What we'll cover' or similar"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "string",
+                "description": "'01 / 06' format"
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 80
+              }
+            },
+            "required": [
+              "number",
+              "title",
+              "description"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.agenda",
+          "layout_name": "Feinschliff · Agenda",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0,
+            "items[0].number": 20,
+            "items[0].title": 21,
+            "items[0].description": 22,
+            "items[1].number": 23,
+            "items[1].title": 24,
+            "items[1].description": 25,
+            "items[2].number": 26,
+            "items[2].title": 27,
+            "items[2].description": 28,
+            "items[3].number": 29,
+            "items[3].title": 30,
+            "items[3].description": 31,
+            "items[4].number": 32,
+            "items[4].title": 33,
+            "items[4].description": 34,
+            "items[5].number": 35,
+            "items[5].title": 36,
+            "items[5].description": 37
+          }
+        }
+      }
+    },
+    {
+      "id": "chapter-orange",
+      "html_label": "Chapter Orange",
+      "name": "Feinschliff · Chapter · Accent",
+      "role": "chapter-opener",
+      "concepts": [
+        "chapter-opener",
+        "section-break"
+      ],
+      "when_to_use": "Between major sections. Shows chapter number + title. Bold divider slide.",
+      "when_not_to_use": "Only if the deck has one section — then skip the chapter opener entirely.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Format '01\\nBrand.' — number + topic on two lines"
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.chapter_orange",
+          "layout_name": "Feinschliff · Chapter · Accent",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "chapter-ink",
+      "html_label": "Chapter Ink",
+      "name": "Feinschliff · Chapter · Ink + Picture",
+      "role": "chapter-opener",
+      "concepts": [
+        "chapter-opener",
+        "dark-mode",
+        "hero-image"
+      ],
+      "when_to_use": "Chapter opener for serious/formal sections; includes a right-half editorial image frame. Users replace the image via right-click → Format Shape → Fill → Picture.",
+      "when_not_to_use": "Light/celebratory sections — use chapter-orange instead.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 40
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.chapter_ink",
+          "layout_name": "Feinschliff · Chapter · Ink + Picture",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0
+          },
+          "image_fill_mode": "format-shape"
+        }
+      }
+    },
+    {
+      "id": "kpi-grid",
+      "html_label": "KPIs",
+      "name": "Feinschliff · KPI Grid",
+      "role": "data-quantity",
+      "concepts": [
+        "quantity",
+        "metrics",
+        "summary-figures"
+      ],
+      "when_to_use": "2-4 high-level quantitative figures, each with unit + label + delta. Most scannable format for executive updates.",
+      "when_not_to_use": "More than 4 figures (use a table or bar chart). Figures without clear units or time-comparisons.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "kpis": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "description": "Big number, e.g. '62', '100'"
+              },
+              "unit": {
+                "type": "string",
+                "description": "Inline unit, e.g. 'k', 'bn', '%'"
+              },
+              "key": {
+                "type": "string",
+                "maxLength": 40,
+                "description": "Mono uppercase label"
+              },
+              "delta": {
+                "type": "string",
+                "maxLength": 20,
+                "description": "Change indicator, e.g. '+3% YoY'"
+              }
+            },
+            "required": [
+              "value",
+              "key"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.kpi_grid",
+          "layout_name": "Feinschliff · KPI Grid",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0,
+            "kpis[0].key": 20,
+            "kpis[0].delta": 21,
+            "kpis[1].key": 22,
+            "kpis[1].delta": 23,
+            "kpis[2].key": 24,
+            "kpis[2].delta": 25,
+            "kpis[3].key": 26,
+            "kpis[3].delta": 27,
+            "kpis[0].value": 30,
+            "kpis[0].unit": 31,
+            "kpis[1].value": 32,
+            "kpis[1].unit": 33,
+            "kpis[2].value": 34,
+            "kpis[2].unit": 35,
+            "kpis[3].value": 36,
+            "kpis[3].unit": 37
+          }
+        }
+      }
+    },
+    {
+      "id": "two-column-cards",
+      "html_label": "Two Contents",
+      "name": "Feinschliff · 2-Column Cards",
+      "role": "content-columns",
+      "concepts": [
+        "comparison",
+        "pair",
+        "before-after",
+        "pros-cons",
+        "product-a-vs-b"
+      ],
+      "when_to_use": "Two parallel concepts of equal weight — comparison, pair of principles, two-track plan.",
+      "when_not_to_use": "Three or more items (use 3-column or 4-column). Content-heavy analysis (use text-picture).",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "string",
+                "description": "Mono label, e.g. '01 · Consumer'"
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 220
+              }
+            },
+            "required": [
+              "number",
+              "title",
+              "body"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.two_column_cards",
+          "layout_name": "Feinschliff · 2-Column Cards",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0,
+            "columns[0].number": 20,
+            "columns[0].title": 21,
+            "columns[0].body": 22,
+            "columns[1].number": 23,
+            "columns[1].title": 24,
+            "columns[1].body": 25
+          }
+        }
+      }
+    },
+    {
+      "id": "three-column",
+      "html_label": "Three Contents",
+      "name": "Feinschliff · 3-Column",
+      "role": "content-columns",
+      "concepts": [
+        "composition",
+        "triad",
+        "pillars",
+        "phases"
+      ],
+      "when_to_use": "Three parallel items — pillars of a strategy, three brands/products, three phases.",
+      "when_not_to_use": "Two items (use 2-column-cards) or four+ (use 4-column-cards).",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "string",
+                "description": "Mono label, e.g. '01'"
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 60
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 180
+              }
+            },
+            "required": [
+              "number",
+              "title",
+              "body"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.three_column",
+          "layout_name": "Feinschliff · 3-Column",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0,
+            "columns[0].number": 20,
+            "columns[0].title": 21,
+            "columns[0].body": 22,
+            "columns[1].number": 23,
+            "columns[1].title": 24,
+            "columns[1].body": 25,
+            "columns[2].number": 26,
+            "columns[2].title": 27,
+            "columns[2].body": 28
+          }
+        }
+      }
+    },
+    {
+      "id": "four-column-cards",
+      "html_label": "Four Contents",
+      "name": "Feinschliff · 4-Column Cards",
+      "role": "content-columns",
+      "concepts": [
+        "composition",
+        "quarters",
+        "phased-plan",
+        "roadmap"
+      ],
+      "when_to_use": "Four sequential or parallel items — classic Q1-Q4 plan, 4-phase roadmap.",
+      "when_not_to_use": "Fewer than 4 or more than 4 items. Plan with items of unequal weight.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "string",
+                "description": "Mono label, e.g. 'Q1 · Plan'"
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "number",
+              "title",
+              "body"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.four_column_cards",
+          "layout_name": "Feinschliff · 4-Column Cards",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0,
+            "columns[0].number": 20,
+            "columns[0].title": 21,
+            "columns[0].body": 22,
+            "columns[1].number": 23,
+            "columns[1].title": 24,
+            "columns[1].body": 25,
+            "columns[2].number": 26,
+            "columns[2].title": 27,
+            "columns[2].body": 28,
+            "columns[3].number": 29,
+            "columns[3].title": 30,
+            "columns[3].body": 31
+          }
+        }
+      }
+    },
+    {
+      "id": "text-picture",
+      "html_label": "Text + Picture",
+      "name": "Feinschliff · Text + Picture",
+      "role": "content-with-visual",
+      "concepts": [
+        "product-detail",
+        "hero-plus-description",
+        "story-beat"
+      ],
+      "when_to_use": "One substantive idea explained with a supporting visual. Has buttons for CTA. Users replace the image via right-click → Format Shape → Fill → Picture.",
+      "when_not_to_use": "Pure text slide (use 2-column-cards). Pure image (use full-bleed-cover).",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.text_picture",
+          "layout_name": "Feinschliff · Text + Picture",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0,
+            "body": 11
+          },
+          "image_fill_mode": "format-shape"
+        }
+      }
+    },
+    {
+      "id": "full-bleed-cover",
+      "html_label": "Full-bleed Picture",
+      "name": "Feinschliff · Full-bleed Cover",
+      "role": "title-with-visual",
+      "concepts": [
+        "cover",
+        "hero-image",
+        "statement-plus-image"
+      ],
+      "when_to_use": "Strong image + short statement. Chapter opener or deck cover with high visual impact. The full-bleed image area is a fixed shape — users replace it via right-click → Format Shape → Fill → Picture.",
+      "when_not_to_use": "Content-led slides where text carries the meaning. Prefer a title or content layout.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 40
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.full_bleed_cover",
+          "layout_name": "Feinschliff · Full-bleed Cover",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0
+          },
+          "image_fill_mode": "format-shape"
+        }
+      }
+    },
+    {
+      "id": "bar-chart",
+      "name": "Feinschliff · Bar Chart",
+      "role": "data-comparison",
+      "concepts": [
+        "comparison",
+        "ranking",
+        "distribution"
+      ],
+      "when_to_use": "2-6 items with quantitative values to compare, e.g. revenue by region, survey responses.",
+      "when_not_to_use": "Continuous time-series (use a line chart — not yet in Baukasten). More than 6 items (use a table).",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "bars": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "value": {
+                "type": "string",
+                "description": "Percentage or number with unit"
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ]
+          }
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 120,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.bar_chart",
+          "layout_name": "Feinschliff · Bar Chart",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0,
+            "bars[0].label": 20,
+            "bars[0].value": 21,
+            "bars[1].label": 22,
+            "bars[1].value": 23,
+            "bars[2].label": 24,
+            "bars[2].value": 25,
+            "bars[3].label": 26,
+            "bars[3].value": 27,
+            "caption": 40
+          }
+        }
+      }
+    },
+    {
+      "id": "components-showcase",
+      "html_label": "Components",
+      "name": "Feinschliff · Components Showcase",
+      "role": "reference",
+      "concepts": [
+        "ui-kit",
+        "reference",
+        "design-system-demo"
+      ],
+      "when_to_use": "Internal design-system reference — showing available buttons, chips, rules.",
+      "when_not_to_use": "Regular content — this slide is brand-authoring reference, not for end-user decks.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.components_showcase",
+          "layout_name": "Feinschliff · Components Showcase",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "quote",
+      "html_label": "Quote",
+      "name": "Feinschliff · Quote",
+      "role": "quote",
+      "concepts": [
+        "quote",
+        "statement",
+        "voice-guideline"
+      ],
+      "when_to_use": "Strong voice moment — customer testimonial, leadership principle, brand tenet.",
+      "when_not_to_use": "Body text pretending to be a quote. Must be an actual quotation.",
+      "slots": {
+        "title": {
+          "type": "string",
+          "maxLength": 280,
+          "description": "The quote itself, including opening + closing quotation marks"
+        },
+        "attribution": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.quote",
+          "layout_name": "Feinschliff · Quote",
+          "placeholder_map": {
+            "title": 0,
+            "attribution": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "end",
+      "html_label": "End",
+      "name": "Feinschliff · End",
+      "role": "closer",
+      "concepts": [
+        "closer",
+        "thank-you",
+        "end"
+      ],
+      "when_to_use": "Final slide of the deck. Always include for deck closure.",
+      "when_not_to_use": "Never — every deck ends with this or a similar closer.",
+      "slots": {
+        "title": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Typically 'Thank you.'"
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 80,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.end",
+          "layout_name": "Feinschliff · End",
+          "placeholder_map": {
+            "title": 0,
+            "caption": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "graphical",
+      "html_label": "Graphical",
+      "name": "Feinschliff · Graphical",
+      "role": "data-comparison",
+      "concepts": [
+        "chart",
+        "horizontal-bars",
+        "regional-breakdown",
+        "distribution"
+      ],
+      "when_to_use": "3–6 category values that share a scale (e.g. regional share of revenue).",
+      "when_not_to_use": "Avoid for time-series — use mck-stacked-bar or mck-waterfall. Avoid for &gt;6 categories — use mck-table.",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "bars": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "value": {
+                "type": "number",
+                "description": "Percent, 0–100."
+              },
+              "accent": {
+                "type": "boolean",
+                "optional": true
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ]
+          }
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 120,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.graphical",
+          "layout_name": "Feinschliff · Graphical",
+          "placeholder_map": {
+            "title": 0,
+            "eyebrow": 10,
+            "bars[0].label": 20,
+            "bars[0].value": 21,
+            "bars[1].label": 24,
+            "bars[1].value": 25,
+            "bars[2].label": 28,
+            "bars[2].value": 29,
+            "bars[3].label": 32,
+            "bars[3].value": 33,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "action-title",
+      "html_label": "MCK · Action Title",
+      "name": "Feinschliff · Action Title",
+      "role": "title-primary",
+      "concepts": [
+        "action-title",
+        "takeaway-headline",
+        "executive-summary",
+        "so-what"
+      ],
+      "when_to_use": "Any analytical slide where the title itself should carry the takeaway (McKinsey-style “so what?”). Ideal when the slide&#39;s one job is to land a decision or claim.",
+      "when_not_to_use": "Avoid for descriptive or reference content; use title-with-visual or content-columns instead.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180,
+          "description": "Full-sentence takeaway, 1–2 lines."
+        },
+        "supporting_body": {
+          "type": "string",
+          "maxLength": 320,
+          "optional": true
+        },
+        "kpis": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 2,
+          "optional": true,
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string",
+                "optional": true
+              },
+              "key": {
+                "type": "string"
+              },
+              "delta": {
+                "type": "string",
+                "optional": true
+              }
+            },
+            "required": [
+              "value",
+              "key"
+            ]
+          }
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 160,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.action_title",
+          "layout_name": "Feinschliff · Action Title",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "supporting_body": 11,
+            "kpis[0].value": 20,
+            "kpis[0].unit": 21,
+            "kpis[0].key": 22,
+            "kpis[0].delta": 23,
+            "kpis[1].value": 24,
+            "kpis[1].unit": 25,
+            "kpis[1].key": 26,
+            "kpis[1].delta": 27,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "horizontal-bullets",
+      "html_label": "MCK · Horizontal Bullets",
+      "name": "Feinschliff · Horizontal Bullets",
+      "role": "content-columns",
+      "concepts": [
+        "three-column",
+        "bullets",
+        "forces",
+        "drivers",
+        "parallel-ideas"
+      ],
+      "when_to_use": "Three parallel drivers / forces / buckets, each backed by 2–4 short bullets. Good for context or situation slides.",
+      "when_not_to_use": "Avoid when one column deserves more weight; use content-with-visual. Avoid for time-ordered content; use data-timeline.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "properties": {
+              "counter": {
+                "type": "string",
+                "maxLength": 30
+              },
+              "heading": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "bullets": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 5,
+                "items": {
+                  "type": "string",
+                  "maxLength": 140
+                }
+              }
+            },
+            "required": [
+              "counter",
+              "heading",
+              "bullets"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.horizontal_bullets",
+          "layout_name": "Feinschliff · Horizontal Bullets",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "columns[0].counter": 20,
+            "columns[0].heading": 21,
+            "columns[0].bullets": 22,
+            "columns[1].counter": 24,
+            "columns[1].heading": 25,
+            "columns[1].bullets": 26,
+            "columns[2].counter": 28,
+            "columns[2].heading": 29,
+            "columns[2].bullets": 30,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "vertical-bullets",
+      "html_label": "MCK · Vertical Bullets",
+      "name": "Feinschliff · Vertical Bullets",
+      "role": "content-columns",
+      "concepts": [
+        "numbered-list",
+        "steps",
+        "moves",
+        "lede-plus-list"
+      ],
+      "when_to_use": "Prose lede on the left plus a numbered list of 3–6 moves on the right. Good for “we will do X, Y, Z.”",
+      "when_not_to_use": "Avoid for comparisons of equal items; use content-columns. Avoid for time-boxed sequences; use mck-process-flow.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "lede": {
+          "type": "string",
+          "maxLength": 280
+        },
+        "supporting_note": {
+          "type": "string",
+          "maxLength": 160,
+          "optional": true
+        },
+        "items": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "counter": {
+                "type": "string",
+                "maxLength": 6
+              },
+              "heading": {
+                "type": "string",
+                "maxLength": 60
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 180
+              }
+            },
+            "required": [
+              "counter",
+              "heading",
+              "body"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.vertical_bullets",
+          "layout_name": "Feinschliff · Vertical Bullets",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "lede": 11,
+            "supporting_note": 12,
+            "items[0].counter": 20,
+            "items[0].heading": 21,
+            "items[0].body": 22,
+            "items[1].counter": 23,
+            "items[1].heading": 24,
+            "items[1].body": 25,
+            "items[2].counter": 26,
+            "items[2].heading": 27,
+            "items[2].body": 28,
+            "items[3].counter": 29,
+            "items[3].heading": 30,
+            "items[3].body": 31,
+            "items[4].counter": 32,
+            "items[4].heading": 33,
+            "items[4].body": 34,
+            "items[5].counter": 35,
+            "items[5].heading": 36,
+            "items[5].body": 37
+          }
+        }
+      }
+    },
+    {
+      "id": "2x2-matrix",
+      "html_label": "MCK · 2×2 Matrix",
+      "name": "Feinschliff · 2×2 Matrix",
+      "role": "data-comparison",
+      "concepts": [
+        "two-by-two",
+        "prioritisation-matrix",
+        "quadrant",
+        "trade-off"
+      ],
+      "when_to_use": "Classic 2×2 prioritisation grid with one focus quadrant flagged. Good for portfolio choices.",
+      "when_not_to_use": "Avoid if axes can&#39;t be named with one crisp word each; use content-columns instead.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "x_axis_label": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "y_axis_label": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Cells in reading order: TL, TR, BL, BR.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "heading": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 140
+              },
+              "focus": {
+                "type": "boolean",
+                "optional": true
+              }
+            },
+            "required": [
+              "tag",
+              "heading"
+            ]
+          }
+        },
+        "legend_title": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "legend_body": {
+          "type": "string",
+          "maxLength": 240,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.matrix_2x2",
+          "layout_name": "Feinschliff · 2×2 Matrix",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "cells[0].label": 20,
+            "cells[0].body": 21,
+            "cells[1].label": 24,
+            "cells[1].body": 25,
+            "cells[2].label": 28,
+            "cells[2].body": 29,
+            "cells[3].label": 32,
+            "cells[3].body": 33,
+            "x_axis_label": 41,
+            "y_axis_label": 42
+          }
+        }
+      }
+    },
+    {
+      "id": "waterfall",
+      "html_label": "MCK · Waterfall",
+      "name": "Feinschliff · Waterfall",
+      "role": "data-comparison",
+      "concepts": [
+        "waterfall",
+        "bridge",
+        "variance",
+        "plus-minus"
+      ],
+      "when_to_use": "Financial or metric bridge between two anchor totals across 3–7 positive/negative drivers.",
+      "when_not_to_use": "Avoid for non-additive metrics (ratios, averages). Avoid if driver count &gt;7; use mck-table instead.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "bars": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 9,
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "value": {
+                "type": "number"
+              },
+              "kind": {
+                "type": "string",
+                "description": "total | up | down"
+              }
+            },
+            "required": [
+              "label",
+              "value",
+              "kind"
+            ]
+          }
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 160,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.waterfall",
+          "layout_name": "Feinschliff · Waterfall",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "bars[0].value": 20,
+            "bars[0].label": 21,
+            "bars[1].value": 24,
+            "bars[1].label": 25,
+            "bars[2].value": 28,
+            "bars[2].label": 29,
+            "bars[3].value": 32,
+            "bars[3].label": 33,
+            "bars[4].value": 36,
+            "bars[4].label": 37,
+            "bars[5].value": 40,
+            "bars[5].label": 41,
+            "bars[6].value": 44,
+            "bars[6].label": 45,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "process-flow",
+      "html_label": "MCK · Process Flow",
+      "name": "Feinschliff · Process Flow",
+      "role": "data-timeline",
+      "concepts": [
+        "process",
+        "pipeline",
+        "stages",
+        "chevrons",
+        "rhythm"
+      ],
+      "when_to_use": "3–6 sequential stages with chevron arrows; one stage can be highlighted as current. Good for delivery rhythms.",
+      "when_not_to_use": "Avoid for non-sequential buckets; use content-columns. Avoid if stages don&#39;t flow into each other.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "counter": {
+                "type": "string",
+                "maxLength": 30
+              },
+              "heading": {
+                "type": "string",
+                "maxLength": 30
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 140
+              },
+              "active": {
+                "type": "boolean",
+                "optional": true
+              }
+            },
+            "required": [
+              "counter",
+              "heading"
+            ]
+          }
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 160,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.process_flow",
+          "layout_name": "Feinschliff · Process Flow",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "steps[0].counter": 20,
+            "steps[0].heading": 21,
+            "steps[0].body": 22,
+            "steps[1].counter": 24,
+            "steps[1].heading": 25,
+            "steps[1].body": 26,
+            "steps[2].counter": 28,
+            "steps[2].heading": 29,
+            "steps[2].body": 30,
+            "steps[3].counter": 32,
+            "steps[3].heading": 33,
+            "steps[3].body": 34,
+            "steps[4].counter": 36,
+            "steps[4].heading": 37,
+            "steps[4].body": 38,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "stacked-bar",
+      "html_label": "MCK · Stacked Bar",
+      "name": "Feinschliff · Stacked Bar",
+      "role": "data-comparison",
+      "concepts": [
+        "stacked-bar",
+        "time-series",
+        "mix",
+        "segment-breakdown"
+      ],
+      "when_to_use": "Multi-year or multi-category revenue/share mix across 3–6 time buckets and 2–5 segments.",
+      "when_not_to_use": "Avoid if the story is about a single segment — use a line chart. Avoid if segment count &gt;5 — the bars become illegible.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "categories": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "total": {
+                "type": "string",
+                "maxLength": 8
+              },
+              "segments": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 5,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "maxLength": 8
+                    },
+                    "height_px": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "height_px"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "label",
+              "total",
+              "segments"
+            ]
+          }
+        },
+        "legend": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "change": {
+                "type": "string",
+                "maxLength": 20,
+                "optional": true
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.stacked_bar",
+          "layout_name": "Feinschliff · Stacked Bar",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "categories[0].label": 20,
+            "categories[1].label": 21,
+            "categories[2].label": 22,
+            "categories[3].label": 23,
+            "categories[4].label": 24,
+            "categories[0].total": 30,
+            "categories[1].total": 31,
+            "categories[2].total": 32,
+            "categories[3].total": 33,
+            "categories[4].total": 34,
+            "legend[0].name": 40,
+            "legend[0].change": 41,
+            "legend[1].name": 42,
+            "legend[1].change": 43,
+            "legend[2].name": 44,
+            "legend[2].change": 45,
+            "legend[3].name": 46,
+            "legend[3].change": 47,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "table",
+      "html_label": "MCK · Table",
+      "name": "Feinschliff · Table",
+      "role": "data-comparison",
+      "concepts": [
+        "table",
+        "grid",
+        "performance-matrix",
+        "comparison"
+      ],
+      "when_to_use": "5+ rows of comparable metrics (product lines, regions, teams) with 3–6 columns of numbers and variances.",
+      "when_not_to_use": "Avoid for 2–3 row comparisons — use content-columns. Avoid when a chart would show the pattern faster.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "headers": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "maxLength": 24
+              },
+              "numeric": {
+                "type": "boolean",
+                "optional": true
+              }
+            },
+            "required": [
+              "label"
+            ]
+          }
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "properties": {
+              "emphasize": {
+                "type": "boolean",
+                "optional": true
+              },
+              "cells": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 40
+                }
+              }
+            },
+            "required": [
+              "cells"
+            ]
+          }
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 160,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.table",
+          "layout_name": "Feinschliff · Table",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "headers[0]": 20,
+            "headers[1]": 21,
+            "headers[2]": 22,
+            "headers[3]": 23,
+            "headers[4]": 24,
+            "rows[0].label": 30,
+            "rows[1].label": 31,
+            "rows[2].label": 32,
+            "rows[3].label": 33,
+            "rows[4].label": 34,
+            "rows[0].cells[0]": 40,
+            "rows[0].cells[1]": 41,
+            "rows[0].cells[2]": 42,
+            "rows[0].cells[3]": 43,
+            "rows[1].cells[0]": 44,
+            "rows[1].cells[1]": 45,
+            "rows[1].cells[2]": 46,
+            "rows[1].cells[3]": 47,
+            "rows[2].cells[0]": 48,
+            "rows[2].cells[1]": 49,
+            "rows[2].cells[2]": 50,
+            "rows[2].cells[3]": 51,
+            "rows[3].cells[0]": 52,
+            "rows[3].cells[1]": 53,
+            "rows[3].cells[2]": 54,
+            "rows[3].cells[3]": 55,
+            "rows[4].cells[0]": 56,
+            "rows[4].cells[1]": 57,
+            "rows[4].cells[2]": 58,
+            "rows[4].cells[3]": 59,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "pyramid",
+      "html_label": "MCK · Pyramid",
+      "name": "Feinschliff · Pyramid",
+      "role": "content-columns",
+      "concepts": [
+        "pyramid",
+        "hierarchy",
+        "tiers",
+        "value-ladder"
+      ],
+      "when_to_use": "3-tier value hierarchy (foundation → trust → meaning) shown as stacked triangular tiers with a side key.",
+      "when_not_to_use": "Avoid for more than 4 tiers — becomes illegible. Avoid for non-hierarchical relationships; use content-columns.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "tiers": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 4,
+          "description": "Ordered top-tier-first.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "counter": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 160
+              }
+            },
+            "required": [
+              "counter",
+              "label"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.pyramid",
+          "layout_name": "Feinschliff · Pyramid",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "tiers[0].label": 20,
+            "tiers[0].body": 21,
+            "tiers[0].counter": 22,
+            "tiers[1].label": 24,
+            "tiers[1].body": 25,
+            "tiers[1].counter": 26,
+            "tiers[2].label": 28,
+            "tiers[2].body": 29,
+            "tiers[2].counter": 30,
+            "tiers[3].label": 32,
+            "tiers[3].body": 33,
+            "tiers[3].counter": 34
+          }
+        }
+      }
+    },
+    {
+      "id": "key-takeaways",
+      "html_label": "MCK · Key Takeaways",
+      "name": "Feinschliff · Key Takeaways",
+      "role": "closer",
+      "concepts": [
+        "takeaways",
+        "summary",
+        "three-points",
+        "closing-card"
+      ],
+      "when_to_use": "End-of-section summary of 3 most important points, each with an owner.",
+      "when_not_to_use": "Avoid for 1–2 points (use a quote or title-cover). Avoid for &gt;4 points (the card shrinks and loses impact).",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "cards": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "counter": {
+                "type": "string",
+                "maxLength": 6
+              },
+              "heading": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "owner": {
+                "type": "string",
+                "maxLength": 40,
+                "optional": true
+              }
+            },
+            "required": [
+              "counter",
+              "heading",
+              "body"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.key_takeaways",
+          "layout_name": "Feinschliff · Key Takeaways",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "cards[0].counter": 20,
+            "cards[0].heading": 21,
+            "cards[0].body": 22,
+            "cards[0].owner": 23,
+            "cards[1].counter": 24,
+            "cards[1].heading": 25,
+            "cards[1].body": 26,
+            "cards[1].owner": 27,
+            "cards[2].counter": 28,
+            "cards[2].heading": 29,
+            "cards[2].body": 30,
+            "cards[2].owner": 31,
+            "cards[3].counter": 32,
+            "cards[3].heading": 33,
+            "cards[3].body": 34,
+            "cards[3].owner": 35
+          }
+        }
+      }
+    },
+    {
+      "id": "executive-summary",
+      "html_label": "MCK · Executive Summary",
+      "name": "Feinschliff · Executive Summary",
+      "role": "content-columns",
+      "concepts": [
+        "executive-summary",
+        "one-pager",
+        "moves-metrics",
+        "numbered-narrative"
+      ],
+      "when_to_use": "One-page summary of 3–5 moves, each with status commentary and a headline metric. Ideal for board or exec readouts.",
+      "when_not_to_use": "Avoid for narrative chapters; use content-columns instead. Avoid if the moves don&#39;t each have a target metric.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "properties": {
+              "counter": {
+                "type": "string",
+                "maxLength": 6
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 40,
+                "description": "e.g. “Move · Consolidate”."
+              },
+              "summary_heading": {
+                "type": "string",
+                "maxLength": 60
+              },
+              "summary_body": {
+                "type": "string",
+                "maxLength": 140
+              },
+              "status": {
+                "type": "string",
+                "maxLength": 140
+              },
+              "metric_value": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "metric_key": {
+                "type": "string",
+                "maxLength": 40
+              }
+            },
+            "required": [
+              "counter",
+              "label",
+              "summary_heading"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.executive_summary",
+          "layout_name": "Feinschliff · Executive Summary",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "lede": 11,
+            "insights_label": 20,
+            "insights[0].heading": 21,
+            "insights[0].body": 22,
+            "insights[1].heading": 23,
+            "insights[1].body": 24,
+            "insights[2].heading": 25,
+            "insights[2].body": 26,
+            "insights[3].heading": 27,
+            "insights[3].body": 28,
+            "next_steps_label": 30,
+            "next_steps[0].heading": 31,
+            "next_steps[0].body": 32,
+            "next_steps[1].heading": 33,
+            "next_steps[1].body": 34,
+            "next_steps[2].heading": 35,
+            "next_steps[2].body": 36,
+            "next_steps[3].heading": 37,
+            "next_steps[3].body": 38,
+            "kpis[0].value": 50,
+            "kpis[0].unit": 51,
+            "kpis[0].key": 52,
+            "kpis[1].value": 53,
+            "kpis[1].unit": 54,
+            "kpis[1].key": 55,
+            "kpis[2].value": 56,
+            "kpis[2].unit": 57,
+            "kpis[2].key": 58,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "line-chart",
+      "html_label": "MCK · Line Chart",
+      "name": "Feinschliff · Line Chart",
+      "role": "data-comparison",
+      "concepts": [
+        "line-chart",
+        "trend",
+        "time-series",
+        "two-metric"
+      ],
+      "when_to_use": "Two-to-three metric trend over 3–8 time buckets (years or quarters). Good for showing divergence or trajectory.",
+      "when_not_to_use": "Avoid for single-point comparisons — use KPIs. Avoid for &gt;3 series — becomes tangled; use mck-stacked-bar or mck-table.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "x_labels": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "maxLength": 8
+          }
+        },
+        "series": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "accent": {
+                "type": "boolean",
+                "optional": true
+              }
+            },
+            "required": [
+              "name",
+              "values"
+            ]
+          }
+        },
+        "annotation": {
+          "type": "string",
+          "maxLength": 200,
+          "optional": true
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 160,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.line_chart",
+          "layout_name": "Feinschliff · Line Chart",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "x_labels[0]": 20,
+            "x_labels[1]": 21,
+            "x_labels[2]": 22,
+            "x_labels[3]": 23,
+            "x_labels[4]": 24,
+            "series[0].name": 30,
+            "series[1].name": 31,
+            "series[2].name": 32,
+            "source": 40
+          }
+        }
+      }
+    },
+    {
+      "id": "scorecard",
+      "html_label": "MCK · Scorecard",
+      "name": "Feinschliff · Scorecard",
+      "role": "data-comparison",
+      "concepts": [
+        "scorecard",
+        "harvey-balls",
+        "options-matrix",
+        "criteria-rating"
+      ],
+      "when_to_use": "Compare 3–5 options against 4–6 criteria using Harvey balls. Use when the recommendation needs defensible, visible trade-offs.",
+      "when_not_to_use": "Avoid for quantitative comparisons where the numbers themselves matter; use mck-table. Avoid for 2-option decisions; use content-columns.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "string",
+            "maxLength": 24
+          }
+        },
+        "options": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "subtitle": {
+                "type": "string",
+                "maxLength": 60,
+                "optional": true
+              },
+              "scores": {
+                "type": "array",
+                "description": "0–4 Harvey ball fill level",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 120,
+                "optional": true
+              },
+              "winner": {
+                "type": "boolean",
+                "optional": true
+              }
+            },
+            "required": [
+              "name",
+              "scores"
+            ]
+          }
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 160,
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.scorecard",
+          "layout_name": "Feinschliff · Scorecard",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "criteria[0]": 20,
+            "criteria[1]": 21,
+            "criteria[2]": 22,
+            "criteria[3]": 23,
+            "options[0].name": 30,
+            "options[1].name": 31,
+            "options[2].name": 32,
+            "options[3].name": 33,
+            "options[0].note": 43,
+            "options[1].note": 48,
+            "options[2].note": 53,
+            "options[3].note": 58,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "gantt",
+      "html_label": "MCK · Gantt",
+      "name": "Feinschliff · Gantt",
+      "role": "data-timeline",
+      "concepts": [
+        "gantt",
+        "swimlane",
+        "project-timeline",
+        "dependencies",
+        "milestones"
+      ],
+      "when_to_use": "Show 3–6 parallel workstreams over 3–6 time buckets with dependencies and milestones. Good for programme reviews.",
+      "when_not_to_use": "Avoid for conceptual (non-dated) plans — use mck-process-flow. Avoid for a single-workstream timeline — use data-timeline cards.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "period_labels": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "maxLength": 12
+          },
+          "description": "e.g. Q1 FY25..Q4 FY25"
+        },
+        "lanes": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "owner": {
+                "type": "string",
+                "maxLength": 40,
+                "optional": true
+              },
+              "bars": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "start_pct": {
+                      "type": "number"
+                    },
+                    "end_pct": {
+                      "type": "number"
+                    },
+                    "style": {
+                      "type": "string",
+                      "description": "default | accent | ghost"
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 40,
+                      "optional": true
+                    }
+                  },
+                  "required": [
+                    "start_pct",
+                    "end_pct"
+                  ]
+                }
+              },
+              "milestones": {
+                "type": "array",
+                "optional": true,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "pct": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "pct"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "name",
+              "bars"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.gantt",
+          "layout_name": "Feinschliff · Gantt",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "period_labels[0]": 20,
+            "period_labels[1]": 21,
+            "period_labels[2]": 22,
+            "period_labels[3]": 23,
+            "lanes[0].name": 30,
+            "lanes[1].name": 31,
+            "lanes[2].name": 32,
+            "lanes[3].name": 33,
+            "lanes[0].bars[0].label": 40,
+            "lanes[0].bars[1].label": 41,
+            "lanes[0].bars[2].label": 42,
+            "lanes[1].bars[0].label": 43,
+            "lanes[1].bars[1].label": 44,
+            "lanes[1].bars[2].label": 45,
+            "lanes[2].bars[0].label": 46,
+            "lanes[2].bars[1].label": 47,
+            "lanes[2].bars[2].label": 48,
+            "lanes[3].bars[0].label": 49,
+            "lanes[3].bars[1].label": 50,
+            "lanes[3].bars[2].label": 51,
+            "source": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "funnel",
+      "html_label": "MCK · Funnel",
+      "name": "Feinschliff · Funnel",
+      "role": "data-comparison",
+      "concepts": [
+        "funnel",
+        "conversion",
+        "drop-off",
+        "acquisition"
+      ],
+      "when_to_use": "Multi-stage conversion view (acquisition, activation, retention) with volume and rate at each step.",
+      "when_not_to_use": "Avoid for time-series — use mck-line-chart. Avoid if stages aren&#39;t a strict sequence — use mck-stacked-bar.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "detail": {
+                "type": "string",
+                "maxLength": 60,
+                "optional": true
+              },
+              "volume": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "rate": {
+                "type": "string",
+                "maxLength": 12,
+                "optional": true
+              },
+              "accent": {
+                "type": "boolean",
+                "optional": true
+              }
+            },
+            "required": [
+              "name",
+              "volume"
+            ]
+          }
+        },
+        "dropoffs": {
+          "type": "array",
+          "optional": true,
+          "minItems": 0,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "properties": {
+              "pct": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 160
+              }
+            },
+            "required": [
+              "pct",
+              "label"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.funnel",
+          "layout_name": "Feinschliff · Funnel",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "stages[0].name": 20,
+            "stages[0].detail": 21,
+            "stages[0].volume": 22,
+            "stages[0].rate": 23,
+            "stages[1].name": 24,
+            "stages[1].detail": 25,
+            "stages[1].volume": 26,
+            "stages[1].rate": 27,
+            "stages[2].name": 28,
+            "stages[2].detail": 29,
+            "stages[2].volume": 30,
+            "stages[2].rate": 31,
+            "stages[3].name": 32,
+            "stages[3].detail": 33,
+            "stages[3].volume": 34,
+            "stages[3].rate": 35,
+            "dropoffs[0].pct": 50,
+            "dropoffs[0].label": 51,
+            "dropoffs[0].body": 52,
+            "dropoffs[1].pct": 54,
+            "dropoffs[1].label": 55,
+            "dropoffs[1].body": 56,
+            "dropoffs[2].pct": 58,
+            "dropoffs[2].label": 59,
+            "dropoffs[2].body": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "venn",
+      "html_label": "MCK · Venn",
+      "name": "Feinschliff · Venn",
+      "role": "content-columns",
+      "concepts": [
+        "venn",
+        "overlap",
+        "intersection",
+        "strategy-map"
+      ],
+      "when_to_use": "Show the strategic sweet spot where 2–3 capabilities overlap. Good for positioning and differentiation slides.",
+      "when_not_to_use": "Avoid for quantitative overlap — a Venn is illustrative, not proportional. Avoid for &gt;3 sets — becomes illegible; use mck-pyramid.",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 40,
+          "optional": true
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "circles": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 30
+              },
+              "subtitle": {
+                "type": "string",
+                "maxLength": 40,
+                "optional": true
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "intersections": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Which circles it sits in."
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 60
+              }
+            },
+            "required": [
+              "members",
+              "label"
+            ]
+          }
+        },
+        "side_items": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "optional": true,
+          "items": {
+            "type": "object",
+            "properties": {
+              "counter": {
+                "type": "string"
+              },
+              "heading": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 180
+              }
+            },
+            "required": [
+              "counter",
+              "heading",
+              "body"
+            ]
+          }
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.venn",
+          "layout_name": "Feinschliff · Venn",
+          "placeholder_map": {
+            "action_title": 0,
+            "kicker": 10,
+            "circles[0].name": 20,
+            "circles[0].subtitle": 21,
+            "circles[1].name": 24,
+            "circles[1].subtitle": 25,
+            "circles[2].name": 28,
+            "circles[2].subtitle": 29,
+            "intersections[0].label": 30,
+            "intersections[1].label": 31,
+            "intersections[2].label": 32,
+            "intersections[3].label": 33,
+            "side_items[0].counter": 40,
+            "side_items[0].heading": 41,
+            "side_items[0].body": 42,
+            "side_items[1].counter": 44,
+            "side_items[1].heading": 45,
+            "side_items[1].body": 46,
+            "side_items[2].counter": 48,
+            "side_items[2].heading": 49,
+            "side_items[2].body": 50,
+            "side_items[3].counter": 52,
+            "side_items[3].heading": 53,
+            "side_items[3].body": 54
+          }
+        }
+      }
+    },
+    {
+      "id": "diagram",
+      "name": "Feinschliff · Diagram",
+      "role": "content-with-diagram",
+      "concepts": [
+        "diagram",
+        "flowchart",
+        "architecture-overview",
+        "architectural-overview",
+        "system-architecture",
+        "system-overview",
+        "layered-system",
+        "layer-diagram",
+        "concept-map",
+        "mind-map",
+        "block-diagram",
+        "freeform-diagram"
+      ],
+      "when_to_use": "User mentions diagram, flowchart, architecture, architectural overview, system overview, layers, concept map, mind map, block diagram, or any one-big-rich-visual-per-slide intent. Also: multi-element flows with callouts that don't fit a parameterized template. The diagram is authored as Excalidraw DSL and rendered+Feinschliff-themed at build time.",
+      "when_not_to_use": "Content that fits a parameterized template — prefer process-flow for pipelines, pyramid for hierarchy, venn for overlap, 2x2-matrix for quadrants, funnel for conversion, bar-chart for ranked numeric data, kpi-grid for metrics. Also not for photographic imagery (use text-picture or title-picture).",
+      "slots": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true,
+          "description": "Mono uppercase label above the title"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Slide title, one line"
+        },
+        "dsl": {
+          "type": "string",
+          "description": "Excalidraw DSL source (see excalidraw/references/dsl-syntax.md). First line `theme bsh` is auto-prepended if missing (the literal `bsh` is the excalidraw plugin's theme key, not a brand reference). Expanded → Feinschliff-themed → rendered to PNG → embedded. The .dsl, .excalidraw, -bsh.excalidraw, and -bsh.png are all preserved under out/<deck>/diagrams/ for post-build editing."
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 160,
+          "optional": true,
+          "description": "One-line caption under the diagram (source, figure number, etc.)"
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.diagram",
+          "layout_name": "Feinschliff · Diagram",
+          "placeholder_map": {
+            "eyebrow": 10,
+            "title": 0,
+            "caption": 11
+          }
+        }
+      }
+    },
+    {
+      "id": "tech-radar-full-bleed",
+      "name": "Feinschliff · Tech Radar · Full Bleed",
+      "role": "data-visualization",
+      "concepts": [
+        "tech-radar",
+        "tech-scouting",
+        "manager-review",
+        "innovation-portfolio",
+        "thought-leadership"
+      ],
+      "when_to_use": "User wants a tech-radar slide — pick a view from `<vault>/Tech-Radar/Views.yaml` (today: `genai-thoughtworks` for the all-blips ThoughtWorks-shaped overview, or `genai-agents`, `genai-models`, `genai-skills`, `genai-tooling` for per-quadrant sub-radars). The /deck pipeline calls `slides.add_radar(prs, slug, view, vault, out_dir, volume?, new_since?)` which runs the full radar-engine pipeline (load blips → magnetic positioning → snapshot edition → SVG → PNG) and embeds the PNG full-bleed. The radar SVG carries its own logo/eyebrow/title/footer, so this layout paints NO chrome of its own.",
+      "when_not_to_use": "A radar that should sit alongside other content on the same slide (use a regular layout and embed a smaller version of the PNG instead). Also not for non-radar full-bleed images — use 'full-bleed-cover' for those.",
+      "slots": {
+        "view": {
+          "type": "string",
+          "description": "View name from <vault>/Tech-Radar/Views.yaml (e.g. 'genai-thoughtworks', 'genai-agents', 'genai-models', 'genai-skills', 'genai-tooling')."
+        },
+        "volume": {
+          "type": "integer",
+          "description": "Optional edition volume number. Defaults to latest existing edition + 1, or 1 for first run.",
+          "optional": true
+        },
+        "new_since": {
+          "type": "string",
+          "description": "Optional ISO date threshold for the NEW badge. Defaults to today − 14 days.",
+          "optional": true
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.tech_radar_full_bleed",
+          "layout_name": "Feinschliff · Tech Radar · Full Bleed",
+          "build_call": "slides.add_radar",
+          "placeholder_map": {}
+        }
+      }
+    },
+    {
+      "id": "v-model",
+      "html_label": "V-Model",
+      "name": "Feinschliff · V-Model",
+      "role": "content-diagram",
+      "concepts": [
+        "v-model",
+        "sdlc",
+        "verification-validation",
+        "testing-map",
+        "software-process",
+        "paired-phases"
+      ],
+      "when_to_use": "Show the software-engineering V-model: paired verification phases (left, top-down) and validation phases (right, bottom-up) converging at implementation. Great when the narrative is 'every design step has a matching test'.",
+      "when_not_to_use": "Avoid for agile or iterative timelines — use process-flow or gantt. Avoid if the audience has no engineering context. Avoid for 2-phase or 6+-phase processes (the tapered grid is tuned to 4 pairs).",
+      "slots": {
+        "kicker": {
+          "type": "string",
+          "maxLength": 60,
+          "optional": true,
+          "description": "Mono orange uppercase label above the title"
+        },
+        "action_title": {
+          "type": "string",
+          "maxLength": 180,
+          "description": "Full-sentence takeaway, 1–2 lines at 52px medium"
+        },
+        "pairs": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Four phase/test pairs, top to bottom (broadest to narrowest).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "left_counter":  { "type": "string", "maxLength": 16 },
+              "left_title":    { "type": "string", "maxLength": 40 },
+              "right_counter": { "type": "string", "maxLength": 16 },
+              "right_title":   { "type": "string", "maxLength": 40 },
+              "connector":     { "type": "string", "maxLength": 40, "optional": true }
+            },
+            "required": ["left_title", "right_title"]
+          }
+        },
+        "pivot_counter": {
+          "type": "string",
+          "maxLength": 16,
+          "optional": true,
+          "description": "Small label above the pivot title, e.g. 'Pivot'"
+        },
+        "pivot_title": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Centre label for the pivot block, e.g. 'Coding & implementation'"
+        }
+      },
+      "renderer": {
+        "pptx": {
+          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.v_model",
+          "layout_name": "Feinschliff · V-Model",
+          "placeholder_map": {
+            "kicker": 11,
+            "action_title": 0,
+            "pairs[0].left_counter": 20,
+            "pairs[0].left_title": 21,
+            "pairs[0].right_counter": 22,
+            "pairs[0].right_title": 23,
+            "pairs[0].connector": 24,
+            "pairs[1].left_counter": 25,
+            "pairs[1].left_title": 26,
+            "pairs[1].right_counter": 27,
+            "pairs[1].right_title": 28,
+            "pairs[1].connector": 29,
+            "pairs[2].left_counter": 30,
+            "pairs[2].left_title": 31,
+            "pairs[2].right_counter": 32,
+            "pairs[2].right_title": 33,
+            "pairs[2].connector": 34,
+            "pairs[3].left_counter": 35,
+            "pairs[3].left_title": 36,
+            "pairs[3].right_counter": 37,
+            "pairs[3].right_title": 38,
+            "pairs[3].connector": 39,
+            "pivot_counter": 40,
+            "pivot_title": 41
+          }
+        }
+      }
+    }
+  ]
+}

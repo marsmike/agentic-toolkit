@@ -8,8 +8,12 @@ Each subdirectory pairs an **input** (a brief, a DESIGN.md, a screenshot) with t
 
 | Example | What's inside | Plugin command |
 |---|---|---|
-| [`feinschliff/template-preview/`](feinschliff/template-preview/) | Pre-built `.pptx` for the eponymous Feinschliff brand (gold + navy, Bauhaus) | `build.py` |
-| [`feinschliff/template-preview-claude/`](feinschliff/template-preview-claude/) | Pre-built `.pptx` for the Claude brand (coral + cream, editorial serif) | `build.py` |
+| [`feinschliff/template-preview/`](feinschliff/template-preview/) | Pre-built `.pdf` for the eponymous Feinschliff brand (gold + navy, Bauhaus) | `build.py` |
+| [`feinschliff/template-preview-claude/`](feinschliff/template-preview-claude/) | Pre-built `.pdf` for the Claude brand (coral + cream, editorial serif) | `build.py` |
+| [`feinschliff/template-preview-spotify/`](feinschliff/template-preview-spotify/) | Pre-built `.pdf` for the Spotify brand (green accent + true-black canvas, geometric sans) | `build.py` |
+| [`feinschliff/template-preview-binance/`](feinschliff/template-preview-binance/) | Pre-built `.pdf` for the Binance brand (yellow accent + crypto-black, IBM Plex tabular) | `build.py` |
+| [`feinschliff/template-preview-bmw/`](feinschliff/template-preview-bmw/) | Pre-built `.pdf` for the BMW brand (corporate blue + white canvas, M-stripe accents) | `build.py` |
+| [`feinschliff/template-preview-ferrari/`](feinschliff/template-preview-ferrari/) | Pre-built `.pdf` for the Ferrari brand (Rosso Corsa + Modena yellow, cinematic black) | `build.py` |
 | [`feinschliff/brief-to-deck/`](feinschliff/brief-to-deck/) | One-paragraph brief → 8-slide branded deck | `/deck "..."` |
 | [`feinschliff/design-md-to-tokens/`](feinschliff/design-md-to-tokens/) | A DESIGN.md + the brand pack it expanded into (v0.2 preview) | `/compile` |
 
