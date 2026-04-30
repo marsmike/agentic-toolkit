@@ -117,7 +117,7 @@ def _add_vertical_row(layout, *, idx_base: int, y_px: int, row_h: int, sample):
         ph_type="body",
         x_px=ROW_X, y_px=text_y + 6, w_px=COUNTER_W, h_px=30,
         prompt_text=counter,
-        size_px=T.SIZE_PX["agenda_num"], font=T.FONT_MONO,
+        size_px=T.SIZE_PX["agenda_num"], weight="bold", font=T.FONT_DISPLAY,
         color=T.ACCENT, tracking_em=0.08,
     )
 
@@ -187,6 +187,6 @@ def build(layout):
         layout, idx=12, name="Supporting Note", ph_type="body",
         x_px=ROW_X, y_px=1010, w_px=ROW_W, h_px=30,
         prompt_text="Work that does not support one of these moves is explicitly descoped, not paused.",
-        size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
-        uppercase=True, tracking_em=0.12,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.GRAPHITE,
+        uppercase=True, tracking_em=0.1,
     )

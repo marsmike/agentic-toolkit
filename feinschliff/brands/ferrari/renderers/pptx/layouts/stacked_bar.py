@@ -123,7 +123,7 @@ def build(layout):
             layout, idx=20 + i, name=f"Bar {i+1} Label", ph_type="body",
             x_px=bar_x, y_px=_LABEL_Y, w_px=bar_w, h_px=30,
             prompt_text=label,
-            size_px=T.SIZE_PX["bar_num"], font=T.FONT_MONO,
+            size_px=T.SIZE_PX["bar_num"], weight="bold", font=T.FONT_DISPLAY,
             color=T.GRAPHITE, uppercase=True, tracking_em=0.1, align="c",
         )
 
@@ -133,7 +133,7 @@ def build(layout):
         layout, idx=39, name="Legend Title", ph_type="body",
         x_px=_LEGEND_X, y_px=_LEGEND_Y - 30, w_px=_LEGEND_W, h_px=24,
         prompt_text="Segment",
-        size_px=14, font=T.FONT_MONO,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=T.BLACK, uppercase=True, tracking_em=0.14,
     )
 
@@ -155,7 +155,7 @@ def build(layout):
             layout, idx=41 + i * 2, name=f"Legend {i+1} Change", ph_type="body",
             x_px=_LEGEND_X + 32, y_px=ly + 28, w_px=_LEGEND_W - 32, h_px=24,
             prompt_text=change,
-            size_px=14, font=T.FONT_MONO,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY,
             color=T.GRAPHITE, tracking_em=0.05,
         )
 
@@ -164,6 +164,6 @@ def build(layout):
         layout, idx=60, name="Source", ph_type="body",
         x_px=_CHART_X, y_px=_SOURCE_Y, w_px=_CHART_W, h_px=24,
         prompt_text="Source · Sample data · EUR bn",
-        size_px=14, font=T.FONT_MONO,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )

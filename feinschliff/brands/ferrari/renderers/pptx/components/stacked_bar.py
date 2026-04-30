@@ -106,7 +106,7 @@ def add_stacked_bar(
                 # White text on dark Feinschliff segments; black on the orange and
                 # any future light fills so the label always passes contrast.
                 light_segment = color in (T.HIGHLIGHT,)
-                label_color = T.BLACK if light_segment else T.WHITE
+                label_color = T.BLACK if light_segment else T.INK
                 add_text(
                     target,
                     bar_x + 4,
@@ -115,7 +115,7 @@ def add_stacked_bar(
                     22,
                     str(value),
                     size_px=T.SIZE_PX["bar_num"],
-                    font=T.FONT_MONO,
+                    weight="bold", font=T.FONT_DISPLAY,
                     color=label_color,
                     align=PP_ALIGN.CENTER,
                 )

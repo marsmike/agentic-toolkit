@@ -196,8 +196,8 @@ def emit_stub_layout(
             layout, idx=trailing_idx, name=key.title(), ph_type="body",
             x_px=CONTENT_X, y_px=ty, w_px=CONTENT_W, h_px=30,
             prompt_text=f"[{key}]",
-            size_px=14, font=T.FONT_MONO,
-            color=T.GRAPHITE, uppercase=True, tracking_em=0.12,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY,
+            color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
         )
         pmap[key] = trailing_idx
         trailing_idx += 1
@@ -297,13 +297,13 @@ def _emit_field(
     *, idx: int, x: int, y: int, w: int, h: int, style: str,
 ) -> None:
     kwargs = {
-        "tag":     dict(size_px=14, font=T.FONT_MONO, color=T.ACCENT,
-                        uppercase=True, tracking_em=0.12),
+        "tag":     dict(size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.ACCENT,
+                        uppercase=True, tracking_em=0.1),
         "title":   dict(size_px=T.SIZE_PX.get("col_title", 36), weight="medium",
                         color=T.BLACK, tracking_em=-0.012, line_height=1.15),
         "body":    dict(size_px=T.SIZE_PX.get("col_body", 20),
                         color=T.GRAPHITE, line_height=1.5),
-        "meta":    dict(size_px=14, font=T.FONT_MONO, color=T.GRAPHITE),
+        "meta":    dict(size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.GRAPHITE),
         "compact": dict(size_px=T.SIZE_PX.get("col_body", 20),
                         color=T.GRAPHITE, line_height=1.3),
     }[style]

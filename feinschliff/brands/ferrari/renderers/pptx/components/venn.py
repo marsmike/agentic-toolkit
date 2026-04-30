@@ -185,8 +185,8 @@ def add_venn(
                 target, lx, cy - _OUTER_LABEL_H_PX / 2,
                 _OUTER_LABEL_W_PX, _OUTER_LABEL_H_PX,
                 name,
-                size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-                color=T.BLACK, uppercase=True, tracking_em=0.12,
+                size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
+                color=T.BLACK, uppercase=True, tracking_em=0.1,
                 align=_center_align(),
             )
             subtitle = spec.get("subtitle")
@@ -195,7 +195,7 @@ def add_venn(
                     target, lx, cy + _OUTER_LABEL_H_PX / 2 + 2,
                     _OUTER_LABEL_W_PX, _OUTER_LABEL_H_PX,
                     subtitle,
-                    size_px=14, font=T.FONT_MONO,
+                    size_px=14, weight="bold", font=T.FONT_DISPLAY,
                     color=T.GRAPHITE, uppercase=False, tracking_em=0.08,
                     align=_center_align(),
                 )

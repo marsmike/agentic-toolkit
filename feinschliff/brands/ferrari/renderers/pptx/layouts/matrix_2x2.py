@@ -155,8 +155,8 @@ def build(layout):
         add_text(
             layout, cx + CELL_PAD, cy + CELL_PAD,
             HALF_W - 2 * CELL_PAD, 22, demo["tag"],
-            size_px=14, font=T.FONT_MONO,
-            color=tag_color, uppercase=True, tracking_em=0.12,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY,
+            color=tag_color, uppercase=True, tracking_em=0.1,
         )
         # Editable cell label (heading).
         label_color = T.BLACK if is_focus else T.BLACK
@@ -186,7 +186,7 @@ def build(layout):
         x_px=GRID_X, y_px=GRID_Y + GRID_H + 56,
         w_px=GRID_W, h_px=24,
         prompt_text="Effort to ship",
-        size_px=16, font=T.FONT_MONO,
+        size_px=16, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.14,
         align="c",
     )
@@ -197,7 +197,7 @@ def build(layout):
         layout, idx=42, name="Y Axis Title", ph_type="body",
         x_px=120, y_px=GRID_Y, w_px=80, h_px=GRID_H,
         prompt_text="I\nm\np\na\nc\nt",
-        size_px=16, font=T.FONT_MONO,
+        size_px=16, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.14,
         align="c", anchor="m", line_height=1.2,
     )

@@ -103,7 +103,7 @@ SAMPLE_TIERS = [
 def _label_color_on_tier(i: int, n: int):
     if n == 4 and i == 0:
         return T.INK
-    return T.WHITE
+    return T.INK
 
 
 def build(layout):
@@ -179,8 +179,8 @@ def build(layout):
             layout, idx=idx_base + 2, name=f"Tier {i+1} Counter", ph_type="body",
             x_px=SIDE_X, y_px=card_y + 16, w_px=SIDE_W, h_px=22,
             prompt_text=sample["counter"],
-            size_px=14, font=T.FONT_MONO, color=T.ACCENT,
-            uppercase=True, tracking_em=0.12,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.ACCENT,
+            uppercase=True, tracking_em=0.1,
         )
 
         # BODY — graphite explainer.

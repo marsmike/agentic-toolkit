@@ -121,7 +121,7 @@ def add_line_chart(
             x_px, gy - 11,            # vertical-center the 22-px label band
             AXIS_LEFT_PX - 8, 22,
             _format_tick(tick_value),
-            size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.GRAPHITE,
             align=PP_ALIGN.RIGHT, tracking_em=0.08, uppercase=True,
         )
 
@@ -137,7 +137,7 @@ def add_line_chart(
             tw = 120
             add_text(
                 target, cx - tw / 2, chart_y1 + 14, tw, 22, label,
-                size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
+                size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.GRAPHITE,
                 align=PP_ALIGN.CENTER, tracking_em=0.08, uppercase=True,
             )
 

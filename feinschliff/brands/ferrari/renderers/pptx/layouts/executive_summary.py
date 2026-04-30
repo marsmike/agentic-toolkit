@@ -182,7 +182,7 @@ def _add_column(
         layout, idx=label_idx, name=f"Col{col_idx} Label", ph_type="body",
         x_px=x, y_px=COLS_Y, w_px=COL_W, h_px=COLS_LABEL_H,
         prompt_text=label_text,
-        size_px=14, font=T.FONT_MONO, color=T.ACCENT,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.ACCENT,
         uppercase=True, tracking_em=0.16,
     )
     # Thin hairline under the label.
@@ -269,7 +269,7 @@ def _add_kpi_ribbon(layout) -> None:
             w_px=value_w,
             h_px=KPI_H - 20,
             prompt_text=value_sample,
-            size_px=56, weight="light", font=T.FONT_DISPLAY,
+            size_px=56, weight="medium", font=T.FONT_DISPLAY,
             color=T.BLACK, tracking_em=-0.02, align="r", anchor="b",
         )
         # Unit — small, bottom-anchored flush with value baseline.
@@ -299,8 +299,8 @@ def _add_kpi_ribbon(layout) -> None:
             w_px=max(120, key_w),
             h_px=26,
             prompt_text=key_sample,
-            size_px=T.SIZE_PX["kpi_key"], font=T.FONT_MONO,
-            color=T.GRAPHITE, uppercase=True, tracking_em=0.12, anchor="b",
+            size_px=T.SIZE_PX["kpi_key"], weight="bold", font=T.FONT_DISPLAY,
+            color=T.GRAPHITE, uppercase=True, tracking_em=0.1, anchor="b",
         )
 
 
@@ -349,6 +349,6 @@ def build(layout):
         layout, idx=60, name="Source", ph_type="body",
         x_px=CONTENT_X, y_px=SOURCE_Y, w_px=CONTENT_W, h_px=24,
         prompt_text=SAMPLE_SOURCE,
-        size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
-        uppercase=True, tracking_em=0.12,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.GRAPHITE,
+        uppercase=True, tracking_em=0.1,
     )

@@ -31,8 +31,8 @@ def build(layout):
     )
     add_text(
         layout, 120, 270, 400, 30, "DIAGRAM · FILL VIA /DECK",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.GRAPHITE, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
+        color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )
 
     paint_chrome(layout, variant="light", pgmeta="Layout · diagram")
@@ -43,14 +43,14 @@ def build(layout):
         layout, idx=10, name="Eyebrow", ph_type="body",
         x_px=100, y_px=160, w_px=1720, h_px=30,
         prompt_text="Layout · diagram",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.BLACK, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
+        color=T.BLACK, uppercase=True, tracking_em=0.1,
     )
     add_text_placeholder(
         layout, idx=0, name="Title", ph_type="title",
         x_px=100, y_px=195, w_px=1720, h_px=50,
         prompt_text="Architectural overview goes here.",
-        size_px=T.SIZE_PX["slide_title"], weight="light",
+        size_px=T.SIZE_PX["slide_title"], weight="medium",
         color=T.BLACK, tracking_em=-0.02, line_height=1.1,
     )
 

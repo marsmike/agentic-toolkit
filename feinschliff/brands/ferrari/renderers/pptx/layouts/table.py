@@ -171,8 +171,8 @@ def build(layout):
             x_px=hdr["text_x"], y_px=hdr["text_y"],
             w_px=hdr["text_w"], h_px=hdr["text_h"],
             prompt_text=prompt,
-            size_px=T.SIZE_PX.get("eyebrow", 18), font=T.FONT_MONO,
-            color=T.ACCENT, uppercase=True, tracking_em=0.12,
+            size_px=T.SIZE_PX.get("eyebrow", 18), weight="bold", font=T.FONT_DISPLAY,
+            color=T.ACCENT, uppercase=True, tracking_em=0.1,
         )
 
     # ── Row labels (idx 30..34) — emphasised left column ───────────────
@@ -214,6 +214,6 @@ def build(layout):
         x_px=GRID_X, y_px=GRID_Y + GRID_H + 40,
         w_px=GRID_W, h_px=24,
         prompt_text=SOURCE_PROMPT,
-        size_px=14, font=T.FONT_MONO,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )

@@ -136,7 +136,7 @@ def build(layout):
             x_px=bbox["x"] - 8, y_px=bbox["value_y"],
             w_px=bbox["w"] + 16, h_px=28,
             prompt_text=f"{sign_prefix}{bar['value']:g}",
-            size_px=value_size, font=T.FONT_MONO,
+            size_px=value_size, weight="bold", font=T.FONT_DISPLAY,
             color=T.BLACK, align="c",
         )
 
@@ -147,7 +147,7 @@ def build(layout):
             x_px=bbox["x"] - 12, y_px=bbox["label_y"] + 14,
             w_px=bbox["w"] + 24, h_px=44,
             prompt_text=bar["label"],
-            size_px=16, font=T.FONT_MONO,
+            size_px=16, weight="bold", font=T.FONT_DISPLAY,
             color=T.GRAPHITE, uppercase=True, tracking_em=0.08,
             align="c",
         )
@@ -159,6 +159,6 @@ def build(layout):
         layout, idx=60, name="Source", ph_type="body",
         x_px=100, y_px=1000, w_px=1720, h_px=24,
         prompt_text="Source · Sample data, FY25 preliminary · EUR bn · variances rounded to 0.1",
-        size_px=14, font=T.FONT_MONO,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )

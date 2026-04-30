@@ -143,8 +143,8 @@ def build(layout):
         layout, idx=10, name="Kicker", ph_type="body",
         x_px=_CONTENT_X, y_px=_KICKER_Y, w_px=_CONTENT_W, h_px=_KICKER_H,
         prompt_text=EYEBROW_PROMPT,
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.ACCENT, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
+        color=T.ACCENT, uppercase=True, tracking_em=0.1,
     )
 
     # ── Action title (hero headline, idx=0) ─────────────────────────────
@@ -183,7 +183,7 @@ def build(layout):
             layout, idx=idx_base, name=f"KPI {i+1} Value", ph_type="body",
             x_px=cx, y_px=_BOTTOM_Y, w_px=_KPI_CELL_W - _KPI_UNIT_W,
             h_px=_KPI_VALUE_H, prompt_text=value,
-            size_px=T.SIZE_PX["kpi_value"], weight="light",
+            size_px=T.SIZE_PX["kpi_value"], weight="medium",
             font=T.FONT_DISPLAY, color=T.BLACK,
             tracking_em=-0.03, align="r", anchor="b",
         )
@@ -200,7 +200,7 @@ def build(layout):
             layout, idx=idx_base + 2, name=f"KPI {i+1} Key", ph_type="body",
             x_px=cx, y_px=_BOTTOM_Y + _KPI_VALUE_H + 16,
             w_px=_KPI_CELL_W, h_px=30, prompt_text=key,
-            size_px=T.SIZE_PX["kpi_key"], font=T.FONT_MONO,
+            size_px=T.SIZE_PX["kpi_key"], weight="bold", font=T.FONT_DISPLAY,
             color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
         )
         # Delta — orange mono, trailing meta under the key.
@@ -208,7 +208,7 @@ def build(layout):
             layout, idx=idx_base + 3, name=f"KPI {i+1} Delta", ph_type="body",
             x_px=cx, y_px=_BOTTOM_Y + _KPI_VALUE_H + 48,
             w_px=_KPI_CELL_W, h_px=26, prompt_text=delta,
-            size_px=T.SIZE_PX["kpi_delta"], font=T.FONT_MONO,
+            size_px=T.SIZE_PX["kpi_delta"], weight="bold", font=T.FONT_DISPLAY,
             color=T.ACCENT_HOVER,
         )
 
@@ -220,6 +220,6 @@ def build(layout):
             "Source · Platform telemetry, Jun–Dec 2025 · "
             "N = 142k accounts"
         ),
-        size_px=14, font=T.FONT_MONO,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )

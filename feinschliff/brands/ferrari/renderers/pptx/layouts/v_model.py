@@ -66,8 +66,8 @@ def build(layout):
         layout, idx=11, name="Kicker", ph_type="body",
         x_px=_CONTENT_X, y_px=_KICKER_Y, w_px=_CONTENT_W, h_px=30,
         prompt_text="Verification · Validation",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.ACCENT, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
+        color=T.ACCENT, uppercase=True, tracking_em=0.1,
     )
 
     # ── Action title (hero sentence, idx=0) ──────────────────────────────
@@ -100,7 +100,7 @@ def build(layout):
             layout, idx=idx_base, name=f"Pair {i+1} L Counter", ph_type="body",
             x_px=pbox["text_x"], y_px=pbox["counter_y"],
             w_px=pbox["text_w"], h_px=20,
-            prompt_text=lc, size_px=12, font=T.FONT_MONO,
+            prompt_text=lc, size_px=12, weight="bold", font=T.FONT_DISPLAY,
             color=T.GRAPHITE, uppercase=True, tracking_em=0.14,
         )
         add_text_placeholder(
@@ -116,7 +116,7 @@ def build(layout):
             layout, idx=idx_base + 2, name=f"Pair {i+1} R Counter", ph_type="body",
             x_px=tbox["text_x"], y_px=tbox["counter_y"],
             w_px=tbox["text_w"], h_px=20,
-            prompt_text=rc, size_px=12, font=T.FONT_MONO,
+            prompt_text=rc, size_px=12, weight="bold", font=T.FONT_DISPLAY,
             color=T.ACCENT_HOVER, uppercase=True, tracking_em=0.14,
             align="r",
         )
@@ -134,7 +134,7 @@ def build(layout):
             layout, idx=idx_base + 4, name=f"Pair {i+1} Connector", ph_type="body",
             x_px=cbox["x"] + 8, y_px=cbox["y"] + 4,
             w_px=cbox["w"] - 16, h_px=cbox["h"] - 8,
-            prompt_text=ct, size_px=11, font=T.FONT_MONO,
+            prompt_text=ct, size_px=11, weight="bold", font=T.FONT_DISPLAY,
             color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
             align="c",
         )
@@ -146,7 +146,7 @@ def build(layout):
         layout, idx=40, name="Pivot Counter", ph_type="body",
         x_px=piv["text_x"], y_px=piv["counter_y"],
         w_px=piv["text_w"], h_px=20,
-        prompt_text=pvc, size_px=12, font=T.FONT_MONO,
+        prompt_text=pvc, size_px=12, weight="bold", font=T.FONT_DISPLAY,
         color=T.ACCENT, uppercase=True, tracking_em=0.14,
         align="c",
     )
@@ -155,5 +155,5 @@ def build(layout):
         x_px=piv["text_x"], y_px=piv["title_y"],
         w_px=piv["text_w"], h_px=40,
         prompt_text=pvt, size_px=22, weight="medium",
-        color=T.WHITE, tracking_em=-0.012, align="c",
+        color=T.INK, tracking_em=-0.012, align="c",
     )

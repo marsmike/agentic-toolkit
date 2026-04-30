@@ -88,15 +88,15 @@ def build(layout):
         layout, idx=10, name="Kicker", ph_type="body",
         x_px=100, y_px=224, w_px=1720, h_px=30,
         prompt_text=EYEBROW_PROMPT,
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.ACCENT, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
+        color=T.ACCENT, uppercase=True, tracking_em=0.1,
     )
     add_text_placeholder(
         layout, idx=0, name="Action Title", ph_type="title",
         x_px=100, y_px=272, w_px=1720, h_px=160,
         prompt_text="Three things to remember: platform first, measure the experience, write plainly.",
         size_px=T.SIZE_PX["slide_title"], weight="bold",
-        color=T.WHITE, tracking_em=-0.015, line_height=1.15,
+        color=T.INK, tracking_em=-0.015, line_height=1.15,
     )
 
     # ─── Takeaway columns: 4W + 3*gap = 1720 → col_w = 412 ───
@@ -120,8 +120,8 @@ def build(layout):
             layout, idx=idx_base, name=f"Card {i+1} Counter", ph_type="body",
             x_px=x, y_px=y0 + 20, w_px=col_w, h_px=30,
             prompt_text=num,
-            size_px=T.SIZE_PX["col_num"], font=T.FONT_MONO,
-            color=T.ACCENT, uppercase=True, tracking_em=0.12,
+            size_px=T.SIZE_PX["col_num"], weight="bold", font=T.FONT_DISPLAY,
+            color=T.ACCENT, uppercase=True, tracking_em=0.1,
         )
         # Heading — white medium, up to 2 lines.
         add_text_placeholder(
@@ -129,7 +129,7 @@ def build(layout):
             x_px=x, y_px=y0 + 64, w_px=col_w, h_px=100,
             prompt_text=head,
             size_px=T.SIZE_PX["col_title"], weight="medium",
-            color=T.WHITE, tracking_em=-0.012, line_height=1.15,
+            color=T.INK, tracking_em=-0.012, line_height=1.15,
         )
         # Body — silver, larger block.
         add_text_placeholder(
@@ -144,6 +144,6 @@ def build(layout):
             layout, idx=idx_base + 3, name=f"Card {i+1} Owner", ph_type="body",
             x_px=x, y_px=y0 + 480, w_px=col_w, h_px=24,
             prompt_text=owner,
-            size_px=14, font=T.FONT_MONO,
-            color=T.STEEL, uppercase=True, tracking_em=0.12,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY,
+            color=T.STEEL, uppercase=True, tracking_em=0.1,
         )

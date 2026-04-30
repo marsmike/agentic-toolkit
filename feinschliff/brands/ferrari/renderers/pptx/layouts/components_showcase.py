@@ -94,7 +94,7 @@ def _right_panel(layout, x: float, y: float, w: float, h: float):
         add_line(layout, inner_x, row_y, rule_w, rule_h, rule_color)
         add_text(
             layout, inner_x, row_y + 14, w - 2 * pad, 24, caption,
-            size_px=14, font=T.FONT_MONO,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY,
             color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
         )
         row_y += 100
@@ -104,6 +104,6 @@ def _panel_label(layout, x: float, y: float, text: str):
     """Small mono uppercase label used above each component row."""
     add_text(
         layout, x, y, 400, 24, text,
-        size_px=14, font=T.FONT_MONO,
-        color=T.BLACK, uppercase=True, tracking_em=0.12,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY,
+        color=T.BLACK, uppercase=True, tracking_em=0.1,
     )

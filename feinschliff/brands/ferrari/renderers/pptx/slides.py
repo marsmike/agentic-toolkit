@@ -313,8 +313,8 @@ def _strip_unfilled_placeholders(slide, filled_idxs: set[int]) -> None:
 def build_demo_deck(prs: Presentation):
     # Title · Accent
     add(prs, "Feinschliff · Title · Accent",
-        _10="Layout · title accent",
-        _0="Feinschliff\nshowcase deck.")
+        _10="THE NEXT GENERATION · 2026",
+        _0="Made in\nMaranello.")
 
     # Title · Ink
     add(prs, "Feinschliff · Title · Ink",
@@ -348,14 +348,18 @@ def build_demo_deck(prs: Presentation):
         _10="Layout · chapter ink",
         _0="02\nChapter\n& Picture.")
 
-    # KPI Grid
+    # KPI Grid — Ferrari spec-cell + race-position pattern
     add(prs, "Feinschliff · KPI Grid",
-        _10="Layout · KPI grid",
-        _0="Headline numbers.",
-        _20="Metric 1", _21="Caption 1",
-        _22="Metric 2", _23="Caption 2",
-        _24="Metric 3", _25="Caption 3",
-        _26="Metric 4", _27="Caption 4")
+        _10="At a glance",
+        _0="Performance figures.",
+        _20="Top speed",        _21="458 Italia",
+        _22="0–100 km/h",       _23="Best in class",
+        _24="V8 peak output",   _25="+9% YoY",
+        _26="Constructors '23", _27="F1 ANNIVERSARY",
+        _30="296", _31=" km/h",
+        _32="2.9", _33=" s",
+        _34="670", _35=" hp",
+        _36="1",   _37="st")
 
     # 2-Column Cards
     add(prs, "Feinschliff · 2-Column Cards",
@@ -430,7 +434,7 @@ def build_demo_deck(prs: Presentation):
     # End
     add(prs, "Feinschliff · End",
         _0="Thank you.",
-        _10="Feinschliff · v0.1 · 2026")
+        _10="FERRARI · 2026 SHOWCASE")
 
     # Funnel
     add(prs, "Feinschliff · Funnel",

@@ -38,7 +38,7 @@ def add_image_placeholder(
 
     return add_text(
         target, x_px, y_px, w_px, h_px, label.upper(),
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
+        size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
         color=label_color, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE,
         tracking_em=0.1,
     )

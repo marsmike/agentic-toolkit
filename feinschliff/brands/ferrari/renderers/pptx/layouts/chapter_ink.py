@@ -1,9 +1,17 @@
-"""Feinschliff · Chapter · Ink + Picture — dark chapter opener with right-half image (HTML 06)."""
+"""Ferrari · Chapter · Ink + Picture — cinematic dark chapter opener with right-half image.
+
+Mirror of chapter_orange but with a 50/50 cinematic photo split: left half
+carries the chapter title in display 500 -0.02em on near-black canvas;
+right half is a full-bleed photographic plate (per DESIGN.md `hero-band-cinema`
++ `feature-card-photo`). Hairline brightness-step + Rosso Corsa eyebrow
+carry the editorial register.
+"""
 from __future__ import annotations
 
 import theme as T
 from components import (
-    add_rule, add_text_placeholder, add_image_placeholder,
+    add_text_placeholder, add_image_placeholder,
+    add_hairline,
     paint_chrome, set_layout_background, set_layout_name,
 )
 
@@ -12,28 +20,35 @@ NAME = "Feinschliff · Chapter · Ink + Picture"
 
 def build(layout):
     set_layout_name(layout, NAME)
-    set_layout_background(layout, T.HEX["ink"])
+    set_layout_background(layout, T.HEX["surface_dark"])
 
-    # Right-half dark image frame. Fixed rect so chrome stays on top.
+    # Right-half cinematic photo plate — full-bleed, no shadow.
     add_image_placeholder(
-        layout, 960, 0, 960, 1080, label="Editorial image · 16:9", dark=True,
+        layout, 960, 0, 960, 1080, label="Editorial image · 21:9", dark=True,
     )
 
-    paint_chrome(layout, variant="dark", pgmeta="Chapter 02")
+    paint_chrome(layout, variant="dark", pgmeta="CHAPTER 02")
 
-    # 3 lines of huge (120px × 1.0 lh) = 360 → title top ~ 540
-    add_rule(layout, 100, 440, width_px=80, height_px=4, color=T.ACCENT)
+    # ── Hairline + Rosso Corsa eyebrow ───────────────────────────────────
+    add_hairline(layout, 96, 436, 80, color=T.ACCENT, weight_px=2)
     add_text_placeholder(
         layout, idx=10, name="Eyebrow", ph_type="body",
-        x_px=100, y_px=484, w_px=820, h_px=30,
-        prompt_text="Chapter opener · ink",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.ACCENT, uppercase=True, tracking_em=0.12,
+        x_px=96, y_px=456, w_px=820, h_px=28,
+        prompt_text="CHAPTER 02 · DESIGN",
+        size_px=T.SIZE_PX["eyebrow"],
+        weight="bold", font=T.FONT_DISPLAY,
+        color=T.ACCENT, uppercase=True, tracking_em=0.1,
     )
+
+    # ── Chapter title — slide-title 80 / 500 / -0.02em ───────────────────
     add_text_placeholder(
         layout, idx=0, name="Title", ph_type="title",
-        x_px=100, y_px=540, w_px=820, h_px=360,
-        prompt_text="02\nColour\n& Type.",
-        size_px=T.SIZE_PX["huge"], weight="light",
-        color=T.WHITE, tracking_em=-0.03, line_height=1.0,
+        x_px=96, y_px=520, w_px=820, h_px=360,
+        prompt_text="Colour\n& Type.",
+        size_px=T.SIZE_PX["slide_title"],
+        weight="medium",
+        font=T.FONT_DISPLAY,
+        color=T.INK,
+        tracking_em=-0.02,
+        line_height=1.05,
     )

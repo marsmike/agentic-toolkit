@@ -102,7 +102,7 @@ def add_v_model(target, x: float, y: float, w: float, h: float) -> dict:
         # with the pill text drawn by the layout as a placeholder.
         tag_x = cx + (cw - _TAG_W) / 2
         tag_y = line_y - _TAG_H / 2
-        add_rect(target, tag_x, tag_y, _TAG_W, _TAG_H, fill=T.WHITE)
+        add_rect(target, tag_x, tag_y, _TAG_W, _TAG_H, fill=T.INK)
         conns.append({
             "x": int(tag_x), "y": int(tag_y), "w": int(_TAG_W), "h": int(_TAG_H),
         })

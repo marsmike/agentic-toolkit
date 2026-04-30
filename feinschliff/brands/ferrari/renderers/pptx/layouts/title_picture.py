@@ -31,14 +31,14 @@ def build(layout):
         layout, idx=10, name="Eyebrow", ph_type="body",
         x_px=100, y_px=494, w_px=820, h_px=30,
         prompt_text="Layout 03 · title + picture",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.BLACK, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
+        color=T.BLACK, uppercase=True, tracking_em=0.1,
     )
     add_text_placeholder(
         layout, idx=0, name="Title", ph_type="title",
         x_px=100, y_px=544, w_px=820, h_px=260,
         prompt_text="Pair a title\nwith a product.",
-        size_px=T.SIZE_PX["huge"], weight="light",
+        size_px=T.SIZE_PX["huge"], weight="medium",
         color=T.BLACK, tracking_em=-0.03, line_height=1.0,
     )
     add_text_placeholder(

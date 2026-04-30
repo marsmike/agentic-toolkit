@@ -173,7 +173,7 @@ def build(layout):
             x_px=value_x, y_px=bar_y + (BAR_H - 28) // 2,
             w_px=VALUE_W, h_px=28,
             prompt_text=f"{value:g}%",
-            size_px=T.SIZE_PX["bar_num"], font=T.FONT_MONO,
+            size_px=T.SIZE_PX["bar_num"], weight="bold", font=T.FONT_DISPLAY,
             color=T.BLACK, align="r",
         )
 
@@ -182,6 +182,6 @@ def build(layout):
         layout, idx=60, name="Source", ph_type="body",
         x_px=CONTENT_X, y_px=SOURCE_Y, w_px=CONTENT_W, h_px=24,
         prompt_text="Figure 01 · Sample data, Q3 FY25 · N = €14.1 bn",
-        size_px=14, font=T.FONT_MONO,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )

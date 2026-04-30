@@ -30,8 +30,8 @@ def add_rule(
 def add_eyebrow(target, x_px, y_px, text, *, color=T.BLACK, w_px=1600, h_px=30):
     return add_text(
         target, x_px, y_px, w_px, h_px, text,
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=color, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
+        color=color, uppercase=True, tracking_em=0.1,
     )
 
 
@@ -48,7 +48,7 @@ def add_slide_title(target, x_px, y_px, text, *, color=T.BLACK, w_px=1720, h_px=
 def add_display(target, x_px, y_px, text, *, color=T.BLACK, w_px=1720, h_px=320, size_px=None, align=PP_ALIGN.LEFT):
     return add_text(
         target, x_px, y_px, w_px, h_px, text,
-        size_px=size_px or T.SIZE_PX["display"], weight="light",
+        size_px=size_px or T.SIZE_PX["display"], weight="medium",
         color=color, tracking_em=-0.035, line_height=0.95, align=align,
     )
 
@@ -57,7 +57,7 @@ def add_display(target, x_px, y_px, text, *, color=T.BLACK, w_px=1720, h_px=320,
 def add_huge(target, x_px, y_px, text, *, color=T.BLACK, w_px=1400, h_px=260, size_px=None):
     return add_text(
         target, x_px, y_px, w_px, h_px, text,
-        size_px=size_px or T.SIZE_PX["huge"], weight="light",
+        size_px=size_px or T.SIZE_PX["huge"], weight="medium",
         color=color, tracking_em=-0.03, line_height=1.0,
     )
 
@@ -83,6 +83,6 @@ def add_body(target, x_px, y_px, text, *, color=T.GRAPHITE, w_px=820, h_px=200):
 def add_mono_caption(target, x_px, y_px, text, *, color=T.GRAPHITE, w_px=1200, h_px=24, size_px=16):
     return add_text(
         target, x_px, y_px, w_px, h_px, text,
-        size_px=size_px, font=T.FONT_MONO,
+        size_px=size_px, weight="bold", font=T.FONT_DISPLAY,
         color=color, uppercase=True, tracking_em=0.1,
     )

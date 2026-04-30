@@ -39,8 +39,8 @@ def add_column(
     # Number label
     add_text(
         target, inner_x, cursor_y, inner_w, 30, number,
-        size_px=T.SIZE_PX["col_num"], font=T.FONT_MONO,
-        color=number_color, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["col_num"], weight="bold", font=T.FONT_DISPLAY,
+        color=number_color, uppercase=True, tracking_em=0.1,
     )
     cursor_y += 44
 
@@ -77,7 +77,7 @@ def add_agenda_row(
     add_line(target, x_px, y_px, w_px, 1, rule_color)
     add_text(
         target, x_px, y_px + 14, 110, 30, number,
-        size_px=T.SIZE_PX["agenda_num"], font=T.FONT_MONO,
+        size_px=T.SIZE_PX["agenda_num"], weight="bold", font=T.FONT_DISPLAY,
         color=number_color, tracking_em=0.08,
     )
     add_text(

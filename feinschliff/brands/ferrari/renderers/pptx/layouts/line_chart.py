@@ -155,7 +155,7 @@ def build(layout):
             layout, idx=20 + i, name=f"X label {i+1}", ph_type="body",
             x_px=cx - tw / 2, y_px=label_y, w_px=tw, h_px=24,
             prompt_text=X_LABELS[i],
-            size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.GRAPHITE,
             uppercase=True, tracking_em=0.08, align="c",
         )
 
@@ -191,6 +191,6 @@ def build(layout):
         layout, idx=40, name="Source / caption", ph_type="body",
         x_px=100, y_px=995, w_px=1720, h_px=24,
         prompt_text="Source · Feinschliff analytics, n = 2.4M accounts",
-        size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.GRAPHITE,
         uppercase=True, tracking_em=0.1,
     )

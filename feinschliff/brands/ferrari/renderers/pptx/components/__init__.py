@@ -18,6 +18,7 @@ from components.type import (
 from components.chrome import (
     add_logo, add_pgmeta, add_footer_left, add_footer_right,
     paint_chrome,
+    add_livery_band, add_uppercase_link, add_hairline,
 )
 from components.controls import add_button, add_chip
 from components.data import add_kpi, add_bar_row
@@ -50,6 +51,7 @@ __all__ = [
     # chrome
     "add_logo", "add_pgmeta", "add_footer_left", "add_footer_right",
     "paint_chrome",
+    "add_livery_band", "add_uppercase_link", "add_hairline",
     # controls
     "add_button", "add_chip",
     # data

@@ -213,8 +213,8 @@ def build(layout):
             x_px=col["x"] + 10, y_px=col["y"] + 14,
             w_px=col["w"] - 20, h_px=col["h"] - 14,
             prompt_text=label,
-            size_px=14, font=T.FONT_MONO,
-            color=T.BLACK, uppercase=True, tracking_em=0.12,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY,
+            color=T.BLACK, uppercase=True, tracking_em=0.1,
             align="l",
         )
 
@@ -235,7 +235,7 @@ def build(layout):
             w_px=label_bbox["w"] - 20,
             h_px=label_bbox["h"] - 20,
             prompt_text=prompt,
-            size_px=14, font=T.FONT_MONO,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY,
             color=T.ACCENT, uppercase=True, tracking_em=0.1,
             line_height=1.5,
             align="l", anchor="m",
@@ -254,14 +254,14 @@ def build(layout):
                 continue  # dependency hairline: no label
             idx = 40 + li * 3 + bi
             # Text colour that contrasts with the bar fill.
-            text_color = T.BLACK if style == "accent" else T.WHITE
+            text_color = T.BLACK if style == "accent" else T.INK
             add_text_placeholder(
                 layout, idx=idx,
                 name=f"Lane {li+1} Bar {bi+1} Label", ph_type="body",
                 x_px=bbox["x"] + 8, y_px=bbox["y"],
                 w_px=bbox["w"] - 16, h_px=bbox["h"],
                 prompt_text=bar_def.get("label", "") or "",
-                size_px=13, font=T.FONT_MONO,
+                size_px=13, weight="bold", font=T.FONT_DISPLAY,
                 color=text_color, uppercase=True, tracking_em=0.08,
                 align="l", anchor="m",
             )
@@ -271,6 +271,6 @@ def build(layout):
         layout, idx=60, name="Source / caption", ph_type="body",
         x_px=100, y_px=1000, w_px=1720, h_px=24,
         prompt_text="Committed · Critical path · Dependency window · Milestone",
-        size_px=14, font=T.FONT_MONO,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )

@@ -126,13 +126,13 @@ def add_matrix_2x2(
     label_y = y + h + EXTREME_OFFSET_PX
     add_text(
         target, x, label_y, EXTREME_LABEL_W_PX, EXTREME_LABEL_H_PX,
-        axis_x_low, size_px=14, font=T.FONT_MONO,
+        axis_x_low, size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=axis_color, uppercase=True, tracking_em=0.14,
     )
     add_text(
         target, x + w - EXTREME_LABEL_W_PX, label_y,
         EXTREME_LABEL_W_PX, EXTREME_LABEL_H_PX,
-        axis_x_high, size_px=14, font=T.FONT_MONO,
+        axis_x_high, size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=axis_color, uppercase=True, tracking_em=0.14,
         align=PP_ALIGN.RIGHT,
     )
@@ -142,13 +142,13 @@ def add_matrix_2x2(
     add_text(
         target, label_x, y + h - EXTREME_LABEL_H_PX,
         EXTREME_LABEL_W_PX, EXTREME_LABEL_H_PX,
-        axis_y_low, size_px=14, font=T.FONT_MONO,
+        axis_y_low, size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=axis_color, uppercase=True, tracking_em=0.14,
         align=PP_ALIGN.RIGHT,
     )
     add_text(
         target, label_x, y, EXTREME_LABEL_W_PX, EXTREME_LABEL_H_PX,
-        axis_y_high, size_px=14, font=T.FONT_MONO,
+        axis_y_high, size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=axis_color, uppercase=True, tracking_em=0.14,
         align=PP_ALIGN.RIGHT,
     )

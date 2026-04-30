@@ -196,8 +196,8 @@ def build(layout):
             x_px=hdr["x"] + 20, y_px=hdr["y"] + 18,
             w_px=hdr["w"] - 40, h_px=hdr["h"] - 18,
             prompt_text=col_label,
-            size_px=T.SIZE_PX.get("eyebrow", 18), font=T.FONT_MONO,
-            color=T.GRAPHITE, uppercase=True, tracking_em=0.12,
+            size_px=T.SIZE_PX.get("eyebrow", 18), weight="bold", font=T.FONT_DISPLAY,
+            color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
         )
 
     # ─── Row label placeholders (display typography — workstream names) ─
@@ -252,8 +252,8 @@ def build(layout):
         add_text(
             layout, lx + swatch_d + 10, legend_y,
             label_w, 24, label,
-            size_px=14, font=T.FONT_MONO,
-            color=T.GRAPHITE, uppercase=True, tracking_em=0.12,
+            size_px=14, weight="bold", font=T.FONT_DISPLAY,
+            color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
         )
         lx += entry_w + entry_gap
 
@@ -262,6 +262,6 @@ def build(layout):
         layout, idx=60, name="Source", ph_type="body",
         x_px=GRID_X, y_px=1000, w_px=GRID_W, h_px=24,
         prompt_text="Source · Programme board · FY25 Q3 status review",
-        size_px=14, font=T.FONT_MONO,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )

@@ -37,7 +37,7 @@ def add_kpi(
 
     vbox = add_text(
         target, x_px + 40, y_px + 36, w_px - 80, 140, value,
-        size_px=T.SIZE_PX["kpi_value"], weight="light",
+        size_px=T.SIZE_PX["kpi_value"], weight="medium",
         color=color_value, tracking_em=-0.03, line_height=0.95,
     )
     if unit:
@@ -50,13 +50,13 @@ def add_kpi(
 
     add_text(
         target, x_px + 40, y_px + 190, w_px - 80, 30, key,
-        size_px=T.SIZE_PX["kpi_key"], font=T.FONT_MONO,
+        size_px=T.SIZE_PX["kpi_key"], weight="bold", font=T.FONT_DISPLAY,
         color=color_key, uppercase=True, tracking_em=0.1,
     )
     if delta:
         add_text(
             target, x_px + 40, y_px + 220, w_px - 80, 26, delta,
-            size_px=T.SIZE_PX["kpi_delta"], font=T.FONT_MONO,
+            size_px=T.SIZE_PX["kpi_delta"], weight="bold", font=T.FONT_DISPLAY,
             color=color_delta,
         )
 
@@ -95,6 +95,6 @@ def add_bar_row(
     )
     add_text(
         target, num_x, y_px + 6, num_w, 32, f"{value_pct:g}%",
-        size_px=T.SIZE_PX["bar_num"], font=T.FONT_MONO,
+        size_px=T.SIZE_PX["bar_num"], weight="bold", font=T.FONT_DISPLAY,
         color=num_color, align=PP_ALIGN.RIGHT,
     )

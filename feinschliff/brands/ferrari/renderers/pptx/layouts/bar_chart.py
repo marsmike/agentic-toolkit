@@ -54,7 +54,7 @@ def build(layout):
         add_text_placeholder(
             layout, idx=21 + i * 2, name=f"Bar {i+1} Value", ph_type="body",
             x_px=1700, y_px=y + 6, w_px=120, h_px=32, prompt_text=f"{pct}%",
-            size_px=T.SIZE_PX["bar_num"], font=T.FONT_MONO,
+            size_px=T.SIZE_PX["bar_num"], weight="bold", font=T.FONT_DISPLAY,
             color=T.BLACK, align="r",
         )
 
@@ -63,6 +63,6 @@ def build(layout):
         layout, idx=40, name="Figure caption", ph_type="body",
         x_px=100, y_px=920, w_px=1720, h_px=30,
         prompt_text="Figure 01 · Sample data, Q3 FY25 · N = €14.1 bn",
-        size_px=16, font=T.FONT_MONO,
+        size_px=16, weight="bold", font=T.FONT_DISPLAY,
         color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
     )
