@@ -12,8 +12,8 @@ FEINSCHLIFF_BRAND=binance /deck "your brief..."
 
 ## Source
 
-- Tokens: [`feinschliff/brands/binance/tokens.json`](../../../feinschliff/brands/binance/tokens.json) — derived from [getdesign.md/binance/design-md](https://getdesign.md/binance/design-md).
-- Renderer: [`feinschliff/brands/binance/renderers/pptx/`](../../../feinschliff/brands/binance/renderers/pptx/) — same shape as the Feinschliff renderer; only the brand-scoped chrome (wordmark, diamond glyph, pgmeta defaults) and tokens differ.
+- Tokens: [`feinschliff/brands/binance/tokens.json`](../../brands/binance/tokens.json) — derived from [getdesign.md/binance/design-md](https://getdesign.md/binance/design-md).
+- Renderer: [`feinschliff/brands/binance/renderers/pptx/`](../../brands/binance/renderers/pptx/) — same shape as the Feinschliff renderer; only the brand-scoped chrome (wordmark, diamond glyph, pgmeta defaults) and tokens differ.
 - No HTML reference deck. Binance was authored from the public DESIGN.md spec without a Binance-Design HTML showcase, so `/compile` is not wired up for this brand. `/deck` works against the python-pptx layouts directly.
 
 ## Regenerating
@@ -23,5 +23,5 @@ cd feinschliff/brands/binance/renderers/pptx
 uv sync
 uv run python build.py
 # out/Binance-Template.pptx is the editable source.
-soffice --headless --convert-to pdf --outdir ../../../../../examples/feinschliff/template-preview-binance out/Binance-Template.pptx
+soffice --headless --convert-to pdf --outdir ../../../../examples/binance out/Binance-Template.pptx
 ```

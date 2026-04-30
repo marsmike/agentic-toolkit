@@ -51,8 +51,8 @@ FEINSCHLIFF_BRAND=spotify /deck "your brief..."
 ## Source
 
 - **Brand spec:** [getdesign.md/spotify](https://getdesign.md/spotify/design-md) — vendored verbatim via the npm `getdesign` package.
-- **Tokens + policy:** [`feinschliff/brands/spotify/tokens.json`](../../../feinschliff/brands/spotify/tokens.json) — DTCG colors, type, radius, plus six Spotify-specific policy blocks (`layout`, `cover`, `section-marker`, `photography`, `headline-rule`, `chip-rule`, `shadow`).
-- **Renderer:** [`feinschliff/brands/spotify/renderers/pptx/`](../../../feinschliff/brands/spotify/renderers/pptx/) — same engine as BMW/Claude, with Spotify-bespoke `chrome.py` (equalizer marker, pill chevron-link, lowercase wordmark), pill `controls.py`, rounded `cards.py`, and rebuilt cover/chapter/KPI/quote/end layouts.
+- **Tokens + policy:** [`feinschliff/brands/spotify/tokens.json`](../../brands/spotify/tokens.json) — DTCG colors, type, radius, plus six Spotify-specific policy blocks (`layout`, `cover`, `section-marker`, `photography`, `headline-rule`, `chip-rule`, `shadow`).
+- **Renderer:** [`feinschliff/brands/spotify/renderers/pptx/`](../../brands/spotify/renderers/pptx/) — same engine as BMW/Claude, with Spotify-bespoke `chrome.py` (equalizer marker, pill chevron-link, lowercase wordmark), pill `controls.py`, rounded `cards.py`, and rebuilt cover/chapter/KPI/quote/end layouts.
 - **Glyph:** chrome glyph is generic three-bar equalizer geometry — an abstract stand-in for the Spotify sound-wave mark, not the licensed logo. Wordmark is "spotify" lowercase per Spotify's wordmark register.
 - **No HTML reference deck.** Spotify was authored from the public DESIGN.md spec without a Spotify-Design HTML showcase, so `/compile` is not wired up for this brand. `/deck` works against the python-pptx layouts directly.
 
@@ -62,5 +62,5 @@ FEINSCHLIFF_BRAND=spotify /deck "your brief..."
 cd feinschliff/brands/spotify/renderers/pptx
 uv sync
 uv run python build.py
-soffice --headless --convert-to pdf --outdir ../../../../../examples/feinschliff/template-preview-spotify out/Spotify-Template.pptx
+soffice --headless --convert-to pdf --outdir ../../../../examples/spotify out/Spotify-Template.pptx
 ```

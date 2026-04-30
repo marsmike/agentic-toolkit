@@ -29,7 +29,7 @@ cd feinschliff/brands/feinschliff/renderers/pptx
 uv sync
 uv run python build.py
 # out/Feinschliff-Template.pptx is the editable source.
-soffice --headless --convert-to pdf --outdir ../../../../examples/feinschliff/template-preview out/Feinschliff-Template.pptx
+soffice --headless --convert-to pdf --outdir ../../../../examples/feinschliff out/Feinschliff-Template.pptx
 ```
 
 CI also rebuilds + renders this template on every push and uploads both the .pptx (editable) and per-slide PNGs as a workflow artifact (see `.github/workflows/ci.yml` → "feinschliff brand pack build"). The committed PDF here is a stable point-in-time reference; the CI artifact is the always-fresh build.

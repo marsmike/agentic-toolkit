@@ -99,15 +99,26 @@ Then add a smoke test at `feinschliff/tests/test_myco_brand_pack.py` (mirror the
 ```
 feinschliff/
 ├── brands/
-│   └── feinschliff/                   MIT — eponymous default
-│       ├── tokens.json                DTCG draft-2 design tokens
-│       ├── claude-design/             HTML reference + assets
-│       ├── catalog/layouts.json       layouts with tool schemas
-│       └── renderers/
-│           ├── pptx/                  Baukasten Python; run build.py
-│           ├── excalidraw/            apply_feinschliff() + palette mapping
-│           ├── remotion/              feinschliff-theme.md (theme.ts recipe)
-│           └── svg/                   theme + primitives + layouts
+│   ├── feinschliff/                   MIT — eponymous default
+│   │   ├── tokens.json                DTCG draft-2 design tokens
+│   │   ├── claude-design/             HTML reference + assets
+│   │   ├── catalog/layouts.json       layouts with tool schemas
+│   │   └── renderers/
+│   │       ├── pptx/                  Baukasten Python; run build.py
+│   │       ├── excalidraw/            apply_feinschliff() + palette mapping
+│   │       ├── remotion/              feinschliff-theme.md (theme.ts recipe)
+│   │       └── svg/                   theme + primitives + layouts
+│   ├── claude/                        derived from getdesign.md/claude
+│   ├── spotify/                       derived from getdesign.md/spotify (reference pack)
+│   ├── bmw/                           derived from getdesign.md/bmw (reference pack)
+│   ├── binance/                       derived from getdesign.md/binance
+│   └── ferrari/                       derived from getdesign.md/ferrari
+├── examples/                          pre-rendered PDF previews + plugin demos
+│   ├── feinschliff/                   eponymous brand preview
+│   ├── claude/   spotify/   bmw/      one folder per brand pack
+│   ├── binance/  ferrari/             — click the .pdf to view inline
+│   ├── brief-to-deck/                 /deck command demo
+│   └── design-md-to-tokens/           /compile command demo
 ├── skills/
 │   ├── compile/SKILL.md               /compile
 │   ├── extend/SKILL.md                /extend
@@ -165,8 +176,9 @@ The wedge is the combination: **`.pptx` users actually edit + brand-pluggable to
 ## Roadmap
 
 - [x] **v0.1.0** — `feinschliff` brand pack, three skills, MIT.
+- [x] **v0.1.x** — six brand packs ship pre-rendered PDFs in [`examples/`](examples/) (Feinschliff, Claude, Spotify, Binance, BMW, Ferrari). BMW + Spotify are reference packs with brand-policy blocks (cover / section-marker / photography / headline-rule / chip-rule / shadow) read by a shared `add_rounded_rect` primitive — pill / sharp / rounded geometry flips by editing tokens, never the renderer.
 - [ ] **v0.2** — accept any `DESIGN.md` from [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) (34k★, 76 design systems) as direct brand-pack input. Stripe, Vercel, Linear, Notion, Spotify, etc., one drop-in.
-- [ ] **v0.3** — `examples/` directory with sample briefs, sample DESIGN.md drafts, the actual `.pptx` they produced.
+- [ ] **v0.3** — converge the per-brand renderer forks into one shared `feinschliff/engine/`. Each brand pack collapses to `tokens.json` + `chrome.py`, no more 96-file forks.
 - [ ] **v0.4** — pluggable verify-pass rule library; users add their own defect classes.
 - [ ] **v0.5** — Remotion + SVG renderer parity (today's parity is partial — pptx is the main path).
 - [ ] **v1.0** — first feedback-driven major; API stability commitment.

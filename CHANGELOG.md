@@ -4,8 +4,11 @@ All notable changes to this project will be documented here. Format follows [Kee
 
 ## [Unreleased]
 
+### Changed (repo layout)
+- Examples moved from repo-root `examples/feinschliff/` into the plugin folder: `feinschliff/examples/`. Per-brand preview folders renamed from `template-preview-{brand}/` to just `{brand}/` so a GitHub user landing on the plugin sees `examples/spotify/`, `examples/bmw/`, etc. — the brand IS the folder name. The eponymous Feinschliff preview lives at `feinschliff/examples/feinschliff/`. The repo root no longer carries an `examples/` directory.
+
 ### Added
-- Four new `feinschliff` brand packs derived from getdesign.md, each with a generic non-trademarked glyph and a stable PDF preview committed to `examples/feinschliff/template-preview-{brand}/`:
+- Four new `feinschliff` brand packs derived from getdesign.md, each with a generic non-trademarked glyph and a stable PDF preview committed to `feinschliff/examples/{brand}/`:
   - **Spotify** — Spotify-green accent on true-black canvas, geometric sans, three-bar equalizer glyph.
   - **Binance** — Binance-yellow accent on crypto-black, IBM Plex Sans tabular, four-segment diamond glyph.
   - **BMW** — corporate-blue accent on pure-white canvas, condensed grotesque, quartered-disc glyph (generic pie geometry, not the BMW roundel).

@@ -48,8 +48,8 @@ FEINSCHLIFF_BRAND=bmw /deck "your brief..."
 ## Source
 
 - **Brand spec:** [getdesign.md/bmw/design-md](https://getdesign.md/bmw/design-md) — canonical DESIGN.md (also vendored as the npm package `getdesign`).
-- **Tokens + policy:** [`feinschliff/brands/bmw/tokens.json`](../../../feinschliff/brands/bmw/tokens.json) — DTCG colors, type, and the BMW-specific policy blocks (`layout`, `cover`, `section-marker`, `photography`, `headline-rule`, `chip-rule`).
-- **Renderer:** [`feinschliff/brands/bmw/renderers/pptx/`](../../../feinschliff/brands/bmw/renderers/pptx/) — same rendering engine as Claude/Feinschliff, with BMW-bespoke `chrome.py` (M-stripe, chevron link, hairline, quartered-disc glyph), `type.py` (700 display + 300 body, tracking 0, label-uppercase eyebrows), and rebuilt cover + chapter + KPI layouts.
+- **Tokens + policy:** [`feinschliff/brands/bmw/tokens.json`](../../brands/bmw/tokens.json) — DTCG colors, type, and the BMW-specific policy blocks (`layout`, `cover`, `section-marker`, `photography`, `headline-rule`, `chip-rule`).
+- **Renderer:** [`feinschliff/brands/bmw/renderers/pptx/`](../../brands/bmw/renderers/pptx/) — same rendering engine as Claude/Feinschliff, with BMW-bespoke `chrome.py` (M-stripe, chevron link, hairline, quartered-disc glyph), `type.py` (700 display + 300 body, tracking 0, label-uppercase eyebrows), and rebuilt cover + chapter + KPI layouts.
 - **Glyph:** the chrome glyph is generic 4-quadrant pie geometry — an abstract stand-in for the BMW roundel, not the licensed brand asset. Wordmark is the literal three-letter "BMW" in display sans 700.
 - **No HTML reference deck.** BMW was authored from the public DESIGN.md spec without a BMW-Design HTML showcase, so `/compile` is not wired up for this brand. `/deck` works against the python-pptx layouts directly.
 
@@ -60,5 +60,5 @@ cd feinschliff/brands/bmw/renderers/pptx
 uv sync
 uv run python build.py
 # out/BMW-Template.pptx is the editable source.
-soffice --headless --convert-to pdf --outdir ../../../../../examples/feinschliff/template-preview-bmw out/BMW-Template.pptx
+soffice --headless --convert-to pdf --outdir ../../../../examples/bmw out/BMW-Template.pptx
 ```
