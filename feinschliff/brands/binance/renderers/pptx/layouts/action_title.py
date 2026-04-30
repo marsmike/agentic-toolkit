@@ -143,8 +143,8 @@ def build(layout):
         layout, idx=10, name="Kicker", ph_type="body",
         x_px=_CONTENT_X, y_px=_KICKER_Y, w_px=_CONTENT_W, h_px=_KICKER_H,
         prompt_text=EYEBROW_PROMPT,
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.ACCENT, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="semibold", font=T.FONT_DISPLAY,
+        color=T.ACCENT, uppercase=True, tracking_em=0.1,
     )
 
     # ── Action title (hero headline, idx=0) ─────────────────────────────
@@ -183,7 +183,7 @@ def build(layout):
             layout, idx=idx_base, name=f"KPI {i+1} Value", ph_type="body",
             x_px=cx, y_px=_BOTTOM_Y, w_px=_KPI_CELL_W - _KPI_UNIT_W,
             h_px=_KPI_VALUE_H, prompt_text=value,
-            size_px=T.SIZE_PX["kpi_value"], weight="light",
+            size_px=T.SIZE_PX["kpi_value"], weight="bold",
             font=T.FONT_DISPLAY, color=T.BLACK,
             tracking_em=-0.03, align="r", anchor="b",
         )

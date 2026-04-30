@@ -348,14 +348,14 @@ def build_demo_deck(prs: Presentation):
         _10="Layout · chapter ink",
         _0="02\nChapter\n& Picture.")
 
-    # KPI Grid
+    # KPI Grid (Binance trust-badges — 4 cards × 3 placeholders: value/key/delta)
     add(prs, "Feinschliff · KPI Grid",
-        _10="Layout · KPI grid",
-        _0="Headline numbers.",
-        _20="Metric 1", _21="Caption 1",
-        _22="Metric 2", _23="Caption 2",
-        _24="Metric 3", _25="Caption 3",
-        _26="Metric 4", _27="Caption 4")
+        _10="EXCHANGE · 2026 · TRUST",
+        _0="Why Binance.",
+        _20="316M", _21="USERS WORLDWIDE",   _22="▲ +3.1% YoY",
+        _24="$429M", _25="FUNDS RECOVERED",  _26="Since 2018",
+        _28="No.1", _29="TRADING VOLUME",    _30="Global rank",
+        _32="100%", _33="BINANCE-AUDITED",   _34="▲ PoR · Nov '26")
 
     # 2-Column Cards
     add(prs, "Feinschliff · 2-Column Cards",
@@ -429,8 +429,8 @@ def build_demo_deck(prs: Presentation):
 
     # End
     add(prs, "Feinschliff · End",
-        _0="Thank you.",
-        _10="Feinschliff · v0.1 · 2026")
+        _0="Trade on Binance.",
+        _10="BINANCE · DESIGN SYSTEM · v1.0 · 2026")
 
     # Funnel
     add(prs, "Feinschliff · Funnel",

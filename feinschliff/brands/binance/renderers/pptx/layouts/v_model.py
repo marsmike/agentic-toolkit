@@ -66,8 +66,8 @@ def build(layout):
         layout, idx=11, name="Kicker", ph_type="body",
         x_px=_CONTENT_X, y_px=_KICKER_Y, w_px=_CONTENT_W, h_px=30,
         prompt_text="Verification · Validation",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.ACCENT, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="semibold", font=T.FONT_DISPLAY,
+        color=T.ACCENT, uppercase=True, tracking_em=0.1,
     )
 
     # ── Action title (hero sentence, idx=0) ──────────────────────────────

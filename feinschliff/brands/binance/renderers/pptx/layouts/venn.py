@@ -202,8 +202,8 @@ def build(layout):
             layout, idx=idx_name, name=f"Set {key} Name", ph_type="body",
             x_px=lx, y_px=cy - 14, w_px=240, h_px=26,
             prompt_text=sample["name"],
-            size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-            color=T.BLACK, uppercase=True, tracking_em=0.12,
+            size_px=T.SIZE_PX["eyebrow"], weight="semibold", font=T.FONT_DISPLAY,
+            color=T.BLACK, uppercase=True, tracking_em=0.1,
             align="c",
         )
         add_text_placeholder(
@@ -267,7 +267,7 @@ def build(layout):
             x_px=SIDE_X, y_px=item_y + 12, w_px=SIDE_W, h_px=22,
             prompt_text=sample["counter"],
             size_px=14, font=T.FONT_MONO,
-            color=counter_color, uppercase=True, tracking_em=0.12,
+            color=counter_color, uppercase=True, tracking_em=0.1,
         )
 
         # Heading — display medium.

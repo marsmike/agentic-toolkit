@@ -166,7 +166,7 @@ def build(layout):
             x_px=x, y_px=counter_y, w_px=col_w, h_px=counter_h,
             prompt_text=counter,
             size_px=T.SIZE_PX["col_num"], font=T.FONT_MONO,
-            color=T.ACCENT, uppercase=True, tracking_em=0.12,
+            color=T.ACCENT, uppercase=True, tracking_em=0.1,
         )
 
         # Heading — display medium, black.
@@ -196,5 +196,5 @@ def build(layout):
         x_px=content_x0, y_px=1000, w_px=content_w, h_px=30,
         prompt_text="Source · Strategy review, Q4 2025",
         size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
-        uppercase=True, tracking_em=0.12,
+        uppercase=True, tracking_em=0.1,
     )

@@ -1,9 +1,9 @@
-"""Feinschliff theme — derived from `brands/feinschliff/tokens.json` (DTCG 1.0).
+"""Binance theme — derived from `brands/binance/tokens.json` (DTCG 1.0).
 
 `tokens.json` is the single source of truth (renderer-protocol.md). This
 module reads it once at import time and exposes the tokens in the shape
 the PPTX renderer expects (RGBColor constants, HEX dict, SIZE_PX dict in
-CSS px, font family strings, weight mapping).
+CSS px, font family strings, weight mapping, RADIUS dict, policy blocks).
 
 Keep this module as a pure projection of tokens.json — never hard-code
 values that exist in the JSON. Fields used only by the PPTX renderer
@@ -59,10 +59,50 @@ SIZE_PX: dict[str, int] = {
 }
 
 # ─── Weights ───────────────────────────────────────────────────────────────
-# python-pptx exposes bold=True only. Medium/Light are named variants so
-# PowerPoint resolves to the correct installed Noto Sans TTF.
+# python-pptx exposes bold=True only. Medium/Light/Semibold are named variants
+# so PowerPoint resolves to the correct installed weight via typeface suffix.
 WEIGHT: dict[str, int] = {
     key: token["$value"]
     for key, token in _TOKENS["font-weight"].items()
     if not key.startswith("$")
 }
+
+# ─── Radius (CSS px → int) ─────────────────────────────────────────────────
+# Read by `add_rounded_rect`. Binance sets radius.btn = 6, radius.card = 12,
+# radius.pill = 9999 — sharp-but-not-zero on standard CTAs, soft 12px on
+# elevated cards (markets-table-card, trust-badges), pill ONLY on the
+# top-of-page signup CTA. Same code path that produces BMW's rectangles
+# (radius.btn = 0) and Spotify's pills (radius.btn = 9999) produces
+# Binance's 6/8/12 register.
+RADIUS: dict[str, int] = {
+    key.replace("-", "_"): _px_to_int(token["$value"])
+    for key, token in _TOKENS["radius"].items()
+    if not key.startswith("$")
+}
+
+
+# ─── Binance policy blocks ─────────────────────────────────────────────────
+# Same shape as BMW / Spotify / Ferrari policy projections — a flat dict per
+# block, dropping `$description` / `$type` meta. Layouts read these to switch
+# on Binance idioms (markets-hero cover, yellow ▌ section marker, no-shadow
+# elevation, sentence-case display, signup-pill CTA).
+
+def _flatten_policy(block: dict) -> dict:
+    out = {}
+    for key, entry in block.items():
+        if key.startswith("$"):
+            continue
+        if isinstance(entry, dict) and "$value" in entry:
+            out[key] = entry["$value"]
+        else:
+            out[key] = entry
+    return out
+
+
+LAYOUT:          dict = _flatten_policy(_TOKENS.get("layout", {}))
+COVER:           dict = _flatten_policy(_TOKENS.get("cover", {}))
+SECTION_MARKER:  dict = _flatten_policy(_TOKENS.get("section-marker", {}))
+PHOTOGRAPHY:     dict = _flatten_policy(_TOKENS.get("photography", {}))
+HEADLINE_RULE:   dict = _flatten_policy(_TOKENS.get("headline-rule", {}))
+CHIP_RULE:       dict = _flatten_policy(_TOKENS.get("chip-rule", {}))
+SHADOW:          dict = _flatten_policy(_TOKENS.get("shadow", {}))

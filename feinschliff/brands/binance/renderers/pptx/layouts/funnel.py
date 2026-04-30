@@ -185,7 +185,7 @@ def build(layout):
             layout, idx=idx_base + 2, name=f"Stage {i+1} Volume", ph_type="body",
             x_px=VOL_X, y_px=slice_y + 12, w_px=VOL_W, h_px=44,
             prompt_text=sample["volume"],
-            size_px=34, weight="light", color=T.INK,
+            size_px=34, weight="bold", color=T.INK,
             tracking_em=-0.02, line_height=1.0, align="r",
         )
 
@@ -214,7 +214,7 @@ def build(layout):
             layout, idx=idx_base, name=f"Dropoff {i+1} Pct", ph_type="body",
             x_px=SIDE_X, y_px=card_y + 16, w_px=SIDE_W, h_px=56,
             prompt_text=sample["pct"],
-            size_px=46, weight="light", color=T.ACCENT,
+            size_px=46, weight="bold", color=T.ACCENT,
             tracking_em=-0.02, line_height=1.0,
         )
 
@@ -224,7 +224,7 @@ def build(layout):
             x_px=SIDE_X, y_px=card_y + 76, w_px=SIDE_W, h_px=22,
             prompt_text=sample["label"],
             size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
-            uppercase=True, tracking_em=0.12,
+            uppercase=True, tracking_em=0.1,
         )
 
         # BODY — graphite explainer.

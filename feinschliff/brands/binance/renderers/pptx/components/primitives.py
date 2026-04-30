@@ -74,6 +74,68 @@ def add_line(target, x_px, y_px, w_px, h_px, color: RGBColor):
     return add_rect(target, x_px, y_px, w_px, h_px, fill=color)
 
 
+# ─── Rounded rectangle (radius-policy-aware) ───────────────────────────────
+def add_rounded_rect(
+    target,
+    x_px: float,
+    y_px: float,
+    w_px: float,
+    h_px: float,
+    *,
+    radius_px: float = 0,
+    fill: RGBColor | None = None,
+    line: RGBColor | None = None,
+    line_weight_px: float = 0,
+    shadow: str | None = None,
+):
+    """Rectangle whose corners are read from brand-pack policy.
+
+    Corner geometry (`radius_px`) is read from `tokens.json` via
+    `theme.RADIUS["btn"]` / `["card"]` / `["pill"]`. Binance sets these to
+    6 / 12 / 9999 so primary CTAs become sharp-but-not-zero, content cards
+    get the soft 12px corner, and the lone pill geometry is reserved for
+    the top-of-page signup CTA. The same code path that produces BMW's
+    rectangles (0) and Spotify's pills (9999) produces Binance's 6/12.
+
+    `radius_px <= 0` falls through to `add_rect` for byte-identical OOXML.
+
+    `shadow` is currently a no-op for Binance — `tokens.json` policy block
+    `shadow.elevated = "none"` confirms the brand is shadow-free. The
+    parameter is kept for parity with the Spotify primitive signature so
+    layouts can be ported across brand packs without diff churn.
+    """
+    if radius_px <= 0:
+        return add_rect(
+            target, x_px, y_px, w_px, h_px,
+            fill=fill, line=line, line_weight_px=line_weight_px,
+        )
+
+    shape = _shapes(target).add_shape(
+        MSO_SHAPE.ROUNDED_RECTANGLE, px(x_px), px(y_px), px(w_px), px(h_px)
+    )
+
+    half_min = min(w_px, h_px) / 2
+    if half_min > 0:
+        adjustment = min(0.5, max(0.0, radius_px / half_min))
+        shape.adjustments[0] = adjustment
+
+    if fill is None:
+        shape.fill.background()
+    else:
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = fill
+
+    if line is None:
+        shape.line.fill.background()
+    else:
+        shape.line.color.rgb = line
+        shape.line.width = px(line_weight_px) if line_weight_px else Pt(0.75)
+
+    # Binance is shadow-free per tokens.json `shadow.elevated = "none"`.
+    shape.shadow.inherit = False
+    return shape
+
+
 # ─── Text ─────────────────────────────────────────────────────────────────
 def add_text(
     target,
@@ -134,13 +196,20 @@ def _apply_run_style(run, *, size_px, weight, color, font, tracking_em):
         spc_val = int(round(tracking_em * (size_px * 0.5) * 100))
         rPr.set("spc", str(spc_val))
 
-    # Noto Sans weight variants — macOS resolves on typeface name suffix.
-    if weight in ("light", "medium"):
+    # Weight variants — macOS resolves on typeface name suffix. Binance uses
+    # `semibold` (600) as the DEFAULT display weight, so it must be handled
+    # alongside `light` / `medium`. `bold` already sets the OOXML b=1 flag
+    # above and resolves to the heavier glyph via that path.
+    if weight in ("light", "medium", "semibold"):
         rPr.set("b", "0")
         latin = rPr.find(qn("a:latin"))
         if latin is None:
             latin = etree.SubElement(rPr, qn("a:latin"))
-        suffix = {"light": " Light", "medium": " Medium"}[weight]
+        suffix = {
+            "light":    " Light",
+            "medium":   " Medium",
+            "semibold": " SemiBold",
+        }[weight]
         latin.set("typeface", font + suffix)
 
 

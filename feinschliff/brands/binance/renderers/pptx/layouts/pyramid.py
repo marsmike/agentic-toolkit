@@ -180,7 +180,7 @@ def build(layout):
             x_px=SIDE_X, y_px=card_y + 16, w_px=SIDE_W, h_px=22,
             prompt_text=sample["counter"],
             size_px=14, font=T.FONT_MONO, color=T.ACCENT,
-            uppercase=True, tracking_em=0.12,
+            uppercase=True, tracking_em=0.1,
         )
 
         # BODY — graphite explainer.

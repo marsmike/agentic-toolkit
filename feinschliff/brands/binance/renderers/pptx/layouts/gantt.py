@@ -214,7 +214,7 @@ def build(layout):
             w_px=col["w"] - 20, h_px=col["h"] - 14,
             prompt_text=label,
             size_px=14, font=T.FONT_MONO,
-            color=T.BLACK, uppercase=True, tracking_em=0.12,
+            color=T.BLACK, uppercase=True, tracking_em=0.1,
             align="l",
         )
 

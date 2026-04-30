@@ -269,7 +269,7 @@ def _add_kpi_ribbon(layout) -> None:
             w_px=value_w,
             h_px=KPI_H - 20,
             prompt_text=value_sample,
-            size_px=56, weight="light", font=T.FONT_DISPLAY,
+            size_px=56, weight="bold", font=T.FONT_DISPLAY,
             color=T.BLACK, tracking_em=-0.02, align="r", anchor="b",
         )
         # Unit — small, bottom-anchored flush with value baseline.
@@ -300,7 +300,7 @@ def _add_kpi_ribbon(layout) -> None:
             h_px=26,
             prompt_text=key_sample,
             size_px=T.SIZE_PX["kpi_key"], font=T.FONT_MONO,
-            color=T.GRAPHITE, uppercase=True, tracking_em=0.12, anchor="b",
+            color=T.GRAPHITE, uppercase=True, tracking_em=0.1, anchor="b",
         )
 
 
@@ -350,5 +350,5 @@ def build(layout):
         x_px=CONTENT_X, y_px=SOURCE_Y, w_px=CONTENT_W, h_px=24,
         prompt_text=SAMPLE_SOURCE,
         size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
-        uppercase=True, tracking_em=0.12,
+        uppercase=True, tracking_em=0.1,
     )

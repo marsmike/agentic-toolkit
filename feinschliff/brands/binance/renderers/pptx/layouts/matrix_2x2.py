@@ -156,7 +156,7 @@ def build(layout):
             layout, cx + CELL_PAD, cy + CELL_PAD,
             HALF_W - 2 * CELL_PAD, 22, demo["tag"],
             size_px=14, font=T.FONT_MONO,
-            color=tag_color, uppercase=True, tracking_em=0.12,
+            color=tag_color, uppercase=True, tracking_em=0.1,
         )
         # Editable cell label (heading).
         label_color = T.BLACK if is_focus else T.BLACK

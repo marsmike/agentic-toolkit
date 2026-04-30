@@ -1,10 +1,17 @@
-"""Feinschliff · Chapter · Ink + Picture — dark chapter opener with right-half image (HTML 06)."""
+"""Binance · Chapter · Ink — full-dark chapter divider.
+
+Yellow ▌ section-marker + UPPERCASE display-lg headline ('FUNDS ARE SAFU'
+brand-claim voice) on the deep crypto-black canvas. Right half carries an
+optional editorial photograph (placeholder) — when omitted, the headline
+spans the full canvas width.
+"""
 from __future__ import annotations
 
 import theme as T
 from components import (
-    add_rule, add_text_placeholder, add_image_placeholder,
-    paint_chrome, set_layout_background, set_layout_name,
+    add_section_marker, add_text_placeholder,
+    add_image_placeholder, paint_chrome,
+    set_layout_background, set_layout_name,
 )
 
 NAME = "Feinschliff · Chapter · Ink + Picture"
@@ -12,28 +19,38 @@ NAME = "Feinschliff · Chapter · Ink + Picture"
 
 def build(layout):
     set_layout_name(layout, NAME)
-    set_layout_background(layout, T.HEX["ink"])
+    set_layout_background(layout, T.HEX["surface_dark"])
 
-    # Right-half dark image frame. Fixed rect so chrome stays on top.
+    # Right-half dark image placeholder (the lifestyle / trading-floor /
+    # 3D coin-stack illustration). Fixed rect so chrome stays on top.
     add_image_placeholder(
-        layout, 960, 0, 960, 1080, label="Editorial image · 16:9", dark=True,
+        layout, 960, 0, 960, 1080, label="Chapter image · 16:9", dark=True,
     )
 
-    paint_chrome(layout, variant="dark", pgmeta="Chapter 02")
+    paint_chrome(layout, variant="dark", pgmeta="CHAPTER 02")
 
-    # 3 lines of huge (120px × 1.0 lh) = 360 → title top ~ 540
-    add_rule(layout, 100, 440, width_px=80, height_px=4, color=T.ACCENT)
+    # Yellow ▌ marker + huge UPPERCASE display headline.
+    # Marker height matches the headline cap-height — 3 lines × 120px ×
+    # 1.05 lh ≈ 380px.
+    add_section_marker(layout, x_px=100, y_px=440, h_px=380)
+
     add_text_placeholder(
         layout, idx=10, name="Eyebrow", ph_type="body",
-        x_px=100, y_px=484, w_px=820, h_px=30,
-        prompt_text="Chapter opener · ink",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.ACCENT, uppercase=True, tracking_em=0.12,
+        x_px=140, y_px=440, w_px=820, h_px=28,
+        prompt_text="CHAPTER · INK",
+        size_px=T.SIZE_PX["eyebrow"],
+        weight="semibold", font=T.FONT_DISPLAY,
+        color=T.ACCENT, uppercase=True,
+        tracking_em=float(T.CHIP_RULE.get("tracking-em", 0.1)),
     )
+
     add_text_placeholder(
         layout, idx=0, name="Title", ph_type="title",
-        x_px=100, y_px=540, w_px=820, h_px=360,
-        prompt_text="02\nColour\n& Type.",
-        size_px=T.SIZE_PX["huge"], weight="light",
-        color=T.WHITE, tracking_em=-0.03, line_height=1.0,
+        x_px=140, y_px=490, w_px=820, h_px=380,
+        prompt_text="02\nFunds Are\nSafu.",
+        size_px=T.SIZE_PX["huge"],
+        weight="bold", font=T.FONT_DISPLAY,
+        color=T.GRAPHITE,
+        tracking_em=float(T.HEADLINE_RULE.get("tracking-em", -0.02)),
+        line_height=1.05,
     )

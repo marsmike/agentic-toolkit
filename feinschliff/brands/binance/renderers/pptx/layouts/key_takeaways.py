@@ -88,8 +88,8 @@ def build(layout):
         layout, idx=10, name="Kicker", ph_type="body",
         x_px=100, y_px=224, w_px=1720, h_px=30,
         prompt_text=EYEBROW_PROMPT,
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.ACCENT, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="semibold", font=T.FONT_DISPLAY,
+        color=T.ACCENT, uppercase=True, tracking_em=0.1,
     )
     add_text_placeholder(
         layout, idx=0, name="Action Title", ph_type="title",
@@ -121,7 +121,7 @@ def build(layout):
             x_px=x, y_px=y0 + 20, w_px=col_w, h_px=30,
             prompt_text=num,
             size_px=T.SIZE_PX["col_num"], font=T.FONT_MONO,
-            color=T.ACCENT, uppercase=True, tracking_em=0.12,
+            color=T.ACCENT, uppercase=True, tracking_em=0.1,
         )
         # Heading — white medium, up to 2 lines.
         add_text_placeholder(
@@ -145,5 +145,5 @@ def build(layout):
             x_px=x, y_px=y0 + 480, w_px=col_w, h_px=24,
             prompt_text=owner,
             size_px=14, font=T.FONT_MONO,
-            color=T.STEEL, uppercase=True, tracking_em=0.12,
+            color=T.STEEL, uppercase=True, tracking_em=0.1,
         )

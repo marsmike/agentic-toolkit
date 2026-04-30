@@ -66,7 +66,7 @@ def build(layout):
             x_px=tx, y_px=chain_y + 40, w_px=tw, h_px=30,
             prompt_text=stage["counter"],
             size_px=14, font=T.FONT_MONO, color=num_color,
-            uppercase=True, tracking_em=0.12,
+            uppercase=True, tracking_em=0.1,
         )
         add_text_placeholder(
             layout, idx=idx_base + 1, name=f"Stage {i+1} Heading", ph_type="body",
@@ -88,5 +88,5 @@ def build(layout):
         x_px=100, y_px=1000, w_px=1720, h_px=30,
         prompt_text="Source · Delivery plan · Wk 1–18 · Pilot currently in flight",
         size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
-        uppercase=True, tracking_em=0.12,
+        uppercase=True, tracking_em=0.1,
     )

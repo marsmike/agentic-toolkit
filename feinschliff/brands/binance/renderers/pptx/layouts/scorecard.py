@@ -197,7 +197,7 @@ def build(layout):
             w_px=hdr["w"] - 40, h_px=hdr["h"] - 18,
             prompt_text=col_label,
             size_px=T.SIZE_PX.get("eyebrow", 18), font=T.FONT_MONO,
-            color=T.GRAPHITE, uppercase=True, tracking_em=0.12,
+            color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
         )
 
     # ─── Row label placeholders (display typography — workstream names) ─
@@ -253,7 +253,7 @@ def build(layout):
             layout, lx + swatch_d + 10, legend_y,
             label_w, 24, label,
             size_px=14, font=T.FONT_MONO,
-            color=T.GRAPHITE, uppercase=True, tracking_em=0.12,
+            color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
         )
         lx += entry_w + entry_gap
 
