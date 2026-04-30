@@ -5,6 +5,13 @@ pairs an **input** (a brief, a DESIGN.md, a screenshot) with the
 **output** the plugin produced (a `.pdf`, a rendered PNG, a generated
 layout). Use these as starting points for your own work.
 
+## Teaser
+
+[`teaser.mp4`](teaser.mp4) — 60-second video showing one brief rendered
+across all five elevated brand packs (Feinschliff · BMW · Spotify ·
+Ferrari · Binance). 1920×1080 @ 30fps, no music, type-led — auto-plays
+silently in social feeds. Made with Claude Code + Remotion.
+
 ## Brand-pack previews
 
 Pre-rendered PDFs for every brand pack the plugin ships. PDFs render
@@ -24,10 +31,15 @@ Each brand folder ships:
 - `{Brand}-Template.pdf` — pre-rendered preview (≈1 MB, 34 slides).
 - `README.md` — palette, typography, glyph abstraction, regenerate recipe.
 
-The first two reference packs (**BMW**, **Spotify**) ship full
-brand-policy blocks alongside DTCG tokens — see their READMEs for
-the policy schema and the design decisions that go beyond colors and
-fonts.
+Four reference packs (**BMW**, **Spotify**, **Ferrari**, **Binance**)
+ship full brand-policy blocks alongside DTCG tokens — see their
+READMEs for the policy schema and the design decisions that go beyond
+colors and fonts. Each demonstrates the architecture in a different
+register: BMW (light canvas + sharp rectangles + 700/300 ladder),
+Spotify (dark + pills + heavy shadows + 700/400 binary), Ferrari
+(cinematic dark + 0px corners + sans 500 display), Binance
+(crypto-black + 6/12px radius + 600/700 display + markets-ticker
+chrome).
 
 ## Plugin-command examples
 
