@@ -4,7 +4,7 @@ from __future__ import annotations
 from pptx.dml.color import RGBColor
 
 import theme as T
-from components.primitives import add_rect, add_line, add_text
+from components.primitives import add_rect, add_rounded_rect, add_line, add_text
 
 
 def add_column(
@@ -25,9 +25,19 @@ def add_column(
     height_px: float = 600,
     pad_px: float = 40,
 ):
-    """A single content column (optionally wrapped in a card rect)."""
+    """A single content column (optionally wrapped in a Spotify rounded card).
+
+    Spotify cards are 8px rounded with `rgba(0,0,0,0.3)` elevation shadow.
+    The radius slot lives in `tokens.json` `radius.card`; the shadow comes
+    from the `shadow` parameter on `add_rounded_rect`.
+    """
     if as_card:
-        add_rect(target, x_px, y_px, w_px, height_px, fill=card_bg)
+        add_rounded_rect(
+            target, x_px, y_px, w_px, height_px,
+            radius_px=T.RADIUS.get("card", 0),
+            fill=card_bg,
+            shadow="elevated",
+        )
         inner_x = x_px + pad_px
         inner_w = w_px - 2 * pad_px
         cursor_y = y_px + pad_px

@@ -30,15 +30,15 @@ def build(layout):
         layout, idx=10, name="Eyebrow", ph_type="body",
         x_px=100, y_px=220, w_px=1600, h_px=30,
         prompt_text="Only title layout",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.BLACK, uppercase=True, tracking_em=0.12,
+        size_px=T.SIZE_PX["eyebrow"], weight="bold", font=T.FONT_DISPLAY,
+        color=T.BLACK, uppercase=True, tracking_em=0.1,
     )
     add_text_placeholder(
         layout, idx=0, name="Title", ph_type="title",
         x_px=100, y_px=260, w_px=1720, h_px=100,
         prompt_text="What we'll cover.",
         size_px=56, weight="light",
-        color=T.BLACK, tracking_em=-0.02, line_height=1.05,
+        color=T.BLACK, tracking_em=0, line_height=1.05,
     )
 
     # 6 agenda rows — 2 cols × 3 rows
@@ -56,14 +56,14 @@ def build(layout):
         add_text_placeholder(
             layout, idx=idx_base, name=f"Row {i+1} Num", ph_type="body",
             x_px=x, y_px=y + 14, w_px=110, h_px=30, prompt_text=n,
-            size_px=T.SIZE_PX["agenda_num"], font=T.FONT_MONO,
-            color=T.ACCENT, tracking_em=0.08,
+            size_px=T.SIZE_PX["agenda_num"], weight="bold", font=T.FONT_DISPLAY,
+            color=T.ACCENT, tracking_em=0.1,
         )
         add_text_placeholder(
             layout, idx=idx_base + 1, name=f"Row {i+1} Title", ph_type="body",
             x_px=x + 120, y_px=y + 10, w_px=col_w - 120, h_px=40, prompt_text=t,
-            size_px=T.SIZE_PX["agenda_t"], weight="medium",
-            color=T.BLACK, tracking_em=-0.01,
+            size_px=T.SIZE_PX["agenda_t"], weight="bold",
+            color=T.BLACK, tracking_em=0,
         )
         add_text_placeholder(
             layout, idx=idx_base + 2, name=f"Row {i+1} Desc", ph_type="body",

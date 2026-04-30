@@ -1,66 +1,58 @@
-"""Feinschliff · Chapter · Accent — chapter opener with transparent big-number (HTML 05)."""
+"""Spotify · Chapter — chapter divider with equalizer marker on dark canvas."""
 from __future__ import annotations
-
-from lxml import etree
-from pptx.oxml.ns import qn
 
 import theme as T
 from components import (
-    add_rule, add_text, add_text_placeholder, paint_chrome,
-    set_layout_background, set_layout_name,
+    add_text, add_text_placeholder,
+    add_equalizer_marker,
+    paint_chrome, set_layout_background, set_layout_name,
 )
+
 
 NAME = "Feinschliff · Chapter · Accent"
 
 
 def build(layout):
     set_layout_name(layout, NAME)
-    set_layout_background(layout, T.HEX["accent"])
-    paint_chrome(layout, variant="light", pgmeta="Chapter 01")
+    set_layout_background(layout, T.HEX["surface_dark"])
+    paint_chrome(layout, variant="dark", pgmeta="CHAPTER 01")
 
-    # Big faded background numeral (HTML: right:100, bottom:80, 220px).
-    # Bottom edge at y=1000, text height ≈ 220, so top ≈ 780. Add slack.
-    big = add_text(
-        layout, 1100, 780, 800, 220, "01 / 06",
-        size_px=220, weight="light",
-        color=T.BLACK, tracking_em=-0.04, line_height=0.85,
+    # Big chapter numeral — soft watermark right
+    add_text(
+        layout, 1100, 240, 720, 280, "01",
+        size_px=240, weight="bold", font=T.FONT_DISPLAY,
+        color=T.RULE_DARK,
+        tracking_em=0, line_height=1.0,
     )
-    _apply_alpha_to_last_run(big, alpha_pct=22)
 
-    add_rule(layout, 100, 498, width_px=80, height_px=4, color=T.BLACK)
+    # Equalizer marker
+    add_equalizer_marker(layout, x_px=120, y_px=440, w_px=180, h_px=56, bars=4)
+
     add_text_placeholder(
         layout, idx=10, name="Eyebrow", ph_type="body",
-        x_px=100, y_px=542, w_px=1600, h_px=30,
-        prompt_text="Chapter opener · orange",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.BLACK, uppercase=True, tracking_em=0.12,
+        x_px=120, y_px=540, w_px=1600, h_px=28,
+        prompt_text="CHAPTER 01 · DISCOVER",
+        size_px=T.SIZE_PX["eyebrow"],
+        weight="bold", font=T.FONT_DISPLAY,
+        color=T.ACCENT, uppercase=True, tracking_em=0.1,
     )
+
     add_text_placeholder(
         layout, idx=0, name="Title", ph_type="title",
-        x_px=100, y_px=596, w_px=1300, h_px=320,
-        prompt_text="01\nBrand.",
-        size_px=T.SIZE_PX["display"], weight="light",
-        color=T.BLACK, tracking_em=-0.035, line_height=0.95,
+        x_px=120, y_px=600, w_px=1300, h_px=280,
+        prompt_text="Discover\n& Listen.",
+        size_px=T.SIZE_PX["slide_title"],
+        weight="bold", font=T.FONT_DISPLAY,
+        color=T.BLACK,
+        tracking_em=0, line_height=1.05,
     )
 
-
-def _apply_alpha_to_last_run(textbox, *, alpha_pct: int):
-    """Inject <a:alpha val="N000"/> into the run's solidFill so the text
-    becomes semi-transparent (matches HTML `rgba(0,0,0,0.22)`)."""
-    tf = textbox.text_frame
-    for p in tf.paragraphs:
-        for r in p.runs:
-            rPr = r._r.get_or_add_rPr()
-            # Find solidFill
-            fill = rPr.find(qn("a:solidFill"))
-            if fill is None:
-                continue
-            srgb = fill.find(qn("a:srgbClr"))
-            if srgb is None:
-                continue
-            # Append <a:alpha val="..."/>
-            existing_alpha = srgb.find(qn("a:alpha"))
-            if existing_alpha is not None:
-                srgb.remove(existing_alpha)
-            alpha = etree.SubElement(srgb, qn("a:alpha"))
-            alpha.set("val", str(alpha_pct * 1000))
+    add_text_placeholder(
+        layout, idx=11, name="Subtitle", ph_type="body",
+        x_px=120, y_px=900, w_px=1100, h_px=80,
+        prompt_text="The radio shelf, made-for-you mixes, and weekly refreshes.",
+        size_px=T.SIZE_PX["lead"],
+        weight="regular", font=T.FONT_DISPLAY,
+        color=T.STEEL,
+        tracking_em=0, line_height=1.4,
+    )

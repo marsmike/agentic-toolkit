@@ -1,76 +1,96 @@
-"""Feinschliff · KPI Grid — 4 KPI cells with hairlines (HTML 07).
+"""Spotify · KPI Grid — 4-up rounded cards on dark canvas.
 
-All four fields per KPI (value, unit, key, delta) are editable placeholders.
-Value is right-aligned big text (Noto Sans Light); unit is small graphite
-sitting flush against it. Together they share a baseline via bottom-anchoring.
+Spotify's app analog of the spec-cell pattern. Each KPI sits inside an
+8px-rounded card on `paper` (#181818) with the elevated shadow.
+Big bold value + UPPERCASE 1.4px tracked label + Spotify Green delta.
 """
 from __future__ import annotations
 
 import theme as T
 from components import (
-    add_line, add_rect, add_text_placeholder, paint_chrome,
+    add_rounded_rect, add_text_placeholder, paint_chrome,
     set_layout_background, set_layout_name,
 )
 from layouts._shared import content_header
 
+
 NAME = "Feinschliff · KPI Grid"
 
 SAMPLES = [
-    ("62",  "k",    "Employees",           "+3% YoY"),
-    ("14",  " bn",  "Revenue · EUR",       "+5.1% YoY"),
-    ("40",  "",     "Factories worldwide", "8 regions"),
-    ("100", "%",    "Green electricity",   "since 2020"),
+    ("574",  "M",   "Monthly listeners",   "+12% YoY"),
+    ("100",  "M",   "Premium subscribers", "+9% YoY"),
+    ("8.5",  "B",   "Tracks streamed",     "DAILY"),
+    ("184",  "",    "Markets",             "GLOBAL"),
 ]
 
 
 def build(layout):
     set_layout_name(layout, NAME)
-    set_layout_background(layout, T.HEX["white"])
-    paint_chrome(layout, variant="light", pgmeta="Company · 2025")
+    set_layout_background(layout, T.HEX["surface_dark"])
+    paint_chrome(layout, variant="dark", pgmeta="2026 · BY THE NUMBERS")
 
-    content_header(layout, eyebrow="Figures at a glance", title="Feinschliff in numbers.")
+    content_header(layout, eyebrow="At a glance", title="By the numbers.")
 
-    # 1720 / 4 = 430 per KPI
-    kpi_w = 430
-    x0, y0, kpi_h = 100, 540, 260
+    # 4-up rounded card grid
+    kpi_w = 400
+    gap = 24
+    x0 = 120
+    y0 = 540
+    kpi_h = 320
+    card_radius = T.RADIUS.get("card", 8)
 
-    # Value fills most of its half, right-aligned; unit starts flush after.
-    value_w = 190
-    unit_w = (kpi_w - 80) - value_w  # 160
-
-    # Left hairline
-    add_rect(layout, x0, y0, 1, kpi_h, fill=T.FOG)
+    value_w = 240
+    unit_w = (kpi_w - 64) - value_w
 
     for i, (value, unit, key, delta) in enumerate(SAMPLES):
-        x = x0 + i * kpi_w
-        add_line(layout, x, y0, kpi_w, 1, T.FOG)
-        add_line(layout, x, y0 + kpi_h - 1, kpi_w, 1, T.FOG)
-        add_rect(layout, x + kpi_w, y0, 1, kpi_h, fill=T.FOG)
+        x = x0 + i * (kpi_w + gap)
 
-        idx_base = 20 + i * 2
-        add_text_placeholder(
-            layout, idx=idx_base, name=f"KPI {i+1} Key", ph_type="body",
-            x_px=x + 40, y_px=y0 + 190, w_px=kpi_w - 80, h_px=30, prompt_text=key,
-            size_px=T.SIZE_PX["kpi_key"], font=T.FONT_MONO,
-            color=T.GRAPHITE, uppercase=True, tracking_em=0.1,
-        )
-        add_text_placeholder(
-            layout, idx=idx_base + 1, name=f"KPI {i+1} Delta", ph_type="body",
-            x_px=x + 40, y_px=y0 + 220, w_px=kpi_w - 80, h_px=26, prompt_text=delta,
-            size_px=T.SIZE_PX["kpi_delta"], font=T.FONT_MONO,
-            color=T.ACCENT_HOVER,
+        # Rounded card with elevated shadow
+        add_rounded_rect(
+            layout, x, y0, kpi_w, kpi_h,
+            radius_px=card_radius,
+            fill=T.PAPER,
+            shadow="elevated",
         )
 
-        # Value + unit as two placeholders, bottom-anchored so baselines align.
+        # Value 700 bold
         add_text_placeholder(
             layout, idx=30 + i * 2, name=f"KPI {i+1} Value", ph_type="body",
-            x_px=x + 40, y_px=y0 + 36, w_px=value_w, h_px=140, prompt_text=value,
-            size_px=T.SIZE_PX["kpi_value"], weight="light", font=T.FONT_DISPLAY,
-            color=T.BLACK, tracking_em=-0.03, align="r", anchor="b",
+            x_px=x + 32, y_px=y0 + 60, w_px=value_w, h_px=140,
+            prompt_text=value,
+            size_px=T.SIZE_PX["kpi_value"],
+            weight="bold", font=T.FONT_DISPLAY,
+            color=T.BLACK,
+            tracking_em=0, line_height=1.0,
+            align="l", anchor="b",
         )
+        # Unit
         add_text_placeholder(
             layout, idx=31 + i * 2, name=f"KPI {i+1} Unit", ph_type="body",
-            x_px=x + 40 + value_w, y_px=y0 + 36, w_px=unit_w, h_px=140,
-            prompt_text=unit, size_px=T.SIZE_PX["kpi_unit"], font=T.FONT_DISPLAY,
-            color=T.GRAPHITE, align="l", anchor="b",
+            x_px=x + 32 + value_w, y_px=y0 + 60, w_px=unit_w, h_px=140,
+            prompt_text=unit,
+            size_px=T.SIZE_PX["kpi_unit"],
+            weight="bold", font=T.FONT_DISPLAY,
+            color=T.STEEL,
+            tracking_em=0,
+            align="l", anchor="b",
+        )
+        # Key — UPPERCASE 1.4px tracked
+        add_text_placeholder(
+            layout, idx=20 + i * 2, name=f"KPI {i+1} Key", ph_type="body",
+            x_px=x + 32, y_px=y0 + 220, w_px=kpi_w - 64, h_px=28,
+            prompt_text=key,
+            size_px=T.SIZE_PX["kpi_key"],
+            weight="bold", font=T.FONT_DISPLAY,
+            color=T.BLACK, uppercase=True, tracking_em=0.1,
+        )
+        # Delta — Spotify Green
+        add_text_placeholder(
+            layout, idx=21 + i * 2, name=f"KPI {i+1} Delta", ph_type="body",
+            x_px=x + 32, y_px=y0 + 260, w_px=kpi_w - 64, h_px=24,
+            prompt_text=delta,
+            size_px=T.SIZE_PX["kpi_delta"],
+            weight="regular", font=T.FONT_DISPLAY,
+            color=T.ACCENT,
+            uppercase=True, tracking_em=0.05,
         )

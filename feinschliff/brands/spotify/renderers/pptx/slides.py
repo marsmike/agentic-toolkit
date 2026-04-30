@@ -348,14 +348,19 @@ def build_demo_deck(prs: Presentation):
         _10="Layout · chapter ink",
         _0="02\nChapter\n& Picture.")
 
-    # KPI Grid
+    # KPI Grid — Spotify rounded-card pattern
     add(prs, "Feinschliff · KPI Grid",
-        _10="Layout · KPI grid",
-        _0="Headline numbers.",
-        _20="Metric 1", _21="Caption 1",
-        _22="Metric 2", _23="Caption 2",
-        _24="Metric 3", _25="Caption 3",
-        _26="Metric 4", _27="Caption 4")
+        _10="At a glance",
+        _0="By the numbers.",
+        _20="Monthly listeners",   _21="+12% YoY",
+        _22="Premium subscribers", _23="+9% YoY",
+        _24="Tracks streamed",     _25="DAILY",
+        _26="Markets",             _27="GLOBAL",
+        _30="574", _31="M",
+        _32="100", _33="M",
+        _34="8.5", _35="B",
+        _36="184", _37="")
+
 
     # 2-Column Cards
     add(prs, "Feinschliff · 2-Column Cards",
@@ -430,7 +435,7 @@ def build_demo_deck(prs: Presentation):
     # End
     add(prs, "Feinschliff · End",
         _0="Thank you.",
-        _10="Feinschliff · v0.1 · 2026")
+        _10="SPOTIFY · 2026 SHOWCASE")
 
     # Funnel
     add(prs, "Feinschliff · Funnel",

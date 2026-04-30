@@ -10,7 +10,7 @@ Adding a new component to the kit (future flow):
   2. Re-export it below so callers can `from components import add_timeline`.
   3. Wire it into one of the layouts in `layouts.py` (or create a new one).
 """
-from components.primitives import add_rect, add_line, add_text, set_solid_fill
+from components.primitives import add_rect, add_rounded_rect, add_line, add_text, set_solid_fill
 from components.type import (
     add_rule, add_eyebrow, add_slide_title, add_display,
     add_huge, add_subtitle, add_body, add_mono_caption,
@@ -18,6 +18,7 @@ from components.type import (
 from components.chrome import (
     add_logo, add_pgmeta, add_footer_left, add_footer_right,
     paint_chrome,
+    add_equalizer_marker, add_pill_link,
 )
 from components.controls import add_button, add_chip
 from components.data import add_kpi, add_bar_row
@@ -43,13 +44,14 @@ from components.placeholders import (
 
 __all__ = [
     # primitives
-    "add_rect", "add_line", "add_text", "set_solid_fill",
+    "add_rect", "add_rounded_rect", "add_line", "add_text", "set_solid_fill",
     # type
     "add_rule", "add_eyebrow", "add_slide_title", "add_display",
     "add_huge", "add_subtitle", "add_body", "add_mono_caption",
     # chrome
     "add_logo", "add_pgmeta", "add_footer_left", "add_footer_right",
     "paint_chrome",
+    "add_equalizer_marker", "add_pill_link",
     # controls
     "add_button", "add_chip",
     # data

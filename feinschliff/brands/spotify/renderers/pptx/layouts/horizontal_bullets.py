@@ -165,8 +165,8 @@ def build(layout):
             layout, idx=idx_base, name=f"Col{i+1} Counter", ph_type="body",
             x_px=x, y_px=counter_y, w_px=col_w, h_px=counter_h,
             prompt_text=counter,
-            size_px=T.SIZE_PX["col_num"], font=T.FONT_MONO,
-            color=T.ACCENT, uppercase=True, tracking_em=0.12,
+            size_px=T.SIZE_PX["col_num"], weight="bold", font=T.FONT_DISPLAY,
+            color=T.ACCENT, uppercase=True, tracking_em=0.1,
         )
 
         # Heading — display medium, black.
@@ -174,8 +174,8 @@ def build(layout):
             layout, idx=idx_base + 1, name=f"Col{i+1} Heading", ph_type="body",
             x_px=x, y_px=heading_y, w_px=col_w, h_px=heading_h,
             prompt_text=heading,
-            size_px=T.SIZE_PX["col_title"], weight="medium",
-            color=T.BLACK, tracking_em=-0.012, line_height=1.15,
+            size_px=T.SIZE_PX["col_title"], weight="bold",
+            color=T.BLACK, tracking_em=0, line_height=1.15,
         )
 
         # Bullets — single multi-line body placeholder, disc marker painted
@@ -195,6 +195,6 @@ def build(layout):
         layout, idx=60, name="Source", ph_type="body",
         x_px=content_x0, y_px=1000, w_px=content_w, h_px=30,
         prompt_text="Source · Strategy review, Q4 2025",
-        size_px=14, font=T.FONT_MONO, color=T.GRAPHITE,
-        uppercase=True, tracking_em=0.12,
+        size_px=14, weight="bold", font=T.FONT_DISPLAY, color=T.GRAPHITE,
+        uppercase=True, tracking_em=0.1,
     )

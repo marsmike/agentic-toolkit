@@ -1,35 +1,45 @@
-"""Feinschliff · End — orange-bg centered "Thank you" (HTML 16)."""
+"""Spotify · End — closing slide with green pill 'Open Spotify' CTA."""
 from __future__ import annotations
 
 import theme as T
 from components import (
-    add_rect, add_text_placeholder, paint_chrome,
+    add_text_placeholder, paint_chrome,
+    add_button, add_equalizer_marker,
     set_layout_background, set_layout_name,
 )
+
 
 NAME = "Feinschliff · End"
 
 
 def build(layout):
     set_layout_name(layout, NAME)
-    set_layout_background(layout, T.HEX["accent"])
-    paint_chrome(layout, variant="light", pgmeta="End")
+    set_layout_background(layout, T.HEX["surface_dark"])
+    paint_chrome(layout, variant="dark", pgmeta="THANK YOU")
 
-    # Centred rule (1920/2 - 60 = 900)
-    add_rect(layout, 900, 380, 120, 4, fill=T.BLACK)
+    add_equalizer_marker(layout, x_px=860, y_px=280, w_px=200, h_px=64, bars=4)
+
     add_text_placeholder(
         layout, idx=0, name="Title", ph_type="title",
-        x_px=100, y_px=420, w_px=1720, h_px=280,
+        x_px=120, y_px=420, w_px=1680, h_px=200,
         prompt_text="Thank you.",
-        size_px=200, weight="light",
-        color=T.BLACK, tracking_em=-0.035, line_height=0.95,
+        size_px=200,
+        weight="bold", font=T.FONT_DISPLAY,
+        color=T.BLACK,
+        tracking_em=0, line_height=1.0,
         align="c",
     )
+
     add_text_placeholder(
         layout, idx=10, name="Caption", ph_type="body",
-        x_px=100, y_px=720, w_px=1720, h_px=40,
-        prompt_text="Feinschliff. Design System · v1.0 · 2026",
-        size_px=T.SIZE_PX["eyebrow"], font=T.FONT_MONO,
-        color=T.BLACK, uppercase=True, tracking_em=0.12,
+        x_px=120, y_px=720, w_px=1680, h_px=30,
+        prompt_text="SPOTIFY · 2026 SHOWCASE",
+        size_px=T.SIZE_PX["eyebrow"],
+        weight="bold", font=T.FONT_DISPLAY,
+        color=T.STEEL,
+        uppercase=True, tracking_em=0.1,
         align="c",
     )
+
+    add_button(layout, x_px=860, y_px=820, label="Open Spotify",
+               variant="primary", w_px=200, h_px=56)

@@ -66,3 +66,40 @@ WEIGHT: dict[str, int] = {
     for key, token in _TOKENS["font-weight"].items()
     if not key.startswith("$")
 }
+
+# ─── Radius (CSS px → int) ─────────────────────────────────────────────────
+# Read by `add_rounded_rect` and the component primitives. Spotify sets
+# radius.btn = radius.chip = 9999 (full pill) and radius.card = 8 (album-art
+# rounded corner), opting into Spotify's pill-and-circle geometry without
+# changing renderer code.
+RADIUS: dict[str, int] = {
+    key.replace("-", "_"): _px_to_int(token["$value"])
+    for key, token in _TOKENS["radius"].items()
+    if not key.startswith("$")
+}
+
+
+# ─── Spotify policy blocks ─────────────────────────────────────────────────
+# Same shape as BMW's policy projections — a flat dict per block, dropping
+# `$description` / `$type` meta. Layouts read these to switch on Spotify
+# idioms (cover pattern, equalizer section marker, shadow elevation).
+
+def _flatten_policy(block: dict) -> dict:
+    out = {}
+    for key, entry in block.items():
+        if key.startswith("$"):
+            continue
+        if isinstance(entry, dict) and "$value" in entry:
+            out[key] = entry["$value"]
+        else:
+            out[key] = entry
+    return out
+
+
+LAYOUT:          dict = _flatten_policy(_TOKENS.get("layout", {}))
+COVER:           dict = _flatten_policy(_TOKENS.get("cover", {}))
+SECTION_MARKER:  dict = _flatten_policy(_TOKENS.get("section-marker", {}))
+PHOTOGRAPHY:     dict = _flatten_policy(_TOKENS.get("photography", {}))
+HEADLINE_RULE:   dict = _flatten_policy(_TOKENS.get("headline-rule", {}))
+CHIP_RULE:       dict = _flatten_policy(_TOKENS.get("chip-rule", {}))
+SHADOW:          dict = _flatten_policy(_TOKENS.get("shadow", {}))

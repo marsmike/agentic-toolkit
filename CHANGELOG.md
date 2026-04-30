@@ -22,6 +22,14 @@ All notable changes to this project will be documented here. Format follows [Kee
   - Cover, both chapters, and KPI grid rebuilt to BMW-canonical compositions (HairlineHeader cover, M-stripe chapter dividers, spec-cell KPI pattern).
   - Quote and End slides moved off forbidden full-bleed BMW Blue onto compliant dark navy / mirrored cover treatments.
 - New radius-aware primitive `add_rounded_rect(radius_px=…)` plumbed through `add_button` / `add_chip` / `add_column(as_card=True)`. Reads from new `radius.btn`, `radius.chip`, `radius.card` token slots so brand packs flip pill / rounded / sharp shapes by editing tokens, never the renderer. BMW (radius=0) falls through to the existing `MSO_SHAPE.RECTANGLE` path — output is pixel-identical to the prior frozen build (verified by per-page PNG diff).
+- **Spotify pack** elevated to the second reference brand pack, demonstrating the policy-driven architecture in its mirror-opposite mode from BMW (pills + rounded cards + heavy shadows + dark canvas, vs. BMW's sharp rectangles + hairlines + light canvas). Same primitive set, different token values:
+  - `radius.btn = radius.chip = 9999` → fully-rounded pill buttons; `radius.card = 8` → 8px rounded album-art card register. BMW's `add_button` / `add_chip` / `add_column(as_card)` produce pills here without a renderer change.
+  - `add_rounded_rect` extended with a `shadow="elevated"|"dialog"` parameter that injects OOXML drop shadows per Spotify DESIGN.md §6 — `rgba(0,0,0,0.3) 0px 8px 8px` for cards, `rgba(0,0,0,0.5) 0px 8px 24px` for modals. Spotify needs heavy shadows on the dark canvas; BMW (no shadows ever) ignores the parameter via the existing `shadow.inherit = False` default.
+  - New chrome primitive `add_equalizer_marker` — three-to-four green pill bars of varying height, replacing BMW's `add_m_stripe` role at chapter dividers.
+  - New chrome primitive `add_pill_link` — UPPERCASE 1.4px-tracked label voice for inline pill-density CTAs (Spotify analog of BMW's `add_chevron_link`).
+  - Bold/regular weight binary (700/400) replaces BMW's 700/300 ladder — the binary IS the typographic hierarchy per DESIGN.md.
+  - Cover (album-art shelf + green PLAY pill), both chapters (equalizer marker + soft chapter watermark), KPI grid (4-up rounded shadowed cards on dark canvas), Quote, and End layouts rebuilt as Spotify-canonical compositions. Title Accent and End slides moved off forbidden full-bleed Spotify Green onto dark canvas with green pill CTAs.
+  - Six new policy blocks (`layout`, `cover`, `section-marker`, `photography`, `headline-rule`, `chip-rule`, `shadow`) — same shape as BMW's, different values. Confirms the architecture generalizes.
 
 ## [0.1.0] — 2026-05-01
 
