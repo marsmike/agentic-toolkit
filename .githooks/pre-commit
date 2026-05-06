@@ -10,7 +10,16 @@ HITS=$(git diff --cached -U0 \
     -- ':!*.svg' ':!*.jpg' ':!*.pptx' \
        ':!.githooks/*' \
     | grep -E "^\+" | grep -E "$PATTERN" || true)
-BIN_HITS=$(git diff --cached --name-only --diff-filter=A | grep -E '\.(svg|jpg|pptx)$' | grep -E 'eyJpZGVudGlmaWVyIjo' || true)
+# Scan the CONTENT of newly-added binaries for the BSH asset-id base64 prefix.
+# (Filename-based check is useless because BSH asset IDs end up embedded in the
+# bytes of legitimately-named .svg/.jpg/.pptx files.)
+BIN_HITS=""
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  if git show ":$f" 2>/dev/null | grep -aqE 'eyJpZGVudGlmaWVyIjo'; then
+    BIN_HITS="${BIN_HITS}${f}"$'\n'
+  fi
+done < <(git diff --cached --name-only --diff-filter=A | grep -E '\.(svg|jpg|pptx)$' || true)
 
 if [[ -n "$HITS" || -n "$BIN_HITS" ]]; then
   echo "ERROR: pre-commit leak scan found BSH markers in staged changes:" >&2
