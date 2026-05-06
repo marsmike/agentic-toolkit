@@ -343,7 +343,9 @@
             "kpis[2].unit": 35,
             "kpis[3].value": 36,
             "kpis[3].unit": 37
-          }
+          },
+          "source": "templates/pptx/kpi-grid.pptx",
+          "sha256": "e71f39ea459301d831a17790c9e978de567b0465920af1538850f0384d008b7d"
         }
       }
     },
