@@ -43,7 +43,7 @@ def test_feinschliff_pptx_build_succeeds():
 
 
 def test_feinschliff_catalog_brand_field():
-    catalog_path = PACK_ROOT / "catalog" / "layouts.json"
+    catalog_path = PACK_ROOT / "catalog.json"
     with catalog_path.open() as f:
         catalog = json.load(f)
     assert catalog.get("brand") == "feinschliff", \

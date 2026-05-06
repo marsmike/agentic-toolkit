@@ -30,8 +30,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_orange",
-          "layout_name": "Feinschliff · Title · Accent",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
@@ -66,8 +64,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_ink",
-          "layout_name": "Feinschliff · Title · Ink",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
@@ -107,14 +103,11 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_picture",
-          "layout_name": "Feinschliff · Title + Picture",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
             "body": 11
           },
-          "image_fill_mode": "format-shape",
           "source": "templates/pptx/title-picture.pptx",
           "sha256": "e0c7dd7d65b10c08635cc37128b134457bf03894408f487ae6c01c37b9685890"
         }
@@ -173,8 +166,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.agenda",
-          "layout_name": "Feinschliff · Agenda",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -227,8 +218,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.chapter_orange",
-          "layout_name": "Feinschliff · Chapter · Accent",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
@@ -263,13 +252,10 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.chapter_ink",
-          "layout_name": "Feinschliff · Chapter · Ink + Picture",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
-          "image_fill_mode": "format-shape",
           "source": "templates/pptx/chapter-ink.pptx",
           "sha256": "ed3b6530a8e064c95ad5c290ec3734d5d39d0c0e2ae426a95f4fa8f16c4000cf"
         }
@@ -332,8 +318,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.kpi_grid",
-          "layout_name": "Feinschliff · KPI Grid",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -413,8 +397,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.two_column_cards",
-          "layout_name": "Feinschliff · 2-Column Cards",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -483,8 +465,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.three_column",
-          "layout_name": "Feinschliff · 3-Column",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -556,8 +536,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.four_column_cards",
-          "layout_name": "Feinschliff · 4-Column Cards",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -608,14 +586,11 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.text_picture",
-          "layout_name": "Feinschliff · Text + Picture",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
             "body": 11
           },
-          "image_fill_mode": "format-shape",
           "source": "templates/pptx/text-picture.pptx",
           "sha256": "55e641513a3463e85125edbb69896c03f7d8052101229c0aa84c5c0d447bd7d2"
         }
@@ -646,13 +621,10 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.full_bleed_cover",
-          "layout_name": "Feinschliff · Full-bleed Cover",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
-          "image_fill_mode": "format-shape",
           "source": "templates/pptx/full-bleed-cover.pptx",
           "sha256": "9f98fe4c0a64e63d89a8072001949e9004fbd28ac080631c938fc39e3716094c"
         }
@@ -709,8 +681,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.bar_chart",
-          "layout_name": "Feinschliff · Bar Chart",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -754,8 +724,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.components_showcase",
-          "layout_name": "Feinschliff · Components Showcase",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
@@ -790,8 +758,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.quote",
-          "layout_name": "Feinschliff · Quote",
           "placeholder_map": {
             "title": 0,
             "attribution": 10
@@ -827,8 +793,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.end",
-          "layout_name": "Feinschliff · End",
           "placeholder_map": {
             "title": 0,
             "caption": 10
@@ -895,8 +859,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.graphical",
-          "layout_name": "Feinschliff · Graphical",
           "placeholder_map": {
             "title": 0,
             "eyebrow": 10,
@@ -981,8 +943,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.action_title",
-          "layout_name": "Feinschliff · Action Title",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1061,8 +1021,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.horizontal_bullets",
-          "layout_name": "Feinschliff · Horizontal Bullets",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1144,8 +1102,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.vertical_bullets",
-          "layout_name": "Feinschliff · Vertical Bullets",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1250,8 +1206,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.matrix_2x2",
-          "layout_name": "Feinschliff · 2×2 Matrix",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1328,8 +1282,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.waterfall",
-          "layout_name": "Feinschliff · Waterfall",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1416,8 +1368,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.process_flow",
-          "layout_name": "Feinschliff · Process Flow",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1535,8 +1485,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.stacked_bar",
-          "layout_name": "Feinschliff · Stacked Bar",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1641,8 +1589,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.table",
-          "layout_name": "Feinschliff · Table",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1736,8 +1682,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.pyramid",
-          "layout_name": "Feinschliff · Pyramid",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1817,8 +1761,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.key_takeaways",
-          "layout_name": "Feinschliff · Key Takeaways",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1914,8 +1856,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.executive_summary",
-          "layout_name": "Feinschliff · Executive Summary",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2027,8 +1967,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.line_chart",
-          "layout_name": "Feinschliff · Line Chart",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2126,8 +2064,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.scorecard",
-          "layout_name": "Feinschliff · Scorecard",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2252,8 +2188,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.gantt",
-          "layout_name": "Feinschliff · Gantt",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2372,8 +2306,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.funnel",
-          "layout_name": "Feinschliff · Funnel",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2508,8 +2440,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.venn",
-          "layout_name": "Feinschliff · Venn",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2538,99 +2468,6 @@
           },
           "source": "templates/pptx/venn.pptx",
           "sha256": "bcc2adf524679cd9b677ef0665d7ad1bc6e574d6d6d29641aea50bac375e571f"
-        }
-      }
-    },
-    {
-      "id": "diagram",
-      "name": "Feinschliff · Diagram",
-      "role": "content-with-diagram",
-      "concepts": [
-        "diagram",
-        "flowchart",
-        "architecture-overview",
-        "architectural-overview",
-        "system-architecture",
-        "system-overview",
-        "layered-system",
-        "layer-diagram",
-        "concept-map",
-        "mind-map",
-        "block-diagram",
-        "freeform-diagram"
-      ],
-      "when_to_use": "User mentions diagram, flowchart, architecture, architectural overview, system overview, layers, concept map, mind map, block diagram, or any one-big-rich-visual-per-slide intent. Also: multi-element flows with callouts that don't fit a parameterized template. The diagram is authored as Excalidraw DSL and rendered+Feinschliff-themed at build time.",
-      "when_not_to_use": "Content that fits a parameterized template — prefer process-flow for pipelines, pyramid for hierarchy, venn for overlap, 2x2-matrix for quadrants, funnel for conversion, bar-chart for ranked numeric data, kpi-grid for metrics. Also not for photographic imagery (use text-picture or title-picture).",
-      "slots": {
-        "eyebrow": {
-          "type": "string",
-          "maxLength": 60,
-          "optional": true,
-          "description": "Mono uppercase label above the title"
-        },
-        "title": {
-          "type": "string",
-          "maxLength": 80,
-          "description": "Slide title, one line"
-        },
-        "dsl": {
-          "type": "string",
-          "description": "Excalidraw DSL source (see excalidraw/references/dsl-syntax.md). First line `theme bsh` is auto-prepended if missing (the literal `bsh` is the excalidraw plugin's theme key, not a brand reference). Expanded → Feinschliff-themed → rendered to PNG → embedded. The .dsl, .excalidraw, -bsh.excalidraw, and -bsh.png are all preserved under out/<deck>/diagrams/ for post-build editing."
-        },
-        "caption": {
-          "type": "string",
-          "maxLength": 160,
-          "optional": true,
-          "description": "One-line caption under the diagram (source, figure number, etc.)"
-        }
-      },
-      "renderer": {
-        "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.diagram",
-          "layout_name": "Feinschliff · Diagram",
-          "placeholder_map": {
-            "eyebrow": 10,
-            "title": 0,
-            "caption": 11
-          }
-        }
-      }
-    },
-    {
-      "id": "tech-radar-full-bleed",
-      "name": "Feinschliff · Tech Radar · Full Bleed",
-      "role": "data-visualization",
-      "concepts": [
-        "tech-radar",
-        "tech-scouting",
-        "manager-review",
-        "innovation-portfolio",
-        "thought-leadership"
-      ],
-      "when_to_use": "User wants a tech-radar slide — pick a view from `<vault>/Tech-Radar/Views.yaml` (today: `genai-thoughtworks` for the all-blips ThoughtWorks-shaped overview, or `genai-agents`, `genai-models`, `genai-skills`, `genai-tooling` for per-quadrant sub-radars). The /deck pipeline calls `slides.add_radar(prs, slug, view, vault, out_dir, volume?, new_since?)` which runs the full radar-engine pipeline (load blips → magnetic positioning → snapshot edition → SVG → PNG) and embeds the PNG full-bleed. The radar SVG carries its own logo/eyebrow/title/footer, so this layout paints NO chrome of its own.",
-      "when_not_to_use": "A radar that should sit alongside other content on the same slide (use a regular layout and embed a smaller version of the PNG instead). Also not for non-radar full-bleed images — use 'full-bleed-cover' for those.",
-      "slots": {
-        "view": {
-          "type": "string",
-          "description": "View name from <vault>/Tech-Radar/Views.yaml (e.g. 'genai-thoughtworks', 'genai-agents', 'genai-models', 'genai-skills', 'genai-tooling')."
-        },
-        "volume": {
-          "type": "integer",
-          "description": "Optional edition volume number. Defaults to latest existing edition + 1, or 1 for first run.",
-          "optional": true
-        },
-        "new_since": {
-          "type": "string",
-          "description": "Optional ISO date threshold for the NEW badge. Defaults to today − 14 days.",
-          "optional": true
-        }
-      },
-      "renderer": {
-        "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.tech_radar_full_bleed",
-          "layout_name": "Feinschliff · Tech Radar · Full Bleed",
-          "build_call": "slides.add_radar",
-          "placeholder_map": {}
         }
       }
     },
@@ -2711,8 +2548,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.v_model",
-          "layout_name": "Feinschliff · V-Model",
           "placeholder_map": {
             "kicker": 11,
             "action_title": 0,
