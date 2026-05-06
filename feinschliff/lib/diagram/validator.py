@@ -20,11 +20,11 @@ vision QA catches (poor visual hierarchy, aesthetic imbalance) but they nail
 the structural failure modes that produced the initial unreadable proof.
 
 Usage:
-    from diagram_validator import check
+    from lib.diagram import check
     issues = check(excalidraw_doc)       # list[str], empty = clean
 
 Or as CLI:
-    uv run python diagram_validator.py path/to/diagram.excalidraw
+    uv run python -m lib.diagram.validator path/to/diagram.excalidraw
 """
 from __future__ import annotations
 
