@@ -19,3 +19,6 @@ feinschliff/docs/images/slides/
 # port_brand.py working files — keep local for review, never commit.
 feinschliff/brands/*/.port-needs-review.txt
 feinschliff/brands/*/.port-verify/
+
+# Python build artifacts
+*.egg-info/
