@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feinschliff.dev/schemas/catalog-v2.schema.json",
+  "title": "Feinschliff Catalog v2",
+  "description": "Brand catalog: tokens, asset sources, templates, and assets.",
+  "type": "object",
+  "required": ["brand", "layouts"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "type": "string" },
+    "brand": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "default": "0.0.0" },
+    "asset_sources": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/assetSource" }
+    },
+    "layouts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/layoutEntry" }
+    },
+    "assets": {
+      "type": "object",
+      "properties": {
+        "icons":         { "type": "array", "items": { "$ref": "asset-entry.schema.json" } },
+        "illustrations": { "type": "array", "items": { "$ref": "asset-entry.schema.json" } },
+        "images":        { "type": "array", "items": { "$ref": "asset-entry.schema.json" } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "assetSource": {
+      "type": "object",
+      "required": ["base_url"],
+      "additionalProperties": false,
+      "properties": {
+        "base_url": { "type": "string", "format": "uri" },
+        "auth": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["type", "env"],
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "query_token" },
+                "env":  { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "layoutEntry": {
+      "type": "object",
+      "required": ["id", "renderer"],
+      "additionalProperties": true,
+      "properties": {
+        "id":              { "type": "string", "minLength": 1 },
+        "name":            { "type": "string" },
+        "when_to_use":     { "type": "string" },
+        "when_not_to_use": { "type": "string" },
+        "tags":            { "type": "array", "items": { "type": "string" } },
+        "slots":           { "type": "object", "additionalProperties": { "type": "object" } },
+        "asset_slots":     { "type": "array", "items": { "$ref": "#/$defs/assetSlot" } },
+        "renderer":        { "type": "object", "additionalProperties": { "$ref": "#/$defs/rendererSpec" } },
+        "alternatives":    { "type": "array", "maxItems": 2, "items": { "$ref": "#/$defs/alternativeEntry" } },
+        "preview":         { "type": "string" }
+      }
+    },
+    "assetSlot": {
+      "type": "object",
+      "required": ["id", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id":             { "type": "string", "minLength": 1 },
+        "type":           { "enum": ["icon", "image", "illustration"] },
+        "preferred_tags": { "type": "array", "items": { "type": "string" } },
+        "optional":       { "type": "boolean", "default": false }
+      }
+    },
+    "rendererSpec": {
+      "description": "v1 (module) and/or v2 (source + sha256). Migration phase allows both keys to coexist on the same entry; the parser prefers source when present.",
+      "type": "object",
+      "anyOf": [
+        {
+          "required": ["module"],
+          "properties": {
+            "module":          { "type": "string", "minLength": 1 },
+            "layout_name":     { "type": "string" },
+            "placeholder_map": { "type": "object", "additionalProperties": { "type": "integer" } }
+          }
+        },
+        {
+          "required": ["source", "sha256", "placeholder_map"],
+          "properties": {
+            "module":          { "type": "string" },
+            "layout_name":     { "type": "string" },
+            "source":          { "type": "string", "minLength": 1 },
+            "sha256":          { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "placeholder_map": { "type": "object", "additionalProperties": { "type": "integer" } }
+          }
+        }
+      ]
+    },
+    "alternativeEntry": {
+      "description": "A visual variant of a parent layout. Shares the parent's slots schema; ships its own renderer artifact.",
+      "type": "object",
+      "required": ["id", "renderer"],
+      "additionalProperties": false,
+      "properties": {
+        "id":          { "type": "string", "minLength": 1 },
+        "when_to_use": { "type": "string" },
+        "renderer":    { "type": "object", "additionalProperties": { "$ref": "#/$defs/rendererSpec" } }
+      }
+    }
+  }
+}
