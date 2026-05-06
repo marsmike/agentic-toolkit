@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Block accidental commits of BSH-internal markers to this OSS repo.
+set -euo pipefail
+
+PATTERN='bshg\.com|boschdevcloud|github-bshg|eforms-online|s\.a\.x\.|MasterLayout|rb-proxy|\.bosch\.com|Bosch Siemens|MUM3RE|YeHVV89kL7aKBQbZWT9k93hLA7kfdfg2uRNrYfd22Y|eyJpZGVudGlmaWVyIjo'
+
+# Limit to staged additions (not whole files — false positives in unchanged code are not our problem).
+HITS=$(git diff --cached -U0 -- ':!*.svg' ':!*.jpg' ':!*.pptx' | grep -E "^\+" | grep -E "$PATTERN" || true)
+BIN_HITS=$(git diff --cached --name-only --diff-filter=A | grep -E '\.(svg|jpg|pptx)$' | grep -E 'eyJpZGVudGlmaWVyIjo' || true)
+
+if [[ -n "$HITS" || -n "$BIN_HITS" ]]; then
+  echo "ERROR: pre-commit leak scan found BSH markers in staged changes:" >&2
+  [[ -n "$HITS" ]] && echo "$HITS" >&2
+  [[ -n "$BIN_HITS" ]] && echo "BSH asset-id binaries: $BIN_HITS" >&2
+  echo >&2
+  echo "If this is a false positive (e.g. unrelated palette text), use 'git commit --no-verify' AFTER manual review." >&2
+  exit 1
+fi
