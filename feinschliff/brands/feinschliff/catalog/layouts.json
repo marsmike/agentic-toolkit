@@ -35,7 +35,9 @@
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
-          }
+          },
+          "source": "templates/pptx/title-orange.pptx",
+          "sha256": "54031af035dc02149e80e8aec1dfb4bb28ca38ba65d2e12ef6bd0345b158da2b"
         }
       }
     },

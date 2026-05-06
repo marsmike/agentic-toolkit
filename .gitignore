@@ -7,6 +7,8 @@ __pycache__/
 out/
 # .pptx are build artefacts — not committed. Examples ship rendered .pdf instead.
 *.pptx
+# v2 catalog template files are committed source assets (not build artefacts).
+!feinschliff/brands/*/templates/pptx/*.pptx
 node_modules/
 .DS_Store
 
