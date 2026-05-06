@@ -6,7 +6,7 @@
     {
       "id": "title-orange",
       "html_label": "Title Orange",
-      "name": "Feinschliff \u00b7 Title \u00b7 Accent",
+      "name": "Feinschliff · Title · Accent",
       "role": "title-primary",
       "concepts": [
         "cover",
@@ -25,13 +25,13 @@
         "title": {
           "type": "string",
           "maxLength": 60,
-          "description": "2-line display headline \u2014 use \\n for line break"
+          "description": "2-line display headline — use \\n for line break"
         }
       },
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_orange",
-          "layout_name": "Feinschliff \u00b7 Title \u00b7 Accent",
+          "layout_name": "Feinschliff · Title · Accent",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
@@ -44,14 +44,14 @@
     {
       "id": "title-ink",
       "html_label": "Title Ink",
-      "name": "Feinschliff \u00b7 Title \u00b7 Ink",
+      "name": "Feinschliff · Title · Ink",
       "role": "title-primary",
       "concepts": [
         "cover",
         "headline",
         "dark-mode"
       ],
-      "when_to_use": "Same as title-orange but on dark ink background \u2014 use for serious/formal contexts (earnings, safety, compliance).",
+      "when_to_use": "Same as title-orange but on dark ink background — use for serious/formal contexts (earnings, safety, compliance).",
       "when_not_to_use": "Light-hearted topics. Any slide with substantial detail.",
       "slots": {
         "eyebrow": {
@@ -67,26 +67,28 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_ink",
-          "layout_name": "Feinschliff \u00b7 Title \u00b7 Ink",
+          "layout_name": "Feinschliff · Title · Ink",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
-          }
+          },
+          "source": "templates/pptx/title-ink.pptx",
+          "sha256": "bb9f7de5991c8ce46724e3c5e997c96c47ea1b879b508e5b1cc6381b5e128739"
         }
       }
     },
     {
       "id": "title-picture",
       "html_label": "Title + Picture",
-      "name": "Feinschliff \u00b7 Title + Picture",
+      "name": "Feinschliff · Title + Picture",
       "role": "title-with-visual",
       "concepts": [
         "cover",
         "product-intro",
         "headline-plus-context"
       ],
-      "when_to_use": "Product-led openers, section intros where a single hero image reinforces the title. The right-half image frame is a fixed shape \u2014 users replace it via right-click \u2192 Format Shape \u2192 Fill \u2192 Picture.",
-      "when_not_to_use": "Data-heavy slides or when multiple visuals/columns are required \u2014 prefer kpi-grid, text-picture, or a column layout instead.",
+      "when_to_use": "Product-led openers, section intros where a single hero image reinforces the title. The right-half image frame is a fixed shape — users replace it via right-click → Format Shape → Fill → Picture.",
+      "when_not_to_use": "Data-heavy slides or when multiple visuals/columns are required — prefer kpi-grid, text-picture, or a column layout instead.",
       "slots": {
         "eyebrow": {
           "type": "string",
@@ -106,20 +108,22 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_picture",
-          "layout_name": "Feinschliff \u00b7 Title + Picture",
+          "layout_name": "Feinschliff · Title + Picture",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
             "body": 11
           },
-          "image_fill_mode": "format-shape"
+          "image_fill_mode": "format-shape",
+          "source": "templates/pptx/title-picture.pptx",
+          "sha256": "8c80a9126ce88135ae152263124430f84e014e0cbdb26d0bc558db581ff806a6"
         }
       }
     },
     {
       "id": "agenda",
       "html_label": "Agenda",
-      "name": "Feinschliff \u00b7 Agenda",
+      "name": "Feinschliff · Agenda",
       "role": "agenda",
       "concepts": [
         "agenda",
@@ -170,7 +174,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.agenda",
-          "layout_name": "Feinschliff \u00b7 Agenda",
+          "layout_name": "Feinschliff · Agenda",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -192,21 +196,23 @@
             "items[5].number": 35,
             "items[5].title": 36,
             "items[5].description": 37
-          }
+          },
+          "source": "templates/pptx/agenda.pptx",
+          "sha256": "7ff260758e3b4a9346e0ec659d01873d6809c602d66aa24712b36f97ab93c635"
         }
       }
     },
     {
       "id": "chapter-orange",
       "html_label": "Chapter Orange",
-      "name": "Feinschliff \u00b7 Chapter \u00b7 Accent",
+      "name": "Feinschliff · Chapter · Accent",
       "role": "chapter-opener",
       "concepts": [
         "chapter-opener",
         "section-break"
       ],
       "when_to_use": "Between major sections. Shows chapter number + title. Bold divider slide.",
-      "when_not_to_use": "Only if the deck has one section \u2014 then skip the chapter opener entirely.",
+      "when_not_to_use": "Only if the deck has one section — then skip the chapter opener entirely.",
       "slots": {
         "eyebrow": {
           "type": "string",
@@ -216,32 +222,34 @@
         "title": {
           "type": "string",
           "maxLength": 40,
-          "description": "Format '01\\nBrand.' \u2014 number + topic on two lines"
+          "description": "Format '01\\nBrand.' — number + topic on two lines"
         }
       },
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.chapter_orange",
-          "layout_name": "Feinschliff \u00b7 Chapter \u00b7 Accent",
+          "layout_name": "Feinschliff · Chapter · Accent",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
-          }
+          },
+          "source": "templates/pptx/chapter-orange.pptx",
+          "sha256": "3891d836f221faf3d329885d258b30db8bfa8f60ce7f1e0f7ffd580cd2ff8fe3"
         }
       }
     },
     {
       "id": "chapter-ink",
       "html_label": "Chapter Ink",
-      "name": "Feinschliff \u00b7 Chapter \u00b7 Ink + Picture",
+      "name": "Feinschliff · Chapter · Ink + Picture",
       "role": "chapter-opener",
       "concepts": [
         "chapter-opener",
         "dark-mode",
         "hero-image"
       ],
-      "when_to_use": "Chapter opener for serious/formal sections; includes a right-half editorial image frame. Users replace the image via right-click \u2192 Format Shape \u2192 Fill \u2192 Picture.",
-      "when_not_to_use": "Light/celebratory sections \u2014 use chapter-orange instead.",
+      "when_to_use": "Chapter opener for serious/formal sections; includes a right-half editorial image frame. Users replace the image via right-click → Format Shape → Fill → Picture.",
+      "when_not_to_use": "Light/celebratory sections — use chapter-orange instead.",
       "slots": {
         "eyebrow": {
           "type": "string",
@@ -256,19 +264,21 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.chapter_ink",
-          "layout_name": "Feinschliff \u00b7 Chapter \u00b7 Ink + Picture",
+          "layout_name": "Feinschliff · Chapter · Ink + Picture",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
-          "image_fill_mode": "format-shape"
+          "image_fill_mode": "format-shape",
+          "source": "templates/pptx/chapter-ink.pptx",
+          "sha256": "67e64d77062d59e78425c81e9ae4deaa61887f1638d8bc16a9f149a557bb8181"
         }
       }
     },
     {
       "id": "kpi-grid",
       "html_label": "KPIs",
-      "name": "Feinschliff \u00b7 KPI Grid",
+      "name": "Feinschliff · KPI Grid",
       "role": "data-quantity",
       "concepts": [
         "quantity",
@@ -323,7 +333,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.kpi_grid",
-          "layout_name": "Feinschliff \u00b7 KPI Grid",
+          "layout_name": "Feinschliff · KPI Grid",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -352,7 +362,7 @@
     {
       "id": "two-column-cards",
       "html_label": "Two Contents",
-      "name": "Feinschliff \u00b7 2-Column Cards",
+      "name": "Feinschliff · 2-Column Cards",
       "role": "content-columns",
       "concepts": [
         "comparison",
@@ -361,7 +371,7 @@
         "pros-cons",
         "product-a-vs-b"
       ],
-      "when_to_use": "Two parallel concepts of equal weight \u2014 comparison, pair of principles, two-track plan.",
+      "when_to_use": "Two parallel concepts of equal weight — comparison, pair of principles, two-track plan.",
       "when_not_to_use": "Three or more items (use 3-column or 4-column). Content-heavy analysis (use text-picture).",
       "slots": {
         "eyebrow": {
@@ -382,7 +392,7 @@
             "properties": {
               "number": {
                 "type": "string",
-                "description": "Mono label, e.g. '01 \u00b7 Consumer'"
+                "description": "Mono label, e.g. '01 · Consumer'"
               },
               "title": {
                 "type": "string",
@@ -404,7 +414,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.two_column_cards",
-          "layout_name": "Feinschliff \u00b7 2-Column Cards",
+          "layout_name": "Feinschliff · 2-Column Cards",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -414,14 +424,16 @@
             "columns[1].number": 23,
             "columns[1].title": 24,
             "columns[1].body": 25
-          }
+          },
+          "source": "templates/pptx/two-column-cards.pptx",
+          "sha256": "00008d9ac766775bc88a920a1df21c0898accba53cf0ba5b693c0c632dcad777"
         }
       }
     },
     {
       "id": "three-column",
       "html_label": "Three Contents",
-      "name": "Feinschliff \u00b7 3-Column",
+      "name": "Feinschliff · 3-Column",
       "role": "content-columns",
       "concepts": [
         "composition",
@@ -429,7 +441,7 @@
         "pillars",
         "phases"
       ],
-      "when_to_use": "Three parallel items \u2014 pillars of a strategy, three brands/products, three phases.",
+      "when_to_use": "Three parallel items — pillars of a strategy, three brands/products, three phases.",
       "when_not_to_use": "Two items (use 2-column-cards) or four+ (use 4-column-cards).",
       "slots": {
         "eyebrow": {
@@ -472,7 +484,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.three_column",
-          "layout_name": "Feinschliff \u00b7 3-Column",
+          "layout_name": "Feinschliff · 3-Column",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -485,14 +497,16 @@
             "columns[2].number": 26,
             "columns[2].title": 27,
             "columns[2].body": 28
-          }
+          },
+          "source": "templates/pptx/three-column.pptx",
+          "sha256": "55a9ce3653038a2693a54776177dd1c36439b2627ce3933a690d097dd5d6c960"
         }
       }
     },
     {
       "id": "four-column-cards",
       "html_label": "Four Contents",
-      "name": "Feinschliff \u00b7 4-Column Cards",
+      "name": "Feinschliff · 4-Column Cards",
       "role": "content-columns",
       "concepts": [
         "composition",
@@ -500,7 +514,7 @@
         "phased-plan",
         "roadmap"
       ],
-      "when_to_use": "Four sequential or parallel items \u2014 classic Q1-Q4 plan, 4-phase roadmap.",
+      "when_to_use": "Four sequential or parallel items — classic Q1-Q4 plan, 4-phase roadmap.",
       "when_not_to_use": "Fewer than 4 or more than 4 items. Plan with items of unequal weight.",
       "slots": {
         "eyebrow": {
@@ -521,7 +535,7 @@
             "properties": {
               "number": {
                 "type": "string",
-                "description": "Mono label, e.g. 'Q1 \u00b7 Plan'"
+                "description": "Mono label, e.g. 'Q1 · Plan'"
               },
               "title": {
                 "type": "string",
@@ -543,7 +557,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.four_column_cards",
-          "layout_name": "Feinschliff \u00b7 4-Column Cards",
+          "layout_name": "Feinschliff · 4-Column Cards",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -559,21 +573,23 @@
             "columns[3].number": 29,
             "columns[3].title": 30,
             "columns[3].body": 31
-          }
+          },
+          "source": "templates/pptx/four-column-cards.pptx",
+          "sha256": "32be46648c005f81b66706863e9182697f6dd20827635e396dafd6a221df63a8"
         }
       }
     },
     {
       "id": "text-picture",
       "html_label": "Text + Picture",
-      "name": "Feinschliff \u00b7 Text + Picture",
+      "name": "Feinschliff · Text + Picture",
       "role": "content-with-visual",
       "concepts": [
         "product-detail",
         "hero-plus-description",
         "story-beat"
       ],
-      "when_to_use": "One substantive idea explained with a supporting visual. Has buttons for CTA. Users replace the image via right-click \u2192 Format Shape \u2192 Fill \u2192 Picture.",
+      "when_to_use": "One substantive idea explained with a supporting visual. Has buttons for CTA. Users replace the image via right-click → Format Shape → Fill → Picture.",
       "when_not_to_use": "Pure text slide (use 2-column-cards). Pure image (use full-bleed-cover).",
       "slots": {
         "eyebrow": {
@@ -593,7 +609,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.text_picture",
-          "layout_name": "Feinschliff \u00b7 Text + Picture",
+          "layout_name": "Feinschliff · Text + Picture",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -608,14 +624,14 @@
     {
       "id": "full-bleed-cover",
       "html_label": "Full-bleed Picture",
-      "name": "Feinschliff \u00b7 Full-bleed Cover",
+      "name": "Feinschliff · Full-bleed Cover",
       "role": "title-with-visual",
       "concepts": [
         "cover",
         "hero-image",
         "statement-plus-image"
       ],
-      "when_to_use": "Strong image + short statement. Chapter opener or deck cover with high visual impact. The full-bleed image area is a fixed shape \u2014 users replace it via right-click \u2192 Format Shape \u2192 Fill \u2192 Picture.",
+      "when_to_use": "Strong image + short statement. Chapter opener or deck cover with high visual impact. The full-bleed image area is a fixed shape — users replace it via right-click → Format Shape → Fill → Picture.",
       "when_not_to_use": "Content-led slides where text carries the meaning. Prefer a title or content layout.",
       "slots": {
         "eyebrow": {
@@ -631,18 +647,20 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.full_bleed_cover",
-          "layout_name": "Feinschliff \u00b7 Full-bleed Cover",
+          "layout_name": "Feinschliff · Full-bleed Cover",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
-          "image_fill_mode": "format-shape"
+          "image_fill_mode": "format-shape",
+          "source": "templates/pptx/full-bleed-cover.pptx",
+          "sha256": "900d51a3196ede52ee26d164c7ff7d4adbbbea4f799cb205ddf65f3fec064d03"
         }
       }
     },
     {
       "id": "bar-chart",
-      "name": "Feinschliff \u00b7 Bar Chart",
+      "name": "Feinschliff · Bar Chart",
       "role": "data-comparison",
       "concepts": [
         "comparison",
@@ -650,7 +668,7 @@
         "distribution"
       ],
       "when_to_use": "2-6 items with quantitative values to compare, e.g. revenue by region, survey responses.",
-      "when_not_to_use": "Continuous time-series (use a line chart \u2014 not yet in Baukasten). More than 6 items (use a table).",
+      "when_not_to_use": "Continuous time-series (use a line chart — not yet in Baukasten). More than 6 items (use a table).",
       "slots": {
         "eyebrow": {
           "type": "string",
@@ -692,7 +710,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.bar_chart",
-          "layout_name": "Feinschliff \u00b7 Bar Chart",
+          "layout_name": "Feinschliff · Bar Chart",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -705,22 +723,24 @@
             "bars[3].label": 26,
             "bars[3].value": 27,
             "caption": 40
-          }
+          },
+          "source": "templates/pptx/bar-chart.pptx",
+          "sha256": "233dc5443e1e9fc49b74d7c7d5f72b9aef263ce141aacb1c10e14876796864bc"
         }
       }
     },
     {
       "id": "components-showcase",
       "html_label": "Components",
-      "name": "Feinschliff \u00b7 Components Showcase",
+      "name": "Feinschliff · Components Showcase",
       "role": "reference",
       "concepts": [
         "ui-kit",
         "reference",
         "design-system-demo"
       ],
-      "when_to_use": "Internal design-system reference \u2014 showing available buttons, chips, rules.",
-      "when_not_to_use": "Regular content \u2014 this slide is brand-authoring reference, not for end-user decks.",
+      "when_to_use": "Internal design-system reference — showing available buttons, chips, rules.",
+      "when_not_to_use": "Regular content — this slide is brand-authoring reference, not for end-user decks.",
       "slots": {
         "eyebrow": {
           "type": "string",
@@ -735,25 +755,27 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.components_showcase",
-          "layout_name": "Feinschliff \u00b7 Components Showcase",
+          "layout_name": "Feinschliff · Components Showcase",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
-          }
+          },
+          "source": "templates/pptx/components-showcase.pptx",
+          "sha256": "bd6af128aa1dca4c2b48fbb265f1417fa9de94ffe2cf471260a43284795b05be"
         }
       }
     },
     {
       "id": "quote",
       "html_label": "Quote",
-      "name": "Feinschliff \u00b7 Quote",
+      "name": "Feinschliff · Quote",
       "role": "quote",
       "concepts": [
         "quote",
         "statement",
         "voice-guideline"
       ],
-      "when_to_use": "Strong voice moment \u2014 customer testimonial, leadership principle, brand tenet.",
+      "when_to_use": "Strong voice moment — customer testimonial, leadership principle, brand tenet.",
       "when_not_to_use": "Body text pretending to be a quote. Must be an actual quotation.",
       "slots": {
         "title": {
@@ -769,18 +791,20 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.quote",
-          "layout_name": "Feinschliff \u00b7 Quote",
+          "layout_name": "Feinschliff · Quote",
           "placeholder_map": {
             "title": 0,
             "attribution": 10
-          }
+          },
+          "source": "templates/pptx/quote.pptx",
+          "sha256": "95bb258bb1ef0b37c861664ab22008cb200dcb33ce2d042dbc629ca0d6534bbb"
         }
       }
     },
     {
       "id": "end",
       "html_label": "End",
-      "name": "Feinschliff \u00b7 End",
+      "name": "Feinschliff · End",
       "role": "closer",
       "concepts": [
         "closer",
@@ -788,7 +812,7 @@
         "end"
       ],
       "when_to_use": "Final slide of the deck. Always include for deck closure.",
-      "when_not_to_use": "Never \u2014 every deck ends with this or a similar closer.",
+      "when_not_to_use": "Never — every deck ends with this or a similar closer.",
       "slots": {
         "title": {
           "type": "string",
@@ -804,18 +828,20 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.end",
-          "layout_name": "Feinschliff \u00b7 End",
+          "layout_name": "Feinschliff · End",
           "placeholder_map": {
             "title": 0,
             "caption": 10
-          }
+          },
+          "source": "templates/pptx/end.pptx",
+          "sha256": "13e3d6ab451de969dcbb632573b27af2b52bd68775167a2f72d9f047fe91ab85"
         }
       }
     },
     {
       "id": "graphical",
       "html_label": "Graphical",
-      "name": "Feinschliff \u00b7 Graphical",
+      "name": "Feinschliff · Graphical",
       "role": "data-comparison",
       "concepts": [
         "chart",
@@ -823,8 +849,8 @@
         "regional-breakdown",
         "distribution"
       ],
-      "when_to_use": "3\u20136 category values that share a scale (e.g. regional share of revenue).",
-      "when_not_to_use": "Avoid for time-series \u2014 use mck-stacked-bar or mck-waterfall. Avoid for &gt;6 categories \u2014 use mck-table.",
+      "when_to_use": "3–6 category values that share a scale (e.g. regional share of revenue).",
+      "when_not_to_use": "Avoid for time-series — use mck-stacked-bar or mck-waterfall. Avoid for &gt;6 categories — use mck-table.",
       "slots": {
         "eyebrow": {
           "type": "string",
@@ -848,7 +874,7 @@
               },
               "value": {
                 "type": "number",
-                "description": "Percent, 0\u2013100."
+                "description": "Percent, 0–100."
               },
               "accent": {
                 "type": "boolean",
@@ -870,7 +896,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.graphical",
-          "layout_name": "Feinschliff \u00b7 Graphical",
+          "layout_name": "Feinschliff · Graphical",
           "placeholder_map": {
             "title": 0,
             "eyebrow": 10,
@@ -883,14 +909,16 @@
             "bars[3].label": 32,
             "bars[3].value": 33,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/graphical.pptx",
+          "sha256": "db2845d7f1778badad82162ef58cbb42975438a0117583260dbb6e8cb5b47fa0"
         }
       }
     },
     {
       "id": "action-title",
-      "html_label": "MCK \u00b7 Action Title",
-      "name": "Feinschliff \u00b7 Action Title",
+      "html_label": "MCK · Action Title",
+      "name": "Feinschliff · Action Title",
       "role": "title-primary",
       "concepts": [
         "action-title",
@@ -898,7 +926,7 @@
         "executive-summary",
         "so-what"
       ],
-      "when_to_use": "Any analytical slide where the title itself should carry the takeaway (McKinsey-style \u201cso what?\u201d). Ideal when the slide&#39;s one job is to land a decision or claim.",
+      "when_to_use": "Any analytical slide where the title itself should carry the takeaway (McKinsey-style “so what?”). Ideal when the slide&#39;s one job is to land a decision or claim.",
       "when_not_to_use": "Avoid for descriptive or reference content; use title-with-visual or content-columns instead.",
       "slots": {
         "kicker": {
@@ -909,7 +937,7 @@
         "action_title": {
           "type": "string",
           "maxLength": 180,
-          "description": "Full-sentence takeaway, 1\u20132 lines."
+          "description": "Full-sentence takeaway, 1–2 lines."
         },
         "supporting_body": {
           "type": "string",
@@ -954,7 +982,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.action_title",
-          "layout_name": "Feinschliff \u00b7 Action Title",
+          "layout_name": "Feinschliff · Action Title",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -968,14 +996,16 @@
             "kpis[1].key": 26,
             "kpis[1].delta": 27,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/action-title.pptx",
+          "sha256": "2ddaf3dfed512efcc9a8215d912ebdefa61212b6311f4d0833ce19360532c502"
         }
       }
     },
     {
       "id": "horizontal-bullets",
-      "html_label": "MCK \u00b7 Horizontal Bullets",
-      "name": "Feinschliff \u00b7 Horizontal Bullets",
+      "html_label": "MCK · Horizontal Bullets",
+      "name": "Feinschliff · Horizontal Bullets",
       "role": "content-columns",
       "concepts": [
         "three-column",
@@ -984,7 +1014,7 @@
         "drivers",
         "parallel-ideas"
       ],
-      "when_to_use": "Three parallel drivers / forces / buckets, each backed by 2\u20134 short bullets. Good for context or situation slides.",
+      "when_to_use": "Three parallel drivers / forces / buckets, each backed by 2–4 short bullets. Good for context or situation slides.",
       "when_not_to_use": "Avoid when one column deserves more weight; use content-with-visual. Avoid for time-ordered content; use data-timeline.",
       "slots": {
         "kicker": {
@@ -1032,7 +1062,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.horizontal_bullets",
-          "layout_name": "Feinschliff \u00b7 Horizontal Bullets",
+          "layout_name": "Feinschliff · Horizontal Bullets",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1046,14 +1076,16 @@
             "columns[2].heading": 29,
             "columns[2].bullets": 30,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/horizontal-bullets.pptx",
+          "sha256": "b82dd6c2c946aeeaf3281f1a1cdd97cbccfc4fa7ac3fb4bbd0db5453c02bffd8"
         }
       }
     },
     {
       "id": "vertical-bullets",
-      "html_label": "MCK \u00b7 Vertical Bullets",
-      "name": "Feinschliff \u00b7 Vertical Bullets",
+      "html_label": "MCK · Vertical Bullets",
+      "name": "Feinschliff · Vertical Bullets",
       "role": "content-columns",
       "concepts": [
         "numbered-list",
@@ -1061,7 +1093,7 @@
         "moves",
         "lede-plus-list"
       ],
-      "when_to_use": "Prose lede on the left plus a numbered list of 3\u20136 moves on the right. Good for \u201cwe will do X, Y, Z.\u201d",
+      "when_to_use": "Prose lede on the left plus a numbered list of 3–6 moves on the right. Good for “we will do X, Y, Z.”",
       "when_not_to_use": "Avoid for comparisons of equal items; use content-columns. Avoid for time-boxed sequences; use mck-process-flow.",
       "slots": {
         "kicker": {
@@ -1113,7 +1145,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.vertical_bullets",
-          "layout_name": "Feinschliff \u00b7 Vertical Bullets",
+          "layout_name": "Feinschliff · Vertical Bullets",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1137,14 +1169,16 @@
             "items[5].counter": 35,
             "items[5].heading": 36,
             "items[5].body": 37
-          }
+          },
+          "source": "templates/pptx/vertical-bullets.pptx",
+          "sha256": "9fd286969681b9e9b1d4ae34818e38ce8748855c39c9fd0063bd2c89c590dbaf"
         }
       }
     },
     {
       "id": "2x2-matrix",
-      "html_label": "MCK \u00b7 2\u00d72 Matrix",
-      "name": "Feinschliff \u00b7 2\u00d72 Matrix",
+      "html_label": "MCK · 2×2 Matrix",
+      "name": "Feinschliff · 2×2 Matrix",
       "role": "data-comparison",
       "concepts": [
         "two-by-two",
@@ -1152,7 +1186,7 @@
         "quadrant",
         "trade-off"
       ],
-      "when_to_use": "Classic 2\u00d72 prioritisation grid with one focus quadrant flagged. Good for portfolio choices.",
+      "when_to_use": "Classic 2×2 prioritisation grid with one focus quadrant flagged. Good for portfolio choices.",
       "when_not_to_use": "Avoid if axes can&#39;t be named with one crisp word each; use content-columns instead.",
       "slots": {
         "kicker": {
@@ -1217,7 +1251,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.matrix_2x2",
-          "layout_name": "Feinschliff \u00b7 2\u00d72 Matrix",
+          "layout_name": "Feinschliff · 2×2 Matrix",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1231,14 +1265,16 @@
             "cells[3].body": 33,
             "x_axis_label": 41,
             "y_axis_label": 42
-          }
+          },
+          "source": "templates/pptx/2x2-matrix.pptx",
+          "sha256": "56bb3a471afd91d5867e4281cefbd182d678a85acb4c7bd91a2d6ab521383f86"
         }
       }
     },
     {
       "id": "waterfall",
-      "html_label": "MCK \u00b7 Waterfall",
-      "name": "Feinschliff \u00b7 Waterfall",
+      "html_label": "MCK · Waterfall",
+      "name": "Feinschliff · Waterfall",
       "role": "data-comparison",
       "concepts": [
         "waterfall",
@@ -1246,7 +1282,7 @@
         "variance",
         "plus-minus"
       ],
-      "when_to_use": "Financial or metric bridge between two anchor totals across 3\u20137 positive/negative drivers.",
+      "when_to_use": "Financial or metric bridge between two anchor totals across 3–7 positive/negative drivers.",
       "when_not_to_use": "Avoid for non-additive metrics (ratios, averages). Avoid if driver count &gt;7; use mck-table instead.",
       "slots": {
         "kicker": {
@@ -1293,7 +1329,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.waterfall",
-          "layout_name": "Feinschliff \u00b7 Waterfall",
+          "layout_name": "Feinschliff · Waterfall",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1312,14 +1348,16 @@
             "bars[6].value": 44,
             "bars[6].label": 45,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/waterfall.pptx",
+          "sha256": "0a892041fec9dcbdbb2e591728ed852fd21615ed749bcbf4f6f8eb5cfc6050dc"
         }
       }
     },
     {
       "id": "process-flow",
-      "html_label": "MCK \u00b7 Process Flow",
-      "name": "Feinschliff \u00b7 Process Flow",
+      "html_label": "MCK · Process Flow",
+      "name": "Feinschliff · Process Flow",
       "role": "data-timeline",
       "concepts": [
         "process",
@@ -1328,7 +1366,7 @@
         "chevrons",
         "rhythm"
       ],
-      "when_to_use": "3\u20136 sequential stages with chevron arrows; one stage can be highlighted as current. Good for delivery rhythms.",
+      "when_to_use": "3–6 sequential stages with chevron arrows; one stage can be highlighted as current. Good for delivery rhythms.",
       "when_not_to_use": "Avoid for non-sequential buckets; use content-columns. Avoid if stages don&#39;t flow into each other.",
       "slots": {
         "kicker": {
@@ -1379,7 +1417,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.process_flow",
-          "layout_name": "Feinschliff \u00b7 Process Flow",
+          "layout_name": "Feinschliff · Process Flow",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1399,14 +1437,16 @@
             "steps[4].heading": 37,
             "steps[4].body": 38,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/process-flow.pptx",
+          "sha256": "ec5bc54401c6a8d2bfa2ea22f381ac212f55f2d8d74e691330ec7f0ed026d685"
         }
       }
     },
     {
       "id": "stacked-bar",
-      "html_label": "MCK \u00b7 Stacked Bar",
-      "name": "Feinschliff \u00b7 Stacked Bar",
+      "html_label": "MCK · Stacked Bar",
+      "name": "Feinschliff · Stacked Bar",
       "role": "data-comparison",
       "concepts": [
         "stacked-bar",
@@ -1414,8 +1454,8 @@
         "mix",
         "segment-breakdown"
       ],
-      "when_to_use": "Multi-year or multi-category revenue/share mix across 3\u20136 time buckets and 2\u20135 segments.",
-      "when_not_to_use": "Avoid if the story is about a single segment \u2014 use a line chart. Avoid if segment count &gt;5 \u2014 the bars become illegible.",
+      "when_to_use": "Multi-year or multi-category revenue/share mix across 3–6 time buckets and 2–5 segments.",
+      "when_not_to_use": "Avoid if the story is about a single segment — use a line chart. Avoid if segment count &gt;5 — the bars become illegible.",
       "slots": {
         "kicker": {
           "type": "string",
@@ -1496,7 +1536,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.stacked_bar",
-          "layout_name": "Feinschliff \u00b7 Stacked Bar",
+          "layout_name": "Feinschliff · Stacked Bar",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1519,14 +1559,16 @@
             "legend[3].name": 46,
             "legend[3].change": 47,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/stacked-bar.pptx",
+          "sha256": "94e59970d568ccac62067bb4e820ef19d26f0074635ce28d6ee116a20b75860a"
         }
       }
     },
     {
       "id": "table",
-      "html_label": "MCK \u00b7 Table",
-      "name": "Feinschliff \u00b7 Table",
+      "html_label": "MCK · Table",
+      "name": "Feinschliff · Table",
       "role": "data-comparison",
       "concepts": [
         "table",
@@ -1534,8 +1576,8 @@
         "performance-matrix",
         "comparison"
       ],
-      "when_to_use": "5+ rows of comparable metrics (product lines, regions, teams) with 3\u20136 columns of numbers and variances.",
-      "when_not_to_use": "Avoid for 2\u20133 row comparisons \u2014 use content-columns. Avoid when a chart would show the pattern faster.",
+      "when_to_use": "5+ rows of comparable metrics (product lines, regions, teams) with 3–6 columns of numbers and variances.",
+      "when_not_to_use": "Avoid for 2–3 row comparisons — use content-columns. Avoid when a chart would show the pattern faster.",
       "slots": {
         "kicker": {
           "type": "string",
@@ -1600,7 +1642,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.table",
-          "layout_name": "Feinschliff \u00b7 Table",
+          "layout_name": "Feinschliff · Table",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1635,14 +1677,16 @@
             "rows[4].cells[2]": 58,
             "rows[4].cells[3]": 59,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/table.pptx",
+          "sha256": "d6f9c29c5c8f82b9273fc6342cceceb7559815750e10068e4cb4bbf12e316fd5"
         }
       }
     },
     {
       "id": "pyramid",
-      "html_label": "MCK \u00b7 Pyramid",
-      "name": "Feinschliff \u00b7 Pyramid",
+      "html_label": "MCK · Pyramid",
+      "name": "Feinschliff · Pyramid",
       "role": "content-columns",
       "concepts": [
         "pyramid",
@@ -1650,8 +1694,8 @@
         "tiers",
         "value-ladder"
       ],
-      "when_to_use": "3-tier value hierarchy (foundation \u2192 trust \u2192 meaning) shown as stacked triangular tiers with a side key.",
-      "when_not_to_use": "Avoid for more than 4 tiers \u2014 becomes illegible. Avoid for non-hierarchical relationships; use content-columns.",
+      "when_to_use": "3-tier value hierarchy (foundation → trust → meaning) shown as stacked triangular tiers with a side key.",
+      "when_not_to_use": "Avoid for more than 4 tiers — becomes illegible. Avoid for non-hierarchical relationships; use content-columns.",
       "slots": {
         "kicker": {
           "type": "string",
@@ -1693,7 +1737,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.pyramid",
-          "layout_name": "Feinschliff \u00b7 Pyramid",
+          "layout_name": "Feinschliff · Pyramid",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1709,14 +1753,16 @@
             "tiers[3].label": 32,
             "tiers[3].body": 33,
             "tiers[3].counter": 34
-          }
+          },
+          "source": "templates/pptx/pyramid.pptx",
+          "sha256": "5ef28217ccae680e8e53a1dcf3c1564e4b8f6c63272663d0ca8b0242875643ca"
         }
       }
     },
     {
       "id": "key-takeaways",
-      "html_label": "MCK \u00b7 Key Takeaways",
-      "name": "Feinschliff \u00b7 Key Takeaways",
+      "html_label": "MCK · Key Takeaways",
+      "name": "Feinschliff · Key Takeaways",
       "role": "closer",
       "concepts": [
         "takeaways",
@@ -1725,7 +1771,7 @@
         "closing-card"
       ],
       "when_to_use": "End-of-section summary of 3 most important points, each with an owner.",
-      "when_not_to_use": "Avoid for 1\u20132 points (use a quote or title-cover). Avoid for &gt;4 points (the card shrinks and loses impact).",
+      "when_not_to_use": "Avoid for 1–2 points (use a quote or title-cover). Avoid for &gt;4 points (the card shrinks and loses impact).",
       "slots": {
         "kicker": {
           "type": "string",
@@ -1772,7 +1818,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.key_takeaways",
-          "layout_name": "Feinschliff \u00b7 Key Takeaways",
+          "layout_name": "Feinschliff · Key Takeaways",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1792,14 +1838,16 @@
             "cards[3].heading": 33,
             "cards[3].body": 34,
             "cards[3].owner": 35
-          }
+          },
+          "source": "templates/pptx/key-takeaways.pptx",
+          "sha256": "73b7bfab07a0921e8c42d5b406ca5c1a584ab1432d8df9fa6d4b8de9f6144dd8"
         }
       }
     },
     {
       "id": "executive-summary",
-      "html_label": "MCK \u00b7 Executive Summary",
-      "name": "Feinschliff \u00b7 Executive Summary",
+      "html_label": "MCK · Executive Summary",
+      "name": "Feinschliff · Executive Summary",
       "role": "content-columns",
       "concepts": [
         "executive-summary",
@@ -1807,7 +1855,7 @@
         "moves-metrics",
         "numbered-narrative"
       ],
-      "when_to_use": "One-page summary of 3\u20135 moves, each with status commentary and a headline metric. Ideal for board or exec readouts.",
+      "when_to_use": "One-page summary of 3–5 moves, each with status commentary and a headline metric. Ideal for board or exec readouts.",
       "when_not_to_use": "Avoid for narrative chapters; use content-columns instead. Avoid if the moves don&#39;t each have a target metric.",
       "slots": {
         "kicker": {
@@ -1833,7 +1881,7 @@
               "label": {
                 "type": "string",
                 "maxLength": 40,
-                "description": "e.g. \u201cMove \u00b7 Consolidate\u201d."
+                "description": "e.g. “Move · Consolidate”."
               },
               "summary_heading": {
                 "type": "string",
@@ -1867,7 +1915,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.executive_summary",
-          "layout_name": "Feinschliff \u00b7 Executive Summary",
+          "layout_name": "Feinschliff · Executive Summary",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1900,14 +1948,16 @@
             "kpis[2].unit": 57,
             "kpis[2].key": 58,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/executive-summary.pptx",
+          "sha256": "b15f7fbb335ba65d5288d740ae1198918122b8574b20c88e60fb77f7a0e9940f"
         }
       }
     },
     {
       "id": "line-chart",
-      "html_label": "MCK \u00b7 Line Chart",
-      "name": "Feinschliff \u00b7 Line Chart",
+      "html_label": "MCK · Line Chart",
+      "name": "Feinschliff · Line Chart",
       "role": "data-comparison",
       "concepts": [
         "line-chart",
@@ -1915,8 +1965,8 @@
         "time-series",
         "two-metric"
       ],
-      "when_to_use": "Two-to-three metric trend over 3\u20138 time buckets (years or quarters). Good for showing divergence or trajectory.",
-      "when_not_to_use": "Avoid for single-point comparisons \u2014 use KPIs. Avoid for &gt;3 series \u2014 becomes tangled; use mck-stacked-bar or mck-table.",
+      "when_to_use": "Two-to-three metric trend over 3–8 time buckets (years or quarters). Good for showing divergence or trajectory.",
+      "when_not_to_use": "Avoid for single-point comparisons — use KPIs. Avoid for &gt;3 series — becomes tangled; use mck-stacked-bar or mck-table.",
       "slots": {
         "kicker": {
           "type": "string",
@@ -1978,7 +2028,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.line_chart",
-          "layout_name": "Feinschliff \u00b7 Line Chart",
+          "layout_name": "Feinschliff · Line Chart",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1991,14 +2041,16 @@
             "series[1].name": 31,
             "series[2].name": 32,
             "source": 40
-          }
+          },
+          "source": "templates/pptx/line-chart.pptx",
+          "sha256": "56780c9a708207c03fe6c7dc6ea46070070826dcdf242d502533fb0c76b2ae9a"
         }
       }
     },
     {
       "id": "scorecard",
-      "html_label": "MCK \u00b7 Scorecard",
-      "name": "Feinschliff \u00b7 Scorecard",
+      "html_label": "MCK · Scorecard",
+      "name": "Feinschliff · Scorecard",
       "role": "data-comparison",
       "concepts": [
         "scorecard",
@@ -2006,7 +2058,7 @@
         "options-matrix",
         "criteria-rating"
       ],
-      "when_to_use": "Compare 3\u20135 options against 4\u20136 criteria using Harvey balls. Use when the recommendation needs defensible, visible trade-offs.",
+      "when_to_use": "Compare 3–5 options against 4–6 criteria using Harvey balls. Use when the recommendation needs defensible, visible trade-offs.",
       "when_not_to_use": "Avoid for quantitative comparisons where the numbers themselves matter; use mck-table. Avoid for 2-option decisions; use content-columns.",
       "slots": {
         "kicker": {
@@ -2045,7 +2097,7 @@
               },
               "scores": {
                 "type": "array",
-                "description": "0\u20134 Harvey ball fill level",
+                "description": "0–4 Harvey ball fill level",
                 "items": {
                   "type": "number"
                 }
@@ -2075,7 +2127,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.scorecard",
-          "layout_name": "Feinschliff \u00b7 Scorecard",
+          "layout_name": "Feinschliff · Scorecard",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2092,14 +2144,16 @@
             "options[2].note": 53,
             "options[3].note": 58,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/scorecard.pptx",
+          "sha256": "317d4a2bcd12d48cc9fe1f1f4d85f1b7d124fde6369aa171dfe3d533474e45cb"
         }
       }
     },
     {
       "id": "gantt",
-      "html_label": "MCK \u00b7 Gantt",
-      "name": "Feinschliff \u00b7 Gantt",
+      "html_label": "MCK · Gantt",
+      "name": "Feinschliff · Gantt",
       "role": "data-timeline",
       "concepts": [
         "gantt",
@@ -2108,8 +2162,8 @@
         "dependencies",
         "milestones"
       ],
-      "when_to_use": "Show 3\u20136 parallel workstreams over 3\u20136 time buckets with dependencies and milestones. Good for programme reviews.",
-      "when_not_to_use": "Avoid for conceptual (non-dated) plans \u2014 use mck-process-flow. Avoid for a single-workstream timeline \u2014 use data-timeline cards.",
+      "when_to_use": "Show 3–6 parallel workstreams over 3–6 time buckets with dependencies and milestones. Good for programme reviews.",
+      "when_not_to_use": "Avoid for conceptual (non-dated) plans — use mck-process-flow. Avoid for a single-workstream timeline — use data-timeline cards.",
       "slots": {
         "kicker": {
           "type": "string",
@@ -2199,7 +2253,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.gantt",
-          "layout_name": "Feinschliff \u00b7 Gantt",
+          "layout_name": "Feinschliff · Gantt",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2224,14 +2278,16 @@
             "lanes[3].bars[1].label": 50,
             "lanes[3].bars[2].label": 51,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/gantt.pptx",
+          "sha256": "9141108abcf3ffd6ba15c2939a42d2350e34f6eed745a1607e29060f360a9cd9"
         }
       }
     },
     {
       "id": "funnel",
-      "html_label": "MCK \u00b7 Funnel",
-      "name": "Feinschliff \u00b7 Funnel",
+      "html_label": "MCK · Funnel",
+      "name": "Feinschliff · Funnel",
       "role": "data-comparison",
       "concepts": [
         "funnel",
@@ -2240,7 +2296,7 @@
         "acquisition"
       ],
       "when_to_use": "Multi-stage conversion view (acquisition, activation, retention) with volume and rate at each step.",
-      "when_not_to_use": "Avoid for time-series \u2014 use mck-line-chart. Avoid if stages aren&#39;t a strict sequence \u2014 use mck-stacked-bar.",
+      "when_not_to_use": "Avoid for time-series — use mck-line-chart. Avoid if stages aren&#39;t a strict sequence — use mck-stacked-bar.",
       "slots": {
         "kicker": {
           "type": "string",
@@ -2317,7 +2373,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.funnel",
-          "layout_name": "Feinschliff \u00b7 Funnel",
+          "layout_name": "Feinschliff · Funnel",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2346,14 +2402,16 @@
             "dropoffs[2].pct": 58,
             "dropoffs[2].label": 59,
             "dropoffs[2].body": 60
-          }
+          },
+          "source": "templates/pptx/funnel.pptx",
+          "sha256": "4d59909458d12b9fe5e6e928611f67355c6e3e0b594632bd81093570087f3f75"
         }
       }
     },
     {
       "id": "venn",
-      "html_label": "MCK \u00b7 Venn",
-      "name": "Feinschliff \u00b7 Venn",
+      "html_label": "MCK · Venn",
+      "name": "Feinschliff · Venn",
       "role": "content-columns",
       "concepts": [
         "venn",
@@ -2361,8 +2419,8 @@
         "intersection",
         "strategy-map"
       ],
-      "when_to_use": "Show the strategic sweet spot where 2\u20133 capabilities overlap. Good for positioning and differentiation slides.",
-      "when_not_to_use": "Avoid for quantitative overlap \u2014 a Venn is illustrative, not proportional. Avoid for &gt;3 sets \u2014 becomes illegible; use mck-pyramid.",
+      "when_to_use": "Show the strategic sweet spot where 2–3 capabilities overlap. Good for positioning and differentiation slides.",
+      "when_not_to_use": "Avoid for quantitative overlap — a Venn is illustrative, not proportional. Avoid for &gt;3 sets — becomes illegible; use mck-pyramid.",
       "slots": {
         "kicker": {
           "type": "string",
@@ -2451,7 +2509,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.venn",
-          "layout_name": "Feinschliff \u00b7 Venn",
+          "layout_name": "Feinschliff · Venn",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2477,13 +2535,15 @@
             "side_items[3].counter": 52,
             "side_items[3].heading": 53,
             "side_items[3].body": 54
-          }
+          },
+          "source": "templates/pptx/venn.pptx",
+          "sha256": "04de1f0a3497e6f4e676295fb68ae649fcc0175de1e955dd0c8838c5cc06e48a"
         }
       }
     },
     {
       "id": "diagram",
-      "name": "Feinschliff \u00b7 Diagram",
+      "name": "Feinschliff · Diagram",
       "role": "content-with-diagram",
       "concepts": [
         "diagram",
@@ -2500,7 +2560,7 @@
         "freeform-diagram"
       ],
       "when_to_use": "User mentions diagram, flowchart, architecture, architectural overview, system overview, layers, concept map, mind map, block diagram, or any one-big-rich-visual-per-slide intent. Also: multi-element flows with callouts that don't fit a parameterized template. The diagram is authored as Excalidraw DSL and rendered+Feinschliff-themed at build time.",
-      "when_not_to_use": "Content that fits a parameterized template \u2014 prefer process-flow for pipelines, pyramid for hierarchy, venn for overlap, 2x2-matrix for quadrants, funnel for conversion, bar-chart for ranked numeric data, kpi-grid for metrics. Also not for photographic imagery (use text-picture or title-picture).",
+      "when_not_to_use": "Content that fits a parameterized template — prefer process-flow for pipelines, pyramid for hierarchy, venn for overlap, 2x2-matrix for quadrants, funnel for conversion, bar-chart for ranked numeric data, kpi-grid for metrics. Also not for photographic imagery (use text-picture or title-picture).",
       "slots": {
         "eyebrow": {
           "type": "string",
@@ -2515,7 +2575,7 @@
         },
         "dsl": {
           "type": "string",
-          "description": "Excalidraw DSL source (see excalidraw/references/dsl-syntax.md). First line `theme bsh` is auto-prepended if missing (the literal `bsh` is the excalidraw plugin's theme key, not a brand reference). Expanded \u2192 Feinschliff-themed \u2192 rendered to PNG \u2192 embedded. The .dsl, .excalidraw, -bsh.excalidraw, and -bsh.png are all preserved under out/<deck>/diagrams/ for post-build editing."
+          "description": "Excalidraw DSL source (see excalidraw/references/dsl-syntax.md). First line `theme bsh` is auto-prepended if missing (the literal `bsh` is the excalidraw plugin's theme key, not a brand reference). Expanded → Feinschliff-themed → rendered to PNG → embedded. The .dsl, .excalidraw, -bsh.excalidraw, and -bsh.png are all preserved under out/<deck>/diagrams/ for post-build editing."
         },
         "caption": {
           "type": "string",
@@ -2527,7 +2587,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.diagram",
-          "layout_name": "Feinschliff \u00b7 Diagram",
+          "layout_name": "Feinschliff · Diagram",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -2538,7 +2598,7 @@
     },
     {
       "id": "tech-radar-full-bleed",
-      "name": "Feinschliff \u00b7 Tech Radar \u00b7 Full Bleed",
+      "name": "Feinschliff · Tech Radar · Full Bleed",
       "role": "data-visualization",
       "concepts": [
         "tech-radar",
@@ -2547,8 +2607,8 @@
         "innovation-portfolio",
         "thought-leadership"
       ],
-      "when_to_use": "User wants a tech-radar slide \u2014 pick a view from `<vault>/Tech-Radar/Views.yaml` (today: `genai-thoughtworks` for the all-blips ThoughtWorks-shaped overview, or `genai-agents`, `genai-models`, `genai-skills`, `genai-tooling` for per-quadrant sub-radars). The /deck pipeline calls `slides.add_radar(prs, slug, view, vault, out_dir, volume?, new_since?)` which runs the full radar-engine pipeline (load blips \u2192 magnetic positioning \u2192 snapshot edition \u2192 SVG \u2192 PNG) and embeds the PNG full-bleed. The radar SVG carries its own logo/eyebrow/title/footer, so this layout paints NO chrome of its own.",
-      "when_not_to_use": "A radar that should sit alongside other content on the same slide (use a regular layout and embed a smaller version of the PNG instead). Also not for non-radar full-bleed images \u2014 use 'full-bleed-cover' for those.",
+      "when_to_use": "User wants a tech-radar slide — pick a view from `<vault>/Tech-Radar/Views.yaml` (today: `genai-thoughtworks` for the all-blips ThoughtWorks-shaped overview, or `genai-agents`, `genai-models`, `genai-skills`, `genai-tooling` for per-quadrant sub-radars). The /deck pipeline calls `slides.add_radar(prs, slug, view, vault, out_dir, volume?, new_since?)` which runs the full radar-engine pipeline (load blips → magnetic positioning → snapshot edition → SVG → PNG) and embeds the PNG full-bleed. The radar SVG carries its own logo/eyebrow/title/footer, so this layout paints NO chrome of its own.",
+      "when_not_to_use": "A radar that should sit alongside other content on the same slide (use a regular layout and embed a smaller version of the PNG instead). Also not for non-radar full-bleed images — use 'full-bleed-cover' for those.",
       "slots": {
         "view": {
           "type": "string",
@@ -2561,14 +2621,14 @@
         },
         "new_since": {
           "type": "string",
-          "description": "Optional ISO date threshold for the NEW badge. Defaults to today \u2212 14 days.",
+          "description": "Optional ISO date threshold for the NEW badge. Defaults to today − 14 days.",
           "optional": true
         }
       },
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.tech_radar_full_bleed",
-          "layout_name": "Feinschliff \u00b7 Tech Radar \u00b7 Full Bleed",
+          "layout_name": "Feinschliff · Tech Radar · Full Bleed",
           "build_call": "slides.add_radar",
           "placeholder_map": {}
         }
@@ -2577,7 +2637,7 @@
     {
       "id": "v-model",
       "html_label": "V-Model",
-      "name": "Feinschliff \u00b7 V-Model",
+      "name": "Feinschliff · V-Model",
       "role": "content-diagram",
       "concepts": [
         "v-model",
@@ -2588,7 +2648,7 @@
         "paired-phases"
       ],
       "when_to_use": "Show the software-engineering V-model: paired verification phases (left, top-down) and validation phases (right, bottom-up) converging at implementation. Great when the narrative is 'every design step has a matching test'.",
-      "when_not_to_use": "Avoid for agile or iterative timelines \u2014 use process-flow or gantt. Avoid if the audience has no engineering context. Avoid for 2-phase or 6+-phase processes (the tapered grid is tuned to 4 pairs).",
+      "when_not_to_use": "Avoid for agile or iterative timelines — use process-flow or gantt. Avoid if the audience has no engineering context. Avoid for 2-phase or 6+-phase processes (the tapered grid is tuned to 4 pairs).",
       "slots": {
         "kicker": {
           "type": "string",
@@ -2599,7 +2659,7 @@
         "action_title": {
           "type": "string",
           "maxLength": 180,
-          "description": "Full-sentence takeaway, 1\u20132 lines at 52px medium"
+          "description": "Full-sentence takeaway, 1–2 lines at 52px medium"
         },
         "pairs": {
           "type": "array",
@@ -2652,7 +2712,7 @@
       "renderer": {
         "pptx": {
           "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.v_model",
-          "layout_name": "Feinschliff \u00b7 V-Model",
+          "layout_name": "Feinschliff · V-Model",
           "placeholder_map": {
             "kicker": 11,
             "action_title": 0,
@@ -2678,7 +2738,9 @@
             "pairs[3].connector": 39,
             "pivot_counter": 40,
             "pivot_title": 41
-          }
+          },
+          "source": "templates/pptx/v-model.pptx",
+          "sha256": "d2bdf527dadb2d81be8e4e82b4854dd2e3808ce0d162a0b99953834431b35ae5"
         }
       }
     }

@@ -35,7 +35,9 @@
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
-          }
+          },
+          "source": "templates/pptx/title-orange.pptx",
+          "sha256": "74aa421fa9a6e78441cdb8acd2ea00720a3353ba888f8c8b6f9f991e62ef6f21"
         }
       }
     },
@@ -69,7 +71,9 @@
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
-          }
+          },
+          "source": "templates/pptx/title-ink.pptx",
+          "sha256": "d711cff1774269e4eb3fa39d3264a61ede5ccc1622560ceb175b3fd7db9638d2"
         }
       }
     },
@@ -110,7 +114,9 @@
             "title": 0,
             "body": 11
           },
-          "image_fill_mode": "format-shape"
+          "image_fill_mode": "format-shape",
+          "source": "templates/pptx/title-picture.pptx",
+          "sha256": "cc3334365e629ba6f133b2aa8d0c7f33769574415f4513750c3ed8ecf279452d"
         }
       }
     },
@@ -190,7 +196,9 @@
             "items[5].number": 35,
             "items[5].title": 36,
             "items[5].description": 37
-          }
+          },
+          "source": "templates/pptx/agenda.pptx",
+          "sha256": "7a1198fbaedafb0d1250f425973e108257fd5c50d7290baaac44e289cc44a3ba"
         }
       }
     },
@@ -224,7 +232,9 @@
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
-          }
+          },
+          "source": "templates/pptx/chapter-orange.pptx",
+          "sha256": "21234ebec4c6fbfc59390bd5c67c554550e61ab553d0ac9406a4207a905bb425"
         }
       }
     },
@@ -259,7 +269,9 @@
             "eyebrow": 10,
             "title": 0
           },
-          "image_fill_mode": "format-shape"
+          "image_fill_mode": "format-shape",
+          "source": "templates/pptx/chapter-ink.pptx",
+          "sha256": "71b19607f79cec54fcfa7d2370edb7965b4dc855e424265b4ae6f1af5abfe604"
         }
       }
     },
@@ -341,7 +353,9 @@
             "kpis[2].unit": 35,
             "kpis[3].value": 36,
             "kpis[3].unit": 37
-          }
+          },
+          "source": "templates/pptx/kpi-grid.pptx",
+          "sha256": "ac84fe8dcf879496770c002db5c180ba3888eb7ab1502b270c03d3bc4002aa1d"
         }
       }
     },
@@ -410,7 +424,9 @@
             "columns[1].number": 23,
             "columns[1].title": 24,
             "columns[1].body": 25
-          }
+          },
+          "source": "templates/pptx/two-column-cards.pptx",
+          "sha256": "d1053cdf639122abc4e12b6e1990506b218cb8c4f0e06188d2b3b42438702d54"
         }
       }
     },
@@ -481,7 +497,9 @@
             "columns[2].number": 26,
             "columns[2].title": 27,
             "columns[2].body": 28
-          }
+          },
+          "source": "templates/pptx/three-column.pptx",
+          "sha256": "87b559bdbef81d1f7a4d17c21823bffec753b21059b039a9bf6e2d817321956d"
         }
       }
     },
@@ -555,7 +573,9 @@
             "columns[3].number": 29,
             "columns[3].title": 30,
             "columns[3].body": 31
-          }
+          },
+          "source": "templates/pptx/four-column-cards.pptx",
+          "sha256": "fa372b6bbfc70f9fff3681ca9dcab23c9876c98428d4228cd0af49cf3379c268"
         }
       }
     },
@@ -595,7 +615,9 @@
             "title": 0,
             "body": 11
           },
-          "image_fill_mode": "format-shape"
+          "image_fill_mode": "format-shape",
+          "source": "templates/pptx/text-picture.pptx",
+          "sha256": "f88ca8cf2b53b30874cf3ab4a3304d68161b32d0c5ca08fff11b74843c1be4ee"
         }
       }
     },
@@ -630,7 +652,9 @@
             "eyebrow": 10,
             "title": 0
           },
-          "image_fill_mode": "format-shape"
+          "image_fill_mode": "format-shape",
+          "source": "templates/pptx/full-bleed-cover.pptx",
+          "sha256": "ea4aa60c98d3786495030270258c8a399836d09ca1509462f95100022bcbb14e"
         }
       }
     },
@@ -699,7 +723,9 @@
             "bars[3].label": 26,
             "bars[3].value": 27,
             "caption": 40
-          }
+          },
+          "source": "templates/pptx/bar-chart.pptx",
+          "sha256": "d7c7f5965ea87677998414de9d67fc9a56e1c7f5a7ba3b12c8925c633c555d26"
         }
       }
     },
@@ -733,7 +759,9 @@
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
-          }
+          },
+          "source": "templates/pptx/components-showcase.pptx",
+          "sha256": "50418becdec051dfd113bd6478f61a3ed3f7f213547eced6ac9171effef727c5"
         }
       }
     },
@@ -767,7 +795,9 @@
           "placeholder_map": {
             "title": 0,
             "attribution": 10
-          }
+          },
+          "source": "templates/pptx/quote.pptx",
+          "sha256": "7be85009f66c6fe7aa4da0fa885caaac8619ab843aa7d0f4374a6c025b8c4fc2"
         }
       }
     },
@@ -802,7 +832,9 @@
           "placeholder_map": {
             "title": 0,
             "caption": 10
-          }
+          },
+          "source": "templates/pptx/end.pptx",
+          "sha256": "7d9b7c509f892fccccdd47e2dc6c7d08359a55819b6ff779adf091c7b5f9b4db"
         }
       }
     },
@@ -877,7 +909,9 @@
             "bars[3].label": 32,
             "bars[3].value": 33,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/graphical.pptx",
+          "sha256": "c1cd4705103c8aac6ca6174df18b4c1af006cafa17b16d6b7750b1ee384766c4"
         }
       }
     },
@@ -962,7 +996,9 @@
             "kpis[1].key": 26,
             "kpis[1].delta": 27,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/action-title.pptx",
+          "sha256": "53b5f5b4b99f5ae6e5707b4d8fefd0694302af052330740a5bce242d40cd0665"
         }
       }
     },
@@ -1040,7 +1076,9 @@
             "columns[2].heading": 29,
             "columns[2].bullets": 30,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/horizontal-bullets.pptx",
+          "sha256": "bc910398e49491e7bf0774de71dcd0434098937162d6842522121c5d8a4f8c90"
         }
       }
     },
@@ -1131,7 +1169,9 @@
             "items[5].counter": 35,
             "items[5].heading": 36,
             "items[5].body": 37
-          }
+          },
+          "source": "templates/pptx/vertical-bullets.pptx",
+          "sha256": "86a44264a632dd88ef352de6987cb898e170f89c35434e7223af4f84a66917d0"
         }
       }
     },
@@ -1225,7 +1265,9 @@
             "cells[3].body": 33,
             "x_axis_label": 41,
             "y_axis_label": 42
-          }
+          },
+          "source": "templates/pptx/2x2-matrix.pptx",
+          "sha256": "f337def8436a3de1454f0daf49f99252b629fb39cf14887ed8dbd7861245886c"
         }
       }
     },
@@ -1306,7 +1348,9 @@
             "bars[6].value": 44,
             "bars[6].label": 45,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/waterfall.pptx",
+          "sha256": "7a9fb332654a2e0d9dd3a2098520d9633f50f6a55cdb86fbbe801d104a83d5f6"
         }
       }
     },
@@ -1393,7 +1437,9 @@
             "steps[4].heading": 37,
             "steps[4].body": 38,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/process-flow.pptx",
+          "sha256": "453af883233ecb1266b3c5207635db811dbe5c86faec9cc05a8c7cd762105edf"
         }
       }
     },
@@ -1513,7 +1559,9 @@
             "legend[3].name": 46,
             "legend[3].change": 47,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/stacked-bar.pptx",
+          "sha256": "c9d6415ed8a1dc53bd851fddcc7c5ea998591fed4348e6947239fcf8eb82650e"
         }
       }
     },
@@ -1629,7 +1677,9 @@
             "rows[4].cells[2]": 58,
             "rows[4].cells[3]": 59,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/table.pptx",
+          "sha256": "df3787a40ccd4a79eb69a782d8a15530b5ec78f6d422b43ccc8a64c3612dc8c1"
         }
       }
     },
@@ -1703,7 +1753,9 @@
             "tiers[3].label": 32,
             "tiers[3].body": 33,
             "tiers[3].counter": 34
-          }
+          },
+          "source": "templates/pptx/pyramid.pptx",
+          "sha256": "908836db7272780d62a71b1ba077ac2068aabe12826dff2d9d2a18e86dc67d7e"
         }
       }
     },
@@ -1786,7 +1838,9 @@
             "cards[3].heading": 33,
             "cards[3].body": 34,
             "cards[3].owner": 35
-          }
+          },
+          "source": "templates/pptx/key-takeaways.pptx",
+          "sha256": "86574bfc985eaa9aab8f2f5f278578889a8ce7ebaca48e678e73106a0b3a98cf"
         }
       }
     },
@@ -1894,7 +1948,9 @@
             "kpis[2].unit": 57,
             "kpis[2].key": 58,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/executive-summary.pptx",
+          "sha256": "a97b937dd76b2e5b75c599ed46e8e8807e6c99e795fa8404211a0a0dbee6ed44"
         }
       }
     },
@@ -1985,7 +2041,9 @@
             "series[1].name": 31,
             "series[2].name": 32,
             "source": 40
-          }
+          },
+          "source": "templates/pptx/line-chart.pptx",
+          "sha256": "e528b04c293a0d77045b5ff43aeca502d0ec197704a0a5b15af69e6885bdd6f8"
         }
       }
     },
@@ -2086,7 +2144,9 @@
             "options[2].note": 53,
             "options[3].note": 58,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/scorecard.pptx",
+          "sha256": "3c897b4e33dbfc474830a0c78889cf96fca2a06ff831ccc88d7cfe4a4fde38f3"
         }
       }
     },
@@ -2218,7 +2278,9 @@
             "lanes[3].bars[1].label": 50,
             "lanes[3].bars[2].label": 51,
             "source": 60
-          }
+          },
+          "source": "templates/pptx/gantt.pptx",
+          "sha256": "43e5f5d3c73324a7180e2c502f837d32616d3f3b1f4e8256fec7d92e37bc9313"
         }
       }
     },
@@ -2340,7 +2402,9 @@
             "dropoffs[2].pct": 58,
             "dropoffs[2].label": 59,
             "dropoffs[2].body": 60
-          }
+          },
+          "source": "templates/pptx/funnel.pptx",
+          "sha256": "84a37deff2ce4cb55097344198a6ef66b96ce65c4371fe83c81efff3a951f072"
         }
       }
     },
@@ -2471,7 +2535,9 @@
             "side_items[3].counter": 52,
             "side_items[3].heading": 53,
             "side_items[3].body": 54
-          }
+          },
+          "source": "templates/pptx/venn.pptx",
+          "sha256": "274bf076ec3dc7e7a0f9dd24bf2591cf2eef8b02ecf3fa6885bb451544f0c467"
         }
       }
     },
@@ -2603,13 +2669,32 @@
           "items": {
             "type": "object",
             "properties": {
-              "left_counter":  { "type": "string", "maxLength": 16 },
-              "left_title":    { "type": "string", "maxLength": 40 },
-              "right_counter": { "type": "string", "maxLength": 16 },
-              "right_title":   { "type": "string", "maxLength": 40 },
-              "connector":     { "type": "string", "maxLength": 40, "optional": true }
+              "left_counter": {
+                "type": "string",
+                "maxLength": 16
+              },
+              "left_title": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "right_counter": {
+                "type": "string",
+                "maxLength": 16
+              },
+              "right_title": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "connector": {
+                "type": "string",
+                "maxLength": 40,
+                "optional": true
+              }
             },
-            "required": ["left_title", "right_title"]
+            "required": [
+              "left_title",
+              "right_title"
+            ]
           }
         },
         "pivot_counter": {
@@ -2653,7 +2738,9 @@
             "pairs[3].connector": 39,
             "pivot_counter": 40,
             "pivot_title": 41
-          }
+          },
+          "source": "templates/pptx/v-model.pptx",
+          "sha256": "88cbbd75a7ecafde9a2052902a08b9633a8158d609abd680fd9b832e1c0d6438"
         }
       }
     }
