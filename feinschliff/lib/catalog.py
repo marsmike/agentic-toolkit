@@ -44,16 +44,17 @@ def _build_validator() -> Draft202012Validator:
     return Draft202012Validator(catalog_schema, resolver=resolver)
 
 
-_VALIDATOR = _build_validator()
-
-
 def load_catalog(path: str | Path) -> dict[str, Any]:
     data = json.loads(Path(path).read_text())
     for k in REQUIRED_TOP_KEYS:
         if k not in data:
             raise ValueError(f"catalog at {path} missing required key '{k}'")
+    # Build a fresh validator per call: jsonschema.RefResolver caches resolved $refs in
+    # internal state, and that cache breaks $defs lookups when the same validator instance
+    # is reused against multiple catalogs in the same process. Cost is negligible (~1ms).
+    validator = _build_validator()
     try:
-        _VALIDATOR.validate(data)
+        validator.validate(data)
     except ValidationError as e:
         raise ValueError(f"catalog at {path} fails schema validation: {e.message}") from e
     return data
