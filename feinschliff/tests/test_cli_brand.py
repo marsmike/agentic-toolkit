@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -61,3 +62,82 @@ def test_brand_inspect_prints_summary(isolated_brands, capsys):
 def test_brand_inspect_unknown_brand_returns_nonzero(isolated_brands, capsys):
     rc = main(["brand", "inspect", "nope"])
     assert rc != 0
+
+
+def test_brand_sync_fetches_v2_templates(isolated_brands, tmp_cache_root, tmp_path, capsys):
+    src_pptx = tmp_path / "demo.pptx"
+    src_pptx.write_bytes(b"PPTX")
+    import hashlib
+    sha = hashlib.sha256(b"PPTX").hexdigest()
+    _write_brand(isolated_brands, "alpha", {
+        "brand": "alpha",
+        "version": "1.0.0",
+        "layouts": [
+            {"id": "x", "renderer": {"pptx": {
+                "source": f"file://{src_pptx}",
+                "sha256": sha,
+                "placeholder_map": {},
+            }}},
+        ],
+        "assets": {"icons": [], "illustrations": [], "images": []},
+    })
+    rc = main(["brand", "sync", "alpha"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "1/1" in out
+
+
+def test_brand_sync_skips_images_by_default(isolated_brands, tmp_cache_root, tmp_path, capsys):
+    src_pptx = tmp_path / "x.pptx"
+    src_pptx.write_bytes(b"X")
+    src_jpg = tmp_path / "img.jpg"
+    src_jpg.write_bytes(b"IMG")
+    import hashlib
+    _write_brand(isolated_brands, "alpha", {
+        "brand": "alpha",
+        "version": "1.0.0",
+        "layouts": [
+            {"id": "x", "renderer": {"pptx": {
+                "source": f"file://{src_pptx}",
+                "sha256": hashlib.sha256(b"X").hexdigest(),
+                "placeholder_map": {},
+            }}},
+        ],
+        "assets": {
+            "icons": [],
+            "illustrations": [],
+            "images": [{
+                "id": "i1", "tags": [],
+                "source": f"file://{src_jpg}",
+                "sha256": hashlib.sha256(b"IMG").hexdigest(),
+            }],
+        },
+    })
+    rc = main(["brand", "sync", "alpha"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "skipping images" in out
+
+
+def test_brand_sync_with_images_fetches_them(isolated_brands, tmp_cache_root, tmp_path, capsys):
+    src_jpg = tmp_path / "img.jpg"
+    src_jpg.write_bytes(b"IMG")
+    import hashlib
+    _write_brand(isolated_brands, "alpha", {
+        "brand": "alpha",
+        "version": "1.0.0",
+        "layouts": [],
+        "assets": {
+            "icons": [],
+            "illustrations": [],
+            "images": [{
+                "id": "i1", "tags": [],
+                "source": f"file://{src_jpg}",
+                "sha256": hashlib.sha256(b"IMG").hexdigest(),
+            }],
+        },
+    })
+    rc = main(["brand", "sync", "alpha", "--with-images"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "1/1" in out
