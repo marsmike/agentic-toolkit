@@ -352,10 +352,10 @@ def build_demo_deck(prs: Presentation):
     add(prs, "Feinschliff · KPI Grid",
         _10="Layout · KPI grid",
         _0="Headline numbers.",
-        _20="Metric 1", _21="Caption 1", _30="62", _31="k",
-        _22="Metric 2", _23="Caption 2", _32="14", _33="bn",
-        _24="Metric 3", _25="Caption 3", _34="40", _35="",
-        _26="Metric 4", _27="Caption 4", _36="100", _37="%")
+        _20="Metric 1", _21="Caption 1",
+        _22="Metric 2", _23="Caption 2",
+        _24="Metric 3", _25="Caption 3",
+        _26="Metric 4", _27="Caption 4")
 
     # 2-Column Cards
     add(prs, "Feinschliff · 2-Column Cards",
