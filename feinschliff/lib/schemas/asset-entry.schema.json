@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feinschliff.dev/schemas/asset-entry.schema.json",
+  "title": "Feinschliff Asset Entry (icon, illustration, or image)",
+  "type": "object",
+  "required": ["id", "source", "sha256"],
+  "additionalProperties": false,
+  "properties": {
+    "id":          { "type": "string", "minLength": 1 },
+    "tags":        { "type": "array", "items": { "type": "string" } },
+    "when_to_use": { "type": "string" },
+    "source":      { "type": "string", "minLength": 1 },
+    "sha256":      { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
