@@ -5,7 +5,11 @@ set -euo pipefail
 PATTERN='bshg\.com|boschdevcloud|github-bshg|eforms-online|s\.a\.x\.|MasterLayout|rb-proxy|\.bosch\.com|Bosch Siemens|MUM3RE|YeHVV89kL7aKBQbZWT9k93hLA7kfdfg2uRNrYfd22Y|eyJpZGVudGlmaWVyIjo'
 
 # Limit to staged additions (not whole files — false positives in unchanged code are not our problem).
-HITS=$(git diff --cached -U0 -- ':!*.svg' ':!*.jpg' ':!*.pptx' | grep -E "^\+" | grep -E "$PATTERN" || true)
+# The hook + leak-scan workflow ARE the scanner so they reference the patterns by definition; exclude them.
+HITS=$(git diff --cached -U0 \
+    -- ':!*.svg' ':!*.jpg' ':!*.pptx' \
+       ':!.githooks/pre-commit' ':!.github/workflows/leak-scan.yml' \
+    | grep -E "^\+" | grep -E "$PATTERN" || true)
 BIN_HITS=$(git diff --cached --name-only --diff-filter=A | grep -E '\.(svg|jpg|pptx)$' | grep -E 'eyJpZGVudGlmaWVyIjo' || true)
 
 if [[ -n "$HITS" || -n "$BIN_HITS" ]]; then
