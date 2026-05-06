@@ -1,0 +1,33 @@
+[project]
+name = "feinschliff"
+version = "0.2.0-dev"
+description = "Feinschliff core library and CLI — catalog, resolver, pptx fill engine."
+requires-python = ">=3.11"
+dependencies = [
+    "python-pptx>=0.6.23",
+    "lxml>=4.9",
+    "jsonschema>=4.21",
+]
+
+[project.scripts]
+feinschliff = "cli.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "ruff>=0.8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lib*", "cli*"]
