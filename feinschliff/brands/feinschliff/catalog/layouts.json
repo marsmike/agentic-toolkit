@@ -37,7 +37,7 @@
             "title": 0
           },
           "source": "templates/pptx/title-orange.pptx",
-          "sha256": "54031af035dc02149e80e8aec1dfb4bb28ca38ba65d2e12ef6bd0345b158da2b"
+          "sha256": "deba6d8bb846afc215a6e0a6a705f57f7fb4899cf87bf95a7113fcbe29adfb73"
         }
       }
     },
@@ -345,7 +345,7 @@
             "kpis[3].unit": 37
           },
           "source": "templates/pptx/kpi-grid.pptx",
-          "sha256": "e71f39ea459301d831a17790c9e978de567b0465920af1538850f0384d008b7d"
+          "sha256": "7335c1dd78ed563acfa0a4aa9eb54672ad785446ff2cacfb597eeaf995548fe6"
         }
       }
     },
@@ -601,7 +601,7 @@
           },
           "image_fill_mode": "format-shape",
           "source": "templates/pptx/text-picture.pptx",
-          "sha256": "3607c5aae847f515deed4b270d5350375fe49ba384807829ba0f30d12c30ce8a"
+          "sha256": "d450471f0b0d0ea0322677a46a0c4423853357a95cce347f393237be2d953fb1"
         }
       }
     },
