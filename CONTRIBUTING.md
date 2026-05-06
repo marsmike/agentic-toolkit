@@ -34,3 +34,13 @@ A plugin is a directory at the repo root with a `.claude-plugin/plugin.json` man
 ## License
 
 Contributions are released under MIT (see [LICENSE](LICENSE)).
+
+## Leak prevention (OSS repo only)
+
+The repo blocks commits containing BSH-internal markers (boschdevcloud URLs, Bosch proxy hostnames, kit auth tokens, asset IDs). Install the pre-commit hook once after cloning:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+CI runs the same scan on every PR; merges are blocked if anything matches.
