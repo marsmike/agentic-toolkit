@@ -10,7 +10,7 @@ from lib.pptx_fill import load_template, fill_slot, write_filled
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BRAND_ROOT = REPO_ROOT / "brands" / "feinschliff"
-CATALOG_PATH = BRAND_ROOT / "catalog" / "layouts.json"
+CATALOG_PATH = BRAND_ROOT / "catalog.json"
 
 
 def _entry(layout_id: str) -> dict:

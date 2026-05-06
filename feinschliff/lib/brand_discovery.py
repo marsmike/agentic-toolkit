@@ -56,21 +56,11 @@ def _env_brands_roots() -> list[Path]:
     return [Path(p) for p in raw.split(os.pathsep) if p]
 
 
-def _resolve_catalog_file(brand_dir: Path) -> Path | None:
-    """Return the catalog file for a brand, supporting both v2 (catalog.json at brand root)
-    and the v1-era layout (catalog/layouts.json) so the discovery works during the migration.
-    """
-    primary = brand_dir / "catalog.json"
-    if primary.is_file():
-        return primary
-    legacy = brand_dir / "catalog" / "layouts.json"
-    if legacy.is_file():
-        return legacy
-    return None
-
-
 def discover_brands() -> list[Brand]:
-    """Returns all brands found across all discovery sources, deduped by name (first wins)."""
+    """Returns all brands found across all discovery sources, deduped by name (first wins).
+
+    A brand is a directory containing a `catalog.json` at its root.
+    """
     seen: dict[str, Brand] = {}
     for root in [
         _bundled_brands_root(),
@@ -83,8 +73,8 @@ def discover_brands() -> list[Brand]:
         for d in sorted(root.iterdir()):
             if not d.is_dir():
                 continue
-            cat = _resolve_catalog_file(d)
-            if cat is None:
+            cat = d / "catalog.json"
+            if not cat.is_file():
                 continue
             if d.name in seen:
                 continue

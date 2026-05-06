@@ -42,7 +42,7 @@ def test_brand_inspect_prints_summary(isolated_brands, capsys):
         "version": "1.0.0",
         "layouts": [
             {"id": "x", "renderer": {"pptx": {"source": "x.pptx", "sha256": "0" * 64, "placeholder_map": {}}}},
-            {"id": "y", "renderer": {"pptx": {"module": "old"}}},
+            {"id": "y", "renderer": {"pptx": {"source": "y.pptx", "sha256": "1" * 64, "placeholder_map": {"title": 0}}}},
         ],
         "assets": {"icons": [
             {"id": "i1", "source": "i1.svg", "sha256": "a" * 64},
@@ -54,8 +54,7 @@ def test_brand_inspect_prints_summary(isolated_brands, capsys):
     out = capsys.readouterr().out
     assert "alpha" in out
     assert "layouts: 2" in out
-    assert "v2: 1" in out
-    assert "v1: 1" in out
+    assert "v2: 2" in out
     assert "icons: 2" in out
 
 

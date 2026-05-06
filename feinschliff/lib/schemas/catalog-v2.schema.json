@@ -81,28 +81,15 @@
       }
     },
     "rendererSpec": {
-      "description": "v1 (module) and/or v2 (source + sha256). Migration phase allows both keys to coexist on the same entry; the parser prefers source when present.",
+      "description": "v2 renderer artifact reference. v1 'module' form was removed in PR-2 after the bulk port.",
       "type": "object",
-      "anyOf": [
-        {
-          "required": ["module"],
-          "properties": {
-            "module":          { "type": "string", "minLength": 1 },
-            "layout_name":     { "type": "string" },
-            "placeholder_map": { "type": "object", "additionalProperties": { "type": "integer" } }
-          }
-        },
-        {
-          "required": ["source", "sha256", "placeholder_map"],
-          "properties": {
-            "module":          { "type": "string" },
-            "layout_name":     { "type": "string" },
-            "source":          { "type": "string", "minLength": 1 },
-            "sha256":          { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-            "placeholder_map": { "type": "object", "additionalProperties": { "type": "integer" } }
-          }
-        }
-      ]
+      "required": ["source", "sha256", "placeholder_map"],
+      "additionalProperties": false,
+      "properties": {
+        "source":          { "type": "string", "minLength": 1 },
+        "sha256":          { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "placeholder_map": { "type": "object", "additionalProperties": { "type": "integer" } }
+      }
     },
     "alternativeEntry": {
       "description": "A visual variant of a parent layout. Shares the parent's slots schema; ships its own renderer artifact.",

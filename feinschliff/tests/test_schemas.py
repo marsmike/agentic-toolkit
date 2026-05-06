@@ -27,32 +27,34 @@ def test_minimal_v2_catalog_validates(sample_v2_catalog):
     _validator().validate(sample_v2_catalog)
 
 
-def test_v1_only_entry_validates():
+def test_legacy_v1_module_form_now_rejected():
+    """v1 'module' form was supported during the migration; PR-2 dropped it.
+    A renderer entry with only a 'module' field no longer validates."""
     cat = {
         "brand": "x",
         "layouts": [
             {"id": "old", "renderer": {"pptx": {"module": "x.y.z", "placeholder_map": {"title": 0}}}}
         ],
     }
-    _validator().validate(cat)
+    with pytest.raises(ValidationError):
+        _validator().validate(cat)
 
 
-def test_dual_v1_v2_entry_validates():
-    """During migration, an entry may carry both `module` (v1) and `source`+`sha256` (v2).
-    anyOf semantics accept this; the parser prefers v2 at runtime."""
+def test_renderer_extra_fields_rejected():
+    """rendererSpec is now strict: only source + sha256 + placeholder_map allowed."""
     cat = {
         "brand": "x",
         "layouts": [
-            {"id": "dual", "renderer": {"pptx": {
-                "module": "x.y.z",
-                "layout_name": "X",
-                "placeholder_map": {"title": 0},
+            {"id": "demo", "renderer": {"pptx": {
                 "source": "templates/pptx/x.pptx",
                 "sha256": "a" * 64,
+                "placeholder_map": {"title": 0},
+                "module": "leftover-from-v1",
             }}}
         ],
     }
-    _validator().validate(cat)
+    with pytest.raises(ValidationError):
+        _validator().validate(cat)
 
 
 def test_alternatives_accepted_with_max_2(sample_v2_catalog):

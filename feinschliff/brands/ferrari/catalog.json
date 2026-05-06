@@ -30,14 +30,12 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_orange",
-          "layout_name": "Feinschliff · Title · Accent",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
           "source": "templates/pptx/title-orange.pptx",
-          "sha256": "a85254c61ebcf2b7f2ce38817eb560d377a0bc228c0789a2bf8b81a01c096c9f"
+          "sha256": "74aa421fa9a6e78441cdb8acd2ea00720a3353ba888f8c8b6f9f991e62ef6f21"
         }
       }
     },
@@ -66,14 +64,12 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_ink",
-          "layout_name": "Feinschliff · Title · Ink",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
           "source": "templates/pptx/title-ink.pptx",
-          "sha256": "91261cd5abd2787ddacc9cb3259adbabdd3edd4e4ea0980e51aa3e2f4fdfd4ae"
+          "sha256": "d711cff1774269e4eb3fa39d3264a61ede5ccc1622560ceb175b3fd7db9638d2"
         }
       }
     },
@@ -107,16 +103,13 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.title_picture",
-          "layout_name": "Feinschliff · Title + Picture",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
             "body": 11
           },
-          "image_fill_mode": "format-shape",
           "source": "templates/pptx/title-picture.pptx",
-          "sha256": "77da978f00004ca00af3826fc79eae1a2748c9a3fad2d52c5f54025318cb8126"
+          "sha256": "cc3334365e629ba6f133b2aa8d0c7f33769574415f4513750c3ed8ecf279452d"
         }
       }
     },
@@ -173,8 +166,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.agenda",
-          "layout_name": "Feinschliff · Agenda",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -198,7 +189,7 @@
             "items[5].description": 37
           },
           "source": "templates/pptx/agenda.pptx",
-          "sha256": "b89206d01aa80d87b417f803bb2f829eec2c6282a41c7352151166675af85723"
+          "sha256": "7a1198fbaedafb0d1250f425973e108257fd5c50d7290baaac44e289cc44a3ba"
         }
       }
     },
@@ -227,14 +218,12 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.chapter_orange",
-          "layout_name": "Feinschliff · Chapter · Accent",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
           "source": "templates/pptx/chapter-orange.pptx",
-          "sha256": "8db4b7bbc22b98bd4c2444cb7a35fbd15b45586a921267c7145cbaa43f4dbb6a"
+          "sha256": "21234ebec4c6fbfc59390bd5c67c554550e61ab553d0ac9406a4207a905bb425"
         }
       }
     },
@@ -263,15 +252,12 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.chapter_ink",
-          "layout_name": "Feinschliff · Chapter · Ink + Picture",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
-          "image_fill_mode": "format-shape",
           "source": "templates/pptx/chapter-ink.pptx",
-          "sha256": "8d9414b0091d99e4fded5f49ee7524f84ae30a433352e831fa826ec2fa220eb6"
+          "sha256": "71b19607f79cec54fcfa7d2370edb7965b4dc855e424265b4ae6f1af5abfe604"
         }
       }
     },
@@ -332,8 +318,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.kpi_grid",
-          "layout_name": "Feinschliff · KPI Grid",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -355,7 +339,7 @@
             "kpis[3].unit": 37
           },
           "source": "templates/pptx/kpi-grid.pptx",
-          "sha256": "ee4539513258e7cf5862f5ff267dd5740618b181e7da4b8d0f06dfdf49009b38"
+          "sha256": "ac84fe8dcf879496770c002db5c180ba3888eb7ab1502b270c03d3bc4002aa1d"
         }
       }
     },
@@ -413,8 +397,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.two_column_cards",
-          "layout_name": "Feinschliff · 2-Column Cards",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -426,7 +408,7 @@
             "columns[1].body": 25
           },
           "source": "templates/pptx/two-column-cards.pptx",
-          "sha256": "0b6b622e8aa6e4284b3c5b725d4b8c627ced95eea3e4f889e796da378481b6db"
+          "sha256": "d1053cdf639122abc4e12b6e1990506b218cb8c4f0e06188d2b3b42438702d54"
         }
       }
     },
@@ -483,8 +465,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.three_column",
-          "layout_name": "Feinschliff · 3-Column",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -499,7 +479,7 @@
             "columns[2].body": 28
           },
           "source": "templates/pptx/three-column.pptx",
-          "sha256": "b3da354482c60a2b7ce9f0850828096070dd211974a3c4863468c51257fcec86"
+          "sha256": "87b559bdbef81d1f7a4d17c21823bffec753b21059b039a9bf6e2d817321956d"
         }
       }
     },
@@ -556,8 +536,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.four_column_cards",
-          "layout_name": "Feinschliff · 4-Column Cards",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -575,7 +553,7 @@
             "columns[3].body": 31
           },
           "source": "templates/pptx/four-column-cards.pptx",
-          "sha256": "cb408bb9b455616bf9d1c54739ed25c661d883ead2b951fb90a07806fb241f40"
+          "sha256": "fa372b6bbfc70f9fff3681ca9dcab23c9876c98428d4228cd0af49cf3379c268"
         }
       }
     },
@@ -608,16 +586,13 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.text_picture",
-          "layout_name": "Feinschliff · Text + Picture",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
             "body": 11
           },
-          "image_fill_mode": "format-shape",
           "source": "templates/pptx/text-picture.pptx",
-          "sha256": "65849041d5b62da083ddd1b0d20cfbf55be075c1dc88b3a8982f8b9fd748559e"
+          "sha256": "f88ca8cf2b53b30874cf3ab4a3304d68161b32d0c5ca08fff11b74843c1be4ee"
         }
       }
     },
@@ -646,15 +621,12 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.full_bleed_cover",
-          "layout_name": "Feinschliff · Full-bleed Cover",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
-          "image_fill_mode": "format-shape",
           "source": "templates/pptx/full-bleed-cover.pptx",
-          "sha256": "b09bd46ab84c455bee7b709705b4ca407053ddee7ac90ca875942df5bdb40930"
+          "sha256": "ea4aa60c98d3786495030270258c8a399836d09ca1509462f95100022bcbb14e"
         }
       }
     },
@@ -709,8 +681,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.bar_chart",
-          "layout_name": "Feinschliff · Bar Chart",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0,
@@ -725,7 +695,7 @@
             "caption": 40
           },
           "source": "templates/pptx/bar-chart.pptx",
-          "sha256": "1fb094540452609060563ecc501ad9f8f0c1ff5d1af997665ce1f56c91e8bd3b"
+          "sha256": "d7c7f5965ea87677998414de9d67fc9a56e1c7f5a7ba3b12c8925c633c555d26"
         }
       }
     },
@@ -754,14 +724,12 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.components_showcase",
-          "layout_name": "Feinschliff · Components Showcase",
           "placeholder_map": {
             "eyebrow": 10,
             "title": 0
           },
           "source": "templates/pptx/components-showcase.pptx",
-          "sha256": "e467c75ecfe082a05c4d8f1dd5ac7a239df9b4006736b6bf7d566dfbfd9ce0e3"
+          "sha256": "50418becdec051dfd113bd6478f61a3ed3f7f213547eced6ac9171effef727c5"
         }
       }
     },
@@ -790,14 +758,12 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.quote",
-          "layout_name": "Feinschliff · Quote",
           "placeholder_map": {
             "title": 0,
             "attribution": 10
           },
           "source": "templates/pptx/quote.pptx",
-          "sha256": "3e9fbad819a8dfe68fbdfcd0d325787e0899414c4ddbed054ca8f663ef94c2cb"
+          "sha256": "7be85009f66c6fe7aa4da0fa885caaac8619ab843aa7d0f4374a6c025b8c4fc2"
         }
       }
     },
@@ -827,14 +793,12 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.end",
-          "layout_name": "Feinschliff · End",
           "placeholder_map": {
             "title": 0,
             "caption": 10
           },
           "source": "templates/pptx/end.pptx",
-          "sha256": "c30e490a69661553521fb543ea0b9d51c5c5f31f8d194ed1082fa0a2c1b7f76f"
+          "sha256": "7d9b7c509f892fccccdd47e2dc6c7d08359a55819b6ff779adf091c7b5f9b4db"
         }
       }
     },
@@ -895,8 +859,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.graphical",
-          "layout_name": "Feinschliff · Graphical",
           "placeholder_map": {
             "title": 0,
             "eyebrow": 10,
@@ -911,7 +873,7 @@
             "source": 60
           },
           "source": "templates/pptx/graphical.pptx",
-          "sha256": "dd22c8b65442c24b3f579fc2121f93d2ad22d280e9d751c66cc0e996049ca148"
+          "sha256": "c1cd4705103c8aac6ca6174df18b4c1af006cafa17b16d6b7750b1ee384766c4"
         }
       }
     },
@@ -981,8 +943,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.action_title",
-          "layout_name": "Feinschliff · Action Title",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -998,7 +958,7 @@
             "source": 60
           },
           "source": "templates/pptx/action-title.pptx",
-          "sha256": "d920a02851b85d26a3c5bf6208be7ac87e84f7efda1fb1e5f11fc214b2e0c24a"
+          "sha256": "53b5f5b4b99f5ae6e5707b4d8fefd0694302af052330740a5bce242d40cd0665"
         }
       }
     },
@@ -1061,8 +1021,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.horizontal_bullets",
-          "layout_name": "Feinschliff · Horizontal Bullets",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1078,7 +1036,7 @@
             "source": 60
           },
           "source": "templates/pptx/horizontal-bullets.pptx",
-          "sha256": "fc54f5f72a825c81b0b299fe55b354b30a52e6ffc16a6d35717dfb44c4d0c9b6"
+          "sha256": "bc910398e49491e7bf0774de71dcd0434098937162d6842522121c5d8a4f8c90"
         }
       }
     },
@@ -1144,8 +1102,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.vertical_bullets",
-          "layout_name": "Feinschliff · Vertical Bullets",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1171,7 +1127,7 @@
             "items[5].body": 37
           },
           "source": "templates/pptx/vertical-bullets.pptx",
-          "sha256": "09870448e78987373a3ad0361eb5e82f31d53362b73b0aab6fb426f5258c7e97"
+          "sha256": "86a44264a632dd88ef352de6987cb898e170f89c35434e7223af4f84a66917d0"
         }
       }
     },
@@ -1250,8 +1206,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.matrix_2x2",
-          "layout_name": "Feinschliff · 2×2 Matrix",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1267,7 +1221,7 @@
             "y_axis_label": 42
           },
           "source": "templates/pptx/2x2-matrix.pptx",
-          "sha256": "cd67030ae6ea60264e927c343dbf850ccd4a716a33744d5c6fd7584189c4ba01"
+          "sha256": "f337def8436a3de1454f0daf49f99252b629fb39cf14887ed8dbd7861245886c"
         }
       }
     },
@@ -1328,8 +1282,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.waterfall",
-          "layout_name": "Feinschliff · Waterfall",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1350,7 +1302,7 @@
             "source": 60
           },
           "source": "templates/pptx/waterfall.pptx",
-          "sha256": "c7bfc96415fb2333bcfe4ae59b4b324b2ded4106f2005c3ffdcf55ba10149094"
+          "sha256": "7a9fb332654a2e0d9dd3a2098520d9633f50f6a55cdb86fbbe801d104a83d5f6"
         }
       }
     },
@@ -1416,8 +1368,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.process_flow",
-          "layout_name": "Feinschliff · Process Flow",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1439,7 +1389,7 @@
             "source": 60
           },
           "source": "templates/pptx/process-flow.pptx",
-          "sha256": "8553e8e6a665560bd58465b9415b30fb03c0e654dc30b287dfa910683840f4fd"
+          "sha256": "453af883233ecb1266b3c5207635db811dbe5c86faec9cc05a8c7cd762105edf"
         }
       }
     },
@@ -1535,8 +1485,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.stacked_bar",
-          "layout_name": "Feinschliff · Stacked Bar",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1561,7 +1509,7 @@
             "source": 60
           },
           "source": "templates/pptx/stacked-bar.pptx",
-          "sha256": "0ab761d941552e2c3bda32ffc7d0865a4cc0ff0e4ba7431857cc5b86431c7ba4"
+          "sha256": "c9d6415ed8a1dc53bd851fddcc7c5ea998591fed4348e6947239fcf8eb82650e"
         }
       }
     },
@@ -1641,8 +1589,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.table",
-          "layout_name": "Feinschliff · Table",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1679,7 +1625,7 @@
             "source": 60
           },
           "source": "templates/pptx/table.pptx",
-          "sha256": "75a6370674612178a0f6e3fdfe3159527f1aed49c7fea80521c76cbcd20b359d"
+          "sha256": "df3787a40ccd4a79eb69a782d8a15530b5ec78f6d422b43ccc8a64c3612dc8c1"
         }
       }
     },
@@ -1736,8 +1682,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.pyramid",
-          "layout_name": "Feinschliff · Pyramid",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1755,7 +1699,7 @@
             "tiers[3].counter": 34
           },
           "source": "templates/pptx/pyramid.pptx",
-          "sha256": "d03eda8fbe7430b24ba3eaf88d3f40abbcc982d518ec94a49cde0fb5700a5a9f"
+          "sha256": "908836db7272780d62a71b1ba077ac2068aabe12826dff2d9d2a18e86dc67d7e"
         }
       }
     },
@@ -1817,8 +1761,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.key_takeaways",
-          "layout_name": "Feinschliff · Key Takeaways",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1840,7 +1782,7 @@
             "cards[3].owner": 35
           },
           "source": "templates/pptx/key-takeaways.pptx",
-          "sha256": "ae13113bf5bb43ac14140251f1c050d04437610d3a277e2aacf4fc232bd0def6"
+          "sha256": "86574bfc985eaa9aab8f2f5f278578889a8ce7ebaca48e678e73106a0b3a98cf"
         }
       }
     },
@@ -1914,8 +1856,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.executive_summary",
-          "layout_name": "Feinschliff · Executive Summary",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -1950,7 +1890,7 @@
             "source": 60
           },
           "source": "templates/pptx/executive-summary.pptx",
-          "sha256": "45f71e6931038e2485755de16ac6ca053f6ec138c351f91140215157e0b2922d"
+          "sha256": "a97b937dd76b2e5b75c599ed46e8e8807e6c99e795fa8404211a0a0dbee6ed44"
         }
       }
     },
@@ -2027,8 +1967,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.line_chart",
-          "layout_name": "Feinschliff · Line Chart",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2043,7 +1981,7 @@
             "source": 40
           },
           "source": "templates/pptx/line-chart.pptx",
-          "sha256": "242d7304adb5e947de486ff1bb6ad6c51d0ec6186fe039c1df39ab5b19b75569"
+          "sha256": "e528b04c293a0d77045b5ff43aeca502d0ec197704a0a5b15af69e6885bdd6f8"
         }
       }
     },
@@ -2126,8 +2064,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.scorecard",
-          "layout_name": "Feinschliff · Scorecard",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2146,7 +2082,7 @@
             "source": 60
           },
           "source": "templates/pptx/scorecard.pptx",
-          "sha256": "652be06d393ac3375f38b096defc1b1695a85b926d588cade98b5dc53301fff5"
+          "sha256": "3c897b4e33dbfc474830a0c78889cf96fca2a06ff831ccc88d7cfe4a4fde38f3"
         }
       }
     },
@@ -2252,8 +2188,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.gantt",
-          "layout_name": "Feinschliff · Gantt",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2280,7 +2214,7 @@
             "source": 60
           },
           "source": "templates/pptx/gantt.pptx",
-          "sha256": "6110fb033a34709bb4bedc8260a9982c525a104dfffa437b6e475375ad7f2ef9"
+          "sha256": "43e5f5d3c73324a7180e2c502f837d32616d3f3b1f4e8256fec7d92e37bc9313"
         }
       }
     },
@@ -2372,8 +2306,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.funnel",
-          "layout_name": "Feinschliff · Funnel",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2404,7 +2336,7 @@
             "dropoffs[2].body": 60
           },
           "source": "templates/pptx/funnel.pptx",
-          "sha256": "aa65d48af4c11ea816ad646f51b6936c61e0c04d5ff900e215a6b07eedc4f674"
+          "sha256": "84a37deff2ce4cb55097344198a6ef66b96ce65c4371fe83c81efff3a951f072"
         }
       }
     },
@@ -2508,8 +2440,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.venn",
-          "layout_name": "Feinschliff · Venn",
           "placeholder_map": {
             "action_title": 0,
             "kicker": 10,
@@ -2537,100 +2467,7 @@
             "side_items[3].body": 54
           },
           "source": "templates/pptx/venn.pptx",
-          "sha256": "50227cf3af67b5c06d77a55ab08433707698b9a65d5a76e9a84a3087285ade10"
-        }
-      }
-    },
-    {
-      "id": "diagram",
-      "name": "Feinschliff · Diagram",
-      "role": "content-with-diagram",
-      "concepts": [
-        "diagram",
-        "flowchart",
-        "architecture-overview",
-        "architectural-overview",
-        "system-architecture",
-        "system-overview",
-        "layered-system",
-        "layer-diagram",
-        "concept-map",
-        "mind-map",
-        "block-diagram",
-        "freeform-diagram"
-      ],
-      "when_to_use": "User mentions diagram, flowchart, architecture, architectural overview, system overview, layers, concept map, mind map, block diagram, or any one-big-rich-visual-per-slide intent. Also: multi-element flows with callouts that don't fit a parameterized template. The diagram is authored as Excalidraw DSL and rendered+Feinschliff-themed at build time.",
-      "when_not_to_use": "Content that fits a parameterized template — prefer process-flow for pipelines, pyramid for hierarchy, venn for overlap, 2x2-matrix for quadrants, funnel for conversion, bar-chart for ranked numeric data, kpi-grid for metrics. Also not for photographic imagery (use text-picture or title-picture).",
-      "slots": {
-        "eyebrow": {
-          "type": "string",
-          "maxLength": 60,
-          "optional": true,
-          "description": "Mono uppercase label above the title"
-        },
-        "title": {
-          "type": "string",
-          "maxLength": 80,
-          "description": "Slide title, one line"
-        },
-        "dsl": {
-          "type": "string",
-          "description": "Excalidraw DSL source (see excalidraw/references/dsl-syntax.md). First line `theme bsh` is auto-prepended if missing (the literal `bsh` is the excalidraw plugin's theme key, not a brand reference). Expanded → Feinschliff-themed → rendered to PNG → embedded. The .dsl, .excalidraw, -bsh.excalidraw, and -bsh.png are all preserved under out/<deck>/diagrams/ for post-build editing."
-        },
-        "caption": {
-          "type": "string",
-          "maxLength": 160,
-          "optional": true,
-          "description": "One-line caption under the diagram (source, figure number, etc.)"
-        }
-      },
-      "renderer": {
-        "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.diagram",
-          "layout_name": "Feinschliff · Diagram",
-          "placeholder_map": {
-            "eyebrow": 10,
-            "title": 0,
-            "caption": 11
-          }
-        }
-      }
-    },
-    {
-      "id": "tech-radar-full-bleed",
-      "name": "Feinschliff · Tech Radar · Full Bleed",
-      "role": "data-visualization",
-      "concepts": [
-        "tech-radar",
-        "tech-scouting",
-        "manager-review",
-        "innovation-portfolio",
-        "thought-leadership"
-      ],
-      "when_to_use": "User wants a tech-radar slide — pick a view from `<vault>/Tech-Radar/Views.yaml` (today: `genai-thoughtworks` for the all-blips ThoughtWorks-shaped overview, or `genai-agents`, `genai-models`, `genai-skills`, `genai-tooling` for per-quadrant sub-radars). The /deck pipeline calls `slides.add_radar(prs, slug, view, vault, out_dir, volume?, new_since?)` which runs the full radar-engine pipeline (load blips → magnetic positioning → snapshot edition → SVG → PNG) and embeds the PNG full-bleed. The radar SVG carries its own logo/eyebrow/title/footer, so this layout paints NO chrome of its own.",
-      "when_not_to_use": "A radar that should sit alongside other content on the same slide (use a regular layout and embed a smaller version of the PNG instead). Also not for non-radar full-bleed images — use 'full-bleed-cover' for those.",
-      "slots": {
-        "view": {
-          "type": "string",
-          "description": "View name from <vault>/Tech-Radar/Views.yaml (e.g. 'genai-thoughtworks', 'genai-agents', 'genai-models', 'genai-skills', 'genai-tooling')."
-        },
-        "volume": {
-          "type": "integer",
-          "description": "Optional edition volume number. Defaults to latest existing edition + 1, or 1 for first run.",
-          "optional": true
-        },
-        "new_since": {
-          "type": "string",
-          "description": "Optional ISO date threshold for the NEW badge. Defaults to today − 14 days.",
-          "optional": true
-        }
-      },
-      "renderer": {
-        "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.tech_radar_full_bleed",
-          "layout_name": "Feinschliff · Tech Radar · Full Bleed",
-          "build_call": "slides.add_radar",
-          "placeholder_map": {}
+          "sha256": "274bf076ec3dc7e7a0f9dd24bf2591cf2eef8b02ecf3fa6885bb451544f0c467"
         }
       }
     },
@@ -2711,8 +2548,6 @@
       },
       "renderer": {
         "pptx": {
-          "module": "feinschliff.brands.feinschliff.renderers.pptx.layouts.v_model",
-          "layout_name": "Feinschliff · V-Model",
           "placeholder_map": {
             "kicker": 11,
             "action_title": 0,
@@ -2740,7 +2575,7 @@
             "pivot_title": 41
           },
           "source": "templates/pptx/v-model.pptx",
-          "sha256": "c5e416b90e214c336af9559c182264b7920948fb6f38e6639f858526a921b6bf"
+          "sha256": "88cbbd75a7ecafde9a2052902a08b9633a8158d609abd680fd9b832e1c0d6438"
         }
       }
     }
