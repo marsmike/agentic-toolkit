@@ -21,7 +21,7 @@ def _entry(layout_id: str) -> dict:
     raise KeyError(layout_id)
 
 
-@pytest.mark.parametrize("layout_id", ["title-orange", "kpi-grid"])
+@pytest.mark.parametrize("layout_id", ["title-orange", "kpi-grid", "text-picture"])
 def test_v2_layout_round_trip(layout_id, tmp_path):
     entry = _entry(layout_id)
     assert get_renderer_kind(entry, "pptx") is RendererKind.V2
