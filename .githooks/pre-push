@@ -29,7 +29,18 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       -- ':!*.svg' ':!*.jpg' ':!*.pptx' \
          ':!.githooks/*' ':!.github/workflows/leak-scan.yml' \
       | grep -E "^\+" | grep -E "$PATTERN" || true)
-  BIN_HITS=$(git diff --name-only "$range" --diff-filter=A | grep -E '\.(svg|jpg|pptx)$' | grep -E 'eyJpZGVudGlmaWVyIjo' || true)
+  # Scan newly-added binaries' CONTENT for the BSH asset-id base64 prefix.
+  # Filename-based detection misses asset IDs embedded inside legitimately-named files.
+  BIN_HITS=""
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    # `git log --diff-filter=A` to find the commit that added this file in this push range,
+    # then grep the blob at that revision. Scanning the current HEAD blob is fine for the
+    # added-only case because once added the content doesn't change without another diff event.
+    if git show "$local_sha:$f" 2>/dev/null | grep -aqE 'eyJpZGVudGlmaWVyIjo'; then
+      BIN_HITS="${BIN_HITS}${f}"$'\n'
+    fi
+  done < <(git diff --name-only "$range" --diff-filter=A | grep -E '\.(svg|jpg|pptx)$' || true)
 
   if [[ -n "$HITS" || -n "$BIN_HITS" ]]; then
     echo "ERROR: pre-push leak scan found BSH markers in $local_ref ($range):" >&2

@@ -14,10 +14,19 @@ class AuthSpec:
     env: str    # name of env var holding the token
 
 
+DEFAULT_TIMEOUT_SECONDS = 30
+
+
 class Fetcher:
-    def __init__(self, base_url: str | None = None, auth: AuthSpec | None = None):
+    def __init__(
+        self,
+        base_url: str | None = None,
+        auth: AuthSpec | None = None,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    ):
         self.base_url = base_url
         self.auth = auth
+        self.timeout = timeout
 
     def _resolve(self, source: str) -> str:
         if source.startswith("file://") or source.startswith("https://") or source.startswith("http://"):
@@ -46,5 +55,5 @@ class Fetcher:
             return Path(url[len("file://"):]).read_bytes()
         url = self._apply_auth(url)
         req = Request(url)
-        with urlopen(req) as resp:
+        with urlopen(req, timeout=self.timeout) as resp:
             return resp.read()

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator, RefResolver
+from jsonschema.exceptions import ValidationError
 
 SCHEMA_DIR = Path(__file__).resolve().parents[1] / "lib" / "schemas"
 CATALOG_SCHEMA = SCHEMA_DIR / "catalog-v2.schema.json"
@@ -86,7 +87,7 @@ def test_alternatives_over_max_rejected(sample_v2_catalog):
         }}}
         for i in range(3)
     ]
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         _validator().validate(sample_v2_catalog)
 
 
@@ -97,7 +98,7 @@ def test_v2_entry_missing_sha256_rejected():
             {"id": "bad", "renderer": {"pptx": {"source": "x.pptx", "placeholder_map": {}}}}
         ],
     }
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         _validator().validate(cat)
 
 
@@ -110,7 +111,7 @@ def test_invalid_sha256_pattern_rejected():
             }}}
         ],
     }
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         _validator().validate(cat)
 
 
@@ -122,12 +123,12 @@ def test_unknown_auth_type_rejected():
         },
         "layouts": [],
     }
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         _validator().validate(cat)
 
 
 def test_asset_entry_with_bogus_sha_rejected():
     bad_asset = {"id": "x", "source": "x.svg", "sha256": "zz"}
     asset_schema = json.loads(ASSET_SCHEMA.read_text())
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Draft202012Validator(asset_schema).validate(bad_asset)

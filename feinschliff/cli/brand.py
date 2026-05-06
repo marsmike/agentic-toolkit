@@ -139,22 +139,37 @@ def cmd_install(args) -> int:
     user_brands_root.mkdir(parents=True, exist_ok=True)
     croot.mkdir(parents=True, exist_ok=True)
 
+    safe_user_brands_root = user_brands_root.resolve()
+    safe_croot = croot.resolve()
+
     extracted_cache_files: list[Path] = []
     with tarfile.open(args.archive, "r:gz") as tf:
         for member in tf.getmembers():
             if not member.isfile():
                 continue
-            parts = Path(member.name).parts
+            # Reject absolute paths and any traversal segments before resolving.
+            member_path = Path(member.name)
+            if member_path.is_absolute() or any(p == ".." for p in member_path.parts):
+                print(f"refusing unsafe archive member: {member.name}", file=sys.stderr)
+                return 3
+            parts = member_path.parts
             if len(parts) < 2:
                 continue
             section, rel_parts = parts[0], parts[1:]
             if section == "brand":
-                target_root = user_brands_root
+                target_root, safe_root = user_brands_root, safe_user_brands_root
             elif section == "cache":
-                target_root = croot
+                target_root, safe_root = croot, safe_croot
             else:
                 continue
             target = target_root.joinpath(*rel_parts)
+            # Final guard: even after sanitisation, confirm the resolved path stays inside.
+            try:
+                resolved = target.resolve()
+                resolved.relative_to(safe_root)
+            except ValueError:
+                print(f"refusing archive member that escapes install root: {member.name}", file=sys.stderr)
+                return 3
             target.parent.mkdir(parents=True, exist_ok=True)
             extracted = tf.extractfile(member)
             if extracted is None:
