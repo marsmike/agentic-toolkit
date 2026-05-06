@@ -20,8 +20,12 @@ jobs:
         run: |
           set -euo pipefail
           PATTERN='bshg\.com|boschdevcloud|github-bshg|eforms-online|s\.a\.x\.|MasterLayout|rb-proxy|\.bosch\.com|Bosch Siemens|MUM3RE|YeHVV89kL7aKBQbZWT9k93hLA7kfdfg2uRNrYfd22Y|eyJpZGVudGlmaWVyIjo'
+          # Exclude the scanner files themselves — they reference the patterns by definition.
           if grep -rEn --binary-files=without-match "$PATTERN" \
-            --exclude-dir=.git --exclude='*.svg' --exclude='*.jpg' --exclude='*.pptx' .; then
+            --exclude-dir=.git \
+            --exclude='*.svg' --exclude='*.jpg' --exclude='*.pptx' \
+            --exclude='pre-commit' --exclude='leak-scan.yml' \
+            .; then
             echo "::error::Leak scan failed — BSH markers found"
             exit 1
           fi
