@@ -15,3 +15,7 @@ node_modules/
 # Intermediate per-slide PNGs from scripts/generate_showcase_visuals.py.
 # Only the composed hero-grid.png and showcase.gif are committed.
 feinschliff/docs/images/slides/
+
+# port_brand.py working files — keep local for review, never commit.
+feinschliff/brands/*/.port-needs-review.txt
+feinschliff/brands/*/.port-verify/
