@@ -36,3 +36,24 @@ class Resolver:
 
         target.write_bytes(data)
         return target
+
+    def _find_in(self, kind: str, tags: list[str]) -> tuple[str, str] | None:
+        items = self.catalog.get("assets", {}).get(kind, [])
+        scored = []
+        wanted = set(tags)
+        for item in items:
+            overlap = len(wanted & set(item.get("tags", [])))
+            if overlap == 0:
+                continue
+            scored.append((-overlap, item["id"], item["source"], item["sha256"]))
+        if not scored:
+            return None
+        scored.sort()
+        _, _, source, sha = scored[0]
+        return source, sha
+
+    def find_icon(self, tags: list[str]) -> tuple[str, str] | None:
+        return self._find_in("icons", tags)
+
+    def find_image(self, tags: list[str]) -> tuple[str, str] | None:
+        return self._find_in("images", tags)
