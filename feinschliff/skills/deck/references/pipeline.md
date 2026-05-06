@@ -89,7 +89,7 @@ After step 1b displays, stop here. Don't proceed to step 2. Jump directly to ste
 
 ## Step 2 — Plan
 
-Read `feinschliff/<brand-root>/catalog/layouts.json` (the active brand's catalog — see `../SKILL.md` for how `<brand-root>` resolves; defaults to `brands/feinschliff/`).
+Read `feinschliff/<brand-root>/catalog.json` (the active brand's catalog — see `../SKILL.md` for how `<brand-root>` resolves; defaults to `brands/feinschliff/`). Use `feinschliff/lib/catalog.py::load_catalog` so the schema is validated on read.
 
 For each slide in `content_plan.json`:
 1. Match the concept to candidate layouts via `layouts.json` (use the `concepts` + `role` fields).
@@ -103,31 +103,34 @@ Output: `deck_plan.json` — an ordered list of `{layout_id, slot_values}` pairs
 
 ## Step 3 — Build
 
-Import the active brand's Baukasten. The renderer module path depends on the resolved brand pack (`<brand-root>` is `brands/feinschliff/` by default):
+In v2, /deck does not import per-brand Python modules. The catalog points at v2 template artefacts; the lib provides fetch + fill + write.
 
 ```python
-import os, sys
-ACTIVE_BRAND = os.environ.get("FEINSCHLIFF_BRAND", "feinschliff")
-BRAND_ROOT = f"brands/{ACTIVE_BRAND}"
-
-sys.path.insert(0, f"/<path>/agentic-toolkit/feinschliff/{BRAND_ROOT}/renderers/pptx")
+from pathlib import Path
 from pptx import Presentation
-from master import (
-    apply_feinschliff_theme,  # or apply_<brand>_theme — exported by the active pack's master.py
-    set_slide_size, ensure_n_layouts, reset_master_shapes, reset_layout,
-)
-import layouts as layouts_mod
-import slides as slides_mod
+from lib.brand_discovery import discover_brands
+from lib.catalog import load_catalog, V2RendererSpec
+from lib.pptx_fill import load_template, fill_slot, write_filled
+from lib.resolver import Resolver
+
+active_brand_name = os.environ.get("FEINSCHLIFF_BRAND", "feinschliff")
+brand = next(b for b in discover_brands() if b.name == active_brand_name)
+catalog = load_catalog(brand.catalog_path)
+version = catalog.get("version", "0.0.0")
+resolver = Resolver(brand=brand.name, version=version, catalog=catalog)
+entries_by_id = {e["id"]: e for e in catalog["layouts"]}
 ```
 
-Each brand pack exposes its own `apply_<slug>_theme(prs)` function in `master.py`. The feinschliff pack ships `apply_feinschliff_theme`. Use the function exported by the resolved pack.
-
 For each entry in `deck_plan.json`:
-- Fetch the renderer module via `layouts.json -> layouts[i].renderer.pptx.module`.
-- Add a slide from that layout: `prs.slides.add_slide(layouts_mod.layout_by_name(prs, layout_name))`.
-- Fill slots using the `placeholder_map` in the catalog entry. Slots addressed as `"columns[0].body"` map to placeholder idx 22 (for example).
-- If the layout is `diagram`: instead of only filling placeholders, call `slides.add_diagram(prs, slug="<NN-topic>", dsl=<dsl-string>, out_dir=<deck-out-dir>, eyebrow=..., title=..., caption=...)`. This runs the DSL → expand → apply the active brand's theme → render PNG pipeline and embeds the PNG into the slide's diagram frame. All four artifacts (`<slug>.dsl`, `<slug>.excalidraw`, `<slug>-<brand>.excalidraw`, `<slug>-<brand>.png`) are preserved under `<deck-out-dir>/diagrams/` for post-build editing.
-- If the layout is `tech-radar`: instead of only filling placeholders, call `slides.add_radar(prs, slug="<NN-topic>", view=<view-name>, vault=<vault-path>, out_dir=<deck-out-dir>, volume=<int|None>, new_since=<"YYYY-MM-DD"|None>)`. This runs the radar-engine pipeline (load blips → magnetic positioning → snapshot edition → SVG → PNG) and embeds the rendered PNG full-bleed at (0, 0, 1920, 1080). All artifacts (`<view>.svg`, `<view>.png`, `meta.json`) are preserved under `<deck-out-dir>/radars/<slug>/`. The edition snapshot lands under `<vault>/Tech-Radar/editions/vol-<N>.yaml` (skip with `publish=False` for preview-only renders that should not affect edition history).
+
+1. Look up the catalog entry by id in `entries_by_id`.
+2. Fetch the template: `spec = V2RendererSpec.from_entry(entry, "pptx")`, then `path = resolver.fetch(source=spec.source, sha256=spec.sha256, kind="templates/pptx", ext="pptx")`. Resolver handles `file://` (in-repo) and `https://` (CDN-hosted, with auth) sources transparently.
+3. Load the single-slide template into its own Presentation: `slide_prs = load_template(path)`. The slide is the canonical version with all layout placeholders materialised.
+4. Fill slots: for each `(slot_name, idx)` in `spec.placeholder_map`, call `fill_slot(slide_prs.slides[0], idx=idx, text=slot_values[slot_name])`. Slots addressed as `"columns[0].body"` map to whatever placeholder idx the catalog declares for that key.
+5. Append the filled slide into the deck-under-construction. Use python-pptx's slide-XML copy idiom to graft the slide's tree into the deck's `_sldIdLst` and copy the slide layout into the deck's slide_master if not already present.
+6. Save the assembled deck once: `write_filled(deck_prs, "out/<name>.pptx")`.
+
+The diagram and tech-radar-full-bleed layouts that v1 special-cased (`slides.add_diagram`, `slides.add_radar`) are not v2 templates. They were dropped from the catalog in PR-2 because they had no v1 demo source. They will be re-introduced as v2 templates via /compile when authored properly. Until then, /deck cannot build slides for those concepts; flag and skip in the plan step.
 
 Output: `out/<name>.pptx` (draft).
 

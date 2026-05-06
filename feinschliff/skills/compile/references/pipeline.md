@@ -1,101 +1,119 @@
-# /compile Pipeline
+# /compile pipeline
 
-Operates on the active brand pack at `<brand-root>/`. See `../SKILL.md` for how `<brand-root>` is resolved (defaults to `brands/feinschliff/`). All path placeholders below are relative to `feinschliff/`.
+Step-by-step detail for the four design-source paths. The skill is per-template
+in v2 — one source → one Slide Concept → one template artefact + one catalog
+entry. The bulk-regeneration model used in v1 is gone (`port_brand.py` is the
+v2 equivalent for one-shot bulk porting; see `feinschliff/scripts/`).
 
-Parses `<brand-root>/claude-design/<brand>-2026.html` and regenerates `<brand-root>/catalog/layouts.json` + per-layout `.py` in `<brand-root>/renderers/pptx/layouts/`.
+## Common preconditions
 
-## Drift check
+- `<brand-root>` resolves to one of `feinschliff/brands/{feinschliff,bmw,ferrari,spotify,claude,binance}/`
+  (see [`../SKILL.md`](../SKILL.md#active-brand) for resolution order). All
+  path placeholders below are relative to `feinschliff/`.
+- The catalog at `<brand-root>/catalog.json` exists and validates against
+  `lib/schemas/catalog-v2.schema.json`.
+- For `--renderer pptx`, the dev environment has LibreOffice (`soffice`) and
+  `pdftoppm` available — both are required by the visual-verification step.
+  See `scripts/verify_v2_template.py` for the install path on macOS / Linux.
 
-Before the full apply pipeline runs, verify HTML and catalog agree on which layouts exist:
+## --from-pptx (adoption mode)
 
-```bash
-cd <brand-root>/renderers/pptx && uv run python compile.py --check
-```
+Used when a brand ships an existing `.pptx` (e.g. a curated kit template or a
+hand-authored slide).
 
-Example resolution (default `FEINSCHLIFF_BRAND=feinschliff`):
+1. Resolve the source. If a local path, copy to a tmp dir. If a URL, fetch via
+   the resolver's auth-aware HTTP path (see `lib/fetcher.py`).
+2. Run `scripts/extract_v2_template.py
+   --input <fetched.pptx> --layout-name "<layout>" --out
+   <brand-root>/templates/pptx/<id>.pptx`. The script:
+   - asserts single-slide
+   - copies layout-only placeholders onto the slide so `fill_slot` can address
+     every placeholder the layout declares
+   - drops orphan slide parts via `part.drop_rel(rId)` so the saved file is
+     small and free of duplicate-name artefacts
+3. Run `scripts/verify_v2_template.py` against the original `.pptx` (the v1
+   baseline equivalent). Skip this step only if there is no design-source
+   render to compare against (e.g. a brand-new template with no prior
+   version); in that case render the emitted template alone for visual
+   inspection and require a human eyeball before committing the catalog.
+4. Compute sha256 of the saved `.pptx`.
+5. Update `<brand-root>/catalog.json`:
+   - If an entry with `id == <id>` exists: replace its
+     `renderer.pptx.{source,sha256,placeholder_map}`. Keep narrative fields
+     (`slots`, `when_to_use`, `when_not_to_use`, `tags`) unless the design
+     source changes them.
+   - Otherwise: insert a new entry. Slots and narrative come from the
+     intent-extraction step.
 
-```bash
-cd brands/feinschliff/renderers/pptx && uv run python compile.py --check
-```
+## --from-html (Claude Design HTML)
 
-This is a standalone script — runs without Claude — and is also the CI gate (`tests/test_compile_drift.py`). It classifies every HTML section as `layout` / `visual-ref` / `UNKNOWN` and every catalog entry as `html-backed` / `code-first`. Non-zero exit = drift.
+Used when a brand designer has authored or updated a Claude Design HTML spec
+at `<brand-root>/claude-design/<brand>-2026.html`. One section in the HTML →
+one Slide Concept → one template.
 
-Keep the label↔id map and visual-ref list in `<brand-root>/renderers/pptx/compile.py` in sync when adding a new layout or renaming one.
+1. Parse the HTML, find the section matching `--id`. Validate the six required
+   `data-*` attributes (label, role, concepts, when-to-use, when-not-to-use,
+   slots). Hard-fail on missing or malformed attrs.
+2. Build a fresh slide via python-pptx using the brand's master/theme and the
+   target slide layout. Populate placeholders to match the slot schema parsed
+   from the HTML.
+3. Save as a single-slide `.pptx`, then run `extract_v2_template.py` against
+   it to canonicalise (materialise layout placeholders + drop orphan parts).
+   The result lands at `<brand-root>/templates/pptx/<id>.pptx`.
+4. Render both the HTML section (via Playwright headless) and the emitted
+   template to PNG; compare via phash. On pass, commit catalog entry.
 
-## Pre-requisite: HTML must meet the contract
+## --from-screenshot (PNG/JPG)
 
-The HTML MUST carry the full `data-*` annotation per `../../../references/claude-design-prompt.md`. If `<brand>-2026.html` only has `data-label` (no `data-role`, `data-concepts`, `data-when-to-use`, `data-when-not-to-use`, `data-slots`), **regenerate it via the prompt before running the apply pipeline**.
+Used when there is no machine-readable design source — a designer's PNG export
+or a photograph of a paper sketch.
 
-## Input contract
+1. Vision model reads the screenshot and produces a Slide Concept.
+2. Build a fresh slide as in `--from-html` step 2, but with slot values
+   inferred from the screenshot rather than parsed from HTML.
+3. Same canonicalisation + verification as `--from-html`, except the baseline
+   render IS the screenshot.
 
-Every `<section class="slide">` MUST be annotated with six `data-*` attributes:
-- `data-label`
-- `data-role`
-- `data-concepts`
-- `data-when-to-use`
-- `data-when-not-to-use`
-- `data-slots` (JSON)
+## --from-brief (markdown)
 
-## Step 1 — Parse + validate
+Used when a designer hands over a markdown spec instead of a finished visual.
 
-Read `<brand-root>/claude-design/<brand>-2026.html`. For each `<section class="slide">`:
-- Assert all six `data-*` attrs present. On missing attr, emit a clear error:
-  ```
-  ERROR: slide #5 (data-label="Chapter Ink") is missing data-when-not-to-use.
-  Add this attribute to the HTML before re-running.
-  ```
-- Parse `data-slots` as JSON — fail on invalid JSON.
-- Parse `data-concepts` as comma-separated list.
+1. Parse the brief to extract the Slide Concept.
+2. Build a fresh slide. Visual verification is best-effort: there is no
+   rendered baseline, so compare against a model-rendered "design intent"
+   image, with a relaxed phash threshold (≤ 16 instead of ≤ 8).
 
-## Step 2 — Emit catalog/layouts.json
+## Common postconditions
 
-For each slide, emit an entry in `<brand-root>/catalog/layouts.json`:
-```json
-{
-  "id": "<slug of data-label>",
-  "name": "<Brand> · <data-label>",
-  "role": "<data-role>",
-  "concepts": [<split of data-concepts>],
-  "when_to_use": "<data-when-to-use>",
-  "when_not_to_use": "<data-when-not-to-use>",
-  "slots": <data-slots parsed>,
-  "renderer": {
-    "pptx": {
-      "module": "feinschliff.<brand-module-prefix>.renderers.pptx.layouts.<id>",
-      "layout_name": "<Brand> · <data-label>",
-      "placeholder_map": {... inferred from slot names ...}
-    }
-  }
-}
-```
+- `<brand-root>/templates/<kind>/<id>.<ext>` exists and parses without error.
+- The catalog entry's `sha256` matches the file's actual content sha256.
+- Visual-verification PNGs sit at `<brand-root>/.port-verify/<id>/` (gitignored)
+  for at least one /compile run, then are overwritten on the next.
+- `feinschliff brand inspect <brand>` shows the new entry under v2 layouts.
 
-The `<brand-module-prefix>` is `brands.<slug>` for packs under `brands/` (e.g. `brands.feinschliff`). The `<Brand>` token in `name` and `layout_name` is the brand's display label (e.g. `Feinschliff`).
+## Failure modes
 
-Preserve existing `renderer.pptx.placeholder_map` values if they already exist for this `id` (humans may have hand-tuned them). Auto-generate from slot names only when creating a new entry.
-
-## Step 3 — Regenerate pptx layout code
-
-For each slide:
-- If `<brand-root>/renderers/pptx/layouts/<id>.py` DOES NOT exist: create it from a layout template that imports `from components import (...)`, sets background from `data-role`, registers placeholders from `data-slots`.
-- If it already exists: PRESERVE the existing Python. The catalog update is the single source of truth for metadata; the Python contains hand-tuned positions + decoration. Do NOT overwrite.
-
-## Step 4 — Build + verify
-
-```bash
-cd <brand-root>/renderers/pptx && uv run python build.py
-```
-
-Render `out/<Brand>-Template.pptx` to PNGs via `soffice + pdftoppm`.
-
-Compare each generated slide to the corresponding `<section>` in the source HTML (rendered via Chrome headless). LLM eyeballs for divergences. Iterate up to 3× per `../../deck/references/iteration-loop.md` — same loop as `/deck` uses.
+- **Verification fails (phash distance > threshold).** Catalog is NOT updated;
+  the emitted `.pptx` stays at `templates/pptx/<id>.pptx` for manual
+  inspection. Either:
+  - Fix the extraction (likely a placeholder-instantiation issue), re-run
+    `/compile`.
+  - Lower the threshold via `--threshold N` if the difference is acceptable
+    (e.g. font-rendering noise on a brand with custom fonts).
+  - Hand-edit the template and run `/compile --from-pptx <hand-edited.pptx>`
+    to commit the manual fix.
+- **Schema validation fails.** The Slide Concept produced an entry shape that
+  does not match the v2 catalog schema. Inspect the catalog after /compile's
+  draft, fix by hand, commit.
+- **No demo source / new template.** When a layout is brand-new (no prior v1
+  baseline), there is nothing to phash-diff against. Render the emitted
+  template alone and require a human approval before committing the catalog.
 
 ## Determinism
 
-Running `/compile` twice on the same HTML produces byte-identical catalog output and (when catalog entries are new) identical initial layout stubs. Existing hand-tuned layouts are preserved.
-
-## When something breaks
-
-- **Missing attribute**: hard fail, clear diagnostic, no partial write.
-- **Invalid JSON in data-slots**: hard fail, show the bad slot and a suggestion.
-- **New slide in HTML but no matching layout file**: compiler creates a stub; operator fills in the rest.
-- **Slide removed from HTML**: compiler leaves orphaned layout `.py` in place + emits warning; operator decides whether to delete.
+Re-running `/compile` against the same `--from-pptx` source produces a
+byte-identical template artefact and identical sha256. Re-running against
+`--from-html` is byte-stable when python-pptx + the brand master have not
+changed. Re-running against `--from-screenshot` or `--from-brief` is NOT
+deterministic because intent extraction goes through the model — re-runs may
+produce semantically equivalent but byte-different artefacts.

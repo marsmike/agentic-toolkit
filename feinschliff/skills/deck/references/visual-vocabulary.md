@@ -1,13 +1,13 @@
 # Visual Vocabulary
 
-How to pick the right visual for a concept. This reference is generic (brand-agnostic). Brand-specific layout names come from the active brand's `<brand-root>/catalog/layouts.json` (see `../SKILL.md` for how the active brand resolves).
+How to pick the right visual for a concept. This reference is generic (brand-agnostic). Brand-specific layout names come from the active brand's `<brand-root>/catalog.json` (see `../SKILL.md` for how the active brand resolves).
 
 ## The Process
 
 For each slide you plan to generate:
 1. Identify the **concept type** (from the list below).
 2. Look up **candidate visual types**.
-3. Cross-reference `catalog/layouts.json` for the brand's specific layouts that match.
+3. Cross-reference `catalog.json` for the brand's specific layouts that match.
 4. Prefer layouts whose `when_to_use` aligns with your content; avoid layouts whose `when_not_to_use` applies.
 
 ## Concept → Visual-type Mapping
@@ -17,7 +17,7 @@ Based on Financial Times Visual Vocabulary (Comparison / Composition / Distribut
 ### Cover / opener
 **Concepts:** deck cover, chapter opener, single-statement slide
 **Visual types:** title-primary, title-with-visual, chapter-opener
-**Catalog layouts (feinschliff):** title-orange, title-ink, title-picture, chapter-orange, chapter-ink, full-bleed-cover. Cross-reference each pack's `catalog/layouts.json` for the actual ids.
+**Catalog layouts (feinschliff):** title-orange, title-ink, title-picture, chapter-orange, chapter-ink, full-bleed-cover. Cross-reference each pack's `catalog.json` for the actual ids.
 
 ### Agenda
 **Concepts:** table-of-contents, section-list
