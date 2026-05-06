@@ -8,7 +8,7 @@ PATTERN='bshg\.com|boschdevcloud|github-bshg|eforms-online|s\.a\.x\.|MasterLayou
 # The hook + leak-scan workflow ARE the scanner so they reference the patterns by definition; exclude them.
 HITS=$(git diff --cached -U0 \
     -- ':!*.svg' ':!*.jpg' ':!*.pptx' \
-       ':!.githooks/pre-commit' ':!.github/workflows/leak-scan.yml' \
+       ':!.githooks/*' \
     | grep -E "^\+" | grep -E "$PATTERN" || true)
 BIN_HITS=$(git diff --cached --name-only --diff-filter=A | grep -E '\.(svg|jpg|pptx)$' | grep -E 'eyJpZGVudGlmaWVyIjo' || true)
 

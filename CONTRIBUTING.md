@@ -37,10 +37,15 @@ Contributions are released under MIT (see [LICENSE](LICENSE)).
 
 ## Leak prevention (OSS repo only)
 
-The repo blocks commits containing BSH-internal markers (boschdevcloud URLs, Bosch proxy hostnames, kit auth tokens, asset IDs). Install the pre-commit hook once after cloning:
+This repo must never receive proprietary internal markers (corporate URLs, kit auth tokens, asset IDs from internal CDN paths). Two local hooks enforce this:
+
+- `.githooks/pre-commit` blocks commits that introduce flagged content.
+- `.githooks/pre-push` blocks pushes that would publish flagged content to GitHub.
+
+Activate both with one command after cloning:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-CI runs the same scan on every PR; merges are blocked if anything matches.
+There is no CI-side scanner: by the time a CI workflow runs, the content is already on GitHub. The hook gate is the only meaningful gate. If a hook trips on a genuine false positive, review the staged diff manually and use `git commit --no-verify` (or `git push --no-verify`) once you are sure.
