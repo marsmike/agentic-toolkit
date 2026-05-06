@@ -79,3 +79,42 @@ def test_plugin_brands_roots_includes_sideload_layout(tmp_path, monkeypatch):
     from lib.brand_discovery import _plugin_brands_roots
     roots = _plugin_brands_roots()
     assert sideload in roots
+
+
+def test_discover_brands_finds_v1_legacy_catalog_path(tmp_path, monkeypatch):
+    """Transitional: brand keeps its catalog at brand/catalog/layouts.json (v1 layout)
+    rather than brand/catalog.json (v2). Discovery accepts both during migration."""
+    bundled = tmp_path / "bundled" / "brands"
+    legacy_brand = bundled / "legacy"
+    (legacy_brand / "catalog").mkdir(parents=True)
+    (legacy_brand / "catalog" / "layouts.json").write_text(
+        json.dumps({"brand": "legacy", "layouts": []})
+    )
+
+    monkeypatch.setenv("FEINSCHLIFF_BRAND_PATH", "")
+    monkeypatch.setattr("lib.brand_discovery._bundled_brands_root", lambda: bundled)
+    monkeypatch.setattr("lib.brand_discovery._user_brands_root", lambda: tmp_path / "no-user")
+    monkeypatch.setattr("lib.brand_discovery._plugin_brands_roots", lambda: [])
+
+    [b] = [b for b in discover_brands() if b.name == "legacy"]
+    assert b.catalog_path == legacy_brand / "catalog" / "layouts.json"
+
+
+def test_discover_brands_prefers_v2_catalog_over_legacy(tmp_path, monkeypatch):
+    """When both catalog.json and catalog/layouts.json exist, v2 wins."""
+    bundled = tmp_path / "bundled" / "brands"
+    brand_dir = bundled / "dual"
+    brand_dir.mkdir(parents=True)
+    (brand_dir / "catalog.json").write_text(json.dumps({"brand": "dual", "layouts": []}))
+    (brand_dir / "catalog").mkdir()
+    (brand_dir / "catalog" / "layouts.json").write_text(
+        json.dumps({"brand": "dual", "layouts": []})
+    )
+
+    monkeypatch.setenv("FEINSCHLIFF_BRAND_PATH", "")
+    monkeypatch.setattr("lib.brand_discovery._bundled_brands_root", lambda: bundled)
+    monkeypatch.setattr("lib.brand_discovery._user_brands_root", lambda: tmp_path / "no-user")
+    monkeypatch.setattr("lib.brand_discovery._plugin_brands_roots", lambda: [])
+
+    [b] = [b for b in discover_brands() if b.name == "dual"]
+    assert b.catalog_path == brand_dir / "catalog.json"
