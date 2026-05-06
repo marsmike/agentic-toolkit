@@ -42,3 +42,33 @@ def test_resolver_skips_hash_check_for_file_sources(tmp_cache_root, tmp_path, sa
     bogus_sha = "0" * 64
     p = r.fetch(source=f"file://{src}", sha256=bogus_sha, kind="x", ext="bin")
     assert p.read_bytes() == b"some bytes"
+
+
+def test_find_icon_returns_top_tag_overlap_match(tmp_cache_root, sample_v2_catalog):
+    sample_v2_catalog["assets"]["icons"] = [
+        {"id": "leaf", "tags": ["sustainability", "green"], "source": "icons/leaf.svg", "sha256": "1" * 64},
+        {"id": "factory", "tags": ["factory", "industry"], "source": "icons/factory.svg", "sha256": "2" * 64},
+        {"id": "plant", "tags": ["sustainability", "factory"], "source": "icons/plant.svg", "sha256": "3" * 64},
+    ]
+    r = Resolver(brand="test", version="1.0.0", catalog=sample_v2_catalog)
+    src, sha = r.find_icon(["sustainability", "factory"])
+    assert src == "icons/plant.svg"  # 2 overlaps wins
+    assert sha == "3" * 64
+
+
+def test_find_icon_deterministic_tiebreak_by_id(tmp_cache_root, sample_v2_catalog):
+    sample_v2_catalog["assets"]["icons"] = [
+        {"id": "zebra", "tags": ["x"], "source": "icons/zebra.svg", "sha256": "1" * 64},
+        {"id": "apple", "tags": ["x"], "source": "icons/apple.svg", "sha256": "2" * 64},
+    ]
+    r = Resolver(brand="test", version="1.0.0", catalog=sample_v2_catalog)
+    src, sha = r.find_icon(["x"])
+    assert src == "icons/apple.svg"
+
+
+def test_find_icon_returns_none_when_no_overlap(tmp_cache_root, sample_v2_catalog):
+    sample_v2_catalog["assets"]["icons"] = [
+        {"id": "leaf", "tags": ["green"], "source": "icons/leaf.svg", "sha256": "1" * 64},
+    ]
+    r = Resolver(brand="test", version="1.0.0", catalog=sample_v2_catalog)
+    assert r.find_icon(["unrelated"]) is None
