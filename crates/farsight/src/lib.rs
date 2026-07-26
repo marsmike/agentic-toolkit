@@ -157,7 +157,10 @@ pub fn discover_notes(vault: &Path) -> Vec<PathBuf> {
             if path.is_file() && name.ends_with(".md") && !name.starts_with('.') {
                 let raw = std::fs::read_to_string(&path).unwrap_or_default();
                 let (fm_text, _) = split_frontmatter(&raw);
-                let status = fm_text.as_deref().map(extract_status).unwrap_or_default();
+                let status = fm_text
+                    .as_deref()
+                    .map(|s| extract_field(s, "status"))
+                    .unwrap_or_default();
                 if status == "active" {
                     found.push(path);
                 }
@@ -222,28 +225,15 @@ fn split_frontmatter(text: &str) -> (Option<String>, String) {
     (Some(fm_lines.join("\n")), body)
 }
 
-/// Pull the `description` field out of a frontmatter block, tolerant of malformed YAML,
+/// Pull a single scalar string field out of a frontmatter block, tolerant of malformed YAML,
 /// non-mapping documents, or the field being absent — all resolve to `""`, never an error.
-/// Unknown keys are implicitly preserved (ignored, not rejected) since only `description`
-/// is ever plucked out.
-fn extract_description(fm_text: &str) -> String {
+/// Unknown keys are implicitly preserved (ignored, not rejected) since only the named field is
+/// ever plucked out. Used for `description` (`Doc::from_path`) and `status` (`discover_notes`,
+/// to decide whether a root-level note opts into the active content set).
+fn extract_field(fm_text: &str, field: &str) -> String {
     match serde_yaml::from_str::<serde_yaml::Value>(fm_text) {
         Ok(serde_yaml::Value::Mapping(map)) => map
-            .get(serde_yaml::Value::String("description".to_string()))
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
-        _ => String::new(),
-    }
-}
-
-/// Pull the `status` field out of a frontmatter block, same tolerance rules as
-/// `extract_description`. Used only to decide whether a root-level note opts into the active
-/// content set (`discover_notes`) — never errors, absent/malformed all resolve to `""`.
-fn extract_status(fm_text: &str) -> String {
-    match serde_yaml::from_str::<serde_yaml::Value>(fm_text) {
-        Ok(serde_yaml::Value::Mapping(map)) => map
-            .get(serde_yaml::Value::String("status".to_string()))
+            .get(serde_yaml::Value::String(field.to_string()))
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),
@@ -279,7 +269,7 @@ impl Doc {
         let (fm_text, body) = split_frontmatter(&raw);
         let description = fm_text
             .as_deref()
-            .map(extract_description)
+            .map(|s| extract_field(s, "description"))
             .unwrap_or_default();
 
         let body_head: String = body.chars().take(BODY_HEAD).collect();

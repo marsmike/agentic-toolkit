@@ -9,7 +9,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from toolkit_core import knowledge, profile, vault
+from toolkit_core import demo, engines, knowledge, profile, vault
 
 
 def _json_default(obj):
@@ -166,6 +166,64 @@ def cmd_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- engines -------------------------------------------------------------------------
+
+
+def _render_engines_action_result(result: dict) -> str:
+    lines = []
+    for r in result["results"]:
+        if not r.get("ok"):
+            lines.append(f"  {r['engine']:<10} ERROR: {r['error']}")
+            continue
+        action = r["action"]
+        lines.append(
+            f"  {r['engine']:<10} up to date ({r['tag']})"
+            if action == "up-to-date"
+            else f"  {r['engine']:<10} {action} {r['tag']} -> {r['path']}"
+        )
+    triple = engines.target_triple()
+    if triple and engines.is_windows_triple(triple):
+        lines.append("note: Windows support is unverified by this toolkit's own CI/tests.")
+    return "\n".join(lines) if lines else "no engines processed"
+
+
+def cmd_engines_install(args: argparse.Namespace) -> int:
+    results = engines.install_all(force=args.force)
+    ok = all(r.get("ok") for r in results)
+    _emit({"ok": ok, "results": results}, args.json, _render_engines_action_result)
+    return 0 if ok else 1
+
+
+def _render_engines_status(result: dict) -> str:
+    lines = []
+    for r in result["engines"]:
+        installed = r["installed_tag"] or "not installed"
+        latest = r["latest_tag"] or "unknown"
+        if r["up_to_date"]:
+            mark = "up to date"
+        elif r["installed_tag"]:
+            mark = "update available"
+        else:
+            mark = "run: toolkit engines install"
+        lines.append(f"  {r['engine']:<10} installed={installed:<20} latest={latest:<20} {mark}")
+        if r.get("note"):
+            lines.append(f"    {r['note']}")
+    return "\n".join(lines)
+
+
+def cmd_engines_status(args: argparse.Namespace) -> int:
+    rows = engines.status_all()
+    _emit({"ok": True, "engines": rows}, args.json, _render_engines_status)
+    return 0
+
+
+# --- demo ------------------------------------------------------------------------------
+
+
+def cmd_demo(args: argparse.Namespace) -> int:
+    return demo.run(as_json=args.json)
+
+
 # --- argument parsing ------------------------------------------------------------------
 
 
@@ -187,6 +245,15 @@ def _build_parser() -> argparse.ArgumentParser:
     profile_parser = subparsers.add_parser("profile", parents=[common])
     profile_parser.add_argument("plugin")
 
+    engines_parser = subparsers.add_parser("engines", parents=[common])
+    engines_subparsers = engines_parser.add_subparsers(dest="engines_command", required=True)
+    for name in ("install", "update"):
+        sub = engines_subparsers.add_parser(name, parents=[common])
+        sub.add_argument("--force", action="store_true", help="re-download even if already at the latest release")
+    engines_subparsers.add_parser("status", parents=[common])
+
+    subparsers.add_parser("demo", parents=[common])
+
     return parser
 
 
@@ -200,6 +267,13 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_doctor(args)
     if args.command == "profile":
         return cmd_profile(args)
+    if args.command == "engines":
+        if args.engines_command in ("install", "update"):
+            return cmd_engines_install(args)
+        if args.engines_command == "status":
+            return cmd_engines_status(args)
+    if args.command == "demo":
+        return cmd_demo(args)
 
     parser.print_help()
     return 1

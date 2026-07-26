@@ -1,33 +1,11 @@
 # Property Schemas
 
-Frontmatter fields this vault's tooling depends on holding still — see
-`contract/VAULT_SCHEMA.md` for the normative table. That table is a floor, not a
-ceiling: a note may carry additional fields no core tool defined, and every reader here
-must tolerate and preserve them.
-
-## Core fields (contract/VAULT_SCHEMA.md)
-
-| Field | Meaning | Required for |
-|---|---|---|
-| `description` | One-sentence purpose | Resources, Areas |
-| `source` | Provenance — URL or citation | Every distilled note |
-| `status` | Lifecycle stage, see below | Every distilled note |
-| `processed_date` | ISO date the note was distilled | Every distilled note |
-| `kind` | Note kind (`concept`, `guide`, `research-finding`, `profile`, ...) | Resources |
-| `topics` | Structured topical taxonomy | Resources |
-| `tags` | Freeform and/or namespaced (`domain/*`, `status/*`) | All |
-| `created` | Note creation date | Most notes |
-| `enrichment_targets` | Notes/profiles to notify when this note is enriched | Opt-in |
-
-## Lifecycle (`status`)
-
-| Status | Meaning |
-|---|---|
-| `draft` | Written, not yet reviewed |
-| `review` | Awaiting the human review checkpoint |
-| `distilled` | Reviewed and integrated — terminal state for most knowledge notes |
-| `active` | Live, in-use (projects, areas) rather than reference material |
-| `archived` | Frozen; lives in or is destined for `05_Archive/` |
+Frontmatter fields this vault's tooling depends on holding still, and the lifecycle
+`status` values, are normative in `contract/VAULT_SCHEMA.md` — read that table rather
+than a copy of it here. That table is a floor, not a ceiling: a note may carry
+additional fields no core tool defined, and every reader here must tolerate and
+preserve them. What follows is what's specific to Obsidian itself or to editing
+frontmatter in practice, not covered by the contract.
 
 ## Obsidian's own default properties
 

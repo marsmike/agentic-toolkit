@@ -14,6 +14,7 @@ Exit codes:
 """
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -49,7 +50,6 @@ def main() -> int:
 
     results = []
     for name in EVAL_MODULES:
-        import importlib
         try:
             mod = importlib.import_module(name)
             result = mod.run(vault)

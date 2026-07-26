@@ -2,7 +2,7 @@
   "name": "agentic-toolkit",
   "metadata": {
     "description": "Vault-first Claude Code toolkit: a curated set of plugins over an Obsidian knowledge base, with contracts, evals, and native engines.",
-    "version": "2.5.0"
+    "version": "2.7.0"
   },
   "owner": {
     "name": "Mike Müller",
@@ -26,6 +26,12 @@
       "source": "./plugins/memory",
       "version": "2.4.0",
       "description": "Session-end capture and on-demand distillation into vault memory: archives session records to 00_Memory/sessions/ via a hook, then distills durable notes to 00_Memory/notes/ via a two-phase-review skill."
+    },
+    {
+      "name": "handoff",
+      "source": "./plugins/handoff",
+      "version": "2.7.0",
+      "description": "Portable session handoff: save/resume work context across sessions, machines, and tools via chained in-repo _handoff/ markdown, with a vault discovery index and PreCompact safety net."
     }
   ]
 }

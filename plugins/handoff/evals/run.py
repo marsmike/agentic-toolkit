@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Run all R0 capability evals for the memory plugin.
+"""Run all R0 capability evals for the handoff plugin.
 
     python3 evals/run.py [--json]
 
 Per contract/PROFILE.md, evals always target ./vault, never a TOOLKIT_VAULT-resolved
 real vault — this script resolves the vault itself rather than importing
-memory_vault.resolve_vault(), so it can never accidentally honor TOOLKIT_VAULT.
+handoff.resolve_vault(), so it can never accidentally honor TOOLKIT_VAULT. Every eval
+here also runs its git-repo half against a throwaway sandbox repo, never this repo's own
+_handoff/ (see evals/_sandbox.py).
 
 Exit codes:
   0 — every eval ran and passed.
@@ -14,21 +16,20 @@ Exit codes:
 """
 from __future__ import annotations
 
-import importlib
 import json
 import sys
 from pathlib import Path
 
 EVAL_MODULES = (
-    "eval_session_capture",
-    "eval_distill_idempotent",
-    "eval_codec_parity",
+    "eval_save_resume_roundtrip",
+    "eval_chain_sequencing",
+    "eval_dlq_index_failure",
 )
 
 
 def resolve_repo_vault() -> Path:
     """./vault relative to this repo's root — deliberately ignores TOOLKIT_VAULT."""
-    here = Path(__file__).resolve().parent  # plugins/memory/evals/
+    here = Path(__file__).resolve().parent  # plugins/handoff/evals/
     return here.parent.parent.parent / "vault"
 
 
@@ -49,6 +50,7 @@ def main() -> int:
 
     results = []
     for name in EVAL_MODULES:
+        import importlib
         try:
             mod = importlib.import_module(name)
             result = mod.run(vault)

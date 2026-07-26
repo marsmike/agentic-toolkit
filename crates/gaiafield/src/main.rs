@@ -255,6 +255,41 @@ fn resolve_db(vault: &std::path::Path, db_flag: Option<PathBuf>) -> PathBuf {
     db_flag.unwrap_or_else(|| gaiafield::default_db_path(vault))
 }
 
+fn require_vault_or_fail(vault_flag: Option<PathBuf>) -> Result<PathBuf, ExitCode> {
+    gaiafield::require_vault(vault_flag.as_deref()).map_err(|e| {
+        eprintln!("{e}");
+        ExitCode::FAILURE
+    })
+}
+
+/// Resolve a CLI note argument, printing the same `NotFound`/`Ambiguous` diagnostics every
+/// call site needs. `hint` controls the trailing "pass a vault-relative path" line, which only
+/// `neighbors` prints today (kept as a per-call-site choice rather than made uniform, to leave
+/// each command's existing output unchanged).
+fn resolve_note_or_fail(
+    conn: &rusqlite::Connection,
+    arg: &str,
+    hint: bool,
+) -> Result<String, ExitCode> {
+    match gaiafield::resolve_note_arg(conn, arg) {
+        Ok(p) => Ok(p),
+        Err(ResolveError::NotFound(a)) => {
+            eprintln!("No indexed note matches {a:?}.");
+            Err(ExitCode::FAILURE)
+        }
+        Err(ResolveError::Ambiguous(candidates)) => {
+            eprintln!("{arg:?} is ambiguous — matches more than one note:");
+            for c in candidates {
+                eprintln!("  {c}");
+            }
+            if hint {
+                eprintln!("Pass a vault-relative path to disambiguate.");
+            }
+            Err(ExitCode::FAILURE)
+        }
+    }
+}
+
 fn open_db_or_fail(db_path: &std::path::Path) -> Result<rusqlite::Connection, ExitCode> {
     if !db_path.is_file() {
         eprintln!(
@@ -275,12 +310,9 @@ fn run_index(
     full: bool,
     json: bool,
 ) -> ExitCode {
-    let vault = match gaiafield::require_vault(vault_flag.as_deref()) {
+    let vault = match require_vault_or_fail(vault_flag) {
         Ok(v) => v,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
     let db_path = resolve_db(&vault, db_flag);
     let conn = match gaiafield::open_db(&db_path) {
@@ -323,12 +355,9 @@ fn run_neighbors(
     include_inferred: bool,
     json: bool,
 ) -> ExitCode {
-    let vault = match gaiafield::require_vault(vault_flag.as_deref()) {
+    let vault = match require_vault_or_fail(vault_flag) {
         Ok(v) => v,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
     let db_path = resolve_db(&vault, db_flag);
     let conn = match open_db_or_fail(&db_path) {
@@ -336,20 +365,9 @@ fn run_neighbors(
         Err(code) => return code,
     };
 
-    let resolved = match gaiafield::resolve_note_arg(&conn, note) {
+    let resolved = match resolve_note_or_fail(&conn, note, true) {
         Ok(p) => p,
-        Err(ResolveError::NotFound(arg)) => {
-            eprintln!("No indexed note matches {arg:?}.");
-            return ExitCode::FAILURE;
-        }
-        Err(ResolveError::Ambiguous(candidates)) => {
-            eprintln!("{note:?} is ambiguous — matches more than one note:");
-            for c in candidates {
-                eprintln!("  {c}");
-            }
-            eprintln!("Pass a vault-relative path to disambiguate.");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
 
     if include_inferred {
@@ -399,12 +417,9 @@ fn run_neighbors(
 }
 
 fn run_stats(vault_flag: Option<PathBuf>, db_flag: Option<PathBuf>, json: bool) -> ExitCode {
-    let vault = match gaiafield::require_vault(vault_flag.as_deref()) {
+    let vault = match require_vault_or_fail(vault_flag) {
         Ok(v) => v,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
     let db_path = resolve_db(&vault, db_flag);
     let conn = match open_db_or_fail(&db_path) {
@@ -455,12 +470,9 @@ fn run_path(
     include_inferred: bool,
     json: bool,
 ) -> ExitCode {
-    let vault = match gaiafield::require_vault(vault_flag.as_deref()) {
+    let vault = match require_vault_or_fail(vault_flag) {
         Ok(v) => v,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
     let db_path = resolve_db(&vault, db_flag);
     let conn = match open_db_or_fail(&db_path) {
@@ -468,27 +480,11 @@ fn run_path(
         Err(code) => return code,
     };
 
-    let resolve = |arg: &str| -> Result<String, ExitCode> {
-        match gaiafield::resolve_note_arg(&conn, arg) {
-            Ok(p) => Ok(p),
-            Err(ResolveError::NotFound(a)) => {
-                eprintln!("No indexed note matches {a:?}.");
-                Err(ExitCode::FAILURE)
-            }
-            Err(ResolveError::Ambiguous(candidates)) => {
-                eprintln!("{arg:?} is ambiguous — matches more than one note:");
-                for c in candidates {
-                    eprintln!("  {c}");
-                }
-                Err(ExitCode::FAILURE)
-            }
-        }
-    };
-    let from_resolved = match resolve(from) {
+    let from_resolved = match resolve_note_or_fail(&conn, from, false) {
         Ok(p) => p,
         Err(code) => return code,
     };
-    let to_resolved = match resolve(to) {
+    let to_resolved = match resolve_note_or_fail(&conn, to, false) {
         Ok(p) => p,
         Err(code) => return code,
     };
@@ -542,12 +538,9 @@ fn run_infer(
     reset: bool,
     json: bool,
 ) -> ExitCode {
-    let vault = match gaiafield::require_vault(vault_flag.as_deref()) {
+    let vault = match require_vault_or_fail(vault_flag) {
         Ok(v) => v,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
     let db_path = resolve_db(&vault, db_flag);
     let conn = match gaiafield::open_db(&db_path) {
@@ -595,12 +588,9 @@ fn run_candidates(
     include_ambiguous: bool,
     json: bool,
 ) -> ExitCode {
-    let vault = match gaiafield::require_vault(vault_flag.as_deref()) {
+    let vault = match require_vault_or_fail(vault_flag) {
         Ok(v) => v,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
     let db_path = resolve_db(&vault, db_flag);
     let conn = match open_db_or_fail(&db_path) {
@@ -608,19 +598,9 @@ fn run_candidates(
         Err(code) => return code,
     };
 
-    let resolved = match gaiafield::resolve_note_arg(&conn, note) {
+    let resolved = match resolve_note_or_fail(&conn, note, false) {
         Ok(p) => p,
-        Err(ResolveError::NotFound(arg)) => {
-            eprintln!("No indexed note matches {arg:?}.");
-            return ExitCode::FAILURE;
-        }
-        Err(ResolveError::Ambiguous(candidates)) => {
-            eprintln!("{note:?} is ambiguous — matches more than one note:");
-            for c in candidates {
-                eprintln!("  {c}");
-            }
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
 
     let result = match gaiafield::candidates(&conn, &resolved, k, include_ambiguous) {
@@ -654,12 +634,9 @@ fn run_surprise(
     include_ambiguous: bool,
     json: bool,
 ) -> ExitCode {
-    let vault = match gaiafield::require_vault(vault_flag.as_deref()) {
+    let vault = match require_vault_or_fail(vault_flag) {
         Ok(v) => v,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
     let db_path = resolve_db(&vault, db_flag);
     let conn = match open_db_or_fail(&db_path) {
@@ -696,12 +673,9 @@ fn run_calibrate(
     clusters: &std::path::Path,
     json: bool,
 ) -> ExitCode {
-    let vault = match gaiafield::require_vault(vault_flag.as_deref()) {
+    let vault = match require_vault_or_fail(vault_flag) {
         Ok(v) => v,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
     let db_path = resolve_db(&vault, db_flag);
     let conn = match open_db_or_fail(&db_path) {

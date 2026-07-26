@@ -2,6 +2,13 @@
 
 Every release entry links the change to the research or the dated failure that motivated it — this file is the public ratchet.
 
+## [2.7.0] — R7, first-hand value: installers, demo, handoff, and an anti-bloat pass
+
+- **Three-line integration** — `uv tool install git+https://github.com/marsmike/agentic-toolkit#subdirectory=core` puts `toolkit` on PATH; `toolkit engines install` fetches the released engine binaries for your platform (GitHub API via stdlib, sha256-recorded manifest, idempotent) into `~/.local/share/agentic-toolkit/bin`; `claude plugin marketplace add marsmike/agentic-toolkit` adds the plugins. The binary-discovery chain gained the well-known install dir, so zero env vars are needed. `install.sh` bootstraps all of it for the impatient — readable, idempotent, no sudo, asks before installing anything.
+- **`toolkit demo`** — sixty seconds to first-hand value: vault scan → farsight query → gaiafield graph → inferred candidates, each step really executed and explained in one line. Works in a repo checkout against the example vault or anywhere via a temp mini-vault.
+- **plugins/handoff 2.7.0** — the session-continuity plugin, migrated from the legacy toolkit and overhauled vault-driven: portable `_handoff/` markdown chained per stream (cross-tool via an AGENTS.md pointer), discovery index in the vault, profile-configurable (autosnapshot/index path/visibility), PreCompact autosnapshot hardened to the memory-plugin hook standard, DLQ on silently-lost-handoff failure modes. No fourth frontmatter parser: the plugin needs three flat scalars, so a ~25-line scan replaces the general pattern — and the observer's adversarial pass earned it comment-stripping and idiomatic boolean coercion (`autosnapshot: no` no longer silently means yes). Read-compatible with legacy-written handoffs, proven by resuming a real one in the eval.
+- **Anti-bloat pass** — −70 net lines across crates and plugins with zero behavior change: duplicated extraction/guard/collision logic merged into helpers, contract tables deduplicated to pointers, closure-factory flattened. Every `[earned:]` receipt preserved. What was deliberately left alone (cross-crate duplication, transaction semantics) is documented in the PR.
+
 ## [2.6.0] — R6, the vault becomes the published documentation
 
 - **Docs site** — `./vault` published to GitHub Pages via Quartz 4 (pinned v4.5.2): wikilinks resolved, backlinks, full-text search, and an interactive graph view — the knowledge-graph toolkit's docs render as an actual knowledge graph. No separate docs tree exists to drift; the vault is the single source. `00_Memory/` and `01_Capture/` are excluded from the published surface.
