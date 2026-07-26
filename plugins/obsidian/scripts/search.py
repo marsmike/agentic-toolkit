@@ -19,13 +19,22 @@ search.py says so once and returns BM25-only results; it never hangs or errors.
 **farsight (docs/PLAN.md) replaces this whole file in R1** — a Rust hybrid BM25+vector
 engine. This script is the R0 placeholder: correct and dependency-light, not the final
 retrieval architecture.
+
+R1 update: when a `farsight` binary is available (`TOOLKIT_FARSIGHT_BIN` env var, else
+PATH), `search()` shells out to it and returns its results instead of running the BM25
+code below — see `farsight_binary`/`farsight_search`. Without a binary present, this
+file's own BM25 implementation still runs unchanged; it stops being the fallback path
+only once farsight also covers scoped search and the semantic/vector layer.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import math
+import os
 import re
+import shutil
+import subprocess
 import sys
 import time
 from collections import Counter
@@ -180,11 +189,61 @@ def semantic_scores(query: str, corpus: list[Doc], vault: Path, rebuild: bool = 
 
 
 # ---------------------------------------------------------------------------
+# farsight preference chain (docs/PLAN.md: farsight replaces this file's BM25 path in R1)
+# ---------------------------------------------------------------------------
+
+
+def farsight_binary() -> str | None:
+    """`TOOLKIT_FARSIGHT_BIN` env var wins; otherwise a `farsight` binary on PATH, if any."""
+    return os.environ.get("TOOLKIT_FARSIGHT_BIN") or shutil.which("farsight")
+
+
+def farsight_search(query: str, vault: Path, top: int, binary: str) -> dict | None:
+    """Shell out to farsight (`--json`) and adapt its output into this module's result
+    shape. Returns None on any failure (missing binary, bad exit, unparseable output) so
+    the caller falls back to the Python BM25 path below rather than erroring.
+    """
+    try:
+        proc = subprocess.run(
+            [binary, "query", query, "--vault", str(vault), "--k", str(top), "--json"],
+            capture_output=True, text=True, timeout=30, check=True,
+        )
+        rows = json.loads(proc.stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        return None
+
+    gate = float(profile_value(vault, "search_score_gate", 0.70))
+    results = [
+        {
+            "path": r["path"], "title": r["title"], "folder": r["path"].split("/", 1)[0],
+            "score": r["score"], "above_enrichment_gate": r["score"] >= gate,
+            "channels": ["keyword"],
+        }
+        for r in rows
+    ]
+    note = (
+        f"farsight ({binary}) — Rust BM25 engine, R1. Raw scores are not on the "
+        "normalized 0-1 scale score_gate was calibrated against; above_enrichment_gate "
+        "is informational only for farsight-sourced results."
+    )
+    return {"query": query, "semantic_available": False, "note": note, "score_gate": gate, "results": results}
+
+
+# ---------------------------------------------------------------------------
 # Combined search
 # ---------------------------------------------------------------------------
 
 
 def search(query: str, vault: Path, top: int = 10, scope: str | None = None, rebuild_cache: bool = False) -> dict:
+    # farsight has no --scope and no cache to rebuild in R1; only prefer it for the
+    # plain, unscoped, non-rebuild case so those callers keep working via the Python path.
+    if scope is None and not rebuild_cache:
+        binary = farsight_binary()
+        if binary:
+            farsight_result = farsight_search(query, vault, top, binary)
+            if farsight_result is not None:
+                return farsight_result
+
     corpus = build_corpus(vault, scope=scope)
     bm25 = bm25_scores(query, corpus)
     sem = semantic_scores(query, corpus, vault, rebuild=rebuild_cache)

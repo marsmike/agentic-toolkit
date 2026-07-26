@@ -64,8 +64,13 @@ backed by a small cache this script builds and owns — never Smart Connections'
 `.smart-env/` format. When the optional layer isn't installed, it says so explicitly and
 returns keyword-only results rather than erroring or silently doing nothing.
 
-**farsight** (`docs/PLAN.md`), a Rust hybrid BM25+vector engine, replaces this file in
-R1. Nothing here is meant to be the final retrieval architecture.
+**farsight** (`docs/PLAN.md`, `crates/farsight/`), a Rust engine, landed in R1 as a
+stateless BM25 binary. `search.py` now prefers it — shelling out to `farsight query
+--json` when `TOOLKIT_FARSIGHT_BIN` is set or a `farsight` binary is on PATH — and falls
+back to its own BM25 implementation unchanged otherwise, since farsight doesn't yet cover
+scoped search, the semantic layer, or PDF chunks. `search.py` stops being the fallback
+path only once farsight covers all of that; nothing here is meant to be the final
+retrieval architecture.
 
 ## What changed vs. v1 (`~/Developer/agentic-toolkit/obsidian`)
 

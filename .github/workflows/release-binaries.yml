@@ -1,6 +1,5 @@
-# Inactive until crates/ has members (R1) — Cargo.toml's workspace is empty
-# today, so this workflow can only ever be triggered, never usefully run.
-# Kept minimal on purpose: a skeleton to fill in once the first crate lands.
+# farsight (R1) is the first real crate this workflow builds — see crates/farsight.
+# Kept minimal on purpose: a skeleton to extend as more crates ship.
 # Removal condition: replace with cargo-dist if crate count exceeds 2.
 name: Release Binaries
 
@@ -39,12 +38,21 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      # x86_64 musl builds with just musl-tools; aarch64 musl cross-linking
-      # needs a real cross toolchain (e.g. the `cross` project) — deferred
-      # until a crate actually exists to prove this step against.
-      - name: Install musl tools
-        if: contains(matrix.target, 'musl')
+      # x86_64 musl is native to the ubuntu-latest runner — musl-tools alone is enough.
+      - name: Install musl tools (native x86_64)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      # aarch64 musl is a real cross-compile from an x86_64 runner: apt's musl-tools
+      # only ships an x86_64 musl-gcc, so linking needs an aarch64 musl cross toolchain.
+      # farsight itself has no C dependencies (confirmed via `cargo tree`: serde_yaml's
+      # unsafe-libyaml is pure Rust), so this step only needs to provide a linker, not a
+      # C compiler for vendored sources — this is the step the crate now proves out.
+      - name: Set up aarch64-musl cross toolchain
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }} -p ${{ steps.crate.outputs.name }}

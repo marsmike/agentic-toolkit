@@ -2,7 +2,7 @@
   "name": "agentic-toolkit",
   "metadata": {
     "description": "Vault-first Claude Code toolkit: a curated set of plugins over an Obsidian knowledge base, with contracts, evals, and native engines.",
-    "version": "2.0.0"
+    "version": "2.1.0"
   },
   "owner": {
     "name": "Mike Muehlberger",
@@ -12,7 +12,7 @@
     {
       "name": "obsidian",
       "source": "./plugins/obsidian",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "description": "Vault interface: CLI operations, search, the distill pipeline, and retrieval-verification maintenance — the reference implementation of the vault contract."
     }
   ]
