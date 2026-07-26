@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Single detection job so each language/domain job below can be path-filtered
+  # without needing its own workflow-level trigger.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      contract: ${{ steps.filter.outputs.contract }}
+      evals: ${{ steps.filter.outputs.evals }}
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'core/**'
+              - 'plugins/**'
+              - 'pyproject.toml'
+            contract:
+              - 'contract/**'
+              - 'vault/**'
+              - 'core/**'
+            evals:
+              - 'plugins/**'
+              - 'vault/**'
+            rust:
+              - 'crates/**'
+              - 'Cargo.toml'
+
+  python:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run pytest core/tests -v
+
+  # The executable-contract gate: a schema change (contract/) or a vault change
+  # that isn't reflected in the example vault fails here. See docs/PLAN.md
+  # "The example vault" and "Verification".
+  contract-consistency:
+    needs: changes
+    if: needs.changes.outputs.contract == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync
+      - run: uv run pytest core/tests/test_example_vault_conformance.py -v
+
+  evals:
+    needs: changes
+    if: needs.changes.outputs.evals == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync
+      # run.py exits nonzero on any failing eval; --json makes the output
+      # machine-readable so the grep gate below actually matches the format
+      # [earned: adversarial R0 review 2026-07-26 — grep gate was dead code
+      # against the human-readable format].
+      - name: Run obsidian plugin evals
+        run: |
+          set -o pipefail
+          uv run python plugins/obsidian/evals/run.py --json | tee eval-output.json
+          if grep -q '"pass": false' eval-output.json; then
+            echo "::error::One or more evals reported pass: false"
+            exit 1
+          fi
+
+  # cargo fails on a memberless virtual workspace, so the job skips cleanly
+  # until R1 adds the first crate [earned: adversarial R0 review 2026-07-26 —
+  # "harmless while empty" claim was verifiably false, exit 101].
+  rust:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build and test (skip while workspace has no members)
+        run: |
+          if compgen -G "crates/*/Cargo.toml" > /dev/null; then
+            cargo build --workspace
+            cargo test --workspace
+          else
+            echo "No crates yet — skipping (R1 adds the first crate; see docs/PLAN.md)"
+          fi

@@ -1,0 +1,4 @@
+# Cargo workspace root. Crates land in R1+ (farsight, then gaiafield) — see docs/PLAN.md.
+[workspace]
+resolver = "2"
+members = []

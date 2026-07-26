@@ -1,0 +1,23 @@
+[project]
+name = "agentic-toolkit-workspace"
+version = "2.0.0"
+description = "Workspace root — see core/ for the toolkit package."
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = ["core"]
+
+[dependency-groups]
+dev = ["ruff>=0.15", "pytest>=8"]
+
+# Pinned ruleset so local and CI lint agree regardless of user-level ruff config.
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Self-contained plugin scripts do sys.path setup before imports (no installed package).
+"plugins/*/scripts/**" = ["E402"]
+"plugins/*/evals/**" = ["E402"]

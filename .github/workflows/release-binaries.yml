@@ -1,0 +1,68 @@
+# Inactive until crates/ has members (R1) — Cargo.toml's workspace is empty
+# today, so this workflow can only ever be triggered, never usefully run.
+# Kept minimal on purpose: a skeleton to fill in once the first crate lands.
+# Removal condition: replace with cargo-dist if crate count exceeds 2.
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - '*-v*' # e.g. farsight-v0.1.0 -> crate "farsight", version "0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Derive crate name from tag
+        id: crate
+        shell: bash
+        run: echo "name=${GITHUB_REF_NAME%-v*}" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # x86_64 musl builds with just musl-tools; aarch64 musl cross-linking
+      # needs a real cross toolchain (e.g. the `cross` project) — deferred
+      # until a crate actually exists to prove this step against.
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }} -p ${{ steps.crate.outputs.name }}
+
+      - name: Package binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="${{ steps.crate.outputs.name }}"
+          target="${{ matrix.target }}"
+          mkdir -p dist
+          if [[ "${{ matrix.os }}" == windows-latest ]]; then
+            cp "target/${target}/release/${bin}.exe" "dist/${bin}-${target}.exe"
+          else
+            cp "target/${target}/release/${bin}" "dist/${bin}-${target}"
+          fi
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*

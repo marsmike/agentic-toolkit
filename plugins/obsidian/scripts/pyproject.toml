@@ -1,0 +1,20 @@
+[project]
+name = "obsidian-plugin-scripts"
+version = "2.0.0"
+description = "Standalone scripts for the obsidian plugin — no vendored env, run via `uv run`."
+requires-python = ">=3.11"
+dependencies = [
+  "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+# Optional semantic-search boost for scripts/search.py. Without these installed,
+# search.py degrades to its always-available keyword + Index.md scan and says so.
+# farsight (contract/KNOWLEDGE_API.md, docs/PLAN.md) replaces this whole layer in R1.
+semantic = [
+  "sentence-transformers>=3",
+  "numpy>=1.26",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

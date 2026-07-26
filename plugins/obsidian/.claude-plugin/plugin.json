@@ -1,0 +1,17 @@
+{
+  "name": "obsidian",
+  "version": "2.0.0",
+  "description": "Vault interface for the agentic-toolkit contract: filesystem-first CRUD, keyword/optional-semantic search, the distill pipeline, vault-lint maintenance, and retrieval-verification description auditing.",
+  "author": {
+    "name": "agentic-toolkit contributors"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/marsmike/agentic-toolkit",
+  "keywords": [
+    "obsidian",
+    "vault",
+    "knowledge-management",
+    "distillation",
+    "retrieval"
+  ]
+}
