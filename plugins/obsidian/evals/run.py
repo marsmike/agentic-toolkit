@@ -25,6 +25,7 @@ EVAL_MODULES = (
     "eval_retrieval_verification_report",
     "eval_dlq_on_missing_scores",
     "eval_search_parity",
+    "eval_graph_context",
 )
 
 

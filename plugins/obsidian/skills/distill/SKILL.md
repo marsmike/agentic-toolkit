@@ -32,7 +32,10 @@ this skill loaded. Read [rules.md](references/rules.md) before starting.
    writing anything. Skip only on an explicit `--auto`/non-interactive instruction.
 2. **Search before writing.** Run `scripts/search.py` against the capture's key terms —
    it degrades gracefully with no embeddings store present, but it must run; a distill
-   pass with zero search is a name for "guessing at what already exists."
+   pass with zero search is a name for "guessing at what already exists." When a
+   `gaiafield` binary is available, `scripts/graph.py`'s `graph_context()` also adds
+   graph-derived backlink/bridge candidates the text search alone missed (see
+   workflow.md); its absence never blocks this step.
 3. **Every distilled note carries its source** — a `*Source: ...*` line in the body and
    a `source:` frontmatter field — and gets `status: distilled`.
 4. **The capture leaves `01_Capture/`** after distilling — archived (default, to

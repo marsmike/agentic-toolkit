@@ -43,9 +43,11 @@ from typing import Any
 
 from vault_utils import (
     ACTIVE_CONTENT_FOLDERS,
+    UnparseableFrontmatter,
     discover_notes,
     parse_existing_index,
     profile_value,
+    read_frontmatter,
     require_vault,
 )
 
@@ -88,9 +90,27 @@ class Doc:
         self.length = len(self.tokens)
 
 
+def _root_active_notes(vault: Path) -> list[Path]:
+    """Root-level *.md files whose own frontmatter declares `status: active` —
+    contract/VAULT_SCHEMA.md's root-note clause (e.g. a persona/profile note). `Index.md`
+    and `CLAUDE.md` never qualify since neither carries frontmatter."""
+    notes = []
+    for p in sorted(vault.glob("*.md")):
+        try:
+            frontmatter, _ = read_frontmatter(p, strict=True)
+        except UnparseableFrontmatter:
+            continue
+        if frontmatter.get("status") == "active":
+            notes.append(p)
+    return notes
+
+
 def build_corpus(vault: Path, scope: str | None = None) -> list[Doc]:
     index_entries = parse_existing_index(vault / "Index.md")
     notes = discover_notes(vault, scope=scope)
+    # A `scope` narrows to one PARA folder, which a root-level note can never belong to.
+    if scope is None:
+        notes = sorted(notes + _root_active_notes(vault), key=lambda p: p.as_posix())
     return [Doc(p, vault, index_entries) for p in notes]
 
 

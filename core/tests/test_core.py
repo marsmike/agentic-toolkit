@@ -9,7 +9,7 @@ import json
 
 import pytest
 from conftest import skip_if_example_vault_empty
-from toolkit_core import cli, profile, vault
+from toolkit_core import cli, knowledge, profile, vault
 
 NOTE_TEXT = """---
 description: A test note.
@@ -94,6 +94,8 @@ def test_profile_resolution_precedence(tmp_path, monkeypatch):
 def test_doctor_green_on_example_vault(monkeypatch, repo_root, capsys):
     skip_if_example_vault_empty()
     monkeypatch.delenv("TOOLKIT_VAULT", raising=False)
+    monkeypatch.delenv("TOOLKIT_GAIAFIELD_BIN", raising=False)
+    monkeypatch.setattr(knowledge, "gaiafield_binary", lambda: None)
     monkeypatch.chdir(repo_root)
 
     exit_code = cli.main(["doctor", "--json"])
@@ -103,3 +105,45 @@ def test_doctor_green_on_example_vault(monkeypatch, repo_root, capsys):
     assert set(out["para_folders"]) == set(vault.PARA_FOLDERS)
     assert out["frontmatter_parse_errors"] == []
     assert "obsidian" in out["profiles"]
+    assert out["graph"] == {"present": False, "note": "gaiafield not present"}
+
+    # contract/VAULT_SCHEMA.md's root-note clause: a root-level *.md with its own
+    # frontmatter status: active (the example vault's Alex-Vega.md persona note) counts as
+    # active content; Index.md/CLAUDE.md (no frontmatter) and Config/ never do.
+    active_rels = {
+        p.relative_to(repo_root / "vault").as_posix() for p in vault.list_active_notes(repo_root / "vault")
+    }
+    assert "Alex-Vega.md" in active_rels
+    assert "Index.md" not in active_rels
+    assert "CLAUDE.md" not in active_rels
+    assert not any(rel.startswith("Config/") for rel in active_rels)
+
+
+def test_doctor_graph_section_reports_present_binary(monkeypatch, repo_root, tmp_path, capsys):
+    """With a gaiafield binary configured, doctor's graph section reports counts and
+    freshness from `gaiafield stats --json` rather than "not present" — exercised with a
+    stub script and a tmp_path db (never the real vault's) so this doesn't depend on the
+    Rust crate being built for pytest to pass, and never touches ./vault/.gaiafield."""
+    skip_if_example_vault_empty()
+    monkeypatch.delenv("TOOLKIT_VAULT", raising=False)
+    monkeypatch.chdir(repo_root)
+
+    fake_db = tmp_path / "graph.db"
+    fake_db.write_bytes(b"")
+    monkeypatch.setattr(knowledge, "default_db_path", lambda vault_path: fake_db)
+
+    stub = tmp_path / "gaiafield"
+    stub.write_text(
+        "#!/bin/sh\n"
+        'echo \'{"nodes": 73, "edges": 627, "dangling_edges": 1, "boundary_violations": 0, "top_linked": []}\'\n'
+    )
+    stub.chmod(0o755)
+    monkeypatch.setenv("TOOLKIT_GAIAFIELD_BIN", str(stub))
+
+    exit_code = cli.main(["doctor", "--json"])
+    out = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert out["graph"]["present"] is True
+    assert out["graph"]["nodes"] == 73
+    assert out["graph"]["dangling_edges"] == 1
+    assert out["graph"]["stale"] is False  # db just written now postdates every existing note's mtime

@@ -9,7 +9,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from toolkit_core import profile, vault
+from toolkit_core import knowledge, profile, vault
 
 
 def _json_default(obj):
@@ -94,6 +94,17 @@ def _render_doctor_text(result: dict) -> str:
 
     dlq = result["dlq"]
     lines.append(f"DLQ: {dlq['note']}")
+
+    graph = result["graph"]
+    if not graph["present"]:
+        lines.append(f"graph: {graph['note']}")
+    else:
+        stale_mark = " (stale)" if graph.get("stale") else ""
+        lines.append(
+            f"graph: nodes={graph.get('nodes')} edges={graph.get('edges')} "
+            f"dangling={graph.get('dangling_edges')} boundary={graph.get('boundary_violations')}"
+            f"{stale_mark}"
+        )
     return "\n".join(lines)
 
 
@@ -114,6 +125,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     counts = vault.note_counts(vault_path) if exists else dict.fromkeys(vault.PARA_FOLDERS, 0)
     parse_errors = vault.frontmatter_parse_errors(vault_path) if exists else []
     dlq = vault.dlq_status(vault_path) if exists else {"present": False, "count": 0, "note": "no DLQ entries"}
+    graph = knowledge.graph_status(vault_path) if exists else {"present": False, "note": "vault does not exist"}
 
     repo_root = resolution.repo_root or vault.find_repo_root(Path(__file__).resolve().parent)
     plugin_names = profile.known_plugins(repo_root)
@@ -129,6 +141,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "frontmatter_parse_errors": parse_errors,
         "profiles": profile_status,
         "dlq": dlq,
+        "graph": graph,
     }
     _emit(result, args.json, _render_doctor_text)
     return 0

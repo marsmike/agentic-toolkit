@@ -138,8 +138,30 @@ def update_note_frontmatter(path: Path, updates: dict) -> dict:
 # --- Note listing --------------------------------------------------------------------
 
 
+def _root_active_notes(vault_path: Path) -> list[Path]:
+    """Root-level *.md files whose own frontmatter declares `status: active` — the
+    root-note clause in contract/VAULT_SCHEMA.md (e.g. a persona/profile note). `Index.md`
+    and `CLAUDE.md` never qualify since neither carries frontmatter. Malformed frontmatter
+    is skipped here rather than raised — `frontmatter_parse_errors()` is the dedicated
+    surface for that failure mode.
+    """
+    notes: list[Path] = []
+    for note_path in sorted(vault_path.glob("*.md")):
+        try:
+            text = note_path.read_text(encoding="utf-8")
+            frontmatter, _, had_frontmatter = parse_frontmatter(text)
+        except (FrontmatterError, OSError, UnicodeDecodeError):
+            continue
+        if had_frontmatter and frontmatter.get("status") == "active":
+            notes.append(note_path)
+    return notes
+
+
 def list_active_notes(vault_path: Path) -> list[Path]:
-    """List notes under the active-content folders only (02_Projects/03_Areas/04_Resources).
+    """List notes under the active-content folders (02_Projects/03_Areas/04_Resources),
+    plus any root-level note whose own frontmatter declares `status: active` (a
+    persona/profile note living at the vault root) — contract/VAULT_SCHEMA.md's root-note
+    clause.
 
     00_Memory, 01_Capture, and 05_Archive are always excluded, per contract/VAULT_SCHEMA.md.
     """
@@ -149,6 +171,7 @@ def list_active_notes(vault_path: Path) -> list[Path]:
         folder_path = vault_path / folder
         if folder_path.is_dir():
             notes.extend(sorted(folder_path.rglob("*.md")))
+    notes.extend(_root_active_notes(vault_path))
     return notes
 
 

@@ -9,6 +9,7 @@ says they must be. This is the "example vault as executable contract" check from
 from __future__ import annotations
 
 from conftest import EXAMPLE_VAULT, skip_if_example_vault_empty
+from toolkit_core import knowledge
 from toolkit_core.vault import PARA_FOLDERS, FrontmatterError, parse_frontmatter
 
 
@@ -88,17 +89,11 @@ def test_capture_is_flat_no_subfolders():
 
 
 def test_core_and_plugin_frontmatter_implementations_agree(tmp_path):
-    """The obsidian plugin's standalone vault_utils must apply the same floor rule as
-    toolkit_core — two implementations of the contract may never drift apart
-    [earned: adversarial R0 review 2026-07-26 — duplicated logic with no shared test]."""
+    """The obsidian and readwise plugins' standalone vault_utils must each apply the same
+    floor rule as toolkit_core — independent implementations of the contract may never
+    drift apart [earned: adversarial R0 review 2026-07-26 — duplicated logic with no
+    shared test]."""
     import sys
-
-    scripts_dir = EXAMPLE_VAULT.parent / "plugins" / "obsidian" / "scripts"
-    sys.path.insert(0, str(scripts_dir))
-    try:
-        import vault_utils
-    finally:
-        sys.path.remove(str(scripts_dir))
 
     note = tmp_path / "note.md"
     note.write_text(
@@ -106,10 +101,51 @@ def test_core_and_plugin_frontmatter_implementations_agree(tmp_path):
         "nested:\n  a: 1\n---\n\nBody text.\n",
         encoding="utf-8",
     )
-
     core_fm, core_body, _ = parse_frontmatter(note.read_text(encoding="utf-8"))
-    plugin_fm, plugin_body = vault_utils.read_frontmatter(note)
 
-    assert plugin_fm == core_fm
-    assert plugin_body.strip() == core_body.strip()
-    assert plugin_fm["unknown_field"] == "keep-me"
+    # Both plugins ship a same-named `vault_utils` module in their own scripts/ dir — pop
+    # the cached module between imports so each iteration loads the plugin under test's
+    # own copy rather than a stale sys.modules hit from the previous one.
+    for plugin_name in ("obsidian", "readwise"):
+        scripts_dir = EXAMPLE_VAULT.parent / "plugins" / plugin_name / "scripts"
+        sys.path.insert(0, str(scripts_dir))
+        sys.modules.pop("vault_utils", None)
+        try:
+            import vault_utils
+
+            plugin_fm, plugin_body = vault_utils.read_frontmatter(note)
+        finally:
+            sys.path.remove(str(scripts_dir))
+            sys.modules.pop("vault_utils", None)
+
+        assert plugin_fm == core_fm, f"plugins/{plugin_name}/scripts/vault_utils.read_frontmatter disagreed"
+        assert plugin_body.strip() == core_body.strip()
+        assert plugin_fm["unknown_field"] == "keep-me"
+
+
+def test_core_and_plugin_graph_discovery_agree(tmp_path, monkeypatch):
+    """toolkit_core.knowledge's gaiafield binary discovery and default db path must agree
+    with the obsidian plugin's graph.py — two independent reimplementations of the same
+    preference chain (docs/PLAN.md's plugin-independence rule) that may never drift apart
+    on the env var honored, the PATH fallback binary name, or the db path convention."""
+    import sys
+
+    scripts_dir = EXAMPLE_VAULT.parent / "plugins" / "obsidian" / "scripts"
+    sys.path.insert(0, str(scripts_dir))
+    try:
+        import graph as graph_mod
+    finally:
+        sys.path.remove(str(scripts_dir))
+
+    assert knowledge.GAIAFIELD_BIN_ENV == graph_mod.GAIAFIELD_BIN_ENV
+
+    # `import shutil` in both modules refers to the same module object, so patching
+    # either's `.which` patches both — asserted as calls below, not assumed.
+    monkeypatch.delenv(knowledge.GAIAFIELD_BIN_ENV, raising=False)
+    monkeypatch.setattr(knowledge.shutil, "which", lambda name: f"/usr/bin/{name}" if name == "gaiafield" else None)
+    assert knowledge.gaiafield_binary() == graph_mod.gaiafield_binary() == "/usr/bin/gaiafield"
+
+    monkeypatch.setenv(knowledge.GAIAFIELD_BIN_ENV, "/custom/gaiafield-bin")
+    assert knowledge.gaiafield_binary() == graph_mod.gaiafield_binary() == "/custom/gaiafield-bin"
+
+    assert knowledge.default_db_path(tmp_path) == graph_mod.default_db_path(tmp_path)

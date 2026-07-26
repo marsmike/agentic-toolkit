@@ -10,7 +10,7 @@ loop for description quality.
 | Skill | Purpose |
 |---|---|
 | `vault-ops` | Read/create/edit/search notes directly on the filesystem; wikilinks, callouts, properties, `.canvas`/`.base` file formats; the Obsidian desktop CLI as an optional enhancement, never a requirement |
-| `distill` | Process `01_Capture/` into linked, sourced knowledge notes — triage, single-file distill, or conversation-insight filing, all through one search-then-checkpoint-then-write workflow |
+| `distill` | Process `01_Capture/` into linked, sourced knowledge notes — triage, single-file distill, or conversation-insight filing, all through one search-then-checkpoint-then-write workflow; graph-aware backlink/bridge candidates when a gaiafield binary is available |
 | `vault-lint` | Vault health (orphans, stale pages, broken links, Index.md drift) and metadata normalization (frontmatter, tags, source, summaries), audit-only unless `--fix` |
 | `retrieval-verification` | Predict a note's content from title+description alone, score against the real body, flag weak descriptions for rewrite |
 
@@ -49,8 +49,11 @@ plugin root.
 Every script that can fail ambiguously — rather than proceeding on a guess — writes a
 note to `00_Memory/dlq/` via `scripts/vault_utils.write_dlq_note()`: `vault_normalize.py`
 on unparseable frontmatter it refuses to write through, `retrieval_verification.py` on
-an incomplete scores map, and the `distill` skill/agent on unresolved search/placement/
-source ambiguity. `toolkit doctor` (in `core/`) surfaces the count. See
+an incomplete scores map, `graph.py` on a gaiafield binary that's present but fails on a
+real invocation (never on the normal absent-binary state), and the `distill` skill/agent
+on unresolved search/placement/source ambiguity. `toolkit doctor` (in `core/`) surfaces
+the DLQ count, plus (R3) a graph section: db present/absent, node/edge/dangling/boundary
+counts, and index freshness. See
 `00_Memory/dlq/*.md` in the example vault for the worked convention this follows:
 `description`/`status`/`created`/`confidence` frontmatter, and a "What happened / Why
 it's here / Resolution" body.
@@ -71,6 +74,42 @@ back to its own BM25 implementation unchanged otherwise, since farsight doesn't 
 scoped search, the semantic layer, or PDF chunks. `search.py` stops being the fallback
 path only once farsight covers all of that; nothing here is meant to be the final
 retrieval architecture.
+
+## Graph: `scripts/graph.py`
+
+**gaiafield** (`docs/PLAN.md`, `crates/gaiafield/`), the second Rust engine, landed in R2
+as a deterministic wikilink/frontmatter/tag graph over SQLite (v1 scope — no inferred
+edges, no LLM calls). R3 adds `scripts/graph.py`, a thin client mirroring `search.py`'s
+farsight preference chain: resolve a binary via `TOOLKIT_GAIAFIELD_BIN` env var, else
+`gaiafield` on PATH, else absent. `available()`, `ensure_index(vault)`, `neighbors(vault,
+note, depth)`, and `graph_stats(vault)` all shell out with `--json`; `graph_context(vault,
+matched_paths, k)` layers on top of `neighbors()` to split a set of text-search matches'
+depth-`k` neighbors into backlink candidates (notes the search missed) and bridge
+opportunities (candidates in a different top-level PARA subtree than the proposed
+placement — gaiafield v2's future surprise scoring, made deterministic here).
+
+Every function degrades to a `GraphUnavailable` outcome instead of raising. Two distinct
+"no graph" states: a binary that's simply absent (`reason="no-binary"`, or `"no-index"`
+before the first `ensure_index()` call) is normal and silent — no DLQ note, same as
+farsight's absence in `search.py`. A binary that IS present but fails on a real invocation
+(`reason="call-failed"`) is abnormal: `graph.py` writes a DLQ note to `00_Memory/dlq/`
+(via `vault_utils.write_dlq_note`) before degrading, so a broken gaiafield install is
+visible in `toolkit doctor`'s DLQ count rather than silently reducing the workflow.
+
+The `distill` skill's phase 1 is the first consumer: after its search step, when the graph
+is available, it fetches depth-1 neighbors of the top matches and folds backlink/bridge
+candidates into the Phase 1 handoff (see `skills/distill/references/workflow.md`). When
+the binary is absent, phase 1 runs exactly as it did before R3.
+
+`checks/links.py`'s broken-wikilink audit does **not** get a gaiafield-backed path this
+release: gaiafield's CLI surface (`index`/`neighbors`/`stats`/`path`) only exposes
+aggregate dangling-edge/boundary-violation *counts*, not the per-note list of broken links
+with raw target text `links.py`'s `audit()`/`fix()` need. Getting that list would require
+either a new gaiafield CLI verb (an engine change, out of scope here) or reading the
+SQLite database directly, which `contract/KNOWLEDGE_API.md`'s "never bypass an engine's
+internal state" rule forbids — so `links.py`'s own Python scan stays the only
+implementation. `toolkit doctor` (in `core/`) surfaces gaiafield's own dangling-edge count
+separately, as a graph-level cross-check, not a replacement for this check.
 
 ## What changed vs. v1 (`~/Developer/agentic-toolkit/obsidian`)
 
@@ -136,7 +175,7 @@ retrieval architecture.
 
 ## Evals
 
-`evals/run.py` runs four R0 capability evals against `./vault`, emitting JSON
+`evals/run.py` runs six capability evals against `./vault`, emitting JSON
 `{eval, pass, detail}` per check:
 
 | Eval | Asserts |
@@ -145,6 +184,8 @@ retrieval architecture.
 | `distill_placement` | `search.propose_placement()` routes a synthetic capture drawn from the home-lab-migration project's own vocabulary to that project's folder, not the generic default |
 | `retrieval_verification_report` | The sample→score→report cycle produces a correct JSON report and a `01_Capture/` summary note, using the vault's own BM25-dilution specimen pair as fixture |
 | `dlq_on_missing_scores` | An incomplete scores map produces a DLQ note under `00_Memory/dlq/` with the expected frontmatter fields, instead of a silently-incomplete report |
+| `search_parity` | When a farsight binary is present, its top-3 results overlap `search.py`'s Python BM25 top-3 for fixed cross-cluster queries; passes with "farsight not present" otherwise |
+| `graph_context` (R3) | A stub binary that exits 1 makes `graph.ensure_index()` degrade to `GraphUnavailable("call-failed")` and write a DLQ note under `00_Memory/dlq/` (runs always); then, when a real gaiafield binary is present, `graph.graph_context()` proposes a correct backlink candidate and a non-empty bridge-opportunity list for a capture planted in the birding cluster — passes with "gaiafield not present" for that second phase otherwise |
 
 Read-only evals run directly against the resolved vault; anything that writes runs
 against a throwaway copy (`evals/_sandbox.py`) so the real `./vault` is never touched.

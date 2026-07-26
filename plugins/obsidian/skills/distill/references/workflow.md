@@ -48,6 +48,42 @@ always runs; a distill pass never proceeds with zero search. Results at or above
 vault's `search_score_gate` (default 0.70, see `profile.example.md`) are enrichment
 candidates (step 8).
 
+### Graph context (if a gaiafield binary is available)
+
+`scripts/graph.py` mirrors `search.py`'s farsight preference chain: a `gaiafield` binary
+(`TOOLKIT_GAIAFIELD_BIN` env var, else PATH) is optional, deterministic-only (v1 scope —
+wikilinks/frontmatter/tags, no inferred edges), and this step must never block the
+workflow when it's absent.
+
+```python
+import graph
+
+if graph.available():
+    graph.ensure_index(vault)  # incremental — cheap on repeat runs
+    context = graph.graph_context(vault, [m["path"] for m in top_matches], k=1)
+```
+
+When `context` comes back as a dict (not `graph.GraphUnavailable`), fold it into the
+Phase 1 handoff's related-notes list, labeled distinctly from the search-scored matches:
+
+- **Backlink candidates** (`context["backlink_candidates"]`) — notes directly linked to a
+  top match that the text search itself didn't surface. Propose these as additional
+  Level-1 backlinks (step 8), same as a search hit above the score gate.
+- **Bridge opportunities** (`context["bridge_opportunities"]`) — the subset of the above
+  living in a different top-level PARA subtree (`02_Projects`/`03_Areas`/`04_Resources`,
+  or a root-level note) than the capture's proposed placement. Call these out by that
+  exact name, **"bridge opportunity,"** in the Phase 1 handoff. This is a deterministic
+  precursor of the surprise scoring a later gaiafield increment adds
+  (`crates/gaiafield/README.md`) — present it as "worth a look," never as a ranked or
+  scored recommendation.
+
+When `graph.available()` is false (`GraphUnavailable` reason `"no-binary"`), skip this
+section entirely and proceed with steps 4+ exactly as they read below — the search
+step's results are the only related-notes source, and the Phase 1 handoff says so in one
+line rather than silently doing less than a run where the binary was present. A failed
+invocation of a binary that IS present (`"call-failed"`) writes a DLQ note automatically
+(`scripts/graph.py`'s `_dlq_on_call_failure`) and degrades the same way.
+
 ## 4. Extract core mechanics (reasoning, not writing yet)
 
 For each key idea: what's the underlying mechanism that makes this work? Name it as a
@@ -63,6 +99,8 @@ Report back and stop:
 - The original source (confirm you identified it, or flag that you couldn't).
 - Proposed PARA placement (see rules.md) and title.
 - Top 3-5 related notes with scores, and proposed enrichment level per note (L1/2/3).
+- If graph context ran: any backlink candidates and bridge opportunities it added, or one
+  line saying it didn't run (no gaiafield binary available).
 - Already-distilled mode if step 2 found a canonical hit: `new-note | enrich-only | hybrid`.
 
 Wait for confirm / redirect / reject. Skip only with an explicit `--auto` instruction.
