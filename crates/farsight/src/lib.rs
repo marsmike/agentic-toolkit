@@ -1,9 +1,10 @@
 //! farsight — stateless BM25 search over an agentic-toolkit vault.
 //!
 //! No persisted index: every `query` call re-scans the vault's active-content notes
-//! (`02_Projects`, `03_Areas`, `04_Resources`) and scores them with BM25 over
-//! title + description + body. See the crate README for why this is stateless by
-//! design and the condition under which that should change.
+//! (`02_Projects`, `03_Areas`, `04_Resources`, plus any root-level note whose own
+//! frontmatter declares `status: active` — `contract/VAULT_SCHEMA.md`) and scores them
+//! with BM25 over title + description + body. See the crate README for why this is
+//! stateless by design and the condition under which that should change.
 //!
 //! Mirrors `core/toolkit_core/vault.py` and `plugins/obsidian/scripts/search.py` in
 //! semantics (vault resolution, active-content filter, tolerant frontmatter, BM25
@@ -19,6 +20,12 @@ const MARKETPLACE_MARKER: &str = ".claude-plugin/marketplace.json";
 
 /// Folders that search is allowed to consider (contract/VAULT_SCHEMA.md's active-content
 /// filter). `00_Memory`, `01_Capture`, and `05_Archive` are always excluded.
+///
+/// Not the whole story: `discover_notes` also pulls in any note directly at the vault root
+/// whose own frontmatter declares `status: active` (contract/VAULT_SCHEMA.md's root-level-note
+/// clause) — mirrors `crates/gaiafield::discover_nodes`, whose doc comment explains why (the
+/// vault's planted bridge persona note, `Alex-Vega.md`, lives at the root and self-declares
+/// `status: active`; excluding it here made the two engines disagree on the same query).
 pub const ACTIVE_CONTENT_FOLDERS: [&str; 3] = ["02_Projects", "03_Areas", "04_Resources"];
 
 /// Directory names skipped during note discovery regardless of which PARA folder they
@@ -127,13 +134,34 @@ fn shellexpand_home(value: &str) -> String {
 // Note discovery
 // ---------------------------------------------------------------------------
 
-/// Walk the active PARA folders and return every eligible `.md` path, sorted.
+/// Walk the active PARA folders and return every eligible `.md` path, sorted, **plus** any note
+/// directly at the vault root whose own frontmatter declares `status: active`
+/// (contract/VAULT_SCHEMA.md's root-level-note clause). Mirrors
+/// `crates/gaiafield::discover_nodes`'s narrow reading: only a root file that opts in via
+/// `status: active` joins the set — `Index.md`/`CLAUDE.md` naturally stay out since neither
+/// carries frontmatter at all, and `Config/`/`Templates/` are separate top-level dirs, not
+/// root-level files, so they're never considered here.
 pub fn discover_notes(vault: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
     for folder in ACTIVE_CONTENT_FOLDERS {
         let root = vault.join(folder);
         if root.is_dir() {
             walk_dir(&root, &mut found);
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(vault) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if path.is_file() && name.ends_with(".md") && !name.starts_with('.') {
+                let raw = std::fs::read_to_string(&path).unwrap_or_default();
+                let (fm_text, _) = split_frontmatter(&raw);
+                let status = fm_text.as_deref().map(extract_status).unwrap_or_default();
+                if status == "active" {
+                    found.push(path);
+                }
+            }
         }
     }
     found.sort();
@@ -202,6 +230,20 @@ fn extract_description(fm_text: &str) -> String {
     match serde_yaml::from_str::<serde_yaml::Value>(fm_text) {
         Ok(serde_yaml::Value::Mapping(map)) => map
             .get(serde_yaml::Value::String("description".to_string()))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        _ => String::new(),
+    }
+}
+
+/// Pull the `status` field out of a frontmatter block, same tolerance rules as
+/// `extract_description`. Used only to decide whether a root-level note opts into the active
+/// content set (`discover_notes`) — never errors, absent/malformed all resolve to `""`.
+fn extract_status(fm_text: &str) -> String {
+    match serde_yaml::from_str::<serde_yaml::Value>(fm_text) {
+        Ok(serde_yaml::Value::Mapping(map)) => map
+            .get(serde_yaml::Value::String("status".to_string()))
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),

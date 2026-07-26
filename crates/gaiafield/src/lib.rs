@@ -696,7 +696,18 @@ pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<In
     for old_path in existing.keys() {
         if !node_paths.contains(old_path) {
             conn.execute("DELETE FROM nodes WHERE path = ?1", [old_path])?;
+            // The removed note's own outgoing links are meaningless now — it no longer exists to
+            // author them. But other notes' *incoming* edges into it are not deleted: those
+            // wikilinks are still real text sitting in other notes' bodies ("dangling links are
+            // data" — see the module doc). Re-flag them dangling rather than dropping the row, so
+            // `stats` still counts them and `neighbors`/`path` exclude them exactly like any
+            // scan-time dangling edge, instead of silently traversing into a node that no longer
+            // has a row in `nodes` (the crash/misroute this fixes).
             conn.execute("DELETE FROM edges WHERE source = ?1", [old_path])?;
+            conn.execute(
+                "UPDATE edges SET target = NULL, dangling = 1 WHERE target = ?1",
+                [old_path],
+            )?;
             report.removed += 1;
         }
     }

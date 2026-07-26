@@ -26,6 +26,8 @@ frontmatter declares `status: active` — e.g. a persona/profile note; `Index.md
 never qualify (no frontmatter). Notes under `Config/` are configuration, not content: links into
 them are neither dangling nor violations, just unmodeled. [earned: gaiafield R2 node-scope
 conflict — the bridge persona note was unreachable under a literal reading, 2026-07-26]
+**Removal condition:** fold into the folder table above if root-level notes are ever migrated
+into a PARA folder.
 
 ## Frontmatter field table
 

@@ -120,5 +120,5 @@ release-binaries.yml` cross-compiles `aarch64-unknown-linux-musl` via
 `taiki-e/setup-cross-toolchain-action`, which (per its own `main.sh`) pulls a real cross
 toolchain image and sets `CC_<target>`/`CXX_<target>`/`AR_<target>` env vars that `cc-rs` (the
 build-time dependency `libsqlite3-sys` uses to invoke a C compiler) reads directly — so this
-should work without a workflow change. This is a static read of the action's script, not a
-verified build; the first `gaiafield-v*` tag push is the real test.
+works without a workflow change. Verified: the `gaiafield-v0.1.0` tag push built and released all
+4 target assets, including `aarch64-unknown-linux-musl`.

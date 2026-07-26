@@ -30,7 +30,11 @@ fn condensed_specimen_outranks_long_prose_sibling() {
 }
 
 /// contract/VAULT_SCHEMA.md's active-content filter: 00_Memory, 01_Capture, and
-/// 05_Archive are never in scope for search.
+/// 05_Archive are never in scope for search — but the root-level-note clause of the same
+/// filter means the vault's bridge persona note, `Alex-Vega.md` (root, `status: active`),
+/// *is* in scope, and a query matching its own content must return it (this used to
+/// disagree with `gaiafield`, which already indexed the note as a graph node — see
+/// `contract/VAULT_SCHEMA.md`'s root-level-note clause).
 #[test]
 fn active_content_filter_excludes_memory_capture_and_archive() {
     let vault = vault_path();
@@ -54,6 +58,12 @@ fn active_content_filter_excludes_memory_capture_and_archive() {
             "{excluded} should never appear in discovered notes, found {leaked:?}"
         );
     }
+
+    let results = farsight::search("Alex Vega", &vault, 10);
+    assert!(
+        results.iter().any(|r| r.path.contains("Alex-Vega")),
+        "a query matching the root-level persona note's content should return it: {results:?}"
+    );
 }
 
 /// contract/VAULT_SCHEMA.md: a note with no frontmatter block at all is valid, not an

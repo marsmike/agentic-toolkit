@@ -1,6 +1,6 @@
 [package]
 name = "gaiafield"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Deterministic knowledge-graph extraction over an agentic-toolkit vault's wikilinks."
 license = "MIT"

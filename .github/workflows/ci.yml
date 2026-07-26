@@ -104,9 +104,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - name: Build and test (skip while workspace has no members)
         run: |
           if compgen -G "crates/*/Cargo.toml" > /dev/null; then
+            cargo clippy --workspace --all-targets -- -D warnings
             cargo build --workspace
             cargo test --workspace
           else

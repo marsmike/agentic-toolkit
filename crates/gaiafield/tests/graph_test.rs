@@ -299,3 +299,133 @@ fn filetime_touch(path: &Path, _now: std::time::SystemTime) {
     let contents = std::fs::read(path).expect("read note to touch");
     std::fs::write(path, contents).expect("rewrite note to bump mtime");
 }
+
+/// Recursively copy `src` into `dst` (which must not yet exist). Used by the deletion test below
+/// so it can remove a file without ever mutating the repo's own `./vault`.
+fn copy_dir_recursive(src: &Path, dst: &Path) {
+    std::fs::create_dir_all(dst).expect("create scratch vault dir");
+    for entry in std::fs::read_dir(src).expect("read source dir") {
+        let entry = entry.expect("dir entry");
+        let file_type = entry.file_type().expect("file type");
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path);
+        } else {
+            std::fs::copy(&src_path, &dst_path).expect("copy vault file");
+        }
+    }
+}
+
+/// (h) Incremental deletion must not corrupt the graph. Deleting a note's row must not silently
+/// drop *other* notes' incoming edges into it — those wikilinks are still real text sitting in
+/// other notes' bodies, and the crate's own design treats dangling links as data (module doc).
+/// The planted target is `04_Resources/Concepts/Atomic-Notes.md`, linked from exactly 4 distinct
+/// active-content notes (`Species-Accounts-Workflow.md`, `Capture-Conventions.md` — twice —,
+/// `Anonymized-Failure-Repros.md` — twice —, and `Vault-Größe-und-Skalierungsschwellen.md`), 6
+/// resolved incoming edges total, with no other file in the vault sharing its filename stem (so
+/// resolution is unambiguous). Runs against a scratch copy of the vault, never the repo's own
+/// `./vault`, since this test deletes a file.
+#[test]
+fn incremental_deletion_reflags_incoming_edges_dangling_not_corrupt() {
+    let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+    let scratch = std::env::temp_dir().join(format!(
+        "gaiafield-test-deletion-vault-{}-{}",
+        std::process::id(),
+        n
+    ));
+    copy_dir_recursive(&vault_path(), &scratch);
+
+    let db = fresh_db_path("deletion");
+    let conn = gaiafield::open_db(&db).expect("open db");
+    gaiafield::index(&scratch, &conn, true).expect("full index should succeed");
+
+    let deleted = "04_Resources/Concepts/Atomic-Notes.md";
+
+    let before_incoming: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM edges WHERE target = ?1 AND dangling = 0",
+            [deleted],
+            |r| r.get(0),
+        )
+        .expect("count incoming edges before deletion");
+    assert_eq!(
+        before_incoming, 6,
+        "expected 6 resolved incoming wikilink occurrences into Atomic-Notes.md before deletion"
+    );
+    let before_dangling: i64 = conn
+        .query_row("SELECT COUNT(*) FROM edges WHERE dangling = 1", [], |r| {
+            r.get(0)
+        })
+        .expect("count dangling edges before deletion");
+
+    std::fs::remove_file(scratch.join(deleted)).expect("delete the note from the scratch vault");
+
+    let report =
+        gaiafield::index(&scratch, &conn, false).expect("incremental re-index should succeed");
+    assert_eq!(report.removed, 1, "exactly one node should be removed");
+
+    let node_exists = conn
+        .query_row("SELECT 1 FROM nodes WHERE path = ?1", [deleted], |_| Ok(()))
+        .is_ok();
+    assert!(!node_exists, "deleted note should be absent from nodes");
+
+    // Former incoming edges survive as data but are re-flagged dangling, never left resolved
+    // against a node that no longer has a row, and never silently dropped.
+    let after_incoming_resolved: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM edges WHERE target = ?1 AND dangling = 0",
+            [deleted],
+            |r| r.get(0),
+        )
+        .expect("count incoming edges after deletion");
+    assert_eq!(
+        after_incoming_resolved, 0,
+        "no edge should still resolve to the deleted node"
+    );
+    let stray_target: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM edges WHERE target = ?1",
+            [deleted],
+            |r| r.get(0),
+        )
+        .expect("count any edge still pointing at the deleted path");
+    assert_eq!(
+        stray_target, 0,
+        "re-flagged edges should clear target to NULL like any other dangling edge"
+    );
+    let after_dangling: i64 = conn
+        .query_row("SELECT COUNT(*) FROM edges WHERE dangling = 1", [], |r| {
+            r.get(0)
+        })
+        .expect("count dangling edges after deletion");
+    assert_eq!(
+        after_dangling,
+        before_dangling + 6,
+        "the 6 former incoming edges should have joined the dangling count"
+    );
+
+    // `neighbors` of a former neighbor must not crash querying a vanished node, and must exclude
+    // the deleted note from its results.
+    let former_neighbor = "04_Resources/Guides/Capture-Conventions.md";
+    let neighbor_result = gaiafield::neighbors(&conn, former_neighbor, 2, Direction::Both)
+        .expect("neighbors of a former neighbor of the deleted note should not error");
+    assert!(
+        !neighbor_result.iter().any(|n| n.path == deleted),
+        "neighbors should never surface the deleted note: {neighbor_result:?}"
+    );
+
+    // `path` between two notes previously connected through the deleted note must never route
+    // through it — either it finds another route, or it correctly reports not-connected.
+    let other_former_neighbor = "02_Projects/field-guide/Species-Accounts-Workflow.md";
+    let path_report = gaiafield::shortest_path(&conn, other_former_neighbor, former_neighbor)
+        .expect("path query should not error");
+    assert!(
+        !path_report.path.iter().any(|p| p == deleted),
+        "path must never route through the deleted node: {:?}",
+        path_report.path
+    );
+
+    let _ = std::fs::remove_dir_all(db.parent().unwrap());
+    let _ = std::fs::remove_dir_all(&scratch);
+}

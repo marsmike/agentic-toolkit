@@ -1,6 +1,6 @@
 [package]
 name = "farsight"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Stateless BM25 search over an agentic-toolkit vault's active-content notes."
 license = "MIT"
