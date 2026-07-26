@@ -25,8 +25,13 @@ settings, body prose for rationale a future editor would want.
 
 ## Debugging a setting that isn't taking effect
 
-`toolkit doctor` (see [[Toolkit-CLI]]) reports which step of the resolution order supplied each
-setting's current value — check that first before assuming a profile note is malformed.
+`toolkit doctor` (see [[Toolkit-CLI]]) reports profile completeness per plugin — present or
+missing, nothing finer. It does **not** report which step of the resolution order (env var, vault
+profile note, shipped default) supplied a setting's current value; that distinction only exists in
+`toolkit profile <plugin>`'s merged JSON output, and even there the merge itself doesn't label
+which layer a given key came from. To debug a setting that isn't taking effect, check the
+environment and the profile note directly rather than expecting doctor to point at the source. See
+[[Troubleshooting-Toolkit-Doctor]] for doctor's actual four-section report shape.
 
 ## What never belongs in a profile note
 
@@ -39,4 +44,5 @@ note may say a credential exists and name where to configure it; it never carrie
 - [[Fill-From-Obsidian-Profiles]]
 - [[Config/toolkit/obsidian.md]]
 - [[Toolkit-CLI]]
+- [[Troubleshooting-Toolkit-Doctor]]
 - [[Alex-Vega]]

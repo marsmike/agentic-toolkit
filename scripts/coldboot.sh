@@ -17,7 +17,12 @@ WORK="$(mktemp -d -t toolkit-coldboot)"
 trap 'rm -rf "$WORK"' EXIT
 echo "workdir: $WORK"
 
-# Stage 1 — the README quick start, verbatim
+# Stage 1 — only the doctor half of the README quick start.
+# The README quick start is clone + `uv run toolkit doctor` + `claude plugin marketplace
+# add .` + `claude plugin install obsidian@agentic-toolkit`; the marketplace-add/install
+# part needs an isolated CLAUDE_CONFIG_DIR (never the developer's own), so it doesn't run
+# until Stage 4 (--live) below. Stages 1-3 without --live verify the doctor/engine half
+# only, not the full quick start end to end.
 git clone -q "https://github.com/$REPO.git" "$WORK/repo"
 cd "$WORK/repo"
 uv run toolkit doctor

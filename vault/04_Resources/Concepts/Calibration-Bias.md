@@ -23,15 +23,16 @@ dominate a number that's supposed to describe the whole population.**
 
 ## What went wrong, concretely
 
-This vault has three planted clusters: `toolkit-concepts` (57 notes — a broad grab-bag), `birding`
-(7 notes), `homelab` (7 notes). Pooling every intra-cluster pair across all three gives
-toolkit-concepts ~1596 pairs against birding's and homelab's 21 apiece — toolkit-concepts alone is
-about 97% of every intra-pair in the pool, purely because pair count grows quadratically with
-cluster size. The reported numbers (`intra_mean: 0.622, cross_mean: 0.542, separation: 0.080`) were
-measuring the grab-bag, not the signal. The tell: birding's and homelab's notes scored **0.630**
-similarity to *each other* — a genuine cross-cluster pair — higher than toolkit-concepts' own
-diluted intra-mean of 0.617. A "different topic" pair out-scored a "same topic" one, and the gates
-derived from that gap flagged 1405 of all non-linked pairs in the vault, most of them noise.
+This vault has three planted clusters: `toolkit-concepts` (57 notes at the time of this finding — a
+broad grab-bag), `birding` (7 notes), `homelab` (7 notes). Pooling every intra-cluster pair across
+all three gives toolkit-concepts ~1596 pairs against birding's and homelab's 21 apiece —
+toolkit-concepts alone is about 97% of every intra-pair in the pool, purely because pair count grows
+quadratically with cluster size. The reported numbers (`intra_mean: 0.622, cross_mean: 0.542,
+separation: 0.080`) were measuring the grab-bag, not the signal. The tell: birding's and homelab's
+notes scored **0.630** similarity to *each other* — a genuine cross-cluster pair — higher than
+toolkit-concepts' own diluted intra-mean of 0.617. A "different topic" pair out-scored a "same
+topic" one, and the gates derived from that gap flagged 1405 of all non-linked pairs in the vault,
+most of them noise.
 
 ## The fix: an objective, self-excluding tightness rule
 
@@ -40,10 +41,22 @@ For each cluster, compute a leave-one-out reference: the pooled cross-cluster me
 Recompute the real `intra_mean`/`cross_mean` over tight clusters' own pairs only — a pair touching
 a non-tight cluster is dropped entirely, not folded into either side. On this vault: `birding` and
 `homelab` both clear their bar; `toolkit-concepts` does not — it self-excludes exactly as its own
-diluted intra-mean predicted it should. Recalibrated this way: separation more than doubles to
-0.177, gates land at 0.72/0.67, and flagged pairs drop from 1405 to 480 (226 INFERRED + 254
-AMBIGUOUS) — a birding note's default candidate view narrows from 31 mostly-noise hits to a single,
-correct same-cluster one.
+diluted intra-mean predicted it should. Recalibrated this way, at the time of this finding:
+separation more than doubled to 0.177, gates landed at 0.72/0.67, and flagged pairs dropped from
+1405 to 480 (226 INFERRED + 254 AMBIGUOUS) — a birding note's default candidate view narrowed from
+31 mostly-noise hits to a single, correct same-cluster one.
+
+## The numbers today — and why they'll be different again tomorrow
+
+The 1405 → 480 story above is a dated finding, not a permanent constant: it describes what one
+`gaiafield calibrate` run found on the vault as it existed then. The corpus keeps growing —
+`toolkit-concepts` is 63 notes as of this writing, not 57 — and every added or edited note shifts
+the pairwise similarity pool the calibration is computed over. Recalibrating today, the same
+leave-one-out method now reports 218 INFERRED + 279 AMBIGUOUS = 497 flagged pairs. That number will
+drift again the next time a note is added, split, or reworded; **numbers drift as the corpus
+grows** — treat both the 1405→480 figures and the 497 figure above as snapshots of a specific run,
+and re-run `gaiafield calibrate` for the vault's actual current values rather than trusting either
+set as current.
 
 ## The generalizable lesson
 

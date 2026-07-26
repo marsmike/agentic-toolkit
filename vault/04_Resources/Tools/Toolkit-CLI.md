@@ -15,9 +15,12 @@ tags:
 `core`'s command-line surface, three commands wide by design (see
 [[Scope-Discipline-for-Curated-Systems]] for why that's a feature, not a gap):
 
-- **`toolkit vault init [path]`** — scaffolds a new vault from this example vault's template:
+- **`toolkit vault init <path>`** — scaffolds a new vault from this example vault's template:
   the PARA folders, `Templates/`, and a `CLAUDE.md` copied from `contract/templates/VAULT_CLAUDE.md`.
-  Defaults to `./vault` when no path is given.
+  `path` is a required positional argument — there is no default. That's deliberate, not an
+  oversight: this repo's own `./vault` is the example/test-corpus vault (see
+  [[Test-Corpus-Map]]), so a default that quietly pointed `init` at `./vault` would risk
+  scaffolding a stranger's real vault on top of it.
 - **`toolkit doctor`** — reports which vault is active and how it was resolved (env var vs.
   fallback), PARA folder/note counts, frontmatter parse errors, profile completeness per plugin,
   and surfaces any dead-letter entries waiting for review (see
