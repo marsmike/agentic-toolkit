@@ -10,6 +10,12 @@ jobs:
   # Single detection job so each language/domain job below can be path-filtered
   # without needing its own workflow-level trigger.
   changes:
+    # paths-filter reads the associated PR via API; dependabot-triggered runs get a
+    # restricted token without pull-requests:read by default
+    # [earned: run on dependabot/uv/pyyaml branch, "Resource not accessible by integration", 2026-07-26]
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       python: ${{ steps.filter.outputs.python }}
