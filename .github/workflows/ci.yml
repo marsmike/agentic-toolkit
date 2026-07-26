@@ -46,7 +46,7 @@ jobs:
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --all-packages  # root project has no deps; members (toolkit-core) carry them [earned: CI run 30203390547 — ModuleNotFoundError toolkit_core/yaml]
       - run: uv run ruff check .
       - run: uv run pytest core/tests -v
 
@@ -62,8 +62,8 @@ jobs:
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
-      - run: uv sync
-      - run: uv run pytest core/tests/test_example_vault_conformance.py -v
+      - run: uv sync --all-packages  # root project has no deps; members (toolkit-core) carry them [earned: CI run 30203390547 — ModuleNotFoundError toolkit_core/yaml]
+      - run: uv run pytest core/tests/test_contract.py -v
 
   evals:
     needs: changes
@@ -74,7 +74,7 @@ jobs:
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --all-packages  # root project has no deps; members (toolkit-core) carry them [earned: CI run 30203390547 — ModuleNotFoundError toolkit_core/yaml]
       # run.py exits nonzero on any failing eval; --json makes the output
       # machine-readable so the grep gate below actually matches the format
       # [earned: adversarial R0 review 2026-07-26 — grep gate was dead code

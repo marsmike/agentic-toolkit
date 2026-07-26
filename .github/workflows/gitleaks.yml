@@ -1,8 +1,12 @@
 name: gitleaks
 
+# push-only: every in-repo branch (incl. dependabot) is scanned on push, and the
+# pull_request trigger failed on dependabot's read-only token ("Resource not
+# accessible by integration") [earned: run 30203439089, 2026-07-26]. Removal
+# condition: re-add pull_request with explicit permissions if external-fork PRs
+# ever need pre-merge scanning.
 on:
   push:
-  pull_request:
 
 jobs:
   scan:
