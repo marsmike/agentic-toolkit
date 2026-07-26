@@ -1,0 +1,23 @@
+<svg width="720" height="140" viewBox="0 0 720 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="agentic-toolkit">
+  <style>
+    .wire { stroke: #4a5568; stroke-width: 1.5; }
+    .wire-inferred { stroke: #4a5568; stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .node { fill: #a0aec0; }
+    .node-hub { fill: #63b3ed; }
+    .wordmark { font: 700 40px ui-monospace, "SF Mono", Menlo, monospace; fill: #f7fafc; }
+    .tagline { font: 400 15px ui-monospace, "SF Mono", Menlo, monospace; fill: #a0aec0; }
+  </style>
+  <line class="wire" x1="60" y1="40" x2="105" y2="70"/>
+  <line class="wire" x1="105" y1="70" x2="70" y2="105"/>
+  <line class="wire" x1="105" y1="70" x2="150" y2="45"/>
+  <line class="wire-inferred" x1="150" y1="45" x2="60" y2="40"/>
+  <line class="wire-inferred" x1="70" y1="105" x2="145" y2="100"/>
+  <line class="wire" x1="105" y1="70" x2="145" y2="100"/>
+  <circle class="node" cx="60" cy="40" r="7"/>
+  <circle class="node-hub" cx="105" cy="70" r="10"/>
+  <circle class="node" cx="70" cy="105" r="7"/>
+  <circle class="node" cx="150" cy="45" r="7"/>
+  <circle class="node" cx="145" cy="100" r="7"/>
+  <text class="wordmark" x="195" y="78">agentic-toolkit</text>
+  <text class="tagline" x="197" y="106">your vault is the platform · claude code plugins · rust engines</text>
+</svg>
