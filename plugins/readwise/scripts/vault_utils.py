@@ -179,6 +179,20 @@ def atomic_write(path: Path, content: str) -> None:
         raise
 
 
+def unique_path(directory: Path, base_name: str, suffix: str = ".md") -> Path:
+    """`directory/base_name.md`, or `-2`/`-3`/... appended if that already exists.
+
+    Shared by every writer here that must never overwrite an existing note on
+    collision (a DLQ entry, a capture note) — same suffix rule, one implementation.
+    """
+    dest = directory / f"{base_name}{suffix}"
+    n = 2
+    while dest.exists():
+        dest = directory / f"{base_name}-{n}{suffix}"
+        n += 1
+    return dest
+
+
 # ---------------------------------------------------------------------------
 # Dead-letter queue — 00_Memory/dlq/ (contract's doctor-surfaced DLQ convention)
 # ---------------------------------------------------------------------------
@@ -205,11 +219,7 @@ def write_dlq_note(
     dlq_dir = vault / "00_Memory" / "dlq"
     dlq_dir.mkdir(parents=True, exist_ok=True)
     today = time.strftime("%Y-%m-%d")
-    dest = dlq_dir / f"{today}-{slug}.md"
-    n = 2
-    while dest.exists():
-        dest = dlq_dir / f"{today}-{slug}-{n}.md"
-        n += 1
+    dest = unique_path(dlq_dir, f"{today}-{slug}")
 
     related_lines = "\n".join(f"- [[{r}]]" for r in (related or [])) or "- (none)"
     fm = {

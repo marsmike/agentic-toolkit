@@ -59,9 +59,31 @@ class GraphUnavailable:
     detail: str
 
 
+def _engines_install_dir() -> Path:
+    """Mirrors `core/toolkit_core/engines.py::install_dir()` — plugin scripts are
+    self-contained (no import of `core`, per this file's module docstring), so the
+    well-known `toolkit engines install` dir is redefined here rather than imported.
+    Keep both in sync. Invariant: suffix is `.exe` iff `os.name == "nt"` — identical
+    expression to `engines.py::binary_path()` and to `search.py`'s own mirror; the
+    three must never drift apart on this check."""
+    xdg = os.environ.get("XDG_DATA_HOME")
+    base = Path(xdg).expanduser() if xdg else Path.home() / ".local" / "share"
+    suffix = ".exe" if os.name == "nt" else ""
+    return base / "agentic-toolkit" / "bin" / f"gaiafield{suffix}"
+
+
 def gaiafield_binary() -> str | None:
-    """`TOOLKIT_GAIAFIELD_BIN` env var wins; otherwise a `gaiafield` binary on PATH, if any."""
-    return os.environ.get(GAIAFIELD_BIN_ENV) or shutil.which("gaiafield")
+    """`TOOLKIT_GAIAFIELD_BIN` env var wins; then a `gaiafield` binary on PATH; then the
+    well-known `toolkit engines install` dir — the one added probe step, so
+    `toolkit engines install` alone is enough with no PATH/env wiring."""
+    env = os.environ.get(GAIAFIELD_BIN_ENV)
+    if env:
+        return env
+    on_path = shutil.which("gaiafield")
+    if on_path:
+        return on_path
+    installed = _engines_install_dir()
+    return str(installed) if installed.is_file() else None
 
 
 def available() -> bool:

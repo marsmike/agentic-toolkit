@@ -14,13 +14,15 @@ tags:
 
 `.claude-plugin/marketplace.json` lists every plugin under `plugins/` as a source; installing one
 is `claude plugin marketplace add <path>` against this repo. As shipped, that file registers
-exactly three plugins — this is the current, verified reality, not a roadmap summary:
+exactly four plugins — this is the current, verified reality, not a roadmap summary:
 
 - **obsidian** — the vault-contract reference implementation: CLI operations, search, graph-aware
   distill, retrieval-verification maintenance. See [[Obsidian-Plugin]].
 - **readwise** — Readwise ingestion into origin-prefixed `01_Capture/` notes. See
   [[Readwise-Plugin]].
 - **memory** — session-end capture and on-demand distillation into `00_Memory/`.
+- **handoff** — portable session continuity: chained `_handoff/` markdown in the repo, a
+  discovery index in the vault, and a pre-compaction autosnapshot hook.
 
 [[Farsight]] and [[Gaiafield]] are **not** marketplace entries — they're native Rust engine
 binaries that plugins shell out to (see [[CLI-in-JSON-out-Contracts]]), not Claude Code plugins

@@ -114,11 +114,7 @@ def capture_session(hook_input: dict, vault: Path) -> Path | None:
     project = mv.project_name(cwd)
     slug = mv.slugify(f"{project}-{session_id[:8]}")
     sessions_dir = Path(vault) / "00_Memory" / "sessions"
-    dest = sessions_dir / f"{today}-{slug}.md"
-    n = 2
-    while dest.exists():
-        dest = sessions_dir / f"{today}-{slug}-{n}.md"
-        n += 1
+    dest = mv.unique_path(sessions_dir, f"{today}-{slug}")
 
     turn_word = "turn" if stats["human_turns"] == 1 else "turns"
     frontmatter = {

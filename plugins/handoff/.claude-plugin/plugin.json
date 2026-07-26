@@ -1,0 +1,18 @@
+{
+  "name": "handoff",
+  "version": "2.7.0",
+  "description": "Portable session handoff: save/resume work context across sessions, machines, and tools via chained in-repo _handoff/ markdown, with a vault discovery index and PreCompact safety net.",
+  "author": {
+    "name": "agentic-toolkit contributors"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/marsmike/agentic-toolkit",
+  "keywords": [
+    "handoff",
+    "context",
+    "session",
+    "continuity",
+    "compaction",
+    "cross-tool"
+  ]
+}

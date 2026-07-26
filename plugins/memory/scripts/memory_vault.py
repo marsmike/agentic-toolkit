@@ -182,6 +182,20 @@ def read_note(path: Path) -> tuple[dict, str]:
     return parse_frontmatter(match.group(1)), text[match.end() :]
 
 
+def unique_path(directory: Path, base_name: str, suffix: str = ".md") -> Path:
+    """`directory/base_name.md`, or `-2`/`-3`/... appended if that already exists.
+
+    Shared by every writer that must never overwrite an existing note on collision
+    (a DLQ entry, a session record) — same suffix rule, one implementation.
+    """
+    dest = directory / f"{base_name}{suffix}"
+    n = 2
+    while dest.exists():
+        dest = directory / f"{base_name}-{n}{suffix}"
+        n += 1
+    return dest
+
+
 def write_note(path: Path, frontmatter: dict, body: str) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -219,11 +233,7 @@ def write_dlq_note(
     the example vault and plugins/obsidian/scripts/vault_utils.write_dlq_note()."""
     dlq_dir = Path(vault) / "00_Memory" / "dlq"
     today = time.strftime("%Y-%m-%d")
-    dest = dlq_dir / f"{today}-{slug}.md"
-    n = 2
-    while dest.exists():
-        dest = dlq_dir / f"{today}-{slug}-{n}.md"
-        n += 1
+    dest = unique_path(dlq_dir, f"{today}-{slug}")
     fm = {
         "description": title,
         "status": "active",

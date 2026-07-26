@@ -23,7 +23,7 @@ from html import unescape
 from pathlib import Path
 from typing import Any
 
-from vault_utils import find_capture_by_doc_id, write_dlq_note, write_frontmatter
+from vault_utils import find_capture_by_doc_id, unique_path, write_dlq_note, write_frontmatter
 
 CATEGORY_LABEL = {
     "tweet": "Tweet",
@@ -112,12 +112,7 @@ def write_capture(vault: Path, item: dict[str, Any]) -> tuple[Path | None, str]:
     slug = _slugify(slug_base)
     capture_dir = vault / "01_Capture"
     capture_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"Readwise-{label}-{slug}-{saved_at or 'undated'}.md"
-    dest = capture_dir / filename
-    n = 2
-    while dest.exists():
-        dest = capture_dir / f"Readwise-{label}-{slug}-{saved_at or 'undated'}-{n}.md"
-        n += 1
+    dest = unique_path(capture_dir, f"Readwise-{label}-{slug}-{saved_at or 'undated'}")
 
     fm = {
         "source": source_url,
@@ -170,12 +165,7 @@ def write_book_capture(vault: Path, book: dict[str, Any], highlights: list[dict[
     capture_dir = vault / "01_Capture"
     capture_dir.mkdir(parents=True, exist_ok=True)
     slug = _slugify(f"{author}-{title}" if author else title)
-    filename = f"Readwise-Book-{slug}.md"
-    dest = capture_dir / filename
-    n = 2
-    while dest.exists():
-        dest = capture_dir / f"Readwise-Book-{slug}-{n}.md"
-        n += 1
+    dest = unique_path(capture_dir, f"Readwise-Book-{slug}")
 
     fm = {
         "source": book.get("source_url") or book.get("readwise_url") or "",

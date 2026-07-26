@@ -208,7 +208,7 @@ pub fn discover_nodes(vault: &Path) -> Vec<VaultFile> {
                 let (fm_text, _) = split_frontmatter(&raw);
                 let status = fm_text
                     .as_deref()
-                    .map(extract_field(FIELD_STATUS))
+                    .map(|s| extract_field(s, FIELD_STATUS))
                     .unwrap_or_default();
                 if status == "active" {
                     found.push(VaultFile {
@@ -263,16 +263,14 @@ const FIELD_KIND: &str = "kind";
 /// Pull a single scalar string field out of a frontmatter block. Absent field, non-mapping
 /// document, malformed YAML, or a non-string value all resolve to `""` — never an error, and
 /// unknown keys are simply never looked at (ignored, not rejected).
-fn extract_field(field: &'static str) -> impl Fn(&str) -> String {
-    move |fm_text: &str| -> String {
-        match serde_yaml::from_str::<serde_yaml::Value>(fm_text) {
-            Ok(serde_yaml::Value::Mapping(map)) => map
-                .get(serde_yaml::Value::String(field.to_string()))
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            _ => String::new(),
-        }
+fn extract_field(fm_text: &str, field: &str) -> String {
+    match serde_yaml::from_str::<serde_yaml::Value>(fm_text) {
+        Ok(serde_yaml::Value::Mapping(map)) => map
+            .get(serde_yaml::Value::String(field.to_string()))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        _ => String::new(),
     }
 }
 
@@ -478,15 +476,15 @@ pub fn read_note(file: &VaultFile) -> NoteMeta {
     let (fm_text, body) = split_frontmatter(&raw);
     let description = fm_text
         .as_deref()
-        .map(extract_field(FIELD_DESCRIPTION))
+        .map(|s| extract_field(s, FIELD_DESCRIPTION))
         .unwrap_or_default();
     let status = fm_text
         .as_deref()
-        .map(extract_field(FIELD_STATUS))
+        .map(|s| extract_field(s, FIELD_STATUS))
         .unwrap_or_default();
     let kind = fm_text
         .as_deref()
-        .map(extract_field(FIELD_KIND))
+        .map(|s| extract_field(s, FIELD_KIND))
         .unwrap_or_default();
     let tags = fm_text.as_deref().map(extract_tags).unwrap_or_default();
     NoteMeta {
@@ -1008,20 +1006,7 @@ pub fn shortest_path(conn: &Connection, from: &str, to: &str) -> rusqlite::Resul
             path: vec![from.to_string()],
         });
     }
-    let mut adj: HashMap<String, Vec<String>> = HashMap::new();
-    {
-        let mut stmt = conn.prepare(
-            "SELECT source, target FROM edges WHERE dangling = 0 AND boundary_violation = 0 AND target IS NOT NULL",
-        )?;
-        let rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })?;
-        for row in rows.filter_map(Result::ok) {
-            let (s, t) = row;
-            adj.entry(s.clone()).or_default().push(t.clone());
-            adj.entry(t).or_default().push(s);
-        }
-    }
+    let adj = build_extracted_adjacency(conn)?;
 
     let mut visited: HashSet<String> = HashSet::from([from.to_string()]);
     let mut queue: VecDeque<String> = VecDeque::from([from.to_string()]);
@@ -1794,11 +1779,8 @@ pub struct CalibrateReport {
 }
 
 fn pair_key(a: &str, b: &str) -> String {
-    if a <= b {
-        format!("{a}~{b}")
-    } else {
-        format!("{b}~{a}")
-    }
+    let (a, b) = canonical_pair(a, b);
+    format!("{a}~{b}")
 }
 
 fn mean_of(v: &[f64]) -> f64 {

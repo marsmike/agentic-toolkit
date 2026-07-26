@@ -213,9 +213,31 @@ def semantic_scores(query: str, corpus: list[Doc], vault: Path, rebuild: bool = 
 # ---------------------------------------------------------------------------
 
 
+def _engines_install_dir() -> Path:
+    """Mirrors `core/toolkit_core/engines.py::install_dir()` — plugin scripts are
+    self-contained (no import of `core`, see this module's docstring), so the
+    well-known `toolkit engines install` dir is redefined here rather than imported.
+    Keep both in sync. Invariant: suffix is `.exe` iff `os.name == "nt"` — identical
+    expression to `engines.py::binary_path()` and to `graph.py`'s own mirror; the
+    three must never drift apart on this check."""
+    xdg = os.environ.get("XDG_DATA_HOME")
+    base = Path(xdg).expanduser() if xdg else Path.home() / ".local" / "share"
+    suffix = ".exe" if os.name == "nt" else ""
+    return base / "agentic-toolkit" / "bin" / f"farsight{suffix}"
+
+
 def farsight_binary() -> str | None:
-    """`TOOLKIT_FARSIGHT_BIN` env var wins; otherwise a `farsight` binary on PATH, if any."""
-    return os.environ.get("TOOLKIT_FARSIGHT_BIN") or shutil.which("farsight")
+    """`TOOLKIT_FARSIGHT_BIN` env var wins; then a `farsight` binary on PATH; then the
+    well-known `toolkit engines install` dir — the one added probe step, so
+    `toolkit engines install` alone is enough with no PATH/env wiring."""
+    env = os.environ.get("TOOLKIT_FARSIGHT_BIN")
+    if env:
+        return env
+    on_path = shutil.which("farsight")
+    if on_path:
+        return on_path
+    installed = _engines_install_dir()
+    return str(installed) if installed.is_file() else None
 
 
 def farsight_search(query: str, vault: Path, top: int, binary: str) -> dict | None:

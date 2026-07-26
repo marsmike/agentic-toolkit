@@ -1,0 +1,17 @@
+{
+  "description": "Handoff hooks: auto-snapshot git state before context compaction so nothing volatile is lost.",
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/precompact.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

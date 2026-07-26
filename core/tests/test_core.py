@@ -6,10 +6,11 @@ Deliberately lean — one test per unique failure mode, nothing else.
 from __future__ import annotations
 
 import json
+import shutil
 
 import pytest
 from conftest import skip_if_example_vault_empty
-from toolkit_core import cli, knowledge, profile, vault
+from toolkit_core import cli, engines, knowledge, profile, vault
 
 NOTE_TEXT = """---
 description: A test note.
@@ -200,3 +201,100 @@ def test_doctor_graph_section_reports_inference_when_present(monkeypatch, repo_r
         "available": False,
         "note": "not inferred — run `gaiafield infer` to compute inferred edges",
     }
+
+
+# --- engines: platform-triple mapping, manifest round-trip, discovery-dir probe order ---
+# No network in any of these — the fetch itself (engines._fetch_releases /
+# install_engine's download) is never exercised here, only the pure-logic and
+# filesystem-only pieces around it.
+
+
+def test_engine_target_triple_mapping():
+    """Mirrors the exact matrix in .github/workflows/release-binaries.yml (plus the
+    real, well-formed Darwin/x86_64 and Windows/x86_64 triples this repo doesn't build
+    for on every leg — see engines.py's `_TARGET_TRIPLES` docstring)."""
+    assert engines.target_triple("Darwin", "arm64") == "aarch64-apple-darwin"
+    assert engines.target_triple("Darwin", "x86_64") == "x86_64-apple-darwin"
+    assert engines.target_triple("Linux", "aarch64") == "aarch64-unknown-linux-musl"
+    assert engines.target_triple("Linux", "x86_64") == "x86_64-unknown-linux-musl"
+    assert engines.target_triple("Windows", "AMD64") == "x86_64-pc-windows-msvc"
+    # An OS/arch combo not in the release matrix reads as "unsupported", not a guess.
+    assert engines.target_triple("Linux", "i686") is None
+    assert engines.target_triple("FreeBSD", "x86_64") is None
+
+
+def test_engines_latest_for_engine_picks_newest_matching_tag():
+    """`_latest_for_engine` trusts the GitHub API's own newest-first ordering and just
+    filters by tag prefix — each engine's own release cadence never leaks into the
+    other's "latest"."""
+    releases = [
+        {"tag_name": "gaiafield-v0.2.0", "draft": False, "prerelease": False, "assets": []},
+        {"tag_name": "gaiafield-v0.1.1", "draft": False, "prerelease": False, "assets": []},
+        {"tag_name": "farsight-v0.1.1", "draft": False, "prerelease": False, "assets": []},
+        {"tag_name": "gaiafield-v0.3.0-rc1", "draft": False, "prerelease": True, "assets": []},
+    ]
+    assert engines._latest_for_engine("gaiafield", releases)["tag_name"] == "gaiafield-v0.2.0"
+    assert engines._latest_for_engine("farsight", releases)["tag_name"] == "farsight-v0.1.1"
+    assert engines._latest_for_engine("no-such-engine", releases) is None
+
+
+def test_engine_manifest_round_trip_and_install_dir(tmp_path, monkeypatch):
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert engines.install_dir() == tmp_path / ".local" / "share" / "agentic-toolkit" / "bin"
+    assert engines.read_manifest() == {}  # no manifest yet is a normal state, not an error
+
+    payload = {"farsight": {"tag": "farsight-v0.1.1", "sha256": "deadbeef"}}
+    engines.write_manifest(payload)
+    assert engines.read_manifest() == payload
+
+
+def test_engine_manifest_corruption_degrades_to_not_installed(tmp_path, monkeypatch):
+    """A corrupted manifest.json (unparseable JSON) must never raise: `read_manifest()`
+    degrades to `{}` — the same "no manifest yet" state a fresh install sees — and
+    `status_all()` reports every engine as a not-installed row rather than crashing on
+    the bad file. No network: `_fetch_releases` is stubbed to an empty list."""
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(engines, "_fetch_releases", lambda: [])
+
+    manifest_file = engines.manifest_path()
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text("{not valid json!!", encoding="utf-8")
+
+    assert engines.read_manifest() == {}
+
+    rows = engines.status_all()
+    assert len(rows) == len(engines.ENGINES)
+    for row in rows:
+        assert row["installed_tag"] is None
+        assert row["installed_path"] is None
+        assert row["up_to_date"] is False
+
+
+def test_engine_install_dir_honors_xdg_data_home(tmp_path, monkeypatch):
+    xdg = tmp_path / "xdg-data"
+    monkeypatch.setenv("XDG_DATA_HOME", str(xdg))
+    assert engines.install_dir() == xdg / "agentic-toolkit" / "bin"
+
+
+def test_discovery_chain_probe_order_env_beats_install_dir_beats_absent(tmp_path, monkeypatch):
+    """`knowledge.gaiafield_binary()`'s three-step chain: env var, then PATH, then the
+    well-known engines install dir, then absent. PATH is stubbed out entirely so this
+    doesn't depend on whether the real dev machine happens to have gaiafield on PATH."""
+    monkeypatch.delenv("TOOLKIT_GAIAFIELD_BIN", raising=False)
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+
+    assert knowledge.gaiafield_binary() is None  # absent: no env, no PATH, no install-dir file
+
+    install_bin = engines.binary_path("gaiafield")
+    install_bin.parent.mkdir(parents=True, exist_ok=True)
+    install_bin.write_text("#!/bin/sh\necho stub\n", encoding="utf-8")
+    install_bin.chmod(0o755)
+    assert knowledge.gaiafield_binary() == str(install_bin)  # install-dir beats absent
+
+    monkeypatch.setenv("TOOLKIT_GAIAFIELD_BIN", "/explicit/path/gaiafield")
+    assert knowledge.gaiafield_binary() == "/explicit/path/gaiafield"  # env beats install-dir

@@ -28,20 +28,20 @@ flowchart LR
 ## Pick your path
 
 **🌱 New here — "what does this actually do for me?"**
-Clone it and it works immediately against the bundled example vault — no setup,
-no accounts, no API keys:
+No accounts, no API keys — three commands, then a 60-second real demo:
 
 ```bash
-git clone https://github.com/marsmike/agentic-toolkit && cd agentic-toolkit
-uv run toolkit doctor                 # health-check against ./vault, out of the box
-claude plugin marketplace add .
-claude plugin install obsidian@agentic-toolkit
+uv tool install git+https://github.com/marsmike/agentic-toolkit#subdirectory=core  # toolkit on PATH
+toolkit engines install                                                            # sha256-recorded binaries
+claude plugin marketplace add marsmike/agentic-toolkit                             # plugins
+toolkit demo                                                                        # see it work, for real
 ```
+
+**From source**: `git clone https://github.com/marsmike/agentic-toolkit && cd agentic-toolkit && uv run toolkit demo` — then `claude plugin marketplace add .` in place of the line above.
 
 Then read the [Quick Start](https://marsmike.github.io/agentic-toolkit/04_Resources/Guides/Quick-Start)
 and scaffold your own vault with `uv run toolkit vault init ~/my-vault`
-(`export TOOLKIT_VAULT=~/my-vault` to point the toolkit at it — tests and CI
-never touch your vault, only the bundled one).
+(`export TOOLKIT_VAULT=~/my-vault` — tests/CI never touch your vault, only the bundled one).
 
 **🔧 Intermediate — "I want to build on this."**
 Start with [`contract/`](contract/) — the four short documents every plugin
