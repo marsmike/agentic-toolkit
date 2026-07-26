@@ -12,7 +12,7 @@ toolkit = "toolkit_core.cli:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8",
+    "pytest>=9.1.1",
 ]
 
 [build-system]
