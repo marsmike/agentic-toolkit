@@ -21,6 +21,12 @@ executable version of this contract: a schema change that isn't reflected there 
 `02_Projects`, `03_Areas`, `04_Resources` only. `00_Memory`, `01_Capture`, and `05_Archive` are
 always excluded from these operations.
 
+Root-level notes (directly in the vault root) join active content only when their own
+frontmatter declares `status: active` — e.g. a persona/profile note; `Index.md` and `CLAUDE.md`
+never qualify (no frontmatter). Notes under `Config/` are configuration, not content: links into
+them are neither dangling nor violations, just unmodeled. [earned: gaiafield R2 node-scope
+conflict — the bridge persona note was unreachable under a literal reading, 2026-07-26]
+
 ## Frontmatter field table
 
 Field names and meanings are stable — generated views, lint tooling, and plugin logic depend on
