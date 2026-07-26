@@ -26,6 +26,7 @@ EVAL_MODULES = (
     "eval_dlq_on_missing_scores",
     "eval_search_parity",
     "eval_graph_context",
+    "eval_inferred_candidates",
 )
 
 

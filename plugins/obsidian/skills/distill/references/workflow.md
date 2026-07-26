@@ -84,6 +84,39 @@ line rather than silently doing less than a run where the binary was present. A 
 invocation of a binary that IS present (`"call-failed"`) writes a DLQ note automatically
 (`scripts/graph.py`'s `_dlq_on_call_failure`) and degrades the same way.
 
+### Inferred candidates (if the binary supports gaiafield v2)
+
+**Rule 1, verbatim from `contract/KNOWLEDGE_API.md`'s v2 section: report-only, forever.**
+No automation writes vault content — a link, an enrichment, a note — from an inferred
+edge without explicit human confirmation in that session. Everything below is a
+candidate for a human decision, never an input to an autonomous write.
+
+After the deterministic graph-context step above, when `graph.available()` is true, try
+the statistical layer too:
+
+```python
+top_matches = [m["path"] for m in matches[:3]]  # the proposed placement's top matches
+inferred = graph.inferred_candidates(vault, top_matches[0], k=5)  # not GraphUnavailable("no-inference") only on a v2 binary
+```
+
+- If `inferred` comes back as a list (not `GraphUnavailable`): present it as its own,
+  clearly separated block in the Phase 1 handoff — never merged into the deterministic
+  backlink/bridge lists above — labeled along these lines:
+
+  > **Inferred candidates (statistical, report-only — confirm before any use)**
+  > model=`<inferred["model"] if surfaced>`
+  > - `path` — score `0.NN` (INFERRED)
+
+  Only rows labeled `INFERRED` by default. A row labeled `AMBIGUOUS` exists in the model's
+  gate band and is shown only if the human explicitly asks for it (`include_ambiguous=True`);
+  never surface one proactively.
+- If `inferred` comes back as `GraphUnavailable("no-inference", ...)`: the binary predates
+  gaiafield v2 — say so in one line, same as the `"no-binary"` case, and move on; this is
+  a normal, silent degradation, not an error.
+- **Surprise candidates** (`graph.surprise_candidates(vault, top=10)`) are cross-domain
+  leads — mention them as an optional extra the human can request ("want me to check for
+  cross-domain surprise candidates too?"), never run or presented unprompted.
+
 ## 4. Extract core mechanics (reasoning, not writing yet)
 
 For each key idea: what's the underlying mechanism that makes this work? Name it as a
@@ -101,6 +134,9 @@ Report back and stop:
 - Top 3-5 related notes with scores, and proposed enrichment level per note (L1/2/3).
 - If graph context ran: any backlink candidates and bridge opportunities it added, or one
   line saying it didn't run (no gaiafield binary available).
+- If inferred candidates ran: the separated, labeled block from the section above (or one
+  line saying it didn't — no gaiafield v2 support). Never conflate these with the
+  deterministic backlink/bridge lists.
 - Already-distilled mode if step 2 found a canonical hit: `new-note | enrich-only | hybrid`.
 
 Wait for confirm / redirect / reject. Skip only with an explicit `--auto` instruction.

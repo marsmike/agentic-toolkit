@@ -9,6 +9,14 @@ R3 scope: report what already exists (db present, counts, freshness). This modul
 runs `gaiafield index` itself — indexing is a plugin/skill's job; `doctor` only reports
 state, per its existing "surfaces, never mutates" character (see `dlq_status` in
 `vault.py`).
+
+v2 addition (R5): the same `stats --json` call gains inference fields once the engine
+supports them (`contract/KNOWLEDGE_API.md`'s v2 section) — model name, high/low gates,
+inferred/ambiguous edge counts. Three states, distinguished the same way
+`scripts/graph.py`'s `_supports_inference()` probes it: no `model` key at all means a v1
+binary that predates inference; the key present but empty means a v2 binary that hasn't
+run `gaiafield infer` yet; populated is the normal reporting case. `doctor` only ever
+reports this — it never runs `infer` itself.
 """
 
 from __future__ import annotations
@@ -54,6 +62,29 @@ def _newest_active_note_mtime(vault_path: Path) -> float | None:
     return newest
 
 
+def _inference_status(stats: dict) -> dict:
+    """The `inference` sub-section of `graph_status`'s report, derived from the same
+    `stats` payload — see the module docstring's v2 addition for the three-state logic."""
+    if "model" not in stats:
+        return {"available": False, "note": "engine lacks inference (v1 binary — no inference fields in stats)"}
+
+    model = stats.get("model")
+    if not model:
+        return {"available": False, "note": "not inferred — run `gaiafield infer` to compute inferred edges"}
+
+    inferred_edges = stats.get("inferred_edges")
+    ambiguous_edges = stats.get("ambiguous_edges")
+    return {
+        "available": True,
+        "model": model,
+        "high_gate": stats.get("high_gate"),
+        "low_gate": stats.get("low_gate"),
+        "inferred_edges": inferred_edges,
+        "ambiguous_edges": ambiguous_edges,
+        "note": f"{inferred_edges} inferred, {ambiguous_edges} ambiguous (model={model})",
+    }
+
+
 def graph_status(vault_path: Path) -> dict:
     """Graph section for `toolkit doctor`. Never raises: every failure mode collapses
     into a `present`/`note` pair the caller can render directly, matching the rest of
@@ -93,6 +124,7 @@ def graph_status(vault_path: Path) -> dict:
         "dangling_edges": stats.get("dangling_edges"),
         "boundary_violations": stats.get("boundary_violations"),
         "stale": stale,
+        "inference": _inference_status(stats),
         "note": (
             "index may be stale — a note changed since the last `gaiafield index`"
             if stale else "index is fresh"

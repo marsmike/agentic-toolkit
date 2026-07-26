@@ -9,16 +9,23 @@ but fails on a real invocation is a different, abnormal state — that failure i
 the vault's dead-letter queue (`vault_utils.write_dlq_note`) before degrading, per
 `contract/KNOWLEDGE_API.md`'s dead-letter rule.
 
-R3 scope only: deterministic graph consumption — index/neighbors/stats, and the
-`graph_context` helper the distill skill uses for phase-1 backlink/bridge candidates. No
-inferred edges, no LLM calls; see `crates/gaiafield/README.md` (v1 scope) and
-`vault/04_Resources/Concepts/Deterministic-vs-Inferred-Graph-Edges.md`. Surprise scoring
-and inferred edges are gaiafield v2/R4+, not this module.
+R3 scope: deterministic graph consumption — index/neighbors/stats, and the
+`graph_context` helper the distill skill uses for phase-1 backlink/bridge candidates.
+
+v2 addition (R5, `contract/KNOWLEDGE_API.md`'s v2 section): `ensure_inferred()`,
+`inferred_candidates()`, and `surprise_candidates()` consume gaiafield's statistical
+inferred-edge layer (`infer`/`candidates`/`surprise` subcommands). Rule 1 of that section
+binds every caller of these functions, not just this module: inferred edges are
+candidates for a human decision, never inputs to an autonomous write — this module only
+ever *reads* them, and writes nothing to the vault. A binary that predates v2 (no
+`infer` subcommand) is a normal, silent degradation (`GraphUnavailable("no-inference")`),
+probed for rather than discovered by a crash — see `_supports_inference()`.
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -44,6 +51,9 @@ class GraphUnavailable:
       "call-failed" — the binary was invoked and it (or the parse of its output) failed.
                       Abnormal — the caller that detected it has already written a DLQ
                       note under `00_Memory/dlq/` before returning this.
+      "no-inference" — binary present and index present, but it predates gaiafield v2
+                      (no `infer` subcommand). Normal for any binary built before R5;
+                      never logged, same as "no-binary"/"no-index".
     """
     reason: str
     detail: str
@@ -211,3 +221,174 @@ def graph_context(vault: Path, matched_paths: list[str], k: int = 1) -> dict | G
         "backlink_candidates": backlink_candidates,
         "bridge_opportunities": bridge_opportunities,
     }
+
+
+# ---------------------------------------------------------------------------
+# v2 — inferred edges (R5). Report-only: every function below only reads gaiafield's
+# statistical layer; nothing here writes vault content. contract/KNOWLEDGE_API.md's v2
+# section, rule 1.
+# ---------------------------------------------------------------------------
+
+HELP_TIMEOUT = 10
+
+# The v2 subcommand surface this probe checks for, as whole words — never substring
+# matches (see `_supports_inference()`'s docstring for the false-positive this fixes).
+_INFERENCE_SUBCOMMAND_TOKENS = ("infer", "candidates", "surprise")
+
+# Per-binary-path cache for `_supports_inference()`. A binary's capability can't change
+# mid-process, so every consumer in this module (`ensure_inferred()`,
+# `inferred_candidates()`, `surprise_candidates()`) probing independently otherwise pays
+# for a redundant `--help` subprocess each — up to three per skill/CLI run for the same
+# binary.
+_inference_probe_cache: dict[str, bool] = {}
+
+
+def _supports_inference(binary: str) -> bool:
+    """Capability probe for the v2 `infer`/`candidates`/`surprise` subcommands.
+
+    Asks `--help` rather than invoking `infer` directly: a v1 binary would exit non-zero
+    on an unrecognized subcommand, which is indistinguishable from a real call failure
+    without fragile stderr-message matching, and would wrongly earn a DLQ note for a
+    perfectly normal "not built with inference" state. `--help` is side-effect-free and
+    works identically on both binary generations.
+
+    Two bugs in the original bare-substring check, both fixed here:
+
+    - `"infer" in proc.stdout` matches inside ordinary help *prose*, not just an actual
+      `infer` subcommand token — a v1 binary whose `--help` says "statistical inference
+      is not yet supported in this build" probed as supporting inference (since "infer"
+      is a substring of "inference"), and the real `infer`/`candidates`/`surprise` call
+      that followed then failed and wrongly earned a DLQ note for what should have been a
+      silent, normal "no-inference" degrade. Fixed with `\\b<token>\\b` word-boundary
+      matching: a regex boundary requires a word/non-word transition on each side, and
+      there is no such transition between the "r" of "infer" and the "e" that follows in
+      "inference" (both are word characters) — so `\\binfer\\b` does NOT match inside
+      "inference", only a standalone "infer" token, e.g. one entry in a
+      `<index|neighbors|stats|infer|candidates|surprise>` usage line (pipes and
+      whitespace are non-word characters, so they count as boundaries).
+    - No returncode check — a failing `--help` invocation could still emit matching text.
+      `proc.returncode == 0` is now required alongside the token match.
+
+    All three subcommand tokens must appear as whole words for this to return True: a
+    binary advertising only a subset isn't the full v2 surface this module's three
+    consumers collectively depend on.
+
+    Result is cached per binary path (module-level dict) — see `_inference_probe_cache`.
+    Any probe failure (missing binary, timeout, non-zero exit, missing token) reads as
+    "no", the safe default, and is cached the same as a genuine "no"."""
+    if binary in _inference_probe_cache:
+        return _inference_probe_cache[binary]
+
+    try:
+        proc = subprocess.run([binary, "--help"], capture_output=True, text=True, timeout=HELP_TIMEOUT)
+    except (OSError, subprocess.SubprocessError):
+        result = False
+    else:
+        result = proc.returncode == 0 and all(
+            re.search(rf"\b{token}\b", proc.stdout) for token in _INFERENCE_SUBCOMMAND_TOKENS
+        )
+
+    _inference_probe_cache[binary] = result
+    return result
+
+
+def ensure_inferred(vault: Path) -> dict | GraphUnavailable:
+    """Run `gaiafield infer` — the embedding pass that computes the inferred-edge layer
+    on top of whatever `ensure_index()` already built. Mirrors `ensure_index()`'s shape:
+    call once per skill/CLI run before `inferred_candidates()`/`surprise_candidates()`.
+    Returns the raw `{embedded, inferred_edges, ambiguous_edges, model, high_gate,
+    low_gate, elapsed_ms}` object on success."""
+    binary = gaiafield_binary()
+    if binary is None:
+        return GraphUnavailable("no-binary", "no gaiafield binary found (TOOLKIT_GAIAFIELD_BIN or PATH)")
+    if not _supports_inference(binary):
+        return GraphUnavailable("no-inference", "gaiafield binary has no `infer` subcommand (pre-v2)")
+
+    args = ["infer", "--vault", str(vault)]
+    result, error = _run_json(binary, args, timeout=INDEX_TIMEOUT)
+    if error is not None:
+        _dlq_on_call_failure(vault, "infer", error)
+        return GraphUnavailable("call-failed", f"gaiafield infer failed: {error}")
+    return result
+
+
+def inferred_candidates(
+    vault: Path, note: str, k: int = 5, include_ambiguous: bool = False
+) -> list[dict] | GraphUnavailable:
+    """Statistical candidates for `note` — semantic-similarity neighbors gaiafield's
+    embedding pass surfaced, never deterministic wikilinks. Every row carries `score` and
+    a `label` of `"INFERRED"` or `"AMBIGUOUS"` (`contract/KNOWLEDGE_API.md`'s v2 gates).
+
+    `include_ambiguous=False` (the default) filters AMBIGUOUS rows out client-side, even
+    if the binary's own `--include-ambiguous` handling were to misbehave — the v2
+    contract's "surfaced only when a caller explicitly asks" rule is enforced here, not
+    just requested of the engine. Callers presenting these to a human must label them
+    distinctly from any deterministic (`graph_context()`) result — they are candidates
+    for a decision, never a fact about the vault's link graph."""
+    binary = gaiafield_binary()
+    if binary is None:
+        return GraphUnavailable("no-binary", "no gaiafield binary found (TOOLKIT_GAIAFIELD_BIN or PATH)")
+    if not default_db_path(vault).is_file():
+        return GraphUnavailable("no-index", "no graph database yet — call ensure_index() first")
+    if not _supports_inference(binary):
+        return GraphUnavailable("no-inference", "gaiafield binary has no `infer` subcommand (pre-v2)")
+
+    args = ["candidates", note, "--vault", str(vault), "--k", str(k)]
+    if include_ambiguous:
+        args.append("--include-ambiguous")
+    result, error = _run_json(binary, args)
+    if error is not None:
+        _dlq_on_call_failure(vault, "candidates", error)
+        return GraphUnavailable("call-failed", f"gaiafield candidates {note!r} failed: {error}")
+
+    if include_ambiguous:
+        return result
+    return [row for row in result if row.get("label") != "AMBIGUOUS"]
+
+
+def surprise_candidates(
+    vault: Path, top: int = 10, include_ambiguous: bool = False
+) -> list[dict] | GraphUnavailable:
+    """Cross-domain leads: inferred edges whose deterministic graph distance is large (or
+    infinite, or across a different PARA subtree) — pairs a pure similarity search
+    wouldn't flag as related through the link graph. Derived scoring, not stored magic
+    (`contract/KNOWLEDGE_API.md`'s v2 section, rule 5); gaiafield computes it, this just
+    reads the result. Report-only, same as `inferred_candidates()` — present as optional
+    leads a human can request, never as a proactive recommendation.
+
+    **Row shape differs from `inferred_candidates()` — pair-shaped, not single-note.**
+    `candidates` rows describe one *other* note relative to the note you asked about
+    (`path`/`score`/`label`/...); `surprise` has no "queried note" to be relative to, so
+    each row is the pair itself: `a`/`b` (both vault-relative paths), `score`, `surprise`,
+    `det_distance`, `same_subtree`, `label`, `model` (`crates/gaiafield/src/lib.rs`'s
+    `SurpriseRow`). A caller presenting these must render both `a` and `b`, never assume a
+    `row["path"]` key exists — this module's original CLI spec had rows carry no `label` at
+    all and (per that same spec bug) `--include-ambiguous` didn't do anything server-side;
+    both are fixed at the contract layer as of gaiafield v2's `surprise` (Fix 2, R5) and
+    this function's filter below is real defense-in-depth against a live flag now, not
+    dead code guarding a no-op.
+
+    `include_ambiguous=False` (the default) filters AMBIGUOUS rows out client-side, same
+    as `inferred_candidates()` — the v2 contract's "surfaced only when a caller explicitly
+    asks" rule applies at the edge-label level, regardless of which subcommand produced
+    the row, so this function enforces it independently rather than trusting the binary's
+    own `--include-ambiguous` handling alone."""
+    binary = gaiafield_binary()
+    if binary is None:
+        return GraphUnavailable("no-binary", "no gaiafield binary found (TOOLKIT_GAIAFIELD_BIN or PATH)")
+    if not default_db_path(vault).is_file():
+        return GraphUnavailable("no-index", "no graph database yet — call ensure_index() first")
+    if not _supports_inference(binary):
+        return GraphUnavailable("no-inference", "gaiafield binary has no `infer` subcommand (pre-v2)")
+
+    args = ["surprise", "--vault", str(vault), "--top", str(top)]
+    if include_ambiguous:
+        args.append("--include-ambiguous")
+    result, error = _run_json(binary, args)
+    if error is not None:
+        _dlq_on_call_failure(vault, "surprise", error)
+        return GraphUnavailable("call-failed", f"gaiafield surprise failed: {error}")
+
+    if include_ambiguous:
+        return result
+    return [row for row in result if row.get("label") != "AMBIGUOUS"]

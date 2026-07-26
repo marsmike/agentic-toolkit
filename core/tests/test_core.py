@@ -147,3 +147,56 @@ def test_doctor_graph_section_reports_present_binary(monkeypatch, repo_root, tmp
     assert out["graph"]["nodes"] == 73
     assert out["graph"]["dangling_edges"] == 1
     assert out["graph"]["stale"] is False  # db just written now postdates every existing note's mtime
+    # This stub's stats JSON carries no model/inferred/ambiguous fields at all — the v1
+    # engine shape, predating gaiafield v2's inference layer (contract/KNOWLEDGE_API.md).
+    assert out["graph"]["inference"] == {
+        "available": False,
+        "note": "engine lacks inference (v1 binary — no inference fields in stats)",
+    }
+
+
+def test_doctor_graph_section_reports_inference_when_present(monkeypatch, repo_root, tmp_path, capsys):
+    """A v2 `gaiafield stats --json` payload carrying model/gates/inferred/ambiguous
+    fields surfaces them under `graph.inference` instead of the v1 "engine lacks
+    inference" fallback."""
+    skip_if_example_vault_empty()
+    monkeypatch.delenv("TOOLKIT_VAULT", raising=False)
+    monkeypatch.chdir(repo_root)
+
+    fake_db = tmp_path / "graph.db"
+    fake_db.write_bytes(b"")
+    monkeypatch.setattr(knowledge, "default_db_path", lambda vault_path: fake_db)
+
+    stub = tmp_path / "gaiafield"
+    stub.write_text(
+        "#!/bin/sh\n"
+        'echo \'{"nodes": 73, "edges": 627, "dangling_edges": 1, "boundary_violations": 0, '
+        '"top_linked": [], "model": "stub-embed-v1", "high_gate": 0.82, "low_gate": 0.68, '
+        '"inferred_edges": 12, "ambiguous_edges": 3}\'\n'
+    )
+    stub.chmod(0o755)
+    monkeypatch.setenv("TOOLKIT_GAIAFIELD_BIN", str(stub))
+
+    exit_code = cli.main(["doctor", "--json"])
+    out = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert out["graph"]["inference"] == {
+        "available": True,
+        "model": "stub-embed-v1",
+        "high_gate": 0.82,
+        "low_gate": 0.68,
+        "inferred_edges": 12,
+        "ambiguous_edges": 3,
+        "note": "12 inferred, 3 ambiguous (model=stub-embed-v1)",
+    }
+
+    # The untested middle state: a v2 binary whose index exists but `gaiafield infer`
+    # hasn't run yet reports `model: ""` (key present, value empty) rather than omitting
+    # the key entirely (the v1 case, covered above) or populating it (the case just
+    # asserted). knowledge._inference_status() is exercised directly here rather than
+    # through another doctor/stub round trip — same three-state function, no new stub
+    # needed.
+    assert knowledge._inference_status({"model": ""}) == {
+        "available": False,
+        "note": "not inferred — run `gaiafield infer` to compute inferred edges",
+    }

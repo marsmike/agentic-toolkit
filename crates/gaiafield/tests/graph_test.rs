@@ -292,6 +292,446 @@ fn incremental_reindex_touches_only_the_changed_note() {
     let _ = std::fs::remove_dir_all(db.parent().unwrap());
 }
 
+/// Shared model cache across every test in this binary — and across `cargo test` runs, since it's
+/// a fixed path under the system temp dir, not process-id-suffixed like the throwaway db dirs
+/// below. Model acquisition is decoupled from db path specifically so many throwaway-db tests can
+/// share one ~30MB download (see `gaiafield::resolve_model_dir`'s doc comment); deliberately never
+/// cleaned up here, unlike the per-test db dirs.
+fn shared_model_dir() -> PathBuf {
+    std::env::temp_dir().join("gaiafield-v2-test-model-cache")
+}
+
+/// Build a `{"clusters": {...}}` spec matching `Test-Corpus-Map.md`'s three planted clusters,
+/// written to a fresh throwaway file. Paths are discovered from the real vault directories rather
+/// than hardcoded, so this stays correct if a note is added/renamed within a cluster folder.
+fn write_test_clusters_spec() -> PathBuf {
+    fn md_files(dir: &Path) -> Vec<String> {
+        let vault = vault_path();
+        let mut out = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for e in entries.flatten() {
+                let p = e.path();
+                if p.extension().and_then(|s| s.to_str()) == Some("md") {
+                    let rel = p
+                        .strip_prefix(&vault)
+                        .unwrap()
+                        .to_string_lossy()
+                        .replace(std::path::MAIN_SEPARATOR, "/");
+                    out.push(rel);
+                }
+            }
+        }
+        out
+    }
+
+    let vault = vault_path();
+    let mut toolkit = md_files(&vault.join("04_Resources/Concepts"));
+    toolkit.extend(md_files(&vault.join("04_Resources/Guides")));
+    toolkit.extend(md_files(&vault.join("04_Resources/Tools")));
+    toolkit.push("Alex-Vega.md".to_string());
+
+    let mut birding = md_files(&vault.join("02_Projects/field-guide"));
+    birding.push("03_Areas/Birding.md".to_string());
+
+    let mut homelab = md_files(&vault.join("02_Projects/home-lab-migration"));
+    homelab.push("03_Areas/Home-Network-Administration.md".to_string());
+
+    let spec = serde_json::json!({
+        "clusters": {
+            "toolkit-concepts": toolkit,
+            "birding": birding,
+            "homelab": homelab,
+        }
+    });
+
+    let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+    let path = std::env::temp_dir().join(format!(
+        "gaiafield-test-clusters-{}-{}.json",
+        std::process::id(),
+        n
+    ));
+    std::fs::write(
+        &path,
+        serde_json::to_string(&spec).expect("serialize cluster spec"),
+    )
+    .expect("write clusters spec");
+    path
+}
+
+/// (v2-a) `infer` on `./vault` produces `INFERRED` edges, and calibrating against the planted
+/// clusters (`Test-Corpus-Map.md`) shows real separation — intra-cluster notes score higher on
+/// average than cross-cluster ones. This validates the whole v2 approach against the ground truth
+/// the vault was built to provide (contract rule 3: gates are model-calibrated, not universal).
+#[test]
+fn infer_produces_inferred_edges_with_calibration_separation() {
+    let db = fresh_db_path("infer-calibrate");
+    let conn = gaiafield::open_db(&db).expect("open db");
+    let vault = vault_path();
+
+    let report = gaiafield::infer(&vault, &conn, &shared_model_dir(), true, false)
+        .expect("infer should succeed");
+    assert!(
+        report.inferred_edges > 0,
+        "expected at least one INFERRED edge, got {report:?}"
+    );
+    assert_eq!(report.model, gaiafield::MODEL_NAME);
+
+    let spec_path = write_test_clusters_spec();
+    let calibration = gaiafield::calibrate(&conn, &spec_path).expect("calibrate should succeed");
+    assert!(
+        calibration.intra_mean > calibration.cross_mean,
+        "expected intra-cluster similarity to exceed cross-cluster: {calibration:?}"
+    );
+    // A real gap, not the old pooled-mean's noise-thinned ~0.08 (README "Calibration" — the bias
+    // lesson: pooled means overfit to cluster-size imbalance). The tight-clusters-only method
+    // should recover most of `birding`/`homelab`'s ~0.177 separation.
+    assert!(
+        calibration.separation > 0.10,
+        "expected a real, non-noise-thinned separation from the tight-clusters-only method, \
+         got {calibration:?}"
+    );
+
+    let _ = std::fs::remove_file(&spec_path);
+    let _ = std::fs::remove_dir_all(db.parent().unwrap());
+}
+
+/// (v2-a2) `calibrate`'s tightness rule (README "Calibration") correctly self-excludes the planted
+/// `toolkit-concepts` grab-bag (57 notes, weak internal coherence relative to `birding`/`homelab`'s
+/// tight 7-note clusters) from `tight_clusters`, and `cluster_pairs` reports every raw pair's
+/// (mean, n) — not just the post-filter `intra_mean`/`cross_mean` summary. This is the calibration
+/// fix itself under test, independent of whatever `DEFAULT_HIGH_GATE`/`DEFAULT_LOW_GATE` currently
+/// are.
+#[test]
+fn calibrate_self_excludes_the_grab_bag_cluster_via_cluster_pairs_breakdown() {
+    let db = fresh_db_path("calibrate-tightness");
+    let conn = gaiafield::open_db(&db).expect("open db");
+    let vault = vault_path();
+    gaiafield::infer(&vault, &conn, &shared_model_dir(), true, false)
+        .expect("infer should succeed");
+
+    let spec_path = write_test_clusters_spec();
+    let calibration = gaiafield::calibrate(&conn, &spec_path).expect("calibrate should succeed");
+
+    assert_eq!(
+        calibration.tight_clusters,
+        vec!["birding".to_string(), "homelab".to_string()],
+        "toolkit-concepts (the grab-bag) should self-exclude: {calibration:?}"
+    );
+
+    for expected_key in [
+        "birding~birding",
+        "birding~homelab",
+        "birding~toolkit-concepts",
+        "homelab~homelab",
+        "homelab~toolkit-concepts",
+        "toolkit-concepts~toolkit-concepts",
+    ] {
+        assert!(
+            calibration.cluster_pairs.contains_key(expected_key),
+            "expected cluster_pairs to report {expected_key:?}, got keys {:?}",
+            calibration.cluster_pairs.keys().collect::<Vec<_>>()
+        );
+    }
+
+    let toolkit_intra = calibration.cluster_pairs["toolkit-concepts~toolkit-concepts"].mean;
+    let birding_homelab_cross = calibration.cluster_pairs["birding~homelab"].mean;
+    assert!(
+        birding_homelab_cross > toolkit_intra,
+        "expected the tell that motivated the fix: a cross-cluster pair between two tight \
+         clusters scoring higher than the grab-bag's own intra-mean ({birding_homelab_cross} \
+         vs {toolkit_intra})"
+    );
+
+    let _ = std::fs::remove_file(&spec_path);
+    let _ = std::fs::remove_dir_all(db.parent().unwrap());
+}
+
+/// (v2-b) Candidates for a birding note (`Publisher-Outreach-Log.md`) surface a same-cluster note
+/// (`Birding.md`, the area) with a high score, and correctly exclude every note it already links
+/// to (`Field-Guide-Project.md`, `Species-Accounts-Workflow.md`, `Weekly-Review.md`,
+/// `Illustration-Sourcing.md`) — "nothing to suggest where a wikilink already exists."
+#[test]
+fn candidates_surfaces_same_cluster_note_and_excludes_wikilinked_pairs() {
+    let db = fresh_db_path("candidates");
+    let conn = gaiafield::open_db(&db).expect("open db");
+    let vault = vault_path();
+    gaiafield::infer(&vault, &conn, &shared_model_dir(), true, false)
+        .expect("infer should succeed");
+
+    let note = "02_Projects/field-guide/Publisher-Outreach-Log.md";
+    let result = gaiafield::candidates(&conn, note, 50, true).expect("candidates query");
+    assert!(
+        !result.is_empty(),
+        "expected at least one candidate for {note}"
+    );
+
+    let paths: Vec<&str> = result.iter().map(|c| c.path.as_str()).collect();
+    assert!(
+        paths.contains(&"03_Areas/Birding.md"),
+        "expected the same-cluster Birding.md area note among candidates: {paths:?}"
+    );
+    let birding_row = result
+        .iter()
+        .find(|c| c.path == "03_Areas/Birding.md")
+        .unwrap();
+    assert!(
+        birding_row.score >= gaiafield::DEFAULT_HIGH_GATE,
+        "expected a high score for the same-cluster candidate, got {birding_row:?}"
+    );
+
+    for already_linked in [
+        "02_Projects/field-guide/Field-Guide-Project.md",
+        "02_Projects/field-guide/Species-Accounts-Workflow.md",
+        "02_Projects/field-guide/Weekly-Review.md",
+        "02_Projects/field-guide/Illustration-Sourcing.md",
+    ] {
+        assert!(
+            !paths.contains(&already_linked),
+            "already-wikilinked {already_linked} should never appear as an inferred candidate: {paths:?}"
+        );
+    }
+
+    let _ = std::fs::remove_dir_all(db.parent().unwrap());
+}
+
+/// (v2-c) The planted bridge structure guarantees cross-subtree pairs among the top-surprise
+/// results — a high-scoring inferred edge between notes with no short deterministic route between
+/// them (contract rule 5: surprise scoring is derived, not stored magic).
+#[test]
+fn surprise_top_results_include_cross_subtree_pairs() {
+    let db = fresh_db_path("surprise");
+    let conn = gaiafield::open_db(&db).expect("open db");
+    let vault = vault_path();
+    gaiafield::infer(&vault, &conn, &shared_model_dir(), true, false)
+        .expect("infer should succeed");
+
+    let result = gaiafield::surprise(&conn, 20, 0.0, true).expect("surprise query");
+    assert!(
+        !result.is_empty(),
+        "expected at least one inferred edge above min_score 0.0"
+    );
+    assert!(
+        result.iter().any(|r| !r.same_subtree),
+        "expected at least one cross-subtree pair among top-surprise results: {result:?}"
+    );
+    for w in result.windows(2) {
+        assert!(
+            w[0].surprise >= w[1].surprise,
+            "surprise results should be sorted descending: {result:?}"
+        );
+    }
+
+    let _ = std::fs::remove_dir_all(db.parent().unwrap());
+}
+
+/// (v2-f) `surprise` gates its AMBIGUOUS-band pairs exactly like `candidates` does (Fix 2 — the
+/// original CLI spec this crate was built against had no `label`/`model` fields and no
+/// `--include-ambiguous` flag at all, which let the AMBIGUOUS band leak by default with no way to
+/// even see which label a row carried; the contract wins over that spec). Every row carries
+/// `label`/`model`; the default (`include_ambiguous: false`) excludes AMBIGUOUS rows even though
+/// they exist in the db, and `include_ambiguous: true` surfaces them again.
+#[test]
+fn surprise_gates_ambiguous_band_and_every_row_carries_label_and_model() {
+    let db = fresh_db_path("surprise-ambiguous-gate");
+    let conn = gaiafield::open_db(&db).expect("open db");
+    let vault = vault_path();
+    gaiafield::infer(&vault, &conn, &shared_model_dir(), true, false)
+        .expect("infer should succeed");
+
+    let default_result = gaiafield::surprise(&conn, 1000, 0.0, false).expect("surprise query");
+    assert!(
+        !default_result.is_empty(),
+        "expected at least one INFERRED-labeled edge in the default (non-ambiguous) result"
+    );
+    assert!(
+        default_result.iter().all(|r| r.label == "INFERRED"),
+        "default surprise() (include_ambiguous: false) must exclude every AMBIGUOUS row: {default_result:?}"
+    );
+    assert!(
+        default_result
+            .iter()
+            .all(|r| r.model == gaiafield::MODEL_NAME),
+        "every row should carry the model name: {default_result:?}"
+    );
+
+    let with_ambiguous = gaiafield::surprise(&conn, 1000, 0.0, true).expect("surprise query");
+    assert!(
+        with_ambiguous.iter().any(|r| r.label == "AMBIGUOUS"),
+        "include_ambiguous: true should surface AMBIGUOUS rows that exist in the db: \
+         {with_ambiguous:?}"
+    );
+    assert!(
+        with_ambiguous.len() > default_result.len(),
+        "include_ambiguous: true should return strictly more rows than the gated default \
+         (default {}, with_ambiguous {})",
+        default_result.len(),
+        with_ambiguous.len()
+    );
+
+    let _ = std::fs::remove_dir_all(db.parent().unwrap());
+}
+
+/// (v2-d) `infer --reset` restores the exact v1 graph — `nodes`/`edges` after infer-then-reset are
+/// row-for-row identical to a db that was only ever `index`'d, never `infer`'d (contract rule 2:
+/// inference never mutates extraction).
+///
+/// Runs against a private scratch copy of the vault (like the deletion test above), not the
+/// shared `./vault` directly: comparing two independent `index` runs' `mtime` columns would
+/// otherwise be racy against `incremental_reindex_touches_only_the_changed_note`, which
+/// deliberately bumps a real vault file's mtime while tests run in parallel.
+#[test]
+fn infer_reset_restores_exact_v1_graph() {
+    let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+    let scratch = std::env::temp_dir().join(format!(
+        "gaiafield-test-reset-vault-{}-{}",
+        std::process::id(),
+        n
+    ));
+    copy_dir_recursive(&vault_path(), &scratch);
+    let vault = scratch.clone();
+
+    let never_inferred = fresh_db_path("reset-baseline");
+    {
+        let conn = gaiafield::open_db(&never_inferred).expect("open db");
+        gaiafield::index(&vault, &conn, true).expect("index should succeed");
+    }
+
+    let then_reset = fresh_db_path("reset-target");
+    {
+        let conn = gaiafield::open_db(&then_reset).expect("open db");
+        gaiafield::index(&vault, &conn, true).expect("index should succeed");
+        gaiafield::infer(&vault, &conn, &shared_model_dir(), true, false)
+            .expect("infer should succeed");
+        let before_reset: i64 = conn
+            .query_row("SELECT COUNT(*) FROM inferred_edges", [], |r| r.get(0))
+            .unwrap();
+        assert!(
+            before_reset > 0,
+            "sanity: infer should produce inferred edges before the reset"
+        );
+        gaiafield::infer(&vault, &conn, &shared_model_dir(), false, true)
+            .expect("infer --reset should succeed");
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn dump_nodes(db: &Path) -> Vec<(String, String, String, String, String, String, i64, i64)> {
+        let conn = gaiafield::open_db(db).expect("open db");
+        let mut stmt = conn
+            .prepare("SELECT path, title, description, status, kind, tags, mtime, size FROM nodes ORDER BY path")
+            .expect("valid SQL");
+        stmt.query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+                row.get(7)?,
+            ))
+        })
+        .expect("valid query")
+        .filter_map(Result::ok)
+        .collect()
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn dump_edges(db: &Path) -> Vec<(String, Option<String>, String, String, i64, i64)> {
+        let conn = gaiafield::open_db(db).expect("open db");
+        let mut stmt = conn
+            .prepare(
+                "SELECT source, target, raw_target, edge_type, dangling, boundary_violation \
+                 FROM edges ORDER BY source, raw_target, target",
+            )
+            .expect("valid SQL");
+        stmt.query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+            ))
+        })
+        .expect("valid query")
+        .filter_map(Result::ok)
+        .collect()
+    }
+
+    assert_eq!(
+        dump_nodes(&never_inferred),
+        dump_nodes(&then_reset),
+        "nodes table must be row-for-row identical to a never-inferred index after infer --reset"
+    );
+    assert_eq!(
+        dump_edges(&never_inferred),
+        dump_edges(&then_reset),
+        "edges table must be row-for-row identical to a never-inferred index after infer --reset"
+    );
+
+    let post_reset_v2_rows: i64 = {
+        let conn = gaiafield::open_db(&then_reset).expect("open db");
+        conn.query_row("SELECT COUNT(*) FROM inferred_edges", [], |r| r.get(0))
+            .unwrap()
+    };
+    assert_eq!(
+        post_reset_v2_rows, 0,
+        "reset should leave zero inferred edges"
+    );
+
+    let _ = std::fs::remove_dir_all(never_inferred.parent().unwrap());
+    let _ = std::fs::remove_dir_all(then_reset.parent().unwrap());
+    let _ = std::fs::remove_dir_all(&scratch);
+}
+
+/// (v2-e) `neighbors` WITHOUT `--include-inferred` is byte-identical to v1 behavior on a db that
+/// HAS been `infer`'d — the deterministic layer's own CLI output never changes shape just because
+/// inferred edges now exist alongside it (contract rule 4: traversal defaults to deterministic).
+#[test]
+fn neighbors_without_include_inferred_is_byte_identical_on_an_inferred_db() {
+    let vault = vault_path();
+    let note = "Alex-Vega.md";
+
+    let never_inferred = fresh_db_path("byte-identical-baseline");
+    {
+        let conn = gaiafield::open_db(&never_inferred).expect("open db");
+        gaiafield::index(&vault, &conn, true).expect("index should succeed");
+    }
+
+    let inferred_db = fresh_db_path("byte-identical-inferred");
+    {
+        let conn = gaiafield::open_db(&inferred_db).expect("open db");
+        gaiafield::index(&vault, &conn, true).expect("index should succeed");
+        gaiafield::infer(&vault, &conn, &shared_model_dir(), true, false)
+            .expect("infer should succeed");
+    }
+
+    let run = |db: &Path| -> Vec<u8> {
+        Command::new(env!("CARGO_BIN_EXE_gaiafield"))
+            .args(["neighbors", note, "--vault"])
+            .arg(&vault)
+            .args(["--db"])
+            .arg(db)
+            .args(["--depth", "2", "--json"])
+            .output()
+            .expect("failed to run gaiafield neighbors")
+            .stdout
+    };
+
+    let baseline_stdout = run(&never_inferred);
+    let inferred_stdout = run(&inferred_db);
+    assert_eq!(
+        baseline_stdout, inferred_stdout,
+        "neighbors --json without --include-inferred must be byte-identical regardless of \
+         whether the db has inferred edges"
+    );
+
+    let _ = std::fs::remove_dir_all(never_inferred.parent().unwrap());
+    let _ = std::fs::remove_dir_all(inferred_db.parent().unwrap());
+}
+
 /// Bump a file's mtime (and access time) without touching its contents — std has no stable
 /// "touch," so re-write the same bytes back, which updates mtime on every platform this crate
 /// targets without a filetime dependency.

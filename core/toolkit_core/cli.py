@@ -105,6 +105,9 @@ def _render_doctor_text(result: dict) -> str:
             f"dangling={graph.get('dangling_edges')} boundary={graph.get('boundary_violations')}"
             f"{stale_mark}"
         )
+        inference = graph.get("inference")
+        if inference:
+            lines.append(f"  inference: {inference['note']}")
     return "\n".join(lines)
 
 

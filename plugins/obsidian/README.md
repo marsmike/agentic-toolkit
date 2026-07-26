@@ -10,7 +10,7 @@ loop for description quality.
 | Skill | Purpose |
 |---|---|
 | `vault-ops` | Read/create/edit/search notes directly on the filesystem; wikilinks, callouts, properties, `.canvas`/`.base` file formats; the Obsidian desktop CLI as an optional enhancement, never a requirement |
-| `distill` | Process `01_Capture/` into linked, sourced knowledge notes — triage, single-file distill, or conversation-insight filing, all through one search-then-checkpoint-then-write workflow; graph-aware backlink/bridge candidates when a gaiafield binary is available |
+| `distill` | Process `01_Capture/` into linked, sourced knowledge notes — triage, single-file distill, or conversation-insight filing, all through one search-then-checkpoint-then-write workflow; graph-aware backlink/bridge candidates when a gaiafield binary is available, plus report-only inferred candidates when it supports gaiafield v2 |
 | `vault-lint` | Vault health (orphans, stale pages, broken links, Index.md drift) and metadata normalization (frontmatter, tags, source, summaries), audit-only unless `--fix` |
 | `retrieval-verification` | Predict a note's content from title+description alone, score against the real body, flag weak descriptions for rewrite |
 
@@ -111,6 +111,51 @@ internal state" rule forbids — so `links.py`'s own Python scan stays the only
 implementation. `toolkit doctor` (in `core/`) surfaces gaiafield's own dangling-edge count
 separately, as a graph-level cross-check, not a replacement for this check.
 
+### Inferred edges (v2)
+
+gaiafield v2 adds a statistical layer on top of the deterministic graph above: embedding
+similarity between notes, gated by a model-calibrated threshold into `INFERRED` (report
+it) and `AMBIGUOUS` (show only on request) rows (`contract/KNOWLEDGE_API.md`'s v2
+section). `graph.py` adds three consumers, same preference chain and degradation style as
+everything else in this module:
+
+- `ensure_inferred(vault)` — runs `gaiafield infer`, mirroring `ensure_index()`.
+- `inferred_candidates(vault, note, k, include_ambiguous=False)` — statistical candidates
+  for `note`, single-note-shaped rows (`path`/`score`/`label`/...); filters `AMBIGUOUS`
+  rows out client-side by default, rather than trusting the binary's own
+  `--include-ambiguous` handling alone.
+- `surprise_candidates(vault, top, include_ambiguous=False)` — cross-domain leads:
+  inferred edges whose deterministic graph distance is large or spans a different PARA
+  subtree. Rows are **pair-shaped**, not single-note (`a`/`b`, both vault-relative paths,
+  since there's no one "queried note" the way `candidates` has), and — as of gaiafield
+  v2's `surprise` (Fix 2, R5) — every row carries `label`/`model` the same as
+  `candidates`. The CLI spec this consumer was originally built against had neither field
+  and no server-side `--include-ambiguous` at all for `surprise`; the client-side filter
+  below predates that fix and stayed in place as real defense-in-depth once the flag
+  became live, not dead code guarding a no-op.
+
+**Rule 1 binds every caller, without exception: report-only, forever.** No automation —
+this module, the `distill` skill, anything downstream — writes vault content (a link, an
+enrichment, a note) from an inferred edge without explicit human confirmation in that
+session. These functions only ever read gaiafield's output; nothing here writes to the
+vault.
+
+A binary that predates v2 (no `infer` subcommand) degrades the same way an absent binary
+does: `GraphUnavailable("no-inference", ...)`, probed for via a side-effect-free `--help`
+call (`graph._supports_inference()`) rather than discovered by letting a real `infer`
+call fail and crash or wrongly earn a DLQ note. The `distill` skill's phase 1 is the
+consumer (see `skills/distill/references/workflow.md`'s "Inferred candidates" section):
+after the deterministic graph-context step, it fetches inferred candidates for the
+proposed placement's top matches and presents them as a separately labeled, report-only
+block in the Phase 1 handoff — never merged into the deterministic backlink/bridge lists.
+
+`toolkit doctor` (in `core/`) gains an `inference` sub-section under `graph`: model name,
+high/low gates, and inferred/ambiguous edge counts when `gaiafield stats` reports them;
+`"not inferred"` when a v2 binary's index exists but `gaiafield infer` hasn't run yet;
+`"engine lacks inference"` for a v1 binary whose `stats` output has no inference fields at
+all. Same "surfaces, never mutates" character as the rest of doctor — it never runs
+`infer` itself.
+
 ## What changed vs. v1 (`~/Developer/agentic-toolkit/obsidian`)
 
 ### Ported and rewritten
@@ -175,7 +220,7 @@ separately, as a graph-level cross-check, not a replacement for this check.
 
 ## Evals
 
-`evals/run.py` runs six capability evals against `./vault`, emitting JSON
+`evals/run.py` runs seven capability evals against `./vault`, emitting JSON
 `{eval, pass, detail}` per check:
 
 | Eval | Asserts |
@@ -186,6 +231,7 @@ separately, as a graph-level cross-check, not a replacement for this check.
 | `dlq_on_missing_scores` | An incomplete scores map produces a DLQ note under `00_Memory/dlq/` with the expected frontmatter fields, instead of a silently-incomplete report |
 | `search_parity` | When a farsight binary is present, its top-3 results overlap `search.py`'s Python BM25 top-3 for fixed cross-cluster queries; passes with "farsight not present" otherwise |
 | `graph_context` (R3) | A stub binary that exits 1 makes `graph.ensure_index()` degrade to `GraphUnavailable("call-failed")` and write a DLQ note under `00_Memory/dlq/` (runs always); then, when a real gaiafield binary is present, `graph.graph_context()` proposes a correct backlink candidate and a non-empty bridge-opportunity list for a capture planted in the birding cluster — passes with "gaiafield not present" for that second phase otherwise |
+| `inferred_candidates` (v2) | Stub-binary-driven for its first three phases (crates/gaiafield v2 has no release binary as of R3/R4): a v2-shaped stub's inferred candidates come back labeled+separated from deterministic edges, an AMBIGUOUS row is excluded unless explicitly requested (for both `candidates` and pair-shaped `surprise` rows), and neither `ensure_inferred()` nor `inferred_candidates()`/`surprise_candidates()` writes any vault content; a v1-shaped stub (no `infer` subcommand) makes both degrade to `GraphUnavailable("no-inference")` silently, with no DLQ note. A fourth phase runs against a **real** gaiafield binary when `TOOLKIT_GAIAFIELD_BIN` points at a v2-capable one (skips with detail otherwise): asserts `surprise_candidates()` rows are actually pair-shaped and labeled against the real engine, not just the hand-written stub — closing the gap where a stub could silently drift from the real CLI's shape and every stub-driven assertion would still pass |
 
 Read-only evals run directly against the resolved vault; anything that writes runs
 against a throwaway copy (`evals/_sandbox.py`) so the real `./vault` is never touched.

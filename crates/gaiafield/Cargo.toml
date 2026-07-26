@@ -1,6 +1,6 @@
 [package]
 name = "gaiafield"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Deterministic knowledge-graph extraction over an agentic-toolkit vault's wikilinks."
 license = "MIT"
@@ -16,3 +16,17 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
 rusqlite = { version = "0.40", features = ["bundled"] }
+
+# v2 — inferred edges (embedding backend). See README "Embedding backend" section for the full
+# musl cross-compilation story: model2vec-rs + tokenizers/fancy-regex compile zero C/C++ (verified
+# via `cargo build -v` — no `cc`/`g++` invocation), unlike either crate's own default features
+# (`onig`/`fancy-regex` convenience features both drag in `tokenizers/esaxx_fast`, which builds a
+# C++ library). `local-only` drops model2vec-rs's own hf-hub/ureq dependency so this crate owns
+# the download-and-verify path itself (pinned sha256, not hf-hub's cache semantics).
+model2vec-rs = { version = "0.2.1", default-features = false, features = ["local-only"] }
+tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }
+sha2 = "0.10"
+# ureq pulls in rustls+ring (verified: no openssl/native-tls in the dependency tree), the same
+# C/assembly risk class already proven on this workflow's aarch64-unknown-linux-musl target by
+# rusqlite's bundled SQLite (README, "Cross-compilation note").
+ureq = "2"
