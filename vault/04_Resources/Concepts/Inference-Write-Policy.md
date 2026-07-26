@@ -24,9 +24,9 @@ for a human decision, never an input to an autonomous write.
 The reason this is rule 1, not rule 4, is what it prevents: a wrong inferred edge that auto-applied
 wouldn't look wrong. It would render exactly like a correct one, and the automation that applied it
 would signal success — there's no error to catch downstream. `[earned: gaiafield R2 deletion bug,
-2026-07-26 — the deterministic layer already produced one silent-corruption class (see
-[[Deterministic-vs-Inferred-Graph-Edges]]); the statistical layer, which is wrong far more often by
-construction, does not get the chance to produce a second one]`.
+2026-07-26 — the deterministic layer already produced one silent-corruption class (see the
+deterministic-vs-inferred distinction in Related below); the statistical layer, which is wrong far
+more often by construction, does not get the chance to produce a second one]`.
 
 ## Distinct from labeling
 

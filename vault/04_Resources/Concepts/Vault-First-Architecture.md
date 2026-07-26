@@ -35,7 +35,9 @@ too.
 If the vault is the source of truth, nothing downstream is allowed to silently diverge from it —
 generated views (an index, a graph database) must be regenerable from the vault, never edited
 directly themselves. [[Knowledge-Graphs-from-Wikilinks]] and the toolkit's own `Index.md`
-convention both follow from this.
+convention both follow from this. The public [[Docs-Site]] is the same corollary applied to
+publishing: it renders the vault directly rather than maintaining a separate docs source that could
+drift from what the vault actually says.
 
 ## Related
 
@@ -44,4 +46,5 @@ convention both follow from this.
 - [[Filesystem-vs-MCP-for-Agent-Tool-Access]]
 - [[PARA-Method]]
 - [[Frontmatter-as-Floor-Not-Ceiling]]
+- [[Docs-Site]]
 - [[Alex-Vega]]

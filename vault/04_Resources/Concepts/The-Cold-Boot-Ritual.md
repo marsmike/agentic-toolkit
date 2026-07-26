@@ -50,11 +50,23 @@ The `--live` stage goes further than a temp directory for the code: it also uses
 context or plugin state. A cold-boot check that reused the developer's real config would just be
 testing the developer's machine again.
 
+## A sibling ritual: verifying the docs site against reality
+
+Cold-boot verifies the *stranger install* experience; a parallel discipline verifies the *public
+docs* experience — checking the live [[Docs-Site]] against what the running system actually does,
+the same adversarial way cold-boot checks a clean clone against the published repo. Both exist for
+the same reason: a developer's own head is the worst place to notice that a doc drifted from the
+system it describes, because the developer already knows what was meant. `scripts/docscheck.sh`
+carries the mechanically-catchable slice of that verification — plugin-list drift and the
+backtick-in-wikilink-alias class of renderer bug — the same way `scripts/coldboot.sh` carries the
+mechanically-catchable slice of the install-experience check.
+
 ## Related
 
 - [[The-Ratchet]]
 - [[The-Observer-Pattern]]
 - [[Scripting-the-Toolkit-Headless]]
 - [[Vault-First-Architecture]]
+- [[Docs-Site]]
 - [[Quick-Start]]
 - [[Capability-Probing]]
