@@ -2,6 +2,13 @@
 
 Every release entry links the change to the research or the dated failure that motivated it — this file is the public ratchet.
 
+## [2.6.0] — R6, the vault becomes the published documentation
+
+- **Docs site** — `./vault` published to GitHub Pages via Quartz 4 (pinned v4.5.2): wikilinks resolved, backlinks, full-text search, and an interactive graph view — the knowledge-graph toolkit's docs render as an actual knowledge graph. No separate docs tree exists to drift; the vault is the single source. `00_Memory/` and `01_Capture/` are excluded from the published surface.
+- **Docs audit** — every concept/guide note verified against shipped reality (most predated the implementations they describe): Farsight.md no longer claims vector search it doesn't have, Gaiafield.md documents v1+v2 as history with real gates, six new concept notes cover what R1–R5 practiced but never wrote down (the observer pattern, the cold-boot ritual, report-only inference, calibration bias, capability probing, headless scripting). Landing surface rewritten for strangers. Vault: 78 active notes, 829 wikilinks, all planted test invariants intact.
+- **Node-count test made corpus-derived** — gaiafield's planted-structure test now computes the expected count from Index.md instead of hardcoding it; growing the docs is no longer a test-breaking event. [earned: docs-audit R6 2026-07-26 — hardcoded 73 broke at 79]
+- **Pre-publication sweep** — repo made public after a full pass: zero employer references, zero personal identifiers, zero secret patterns; owner name corrected to match the public GitHub profile; the legacy archive noted as private by design.
+
 ## [2.5.0] — R5, inferred edges: the statistical layer, report-only by contract
 
 - **contract/KNOWLEDGE_API.md v2** — two edge kinds, never conflated: `extracted` (deterministic wikilinks) and `inferred` (semantic similarity, labeled INFERRED or AMBIGUOUS). Rule 1 is load-bearing: **report-only, forever** — no automation writes vault content from an inferred edge without human confirmation in-session. Inference is perfectly separable (`infer --reset` provably restores the exact v1 graph), gates are meaningless without their model name, traversal defaults to deterministic.
@@ -56,4 +63,4 @@ lives in the legacy repo.
 - **plugins/obsidian** — the reference plugin, curated from v1 (vendored env dropped): vault operations, distill workflow, lint, and the new retrieval-verification skill.
 - **CI** — path-filtered checks, contract↔example-vault consistency gate, evals gate, gitleaks, release-binaries skeleton.
 
-Prior history lives in [agentic-toolkit-legacy](https://github.com/marsmike/agentic-toolkit-legacy); this repo starts with fresh history by design (see docs/PLAN.md).
+Prior history lives in `agentic-toolkit-legacy` (a private archive — it predates the privacy scrub); this repo starts with fresh history by design (see docs/PLAN.md).

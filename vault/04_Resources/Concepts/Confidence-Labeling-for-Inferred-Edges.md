@@ -33,6 +33,7 @@ one that can only be trusted or not trusted wholesale.
 ## Related
 
 - [[Deterministic-vs-Inferred-Graph-Edges]]
+- [[Inference-Write-Policy|Report-Only Inference]]
 - [[Surprise-Scoring]]
 - [[Knowledge-Graphs-from-Wikilinks]]
 - [[Dead-Letter-Queues-for-Automation]]

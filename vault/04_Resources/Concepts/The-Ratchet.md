@@ -33,6 +33,18 @@ A rule without a stated removal condition tends to outlive the failure it was wr
 rule in this toolkit's own contract states one — see [[Delete-Over-Add-for-Stronger-Models]] for
 the companion argument that stronger models need fewer standing constraints, not more.
 
+## Receipts, not aphorisms
+
+This toolkit's own `CHANGELOG.md` practices the ratchet on itself, one dated `[earned: ...]` tag
+per fix: gaiafield's incremental-deletion corruption case became a re-flag-on-removal rule and a
+regression test (0.1.1); a cross-engine disagreement over root-note scope became farsight's
+matching fix (0.1.1); a statistically broken calibration pass became the self-excluding tightness
+rule in [[Calibration-Bias]]; a `surprise` CLI spec missing `label`/`model` became a binding
+contract clause and a real-binary eval phase, not just a patched stub (see [[Surprise-Scoring]]).
+Every one of these was found by [[The-Observer-Pattern|an independent adversarial review]], not by
+the builder who shipped the original code — the ratchet needs a second party pulling on it to
+actually tighten.
+
 ## Related
 
 - [[The-Graduation-Pattern]]
@@ -42,3 +54,5 @@ the companion argument that stronger models need fewer standing constraints, not
 - [[Dead-Letter-Queues-for-Automation]]
 - [[Open-Source-Maintenance]]
 - [[Anonymized-Failure-Repros]]
+- [[The-Observer-Pattern]]
+- [[Calibration-Bias]]

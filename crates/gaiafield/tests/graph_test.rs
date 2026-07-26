@@ -61,9 +61,20 @@ fn index_recovers_expected_node_count_and_density() {
     );
     let index_json: serde_json::Value =
         serde_json::from_slice(&index_out.stdout).expect("index --json should parse");
+    // Expected node count derives from the corpus itself: one Index.md entry per
+    // active note, plus the root persona note (status: active) which Index.md's
+    // format does not list. Derived, not hardcoded, so vault growth (e.g. new
+    // concept notes) is not a test-breaking event [earned: docs-audit R6
+    // 2026-07-26 — hardcoded 73 broke when the vault grew to 79].
+    let expected_nodes = std::fs::read_to_string(vault.join("Index.md"))
+        .expect("Index.md should exist")
+        .lines()
+        .filter(|l| l.trim_start().starts_with("- "))
+        .count() as u64
+        + 1; // Alex-Vega.md, root-level status: active
     assert_eq!(
-        index_json["total_nodes"], 73,
-        "expected 72 active-content notes (Index.md) + Alex-Vega.md (root, status: active)"
+        index_json["total_nodes"], expected_nodes,
+        "expected Index.md entries + the root persona note"
     );
 
     let stats_out = Command::new(env!("CARGO_BIN_EXE_gaiafield"))
@@ -80,12 +91,12 @@ fn index_recovers_expected_node_count_and_density() {
     );
     let stats_json: serde_json::Value =
         serde_json::from_slice(&stats_out.stdout).expect("stats --json should parse");
-    assert_eq!(stats_json["nodes"], 73);
+    assert_eq!(stats_json["nodes"], expected_nodes);
     assert_eq!(stats_json["dangling_edges"], 1);
     assert_eq!(stats_json["boundary_violations"], 0);
 
     let edges = stats_json["edges"].as_u64().unwrap();
-    let avg = edges as f64 / 73.0;
+    let avg = edges as f64 / expected_nodes as f64;
     assert!(
         (5.0..=15.0).contains(&avg),
         "average resolved out-links per node ({avg:.2}) should be near the vault's ~8-12 target"

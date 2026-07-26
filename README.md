@@ -29,6 +29,25 @@ against the bundled `./vault`, never yours.
 - `crates/` — native engines (Rust), coming in R1+
 - `docs/PLAN.md` — why everything is the way it is, with citations
 
+## Documentation
+
+The site: https://marsmike.github.io/agentic-toolkit (published by
+`.github/workflows/docs.yml` via [Quartz 4](https://github.com/jackyzha0/quartz)
+on every push to `vault/`). The vault **is** the documentation — there's no
+separate docs source to keep in sync, just `./vault` rendered with wikilinks
+resolved, backlinks, full-text search, and a graph view of the whole toolkit's
+knowledge base.
+
+Preview it locally before pushing:
+
+```bash
+git clone --depth 1 --branch v4.5.2 https://github.com/jackyzha0/quartz /tmp/quartz
+cp docs-site/quartz.config.ts docs-site/quartz.layout.ts /tmp/quartz/
+rsync -a vault/ /tmp/quartz/content/ --exclude '00_Memory/' --exclude '01_Capture/' --exclude '.gaiafield/'
+cp /tmp/quartz/content/Index.md /tmp/quartz/content/index.md
+cd /tmp/quartz && npm i && npx quartz build --serve
+```
+
 ## Scripting the toolkit (headless)
 
 The plugins' skills shell out to scripts and engine binaries, so a headless

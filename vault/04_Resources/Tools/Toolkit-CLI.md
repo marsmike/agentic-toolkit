@@ -19,8 +19,15 @@ tags:
   the PARA folders, `Templates/`, and a `CLAUDE.md` copied from `contract/templates/VAULT_CLAUDE.md`.
   Defaults to `./vault` when no path is given.
 - **`toolkit doctor`** — reports which vault is active and how it was resolved (env var vs.
-  fallback), profile completeness per plugin, and surfaces any dead-letter entries waiting for
-  review. See [[Dead-Letter-Queues-for-Automation]].
+  fallback), PARA folder/note counts, frontmatter parse errors, profile completeness per plugin,
+  and surfaces any dead-letter entries waiting for review (see
+  [[Dead-Letter-Queues-for-Automation]]). Since R3 it also reports a graph section — node/edge/
+  dangling/boundary counts and index freshness when a [[Gaiafield]] binary and database are
+  present, `"gaiafield not present"` otherwise — and since R5 (v2), an `inference` sub-section
+  nested under it: model name, high/low gates, and inferred/ambiguous edge counts once `gaiafield
+  infer` has run, distinguishing a v1 binary ("engine lacks inference") from a v2 binary that just
+  hasn't been inferred yet ("not inferred") via [[Capability-Probing]] rather than a version
+  string. Doctor only ever reports this state — it never runs `index` or `infer` itself.
 - **`toolkit profile`** — inspects a plugin's resolved profile: which of env var, vault note, or
   shipped default supplied each setting. See [[Fill-From-Obsidian-Profiles]].
 
@@ -39,3 +46,5 @@ touched by CI.
 - [[Quick-Start]]
 - [[Using-Your-Own-Vault]]
 - [[Troubleshooting-Toolkit-Doctor]]
+- [[Gaiafield]]
+- [[Capability-Probing]]

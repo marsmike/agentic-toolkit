@@ -40,4 +40,5 @@ decision, don't silently pick one.
 - [[Dead-Letter-Queues-for-Automation]]
 - [[Confidence-Labeling-for-Inferred-Edges]]
 - [[The-Ratchet]]
+- [[The-Observer-Pattern]]
 - [[Open-Source-Maintenance]]

@@ -1,0 +1,115 @@
+name: Docs
+
+# Publishes ./vault as a static site via Quartz 4 (jackyzha0/quartz) — the
+# vault IS the documentation, this workflow just builds it. See docs-site/
+# for the two config files copied into quartz at build time, and
+# 04_Resources/Guides/ (in the vault itself) for the PARA schema being
+# rendered.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "vault/**"
+      - "docs-site/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time; never cancel one mid-flight in favor
+# of a newer push landing while it's still running a build.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout agentic-toolkit
+        uses: actions/checkout@v7
+        with:
+          path: repo
+
+      # Pinned to a specific Quartz 4 release tag, not a branch: quartz's
+      # main branch ships breaking layout/config changes between releases,
+      # and this workflow copies our config files over quartz's own, so an
+      # unpinned checkout could silently break the build on quartz's schedule
+      # rather than ours. v5.0.0 exists upstream but the toolkit standardizes
+      # on the Quartz 4 line (see docs/PLAN.md); v4.5.2 is the latest v4
+      # release as of writing. Bump deliberately, not automatically.
+      - name: Checkout Quartz 4 (pinned release)
+        uses: actions/checkout@v7
+        with:
+          repository: jackyzha0/quartz
+          ref: v4.5.2
+          path: quartz
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: quartz/package-lock.json
+
+      - name: Apply agentic-toolkit's Quartz config
+        run: |
+          cp repo/docs-site/quartz.config.ts quartz/quartz.config.ts
+          cp repo/docs-site/quartz.layout.ts quartz/quartz.layout.ts
+          if [ -f repo/docs-site/custom.scss ]; then
+            cp repo/docs-site/custom.scss quartz/quartz/styles/custom.scss
+          fi
+
+      # Publish everything except:
+      #   - 00_Memory/  — agent self-memory (journal, DLQ); not public docs surface
+      #   - 01_Capture/ — raw inbox; not-yet-distilled, not public docs surface
+      #   - .gaiafield/ — local graph-engine cache (SQLite binary), not a doc
+      # Config/ is deliberately INCLUDED: it holds the toolkit profile
+      # examples (Config/toolkit/*.md), and active vault notes wikilink into
+      # it (e.g. 04_Resources/Guides/Profiles-and-Config.md ->
+      # [[Config/toolkit/obsidian.md]]) — excluding it would turn those into
+      # broken links on the site.
+      - name: Copy vault into Quartz content
+        run: |
+          rm -rf quartz/content
+          mkdir -p quartz/content
+          rsync -a repo/vault/ quartz/content/ \
+            --exclude '00_Memory/' \
+            --exclude '01_Capture/' \
+            --exclude '.gaiafield/'
+          # Quartz's homepage requires a page at the exact slug "index"; the
+          # vault follows Obsidian's own convention of capitalizing it
+          # (Index.md). Add a lowercase copy so "/" resolves, without
+          # renaming the original — a note already wikilinks
+          # [[Index.md|Index]], which depends on the "Index" slug existing.
+          cp quartz/content/Index.md quartz/content/index.md
+
+      - name: Install Quartz dependencies
+        working-directory: quartz
+        run: npm ci
+
+      - name: Build site
+        working-directory: quartz
+        run: npx quartz build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: quartz/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

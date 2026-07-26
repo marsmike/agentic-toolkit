@@ -44,3 +44,5 @@ passed.
 - [[The-Distill-Workflow]]
 - [[Using-Your-Own-Vault]]
 - [[Profiles-and-Config]]
+- [[Scripting-the-Toolkit-Headless]]
+- [[The-Cold-Boot-Ritual]]

@@ -40,6 +40,7 @@ automation run rather than to a whole class of hooks.
 - [[Judgment-Calls-vs-Deterministic-Failures]]
 - [[The-Ratchet]]
 - [[The-Graduation-Pattern]]
+- [[Capability-Probing]]
 - [[Toolkit-Maintenance]]
 - [[Open-Source-Maintenance]]
 - [[Two-Phase-Distillation]]

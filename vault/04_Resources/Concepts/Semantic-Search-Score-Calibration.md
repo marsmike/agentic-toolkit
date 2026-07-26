@@ -39,4 +39,5 @@ thresholds tuned for a different model's score distribution.
 - [[Enrichment-Levels]]
 - [[Fill-From-Obsidian-Profiles]]
 - [[Hybrid-Retrieval]]
+- [[Calibration-Bias]]
 - [[Toolkit-Maintenance]]

@@ -24,9 +24,16 @@ concept spread across several notes).
 ## Fusing rather than choosing
 
 Hybrid retrieval runs both and fuses the ranked results — reciprocal rank fusion is the common
-choice — rather than trying to pick the single better method per query. [[Farsight]] is this
-toolkit's implementation: BM25 plus dense vectors over vault notes and PDF chunks, one engine, one
-query interface.
+choice — rather than trying to pick the single better method per query.
+
+**What's actually shipped today is Python, not Rust.** [[Farsight]] — the toolkit's native search
+engine — is BM25-only as of its 0.1.1 release: no vector half, no PDF-chunk support. The one place
+hybrid fusion genuinely exists right now is `plugins/obsidian/scripts/search.py`'s optional
+`[semantic]` extra (`sentence-transformers` + `numpy`): a cosine-similarity layer on top of its own
+BM25 ranking, degrading cleanly to keyword-only when the extra isn't installed. Farsight is where
+this is *headed* — one engine, one query interface, over vault notes and PDF chunks — not where it
+is; see [[Farsight]] for the R1 scope and why the vector half was deferred rather than shipped
+first.
 
 ## Where it still falls short
 
