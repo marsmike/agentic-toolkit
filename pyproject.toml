@@ -3,6 +3,13 @@ name = "agentic-toolkit-workspace"
 version = "2.0.0"
 description = "Workspace root — see core/ for the toolkit package."
 requires-python = ">=3.11"
+# Root depends on toolkit-core so a cold `uv run toolkit ...` works without
+# an explicit --all-packages sync [earned: cold-boot test 2026-07-26 — README
+# quick start failed on a fresh clone with "Failed to spawn: toolkit"].
+dependencies = ["toolkit-core"]
+
+[tool.uv.sources]
+toolkit-core = { workspace = true }
 
 [tool.uv.workspace]
 members = ["core"]
