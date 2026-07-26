@@ -2,7 +2,7 @@
   "name": "agentic-toolkit",
   "metadata": {
     "description": "Vault-first Claude Code toolkit: a curated set of plugins over an Obsidian knowledge base, with contracts, evals, and native engines.",
-    "version": "2.3.0"
+    "version": "2.4.0"
   },
   "owner": {
     "name": "Mike Muehlberger",
@@ -14,6 +14,18 @@
       "source": "./plugins/obsidian",
       "version": "2.3.0",
       "description": "Vault interface: CLI operations, search, graph-aware distill, and retrieval-verification maintenance — the reference implementation of the vault contract."
+    },
+    {
+      "name": "readwise",
+      "source": "./plugins/readwise",
+      "version": "2.4.0",
+      "description": "Readwise ingestion for the vault contract: pulls Reader/Classic highlights into origin-prefixed 01_Capture/ notes, with optional GitHub/YouTube enrichment, a daily digest, and pipeline status."
+    },
+    {
+      "name": "memory",
+      "source": "./plugins/memory",
+      "version": "2.4.0",
+      "description": "Session-end capture and on-demand distillation into vault memory: archives session records to 00_Memory/sessions/ via a hook, then distills durable notes to 00_Memory/notes/ via a two-phase-review skill."
     }
   ]
 }

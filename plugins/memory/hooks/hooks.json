@@ -1,0 +1,17 @@
+{
+  "description": "Memory plugin: archives a lightweight session record into $VAULT/00_Memory/sessions/ at session end. Silent no-op with no vault configured; failures land in 00_Memory/dlq/ instead of erroring.",
+  "hooks": {
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-end.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

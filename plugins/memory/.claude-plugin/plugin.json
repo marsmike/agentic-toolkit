@@ -1,0 +1,17 @@
+{
+  "name": "memory",
+  "version": "2.4.0",
+  "description": "Session-end capture and on-demand distillation into vault memory: archives session records to 00_Memory/sessions/ via a hook, then distills durable notes to 00_Memory/notes/ via a two-phase-review skill.",
+  "author": {
+    "name": "agentic-toolkit contributors"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/marsmike/agentic-toolkit",
+  "keywords": [
+    "memory",
+    "self-memory",
+    "session-capture",
+    "distillation",
+    "vault"
+  ]
+}

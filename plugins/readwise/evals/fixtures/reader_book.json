@@ -1,0 +1,24 @@
+{
+  "book": {
+    "title": "Thinking in Systems",
+    "author": "Donella Meadows",
+    "source_url": "https://readwise.io/bookreview/12345"
+  },
+  "highlights": [
+    {
+      "text": "A system is a set of things interconnected in a pattern that produces its own behavior over time.",
+      "location": 42,
+      "note": ""
+    },
+    {
+      "text": "The behavior of a system cannot be known just by knowing the elements of which the system is made.",
+      "location": 108,
+      "note": "Emergence, not enumeration."
+    },
+    {
+      "text": "Systems can be discovered, but not invented.",
+      "location": 233,
+      "note": ""
+    }
+  ]
+}

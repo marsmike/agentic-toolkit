@@ -1,0 +1,17 @@
+{
+  "name": "readwise",
+  "version": "2.4.0",
+  "description": "Readwise ingestion for the vault contract: pulls Reader/Classic highlights into origin-prefixed 01_Capture/ notes, with optional GitHub/YouTube enrichment, a daily digest, and pipeline status.",
+  "author": {
+    "name": "agentic-toolkit contributors"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/marsmike/agentic-toolkit",
+  "keywords": [
+    "readwise",
+    "obsidian",
+    "knowledge-management",
+    "highlights",
+    "ingestion"
+  ]
+}

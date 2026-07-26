@@ -1,0 +1,11 @@
+[project]
+name = "readwise-plugin-scripts"
+version = "2.3.0"
+description = "Standalone scripts for the readwise plugin — no vendored env, run via `uv run`."
+requires-python = ">=3.11"
+dependencies = [
+  "pyyaml>=6",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -1,0 +1,11 @@
+{
+  "id": "01fixture0000000000000001",
+  "category": "article",
+  "title": "Hybrid Retrieval Beats Either Alone",
+  "author": "someresearcher",
+  "source_url": "https://example.com/hybrid-retrieval-beats-either-alone",
+  "summary": "Argues BM25+vector fusion outperforms either retrieval method used alone.",
+  "saved_at": "2026-07-20T10:00:00Z",
+  "notes": "",
+  "html_content": "<p>Fixture body: teams converging on reciprocal rank fusion of BM25 and dense vectors.</p>"
+}
