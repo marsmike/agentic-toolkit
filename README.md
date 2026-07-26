@@ -29,6 +29,23 @@ against the bundled `./vault`, never yours.
 - `crates/` — native engines (Rust), coming in R1+
 - `docs/PLAN.md` — why everything is the way it is, with citations
 
+## Scripting the toolkit (headless)
+
+The plugins' skills shell out to scripts and engine binaries, so a headless
+`claude -p` session needs explicit tool grants — the default permission mode
+will block execution and the skills will (correctly) fall back to
+filesystem-only analysis:
+
+```bash
+claude -p --allowedTools "Bash(uv run:*),Bash(uv:*),Bash(env:*),Bash(python3:*)" "..."
+```
+
+Note: `--allowedTools` takes **one comma-separated argument**, and `Bash(env:*)`
+is required because skills compose `env VAR=... uv run ...` command lines.
+`scripts/coldboot.sh` runs the full stranger-experience check (clone → doctor →
+released binaries → optional live headless session in an isolated
+`CLAUDE_CONFIG_DIR`) — run it before every release.
+
 ## Principles
 
 Every rule traces to a dated failure. Every plugin declares where its failures
