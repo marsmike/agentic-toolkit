@@ -15,7 +15,7 @@ toolkit-core = { workspace = true }
 members = ["core"]
 
 [dependency-groups]
-dev = ["ruff>=0.16.0", "pytest>=9.1.1"]
+dev = ["ruff>=0.16.1", "pytest>=9.1.1"]
 
 # Pinned ruleset so local and CI lint agree regardless of user-level ruff config.
 [tool.ruff]
