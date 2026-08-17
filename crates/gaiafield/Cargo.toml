@@ -24,9 +24,9 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 # C++ library). `local-only` drops model2vec-rs's own hf-hub/ureq dependency so this crate owns
 # the download-and-verify path itself (pinned sha256, not hf-hub's cache semantics).
 model2vec-rs = { version = "0.2.1", default-features = false, features = ["local-only"] }
-tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }
-sha2 = "0.10"
+tokenizers = { version = "0.23", default-features = false, features = ["fancy-regex"] }
+sha2 = "0.11"
 # ureq pulls in rustls+ring (verified: no openssl/native-tls in the dependency tree), the same
 # C/assembly risk class already proven on this workflow's aarch64-unknown-linux-musl target by
 # rusqlite's bundled SQLite (README, "Cross-compilation note").
-ureq = "2"
+ureq = "3"
