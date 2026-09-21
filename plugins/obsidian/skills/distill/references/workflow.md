@@ -118,6 +118,15 @@ inferred = graph.inferred_candidates(vault, top_matches[0], k=5)  # not GraphUna
 - If `inferred` comes back as `GraphUnavailable("no-inference", ...)`: the binary predates
   gaiafield v2 — say so in one line, same as the `"no-binary"` case, and move on; this is
   a normal, silent degradation, not an error.
+- **Adjudication (if a judgment backend is available):** pass the rows through
+  `graph.adjudicate_candidates(vault, rows, note=...)`, or run
+  `scripts/link_judge.py --note <path>`. Each row gains an advisory `adjudication`:
+  `p` (would a link between the two help a reader), a `LIKELY-LINK` / `UNDECIDED` /
+  `LIKELY-NOISE` label, and `p_same_mechanism` (a stricter, low-running number to read as
+  a ranking). gaiafield's own score, label and order are untouched, the block stays
+  report-only, and an `AMBIGUOUS` row is still shown only when the human asked for that
+  band. Present `LIKELY-LINK` rows first; never drop a row because of its adjudication.
+  `GraphUnavailable("no-judgment")` is the normal no-key state: say nothing and move on.
 - **Surprise candidates** (`graph.surprise_candidates(vault, top=10)`) are cross-domain
   leads — mention them as an optional extra the human can request ("want me to check for
   cross-domain surprise candidates too?"), never run or presented unprompted.
@@ -234,7 +243,8 @@ Write/update a `README.md` manifest in that folder naming the batch and where ea
 distilled output landed — this doubles as the run summary (step 11).
 
 **Delete instead** only for duplicates, empty stubs, or explicit user instruction:
-`rm "$capture_path"`.
+`trash "$capture_path"` when a `trash` command is on PATH (recoverable, and the only form a
+vault with a delete-guard hook allows), otherwise `rm "$capture_path"`.
 
 Either way, the capture must leave `01_Capture/` — an inbox is ephemeral, and anything
 left behind gets reprocessed on the next triage pass.
@@ -272,8 +282,8 @@ uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scri
    candidate: discarding always needs the human.
 3. Preview each with `Read` to assess relevance.
 4. Categorize: **distill** (run the full workflow above) / **quick file** (move to a
-   PARA folder with minimal frontmatter, no full distillation) / **discard** (`rm`, for
-   outdated or low-value material).
+   PARA folder with minimal frontmatter, no full distillation) / **discard** (`trash` if on PATH,
+   else `rm`; for outdated or low-value material).
 
 ## Insight mode
 

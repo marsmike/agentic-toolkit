@@ -205,7 +205,7 @@ def _live_phase(dj, sandbox: Path, saved_env: dict, problems: list[str]) -> str:
     os.environ[KEY_ENVS[0]] = key
     golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
     golden["rows"] = [r for r in golden["rows"] if r.get("expect") is not None]
-    run = dj.run_golden(golden, sandbox, top=8, exclude=[])
+    run = dj.run_golden(golden, sandbox, top=8, exclude=[], base=GOLDEN.parent.parent)
     report = dj.calibrate(golden, run["raw"], run["usages"][0]["backend"], show_holdout=True)
     n = sum(f["n"] for split in report["splits"].values() for f in split.values())
     agree = sum(f["agree"] for split in report["splits"].values() for f in split.values())

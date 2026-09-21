@@ -33,11 +33,11 @@ from typing import Any
 import judge
 from judge import Answer, JudgmentFailed, JudgmentUnavailable, Question
 from judgments import questions as Q
+from judgments.state import domain_glosses, note_payload
 from search import search
 from vault_utils import discover_notes, read_frontmatter, require_vault, write_dlq_note
 
 CAPTURE_CHARS = 6000
-NOTE_CHARS = 1500
 BATCH_CAPTURE_CHARS = 2000
 MAX_BATCH = 12  # 12 captures -> 132 directed pairs in one request
 QUERY_BODY_CHARS = 400
@@ -89,17 +89,6 @@ def read_capture(path: Path) -> dict[str, Any]:
     }
 
 
-def _note_payload(path: Path, vault: Path) -> dict[str, Any]:
-    fm, body = read_frontmatter(path)
-    return {
-        "title": path.stem,
-        "path": path.relative_to(vault).as_posix(),
-        "description": str(fm.get("description") or ""),
-        "source": str(fm.get("source") or ""),
-        "body_head": body.strip()[:NOTE_CHARS],
-    }
-
-
 def url_hits(capture: dict, vault: Path, exclude: list[str]) -> dict[str, str]:
     """workflow.md step 2, in Python: {note rel path: "frontmatter" | "body"} for every
     active note that mentions one of the capture's URLs."""
@@ -143,7 +132,7 @@ def candidates(capture: dict, vault: Path, top: int, exclude: list[str], force: 
         path = vault / rel
         if _excluded(rel, exclude) or not path.is_file():
             continue
-        out.append({**_note_payload(path, vault), **extra, "url_hit": hits.get(rel)})
+        out.append({**note_payload(path, vault), **extra, "url_hit": hits.get(rel)})
     meta = {"score_gate": found.get("score_gate"), "note": found.get("note", "")}
     return out, meta
 
@@ -162,12 +151,12 @@ def build_request(capture: dict, notes: list[dict], vault: Path) -> tuple[dict, 
         "vault_map": Q.VAULT_MAP,
         "projects": _subfolders(vault, "02_Projects"),
         "areas": _subfolders(vault, "03_Areas"),
-        "domains": Q.DOMAIN_GLOSS,
+        "domains": domain_glosses(vault, Q.DOMAIN_GLOSS),
         "notes": {nid: {k: n[k] for k in ("title", "path", "description", "source", "body_head")} for nid, n in note_ids.items()},
     }
     questions: dict[str, Question] = {"triage": Q.triage(), "para": Q.para(), "concept_vs_root": Q.concept_vs_root()}
     stable = {"triage": "triage", "para": "para", "concept_vs_root": "concept_vs_root"}
-    for name in Q.DOMAIN_GLOSS:
+    for name in state["domains"]:
         questions[f"dom_{name}"] = Q.domain(name)
         stable[f"dom_{name}"] = f"dom|{name}"
     for nid, n in note_ids.items():
@@ -217,7 +206,7 @@ def apply_policy(notes: list[dict], answers: dict[str, Answer], t: dict[str, flo
         mode = "new-note"
 
     domains = sorted(
-        ((name, answers[f"dom_{name}"].p) for name in Q.DOMAIN_GLOSS if f"dom_{name}" in answers), key=lambda kv: -kv[1],
+        ((qid[4:], a.p) for qid, a in answers.items() if qid.startswith("dom_")), key=lambda kv: -kv[1],
     )
     picked = [(n, p) for n, p in domains if p >= t["T_DOMAIN"]][:3]
 
@@ -264,7 +253,8 @@ def thresholds(backend: str) -> dict[str, float]:
 # ---------------------------------------------------------------------------
 
 
-def judge_batch(paths: list[Path], vault: Path) -> dict[str, Any]:
+def judge_batch(paths: list[Path], vault: Path, refs: list[str] | None = None) -> dict[str, Any]:
+    """`refs` name the captures in the output (default: file names); golden files pass their own."""
     ids = {f"C{i:02d}": p for i, p in enumerate(paths[:MAX_BATCH], start=1)}
     state = {"captures": {}}
     for cid, p in ids.items():
@@ -274,7 +264,7 @@ def judge_batch(paths: list[Path], vault: Path) -> dict[str, Any]:
     answers, usage = judge.judge(vault, state, questions)
     t = thresholds(usage.backend)
     pairs, raw = [], {}
-    names = {cid: p.name for cid, p in ids.items()}
+    names = {cid: (refs[i] if refs else p.name) for i, (cid, p) in enumerate(ids.items())}
     for a, b in permutations(ids, 2):
         if f"adds_{a}_{b}" in answers:
             raw[f"adds|{names[a]}|{names[b]}"] = round(answers[f"adds_{a}_{b}"].p, 4)
@@ -303,8 +293,18 @@ def _decide(key: str, value: Any, t: dict[str, float]) -> Any:
     return value >= cut
 
 
-def run_golden(golden: dict, vault: Path, top: int, exclude: list[str]) -> dict[str, Any]:
-    """Ask the backend everything the golden file labels and collect raw answers per capture."""
+def _resolve_capture(ref: str, vault: Path, base: Path | None) -> Path:
+    """A golden row names a capture in the vault (`01_Capture/X.md`, or a bare file name
+    under 01_Capture) or a fixture next to the golden file (`fixtures/captures/X.md`)."""
+    for candidate in (vault / ref, vault / "01_Capture" / ref, *([base / ref] if base else [])):
+        if candidate.is_file():
+            return candidate
+    raise SystemExit(f"golden file names a capture that does not exist: {ref}")
+
+
+def run_golden(golden: dict, vault: Path, top: int, exclude: list[str], base: Path | None = None) -> dict[str, Any]:
+    """Ask the backend everything the golden file labels and collect raw answers per capture.
+    `base` is the directory fixture paths are relative to (the evals/ directory)."""
     rows = golden["rows"]
     by_capture: dict[str, list[dict]] = {}
     for row in rows:
@@ -315,12 +315,12 @@ def run_golden(golden: dict, vault: Path, top: int, exclude: list[str]) -> dict[
         if capture == "*batch*":
             continue
         force = sorted({r["qid"].split("|", 1)[1] for r in crows if r["qid"].split("|", 1)[0] in ("rel", "relation", "covers")})
-        block = judge_capture(vault / capture, vault, top, exclude, force)
+        block = judge_capture(_resolve_capture(capture, vault, base), vault, top, exclude, force)
         raw[capture] = block["answers"]
         usages.append(block["judgment"])
     if "*batch*" in by_capture:
-        names = sorted({n for r in by_capture["*batch*"] for n in r["qid"].split("|")[1:]})
-        batch = judge_batch([vault / "01_Capture" / n for n in names], vault)
+        refs = sorted({n for r in by_capture["*batch*"] for n in r["qid"].split("|")[1:]})
+        batch = judge_batch([_resolve_capture(n, vault, base) for n in refs], vault, refs)
         raw["*batch*"] = batch["answers"]
         usages.append(batch["judgment"])
     return {"raw": raw, "usages": usages}
@@ -450,8 +450,10 @@ def main() -> int:
 
     try:
         if args.calibrate:
-            golden = json.loads(Path(args.calibrate).read_text(encoding="utf-8"))
-            run = run_golden(golden, vault, args.top, args.exclude)
+            golden_path = Path(args.calibrate).resolve()
+            golden = json.loads(golden_path.read_text(encoding="utf-8"))
+            golden["rows"] = [r for r in golden["rows"] if r.get("expect") is not None]
+            run = run_golden(golden, vault, args.top, args.exclude, base=golden_path.parent.parent)
             backend = run["usages"][0]["backend"] if run["usages"] else judge.load_config(vault)["backend"]
             report = calibrate(golden, run["raw"], backend, args.show_holdout)
             report["usd"] = round(sum(u["usd"] for u in run["usages"]), 6)

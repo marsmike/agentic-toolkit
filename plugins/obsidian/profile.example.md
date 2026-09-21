@@ -48,6 +48,11 @@ order (env var → this note → shipped default).
   sends nothing, and distill runs exactly as before. Thresholds are deliberately not profile
   keys: they are policy, live in `distill_judge.py` per backend, and move only after a
   calibration run (`judgment-calibration` skill).
+- **`domains`** (optional, not set above) — your vault's own domain taxonomy, as a mapping of
+  name to a one-line meaning (`ai-ml: "machine learning and language models themselves"`), or a
+  plain list of names. Names are the part after `domain/`. When set, it replaces the starter
+  taxonomy in `checks/tags.py` for the tag audit, the LLM tag classifier and the judgment
+  questions alike. The one-line meanings matter: they are what a judgment backend reads.
 - **`enrichment_targets`** — vault-relative note names (as wikilinks) that `distill` treats as
   mandatory enrichment candidates regardless of semantic score, e.g. a personal profile note that
   should always learn about new maintenance-relevant material.

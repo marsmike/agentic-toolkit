@@ -32,6 +32,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import judge
+from judgments import questions as Q
+from judgments.state import note_payload
 from vault_utils import write_dlq_note
 
 GAIAFIELD_BIN_ENV = "TOOLKIT_GAIAFIELD_BIN"
@@ -51,6 +54,8 @@ class GraphUnavailable:
       "call-failed" — the binary was invoked and it (or the parse of its output) failed.
                       Abnormal — the caller that detected it has already written a DLQ
                       note under `00_Memory/dlq/` before returning this.
+      "no-judgment"  — adjudicate_candidates() only: no typed-judgment backend or key
+                       (normal pre-adoption state, silent)
       "no-inference" — binary present and index present, but it predates gaiafield v2
                       (no `infer` subcommand). Normal for any binary built before R5;
                       never logged, same as "no-binary"/"no-index".
@@ -414,3 +419,120 @@ def surprise_candidates(
     if include_ambiguous:
         return result
     return [row for row in result if row.get("label") != "AMBIGUOUS"]
+
+
+# ---------------------------------------------------------------------------
+# Adjudication — a typed judgment per suggested pair (advisory, report-only)
+# ---------------------------------------------------------------------------
+
+MAX_PAIRS_PER_REQUEST = 40
+ADJUDICATION_CHARS = 1200
+
+# Policy per judgment backend, so it lives here and not in question text (contract/ROUTING.md,
+# "Typed-judgment models"). Two numbers per pair: `link` (would a link help a reader; runs on
+# the scale of the vault's own hand-made links, mean 0.75) and `mech` (same underlying idea; the
+# better ranker, AUC 0.95 against blind labels where gaiafield's cosine reaches 0.75, but on a
+# compressed scale where real matches sit at 0.10-0.30). `mech` therefore only counts once
+# `link` clears a floor. Priors, 2026-09-22, jev-1.13, fitted in-sample on 105 labelled pairs of
+# the bundled vault: 11 of 70 gaiafield suggestions read LIKELY-LINK (8 real, base rate 16%),
+# 16 read LIKELY-NOISE (0 real), 0 of 15 unlinked cross-cluster pairs read LIKELY-LINK.
+# Recalibrate on any other vault before trusting the labels; the ranking transfers, the cuts may not.
+LINK_POLICY: dict[str, dict[str, float]] = {
+    "jev": {"link_high": 0.70, "mech_high": 0.15, "link_floor": 0.35, "link_low": 0.30, "mech_low": 0.10},
+}
+
+
+def _link_label(link: float, mech: float | None, policy: dict[str, float]) -> str:
+    mech = 0.0 if mech is None else mech
+    if link >= policy["link_high"] or (mech >= policy["mech_high"] and link >= policy["link_floor"]):
+        return "LIKELY-LINK"
+    if link <= policy["link_low"] and mech < policy["mech_low"]:
+        return "LIKELY-NOISE"
+    return "UNDECIDED"
+
+
+def _pair_of(row: dict, note: str | None) -> tuple[str, str] | None:
+    """`surprise` rows are pair-shaped (a/b); `candidates` rows carry one `path` and are
+    relative to the note they were asked for."""
+    if "a" in row and "b" in row:
+        return row["a"], row["b"]
+    if note and "path" in row:
+        return note, row["path"]
+    return None
+
+
+def adjudicate_pairs(vault: Path, pairs: list[tuple[str, str]]) -> tuple[list[dict], dict]:
+    """P(a link between them would help a reader) for each (a, b) of vault-relative note paths.
+
+    Returns (adjudications aligned with `pairs`, usage). An entry is None where a note is
+    missing or the backend skipped the question. Raises judge.JudgmentUnavailable /
+    judge.JudgmentFailed like judge.judge(); callers decide how to degrade.
+    """
+    results: list[dict | None] = [None] * len(pairs)
+    usage_total = {"backend": "", "model": "", "requests": 0, "input_tokens": 0, "usd": 0.0}
+    cache: dict[str, dict] = {}
+
+    def payload(rel: str) -> dict | None:
+        if rel not in cache and (vault / rel).is_file():
+            cache[rel] = note_payload(vault / rel, vault, ADJUDICATION_CHARS)
+        return cache.get(rel)
+
+    for start in range(0, len(pairs), MAX_PAIRS_PER_REQUEST):
+        state, questions, index = {"pairs": {}}, {}, {}
+        for offset, (a, b) in enumerate(pairs[start:start + MAX_PAIRS_PER_REQUEST]):
+            pa, pb = payload(a), payload(b)
+            if pa is None or pb is None:
+                continue
+            pid = f"P{offset + 1:02d}"
+            state["pairs"][pid] = {"a": pa, "b": pb}
+            questions[f"link_{pid}"] = Q.should_link(pid)
+            questions[f"mech_{pid}"] = Q.same_mechanism(pid)
+            index[pid] = start + offset
+        if not questions:
+            continue
+        answers, usage = judge.judge(vault, state, questions)
+        policy = LINK_POLICY[usage.backend]
+        for pid, position in index.items():
+            link, mech = answers.get(f"link_{pid}"), answers.get(f"mech_{pid}")
+            if link is None:
+                continue
+            label = _link_label(link.p, mech.p if mech else None, policy)
+            results[position] = {"p": round(link.p, 3), "label": label,
+                                 "p_same_mechanism": round(mech.p, 3) if mech else None,
+                                 "backend": usage.backend, "model": usage.model, "questions_version": Q.QUESTIONS_VERSION}
+        usage_total["backend"], usage_total["model"] = usage.backend, usage.model
+        for key in ("requests", "input_tokens", "usd"):
+            usage_total[key] += getattr(usage, key)
+    usage_total["usd"] = round(usage_total["usd"], 6)
+    return results, usage_total
+
+
+def adjudicate_candidates(vault: Path, rows: list[dict], note: str | None = None) -> list[dict] | GraphUnavailable:
+    """Attach an advisory `adjudication` to rows from inferred_candidates()/surprise_candidates().
+
+    gaiafield's own `score`, `label` and order are never changed, and the contract is
+    unchanged too: the rows stay report-only, AMBIGUOUS rows are still fetched only when a
+    human asked for them. The adjudication helps that human; it is not a gate. No judgment
+    backend is a normal, silent degradation (`GraphUnavailable("no-judgment")`).
+    """
+    pairs = [_pair_of(row, note) for row in rows]
+    wanted = [(i, pair) for i, pair in enumerate(pairs) if pair is not None]
+    if not wanted:
+        return [dict(row) for row in rows]
+    try:
+        verdicts, _usage = adjudicate_pairs(vault, [pair for _, pair in wanted])
+    except judge.JudgmentUnavailable as e:
+        return GraphUnavailable("no-judgment", e.reason)
+    except judge.JudgmentFailed as e:
+        write_dlq_note(
+            vault, slug="link-adjudication-failed", title="typed-judgment backend answered nothing",
+            what_happened=f"`graph.adjudicate_candidates` reached a configured judgment backend but every request failed: {e}",
+            why_recorded="A configured backend that fails is not the normal 'no backend' degrade path; the inferred "
+                         "candidates were reported without adjudication and someone should check the key or endpoint.",
+            confidence="low",
+        )
+        return GraphUnavailable("call-failed", str(e))
+    out = [dict(row) for row in rows]
+    for (i, _), verdict in zip(wanted, verdicts, strict=True):
+        out[i]["adjudication"] = verdict
+    return out

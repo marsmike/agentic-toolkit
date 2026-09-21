@@ -28,6 +28,7 @@ EVAL_MODULES = (
     "eval_graph_context",
     "eval_inferred_candidates",
     "eval_distill_judge",
+    "eval_link_adjudication",
 )
 
 

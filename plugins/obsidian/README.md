@@ -47,6 +47,11 @@ pairwise uniqueness across a batch. It writes nothing to the vault. Wording live
 `scripts/judgments/questions.py`, policy in `distill_judge.py`, and the
 `judgment-calibration` skill tunes the first against `evals/golden/`.
 
+Two more report-only scripts use the same seam: `scripts/link_judge.py` adjudicates
+gaiafield's suggested links (would a link help a reader; gaiafield's own score and label
+are never changed, and `AMBIGUOUS` rows still appear only on request), and
+`scripts/vault_judge.py` lists vague descriptions and missing domain tags.
+
 **Data leaves the machine only when you set a key** (`TOOLKIT_OBSIDIAN_JUDGMENT_API_KEY` or
 `OPENROUTER_API_KEY`): then the capture's text and the heads of the notes it is compared with
 go to the hosted backend. Without a key the script prints `SKIPPED` and sends nothing;

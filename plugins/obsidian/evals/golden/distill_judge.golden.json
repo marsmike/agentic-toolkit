@@ -1,6 +1,6 @@
 {
   "about": "Human-reviewed labels for distill_judge.py. 'expect' is what a careful reader decides, never a backend's own answer. labelled_by: claude rows are proposals at strength 'should'; a row becomes 'must' only when labelled_by is 'human'. split: holdout rows are never shown to the judgment-calibration tuning step.",
-  "provenance": "2026-09-21: first set, labelled by Claude after it had already seen jev's answers for these captures (anchoring risk); awaiting human review.",
+  "provenance": "2026-09-21: first set, labelled by Claude after it had already seen jev's answers for these captures (anchoring risk); awaiting human review. 2026-09-22: eight fixture captures added with labels known by construction (labelled_by: construction), to give covers/contradiction/discard/quick-file/project/area/redundancy at least one positive each.",
   "rows": [
     {
       "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
@@ -406,6 +406,213 @@
       "labelled_by": "claude",
       "split": "tune",
       "rationale": "Each capture carries an idea the other lacks; the captures say to keep them separate."
+    },
+    {
+      "capture": "fixtures/captures/Readwise-Article-PARA-Repost.md",
+      "qid": "covers|04_Resources/Concepts/PARA-Method.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "Written as a newsletter reprint of the very article PARA-Method cites as its source, under a different URL."
+    },
+    {
+      "capture": "fixtures/captures/Readwise-Article-PARA-Repost.md",
+      "qid": "rel|04_Resources/Concepts/PARA-Method.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "Same subject by construction."
+    },
+    {
+      "capture": "fixtures/captures/Readwise-Article-PARA-Repost.md",
+      "qid": "para",
+      "expect": "04_Resources",
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "General reference knowledge."
+    },
+    {
+      "capture": "fixtures/captures/Readwise-Article-PARA-Repost.md",
+      "qid": "rel|02_Projects/home-lab-migration/Backup-Strategy.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "No shared subject."
+    },
+    {
+      "capture": "fixtures/captures/Research-Length-Normalization-Benchmark.md",
+      "qid": "rel|04_Resources/Concepts/BM25-Dilution.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "Tests exactly the claim BM25-Dilution makes."
+    },
+    {
+      "capture": "fixtures/captures/Research-Length-Normalization-Benchmark.md",
+      "qid": "relation|04_Resources/Concepts/BM25-Dilution.md",
+      "expect": "contradicts-claim",
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "Written to deny the note's central claim that a long description dilutes keyword weight."
+    },
+    {
+      "capture": "fixtures/captures/Research-Length-Normalization-Benchmark.md",
+      "qid": "covers|04_Resources/Concepts/BM25-Dilution.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "A different work: the note is a synthesis, the capture a benchmark that disputes it."
+    },
+    {
+      "capture": "fixtures/captures/Research-Length-Normalization-Benchmark.md",
+      "qid": "triage",
+      "expect": "distill",
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "A finding with numbers."
+    },
+    {
+      "capture": "fixtures/captures/X-Bookmark-Empty-Stub.md",
+      "qid": "triage",
+      "expect": "discard-candidate",
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "A bookmark that captured only a placeholder."
+    },
+    {
+      "capture": "fixtures/captures/Readwise-Promo-Launch-Week.md",
+      "qid": "triage",
+      "expect": "discard-candidate",
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "holdout",
+      "rationale": "Pure promotion with an expiry date."
+    },
+    {
+      "capture": "fixtures/captures/Research-Restic-Flags-Cheatsheet.md",
+      "qid": "triage",
+      "expect": "quick-file",
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "A command list to look up; no idea of its own."
+    },
+    {
+      "capture": "fixtures/captures/Research-Restore-Drill-For-The-Migration.md",
+      "qid": "para",
+      "expect": "02_Projects",
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "Directly serves the bundled home-lab-migration project's cutover."
+    },
+    {
+      "capture": "fixtures/captures/Research-Restore-Drill-For-The-Migration.md",
+      "qid": "rel|02_Projects/home-lab-migration/Backup-Strategy.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "The concrete schedule for that note's restore-test rule."
+    },
+    {
+      "capture": "fixtures/captures/Research-Restore-Drill-For-The-Migration.md",
+      "qid": "relation|02_Projects/home-lab-migration/Backup-Strategy.md",
+      "expect": "strengthens-passage",
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "Extends the note's 'restore drills happen at cutover time' passage with an order and a fail rule."
+    },
+    {
+      "capture": "fixtures/captures/Research-Restore-Drill-For-The-Migration.md",
+      "qid": "rel|02_Projects/home-lab-migration/Migration-Runbook.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "The runbook owns the cutover steps the drills slot into."
+    },
+    {
+      "capture": "fixtures/captures/Research-Restore-Drill-For-The-Migration.md",
+      "qid": "rel|03_Areas/Birding.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "No shared subject."
+    },
+    {
+      "capture": "fixtures/captures/Research-Patch-Arrival-Dates.md",
+      "qid": "para",
+      "expect": "03_Areas",
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "holdout",
+      "rationale": "A standing practice with no end, under the bundled Birding area."
+    },
+    {
+      "capture": "fixtures/captures/Research-Patch-Arrival-Dates.md",
+      "qid": "rel|03_Areas/Birding.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "holdout",
+      "rationale": "Birding lists 'seasonal arrival dates' as something that lives there."
+    },
+    {
+      "capture": "fixtures/captures/Research-Patch-Arrival-Dates.md",
+      "qid": "rel|02_Projects/home-lab-migration/Backup-Strategy.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "holdout",
+      "rationale": "No shared subject."
+    },
+    {
+      "capture": "fixtures/captures/X-Bookmark-Hybrid-Search-Thread.md",
+      "qid": "rel|04_Resources/Concepts/Hybrid-Retrieval.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "Same mechanism."
+    },
+    {
+      "capture": "fixtures/captures/X-Bookmark-Hybrid-Search-Thread.md",
+      "qid": "covers|04_Resources/Concepts/Hybrid-Retrieval.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "A thread, not the note's source."
+    },
+    {
+      "capture": "*batch*",
+      "qid": "adds|fixtures/captures/X-Bookmark-Hybrid-Search-Thread.md|Readwise-Hybrid-Search-Landscape.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "Written as a strict subset of the Landscape capture: every sentence appears there."
+    },
+    {
+      "capture": "*batch*",
+      "qid": "adds|Readwise-Hybrid-Search-Landscape.md|fixtures/captures/X-Bookmark-Hybrid-Search-Thread.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "construction",
+      "split": "tune",
+      "rationale": "Landscape also carries query-shape weighting and a chunking tangent."
     }
   ]
 }

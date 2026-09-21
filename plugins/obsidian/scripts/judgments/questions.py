@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from judge import Question
 
-QUESTIONS_VERSION = "2026-09-21.2"
+QUESTIONS_VERSION = "2026-09-22.1"
 
 # One-line meaning of each placement target, sent as `vault_map` so `para` can point at it.
 VAULT_MAP = {
@@ -96,12 +96,13 @@ def covers(nid: str) -> Question:
     )
 
 
-def domain(name: str) -> Question:
+def domain(name: str, subject: str = "capture") -> Question:
+    """`subject` is the state path being classified: `capture` in a distill run, `note` in vault-lint."""
     return Question(
         kind="noul",
-        instructions=f"Is `domains.{name}` a primary subject of `capture`, one the owner would look for it under?",
+        instructions=f"Is `domains.{name}` a primary subject of `{subject}`, one the owner would look for it under?",
         criteria={
-            "true": "the capture is mainly about this subject",
+            "true": "it is mainly about this subject",
             "false": "the subject is absent, or only mentioned in passing as background or an example",
         },
     )
@@ -143,8 +144,32 @@ def adds(a: str, b: str) -> Question:
     )
 
 
+def should_link(pid: str) -> Question:
+    """gaiafield adjudication: would a link between two notes help a reader?
+
+    Worded after the vault's own human-made links, not after "same mechanism": on the bundled
+    vault that narrower wording scored real, author-made links at a mean of 0.24 and rejected
+    most of them (calibration log, 2026-09-22)."""
+    return Question(
+        kind="noul",
+        instructions=(
+            f"Would a link between `pairs.{pid}.a` and `pairs.{pid}.b` help a reader, because understanding "
+            "or using one of them genuinely draws on the other?"
+        ),
+        criteria={
+            "true": (
+                "one explains, implements, applies, extends or is a worked example of something the other "
+                "discusses, or someone working from one would need the other"
+            ),
+            "false": "they only share vocabulary, a broad subject area, a document type or a folder, and neither draws on the other",
+        },
+    )
+
+
 def same_mechanism(pid: str) -> Question:
-    """gaiafield adjudication: is a suggested link between two notes real?"""
+    """The narrower companion of should_link(): are the two notes about the same idea? Asked
+    in the same request. Its absolute values run low (real matches average about 0.25), so
+    it is read as a ranking and against its own low cut, never against should_link()'s."""
     return Question(
         kind="noul",
         instructions=(
@@ -154,5 +179,23 @@ def same_mechanism(pid: str) -> Question:
         criteria={
             "true": "both notes explain or apply the same idea, even in different subject areas",
             "false": "they share vocabulary, a domain or a document style, but explain different things",
+        },
+    )
+
+
+def description_specific(nid: str) -> Question:
+    """vault quality: does a note's description earn its place in search and in Index.md?"""
+    return Question(
+        kind="noul",
+        instructions=(
+            f"Does `notes.{nid}.description` tell a reader specifically what `notes.{nid}.body_head` is about, "
+            "well enough to pick this note out from others on nearby subjects?"
+        ),
+        criteria={
+            "true": "it names the note's actual subject and its main point in plain terms",
+            "false": (
+                "it is missing, generic enough to fit many notes, about something the body does not cover, "
+                "or so long and padded that the subject is buried"
+            ),
         },
     )

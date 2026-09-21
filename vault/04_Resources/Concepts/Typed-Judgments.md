@@ -60,6 +60,20 @@ a backend's own answer as a label.
   overlap in the false criterion. After: 31/35 tune, held out unchanged, the false relevance
   gone and the false "strengthens" probability down from 0.76 to 0.40. Thresholds untouched;
   the relevance sweep suggests 0.60 over 0.50 but 13 rows do not justify a policy change.
+- **2026-09-22, jev-1.13, questions 2026-09-22.1, link adjudication.** First wording of the
+  link question ("same underlying mechanism … so that a reader should be pointed to the other")
+  scored 20 author-made links at a mean of 0.24 and rejected 16. Cause class: *question too
+  narrow for the policy it serves* — an author links notes that draw on each other, not only
+  notes about one idea. A broader wording ("would a link help a reader, because one genuinely
+  draws on the other") moved them to 0.75 with unlinked cross-cluster pairs at 0.15 (AUC 0.99,
+  held-out split 1.0). The narrow wording was kept as a second number because it is the better
+  *ranker* of [[Gaiafield]]'s own suggestions: AUC 0.95 against two blind annotations, cosine
+  0.75. Its scale is compressed (real matches at 0.10-0.30), so it is read against its own low
+  cut and only once the broad probability clears a floor: ranking transfers, thresholds do
+  not. Three single-condition rewordings ranked no better and were dropped.
+- **2026-09-22, distill golden set 45 → 68 rows.** Eight fixture captures with answers known by
+  construction. 50/54 tune, 13/14 held out. New miss is a threshold (same-source 0.68 vs a 0.80
+  cut), reported for a human decision, not changed.
 
 ## Related
 

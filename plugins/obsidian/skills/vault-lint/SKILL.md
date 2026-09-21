@@ -74,3 +74,13 @@ vault, not the default categories.
 - [checks.md](references/checks.md) — what each lint/normalize check does, in detail
 - [taxonomy.md](references/taxonomy.md) — tag taxonomy and assignment guidance
 - [backlink-workflows.md](references/backlink-workflows.md) — post-distill verification, orphan/connection discovery
+
+## Quality suggestions from typed judgments (optional, report-only)
+
+With a judgment backend configured (`judgment_*` in the profile, a key in the environment),
+`scripts/vault_judge.py [--scope 04_Resources] [--exclude <prefix>]` lists notes with no
+description, descriptions too vague or padded to pick the note out in search, and domains a
+note is clearly about but does not carry as a tag. It writes nothing: treat it as a reading
+list, fix what you agree with, and leave `vault_normalize.py --fix` as the only thing that
+edits notes. `scripts/link_judge.py` does the same for gaiafield's suggested links. No key
+prints `SKIPPED`.
