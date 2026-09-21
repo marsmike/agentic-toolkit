@@ -11,6 +11,9 @@ default_capture_prefixes:
 inference_backend: ollama
 inference_base_url: http://localhost:11434
 inference_model: null
+judgment_backend: jev
+judgment_base_url: https://openrouter.ai/api
+judgment_model: jev-latest
 enrichment_targets: []
 tags:
   - domain/toolkit-meta
@@ -36,6 +39,15 @@ order (env var → this note → shipped default).
   resolution. `inference_backend` is `ollama` (default, talks to a local Ollama server) or
   `openai-compatible` (any OpenAI-chat-compatible endpoint). Leave `inference_model` unset and the
   LLM-assisted checks report a clear "no model configured" skip rather than guessing one.
+- **`judgment_backend` / `judgment_base_url` / `judgment_model`** — the typed-judgment backend
+  `scripts/distill_judge.py` asks for advisory probabilities during a distill run (is this found
+  note really related, which enrichment level, which folder, does this capture add anything over
+  its sibling). `jev` (default) is TypeSafe's System One model, reached through OpenRouter; `none`
+  switches the layer off. **With a key set, the text of the capture and of the related notes it
+  is compared with is sent to that hosted service.** With no key the layer prints `SKIPPED`,
+  sends nothing, and distill runs exactly as before. Thresholds are deliberately not profile
+  keys: they are policy, live in `distill_judge.py` per backend, and move only after a
+  calibration run (`judgment-calibration` skill).
 - **`enrichment_targets`** — vault-relative note names (as wikilinks) that `distill` treats as
   mandatory enrichment candidates regardless of semantic score, e.g. a personal profile note that
   should always learn about new maintenance-relevant material.
@@ -44,7 +56,8 @@ order (env var → this note → shipped default).
 
 No credential belongs in this file, ever — see `contract/PROFILE.md`'s Secrets section. An
 OpenAI-compatible API key is an environment variable (`TOOLKIT_OBSIDIAN_INFERENCE_API_KEY`),
-referenced here only by name if at all.
+referenced here only by name if at all. The judgment backend reads
+`TOOLKIT_OBSIDIAN_JUDGMENT_API_KEY`, falling back to `OPENROUTER_API_KEY`.
 
 ## Env var overrides
 

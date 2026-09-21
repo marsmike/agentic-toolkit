@@ -38,7 +38,10 @@ this skill loaded. Read [rules.md](references/rules.md) before starting.
    workflow.md); its absence never blocks this step. When the binary supports gaiafield
    v2, `graph.inferred_candidates()` adds a separately-labeled, **report-only** block of
    statistical candidates (workflow.md's "Inferred candidates" section) — these are never
-   auto-applied, ever; see `contract/KNOWLEDGE_API.md`'s v2 section, rule 1.
+   auto-applied, ever; see `contract/KNOWLEDGE_API.md`'s v2 section, rule 1. When a
+   judgment backend is configured, `scripts/distill_judge.py` adds an **advisory** block
+   of typed judgments (relevance, enrichment level, placement, triage; workflow.md's
+   "Advisory judgments" section) — input to your proposal, never a substitute for it.
 3. **Every distilled note carries its source** — a `*Source: ...*` line in the body and
    a `source:` frontmatter field — and gets `status: distilled`.
 4. **The capture leaves `01_Capture/`** after distilling — archived (default, to

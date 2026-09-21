@@ -30,11 +30,27 @@ this plugin's own eval suite.
 This plugin reads `$VAULT/Config/toolkit/obsidian.md` if present, per
 `contract/PROFILE.md`'s "fill from Obsidian" convention. See `profile.example.md` for
 the exact frontmatter shape (`search_score_gate`, `default_capture_prefixes`,
-`inference_backend`/`inference_base_url`/`inference_model`, `enrichment_targets`) and
+`inference_backend`/`inference_base_url`/`inference_model`,
+`judgment_backend`/`judgment_base_url`/`judgment_model`, `enrichment_targets`) and
 what each field controls. Every field also has a `TOOLKIT_OBSIDIAN_<FIELD>` environment
 variable that overrides the note. No profile note and no `inference_model` set is a
 normal, fully-functional state — LLM-assisted checks skip cleanly and say why; only
 `links`' auto-fix and every other rule-based check are unaffected.
+
+## Advisory judgments
+
+`scripts/distill_judge.py` asks a typed-judgment backend (`scripts/judge.py`; default `jev`,
+TypeSafe's System One model through OpenRouter) a batch of narrow questions per capture and
+prints an advisory block for distill's Phase 1 handoff: triage, which found notes are really
+related and at which enrichment level, same-source detection, domains, placement, and
+pairwise uniqueness across a batch. It writes nothing to the vault. Wording lives in
+`scripts/judgments/questions.py`, policy in `distill_judge.py`, and the
+`judgment-calibration` skill tunes the first against `evals/golden/`.
+
+**Data leaves the machine only when you set a key** (`TOOLKIT_OBSIDIAN_JUDGMENT_API_KEY` or
+`OPENROUTER_API_KEY`): then the capture's text and the heads of the notes it is compared with
+go to the hosted backend. Without a key the script prints `SKIPPED` and sends nothing;
+`judgment_backend: none` switches it off outright. A few captures cost a fraction of a cent.
 
 ## Dependencies
 

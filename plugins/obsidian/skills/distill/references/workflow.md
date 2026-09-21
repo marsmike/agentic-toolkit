@@ -28,6 +28,11 @@ distillation already — switch to enrichment-only mode (step 8) rather than wri
 near-duplicate. A hit only in body prose is adjacency, not provenance; treat it as a
 related note, not evidence the capture is already distilled.
 
+A URL match cannot see the same article under a different address (a mirror, a repost, a
+newsletter copy). The advisory judgments in step 3 ask that question per related note
+(`p_covers`); a confident hit there is a reason to open that note before proposing a new
+one, not a verdict.
+
 ## 3. Read Index.md, then search — both, not either
 
 First pass: read `Index.md` at the vault root and skim for topic-area entries. This is
@@ -117,6 +122,33 @@ inferred = graph.inferred_candidates(vault, top_matches[0], k=5)  # not GraphUna
   leads — mention them as an optional extra the human can request ("want me to check for
   cross-domain surprise candidates too?"), never run or presented unprompted.
 
+### Advisory judgments (if a judgment backend is available)
+
+One more call, after the search and graph passes:
+
+```bash
+uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/distill_judge.py" \
+  "01_Capture/<capture>.md" --json
+```
+
+It sends the capture and the top search results to a typed-judgment backend (profile
+keys `judgment_*`, see `profile.example.md`) and returns one block: what kind of material
+the capture is, `p_relevant` and a suggested enrichment level per related note,
+`p_covers` (step 2), domains, and a placement with an explicit `ambiguous` flag. It
+changes nothing in the vault.
+
+- **It is advice, labelled with its backend, model and `questions_version`.** You still do
+  steps 4 and 5 yourself. Where your own reading disagrees with the block, keep your
+  reading and say so in the handoff; the disagreement is the useful part.
+- **Which gate applies.** When `search.py`'s `note` says its scores came from farsight,
+  `above_enrichment_gate` is informational only, and `judged_relevant` is the enrichment
+  gate for step 8. When search ran on the Python path, the score gate stands and
+  `judged_relevant` is a second opinion.
+- **No backend or no key** prints `SKIPPED` and exits 0: say so in one line and carry on
+  exactly as before. This is the normal state of a fresh clone, not an error.
+- A configured backend that fails writes its own DLQ note and exits 1; mention it and
+  carry on without the block.
+
 ## 4. Extract core mechanics (reasoning, not writing yet)
 
 For each key idea: what's the underlying mechanism that makes this work? Name it as a
@@ -138,6 +170,9 @@ Report back and stop:
   line saying it didn't — no gaiafield v2 support). Never conflate these with the
   deterministic backlink/bridge lists.
 - Already-distilled mode if step 2 found a canonical hit: `new-note | enrich-only | hybrid`.
+- If advisory judgments ran: the block's triage, placement, suggested mode and per-note
+  levels in one short table, marked **advisory** with backend/model, and every point
+  where your proposal differs from it, with the reason. Or one line saying it was skipped.
 
 Wait for confirm / redirect / reject. Skip only with an explicit `--auto` instruction.
 
@@ -181,6 +216,10 @@ For each related note at or above the score gate (step 3), in `02_Projects`,
   ```
 
 Default to L1 when unsure. Each related note gets exactly one level.
+
+A `suggested_level` from the advisory judgments is a starting point, never the citation:
+L2 and L3 still require you to name the specific sentence or claim, and a suggestion you
+cannot back with one drops to L1.
 
 ## 9. Retire the capture
 
@@ -226,8 +265,13 @@ uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scri
 ## Triage mode
 
 1. List captures: `ls "$VAULT/01_Capture/"*.md`
-2. Preview each with `Read` to assess relevance.
-3. Categorize: **distill** (run the full workflow above) / **quick file** (move to a
+2. If a judgment backend is available, run `distill_judge.py` once over all captures
+   (`01_Capture/*.md`). Its `triage` recommendation per capture and its pairwise
+   `cluster` block (which captures add nothing over a sibling) are inputs to your
+   categorization, not the categorization. A `discard-candidate` is only ever a
+   candidate: discarding always needs the human.
+3. Preview each with `Read` to assess relevance.
+4. Categorize: **distill** (run the full workflow above) / **quick file** (move to a
    PARA folder with minimal frontmatter, no full distillation) / **discard** (`rm`, for
    outdated or low-value material).
 

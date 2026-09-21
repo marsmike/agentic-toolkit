@@ -27,6 +27,7 @@ EVAL_MODULES = (
     "eval_search_parity",
     "eval_graph_context",
     "eval_inferred_candidates",
+    "eval_distill_judge",
 )
 
 

@@ -12,6 +12,9 @@ default_capture_prefixes:
 inference_backend: ollama
 inference_base_url: http://localhost:11434
 inference_model: null
+judgment_backend: jev
+judgment_base_url: https://openrouter.ai/api
+judgment_model: jev-latest
 enrichment_targets:
   - "[[Alex-Vega]]"
 tags:

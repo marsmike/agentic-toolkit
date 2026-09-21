@@ -52,6 +52,9 @@ multi-source synthesis at `04_Resources/` root.
    unique, say so explicitly in the Phase 1 handoff and record it as a deliberate merge
    — never drop it silently. A capture whose only unique contribution is its URL still
    gets that URL preserved.
+   For a batch, `distill_judge.py`'s pairwise `cluster` block (does A add anything B
+   lacks, asked both ways) is a first pass over exactly this question; you still name the
+   unique contribution yourself.
 
 Report the cluster's membership and each member's unique contribution in the Phase 1
 handoff so the user can veto the grouping before anything is written.

@@ -39,6 +39,8 @@ running inline is the default path and does not need a subagent at all.
    `skills/distill/references/workflow.md` steps 6-8:
    - New note gets `status: distilled`, `processed_date`, `source:` frontmatter, and a
      `*Source: ...*` body line — never invented, never pointed at `01_Capture/`.
+   - If `scripts/distill_judge.py` ran (workflow.md, "Advisory judgments"), its block is
+     advice: report where you disagree with it rather than following or ignoring it.
    - Related notes at or above the vault's `search_score_gate` (default 0.70) get
      exactly one enrichment level: L1 backlink (default), L2 inline merge (only with a
      citable section), or L3 contradiction flag (never a silent overwrite).

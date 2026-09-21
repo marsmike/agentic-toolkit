@@ -1,0 +1,411 @@
+{
+  "about": "Human-reviewed labels for distill_judge.py. 'expect' is what a careful reader decides, never a backend's own answer. labelled_by: claude rows are proposals at strength 'should'; a row becomes 'must' only when labelled_by is 'human'. split: holdout rows are never shown to the judgment-calibration tuning step.",
+  "provenance": "2026-09-21: first set, labelled by Claude after it had already seen jev's answers for these captures (anchoring risk); awaiting human review.",
+  "rows": [
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "triage",
+      "expect": "distill",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "States a transferable mechanism: fuse BM25 and dense vectors at query time, weight by query shape."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "para",
+      "expect": "04_Resources",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "General retrieval knowledge; serves neither bundled project (field-guide, home-lab-migration)."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "concept_vs_root",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "A highlight dump across several teams and one thread, plus a chunking tangent: multi-voice, not one thesis."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "dom|ai-ml",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Retrieval quality, embeddings vs keyword scoring."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "dom|productivity",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Nothing about how a person plans or does work."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "dom|agent-systems",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "No agents, planning or tool use."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "rel|04_Resources/Concepts/Hybrid-Retrieval.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Same mechanism: query-time fusion of BM25 and dense vectors."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "relation|04_Resources/Concepts/Hybrid-Retrieval.md",
+      "expect": "strengthens-passage",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Adds reciprocal rank fusion and query-shape-dependent weighting to the note's fusion claim."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "covers|04_Resources/Concepts/Hybrid-Retrieval.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "The concept note is not a write-up of this highlight dump."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "rel|04_Resources/Tools/Farsight.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Farsight is the BM25 half of exactly this design, with the vector half deferred."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "rel|04_Resources/Concepts/BM25-Dilution.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Different mechanism: description length diluting term weight, not keyword-vs-vector fusion."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "rel|04_Resources/Guides/Capture-Conventions.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Shares only the word 'capture' via the capture's own TODO line; about naming rules."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "relation|04_Resources/Guides/Capture-Conventions.md",
+      "expect": "unrelated",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Naming and provenance rules are a different subject from retrieval fusion."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "rel|04_Resources/Tools/Readwise-Plugin.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Origin of the capture, not its subject."
+    },
+    {
+      "capture": "01_Capture/Readwise-Hybrid-Search-Landscape.md",
+      "qid": "rel|04_Resources/Concepts/Community-Detection-and-Bridge-Notes.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Graph clustering; the capture's TODO mentions Leiden only as a possible overlap to check."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "triage",
+      "expect": "distill",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "A finding (Leiden guarantees well-connected communities; Louvain does not) plus an open tuning question."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "para",
+      "expect": "04_Resources",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "About the toolkit's graph engine, which is not one of the bundled projects."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "concept_vs_root",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "One algorithmic idea from one research pass."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "dom|knowledge-management",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "Community detection over a vault's wikilink graph."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "dom|productivity",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "Not about personal work routines."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "rel|04_Resources/Concepts/Community-Detection-and-Bridge-Notes.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Same subject: clusters in the wikilink graph and the bridge notes between them."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "relation|04_Resources/Concepts/Community-Detection-and-Bridge-Notes.md",
+      "expect": "strengthens-passage",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Adds Leiden-vs-Louvain and the resolution-parameter problem to the note's clustering section."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "rel|04_Resources/Tools/Gaiafield.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "The graph engine whose v3 milestone the capture is research for."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "rel|04_Resources/Concepts/Knowledge-Graphs-from-Wikilinks.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "The graph Leiden would run over."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "rel|04_Resources/Tools/Marketplace-and-Plugin-Curation.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Plugin curation; no shared mechanism."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "rel|04_Resources/Guides/Capture-Conventions.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Shares only capture meta-text ('Raw, not yet distilled')."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "relation|04_Resources/Guides/Capture-Conventions.md",
+      "expect": "unrelated",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Naming rules vs a graph algorithm."
+    },
+    {
+      "capture": "01_Capture/Research-Leiden-Community-Detection.md",
+      "qid": "rel|04_Resources/Concepts/Hybrid-Retrieval.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "Search fusion vs graph clustering."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "triage",
+      "expect": "distill",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "An argued claim with counter-arguments about where vector retrieval stops paying off."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "para",
+      "expect": "04_Resources",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "General retrieval knowledge."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "concept_vs_root",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "A thread with several voices and unresolved counter-replies."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "dom|ai-ml",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Embedding similarity vs structured retrieval."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "dom|toolkit-meta",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "Not about the toolkit's own conventions."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "rel|04_Resources/Concepts/Hybrid-Retrieval.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "Same decision: when keyword/structured search beats or complements vectors."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "relation|04_Resources/Concepts/Hybrid-Retrieval.md",
+      "expect": "adjacent",
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "Bears on the same decision but neither extends nor refutes a specific passage."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "rel|04_Resources/Concepts/BM25-Dilution.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "The capture itself says this is adjacent to, not the same claim as, BM25 dilution."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "rel|04_Resources/Guides/Capture-Conventions.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Meta-text overlap only."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "rel|04_Resources/Concepts/Calibration-Bias.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "Gate calibration statistics, a different mechanism."
+    },
+    {
+      "capture": "01_Capture/X-Bookmark-Retrieval-Debate.md",
+      "qid": "rel|04_Resources/Tools/Readwise-Plugin.md",
+      "expect": false,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "No shared subject."
+    },
+    {
+      "capture": "*batch*",
+      "qid": "adds|Readwise-Hybrid-Search-Landscape.md|Research-Leiden-Community-Detection.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Each capture carries an idea the other lacks; the captures say to keep them separate."
+    },
+    {
+      "capture": "*batch*",
+      "qid": "adds|Readwise-Hybrid-Search-Landscape.md|X-Bookmark-Retrieval-Debate.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Each capture carries an idea the other lacks; the captures say to keep them separate."
+    },
+    {
+      "capture": "*batch*",
+      "qid": "adds|Research-Leiden-Community-Detection.md|Readwise-Hybrid-Search-Landscape.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Each capture carries an idea the other lacks; the captures say to keep them separate."
+    },
+    {
+      "capture": "*batch*",
+      "qid": "adds|Research-Leiden-Community-Detection.md|X-Bookmark-Retrieval-Debate.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Each capture carries an idea the other lacks; the captures say to keep them separate."
+    },
+    {
+      "capture": "*batch*",
+      "qid": "adds|X-Bookmark-Retrieval-Debate.md|Readwise-Hybrid-Search-Landscape.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "holdout",
+      "rationale": "Each capture carries an idea the other lacks; the captures say to keep them separate."
+    },
+    {
+      "capture": "*batch*",
+      "qid": "adds|X-Bookmark-Retrieval-Debate.md|Research-Leiden-Community-Detection.md",
+      "expect": true,
+      "strength": "should",
+      "labelled_by": "claude",
+      "split": "tune",
+      "rationale": "Each capture carries an idea the other lacks; the captures say to keep them separate."
+    }
+  ]
+}
