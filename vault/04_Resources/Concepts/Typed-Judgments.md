@@ -15,6 +15,11 @@ tags:
 
 # Typed Judgments
 
+> [!summary] In one breath
+> Ask a small model many narrow yes/no and pick-one questions about your notes, get a
+> probability for each, and keep every threshold and every consequence in code. The model
+> supplies numbers; the vault's rules decide what they mean; a person decides what happens.
+
 Most of what a distill run has to decide is small: is this found note about the same mechanism
 or does it only share vocabulary, does the capture extend a passage or merely sit next to it,
 which folder, does this capture add anything its sibling lacks. A frontier model can decide all
