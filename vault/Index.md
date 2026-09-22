@@ -98,6 +98,7 @@ convention (see [[Test-Corpus-Map]]). 79 entries.
 
 - [[04_Resources/Guides/Capture-Conventions|Capture Conventions]] — Naming, flatness, and provenance rules for 01_Capture/ — why a directory listing alone should show where every capture came from.
 - [[04_Resources/Guides/Docs-Site|Docs Site]] — How the public docs site is built from this vault — pinned Quartz 4, the vault rendered directly with no separate docs source, and what's excluded from…
+- [[04_Resources/Guides/Migrating-a-Live-Vault|Migrating a Live Vault]] — Moving a long-lived vault onto the toolkit's plugins: rehearse on a copy, profile, parity checks, recalibrate, cut over.
 - [[04_Resources/Guides/Migrating-Notes-From-Plain-Markdown|Migrating-Notes-From-Plain-Markdown]] — No frontmatter — parser-tolerance test specimen; see Test-Corpus-Map.
 - [[04_Resources/Guides/Naming-Conventions-for-Notes-and-Files|Naming Conventions for Notes and Files]] — Filename conventions across captures, distilled notes, and projects — origin prefixes, author/year disambiguation, and when a plain title is fine.
 - [[04_Resources/Guides/Profiles-and-Config|Profiles and Config]] — How a plugin's identity and settings resolve — env var, vault profile note, shipped default — and where to look…

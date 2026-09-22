@@ -42,6 +42,11 @@ BATCH_CAPTURE_CHARS = 2000
 MAX_BATCH = 12  # 12 captures -> 132 directed pairs in one request
 QUERY_BODY_CHARS = 400
 MAX_LISTED_FOLDERS = 60
+# Requests per capture; an even number also asks with the candidate notes in reverse order and
+# averages. Left at 1: measured 2026-09-22, an identical rerun moves a noul by 0.008 on average
+# (max 0.09) and two views by 0.006, with golden agreement unchanged (54/60 vs 55/60). Unlike
+# the pairwise link question there is no order effect worth paying a second request for.
+VIEWS = 1
 
 # Initial priors, 2026-09-21, jev-latest, not yet calibrated against a labelled set.
 # Change only from `--calibrate` output a human accepted; record date + model here.
@@ -229,15 +234,46 @@ def apply_policy(notes: list[dict], answers: dict[str, Answer], t: dict[str, flo
     }
 
 
-def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: list[str] | None = None) -> dict[str, Any]:
+def _average(views: list[dict[str, Answer]]) -> dict[str, Answer]:
+    """Mean of several answers to the same stable-keyed questions (noul p; choice probs per label)."""
+    merged: dict[str, Answer] = {}
+    for key in {k for view in views for k in view}:
+        seen = [view[key] for view in views if key in view]
+        if seen[0].kind == "noul":
+            merged[key] = Answer("noul", p=sum(a.p for a in seen) / len(seen))
+        else:
+            labels = {label for a in seen for label in a.probs}
+            probs = {label: sum(a.probs.get(label, 0.0) for a in seen) / len(seen) for label in labels}
+            merged[key] = Answer("choice", probs=probs, top=max(probs, key=probs.get))
+    return merged
+
+
+def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: list[str] | None = None,
+                  views: int = VIEWS) -> dict[str, Any]:
     capture = read_capture(path)
     notes, search_meta = candidates(capture, vault, top, exclude, force or [])
-    state, questions, stable = build_request(capture, notes, vault)
-    answers, usage = judge.judge(vault, state, questions)
+    per_view, usages = [], []
+    for view in range(views):
+        ordered = notes if view % 2 == 0 else notes[::-1]
+        state, questions, stable = build_request(capture, ordered, vault)
+        raw, used = judge.judge(vault, state, questions)
+        per_view.append({stable[qid]: a for qid, a in raw.items()})
+        usages.append(used)
+    by_key = _average(per_view)
+    # apply_policy() reads per-run ids in the order of `notes`; rebuild that view from the averages.
+    _, _, stable = build_request(capture, notes, vault)
+    answers = {qid: by_key[key] for qid, key in stable.items() if key in by_key}
+    usage = usages[0]
+    for extra in usages[1:]:
+        usage.requests += extra.requests
+        usage.input_tokens += extra.input_tokens
+        usage.usd += extra.usd
+        usage.splits += extra.splits
+        usage.skipped.extend(extra.skipped)
     block = {"capture": path.relative_to(vault).as_posix() if path.is_relative_to(vault) else str(path), "advisory": True,
              "questions_version": Q.QUESTIONS_VERSION, "search": search_meta}
     block.update(apply_policy(notes, answers, thresholds(usage.backend)))
-    block["judgment"] = usage.as_dict()
+    block["judgment"] = {**usage.as_dict(), "views": views}
     block["answers"] = {stable[qid]: (round(a.p, 4) if a.kind == "noul" else _probs(a)) for qid, a in answers.items()}
     return block
 

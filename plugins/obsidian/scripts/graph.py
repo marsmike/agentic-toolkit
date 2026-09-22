@@ -438,12 +438,17 @@ ADJUDICATION_CHARS = 1200
 # 16 read LIKELY-NOISE (0 real), 0 of 15 unlinked cross-cluster pairs read LIKELY-LINK.
 # Recalibrate on any other vault before trusting the labels; the ranking transfers, the cuts may not.
 LINK_POLICY: dict[str, dict[str, float]] = {
-    "jev": {"link_high": 0.70, "mech_high": 0.15, "link_floor": 0.35, "link_low": 0.30, "mech_low": 0.10},
+    "jev": {"link_high": 0.70, "mech_high": 0.15, "link_floor": 0.35, "link_low": 0.30, "mech_low": 0.10,
+            "max_order_gap": 0.30},
 }
 
 
-def _link_label(link: float, mech: float | None, policy: dict[str, float]) -> str:
+def _link_label(link: float, mech: float | None, policy: dict[str, float], order_gap: float = 0.0) -> str:
+    """`order_gap` is how far the two views of a pair (a,b and b,a) disagreed. A pair the
+    backend cannot answer the same way twice is undecided, whatever the average says."""
     mech = 0.0 if mech is None else mech
+    if order_gap >= policy["max_order_gap"]:
+        return "UNDECIDED"
     if link >= policy["link_high"] or (mech >= policy["mech_high"] and link >= policy["link_floor"]):
         return "LIKELY-LINK"
     if link <= policy["link_low"] and mech < policy["mech_low"]:
@@ -461,16 +466,9 @@ def _pair_of(row: dict, note: str | None) -> tuple[str, str] | None:
     return None
 
 
-def adjudicate_pairs(vault: Path, pairs: list[tuple[str, str]]) -> tuple[list[dict], dict]:
-    """P(a link between them would help a reader) for each (a, b) of vault-relative note paths.
-
-    Returns (adjudications aligned with `pairs`, usage). An entry is None where a note is
-    missing or the backend skipped the question. Raises judge.JudgmentUnavailable /
-    judge.JudgmentFailed like judge.judge(); callers decide how to degrade.
-    """
-    results: list[dict | None] = [None] * len(pairs)
-    usage_total = {"backend": "", "model": "", "requests": 0, "input_tokens": 0, "usd": 0.0}
-    cache: dict[str, dict] = {}
+def _adjudicate_once(vault: Path, pairs: list[tuple[str, str]], cache: dict, usage_total: dict) -> list[dict | None]:
+    """One pass: raw {link, mech} per pair, in order, None where a note is missing or skipped."""
+    raw: list[dict | None] = [None] * len(pairs)
 
     def payload(rel: str) -> dict | None:
         if rel not in cache and (vault / rel).is_file():
@@ -491,18 +489,53 @@ def adjudicate_pairs(vault: Path, pairs: list[tuple[str, str]]) -> tuple[list[di
         if not questions:
             continue
         answers, usage = judge.judge(vault, state, questions)
-        policy = LINK_POLICY[usage.backend]
         for pid, position in index.items():
             link, mech = answers.get(f"link_{pid}"), answers.get(f"mech_{pid}")
-            if link is None:
-                continue
-            label = _link_label(link.p, mech.p if mech else None, policy)
-            results[position] = {"p": round(link.p, 3), "label": label,
-                                 "p_same_mechanism": round(mech.p, 3) if mech else None,
-                                 "backend": usage.backend, "model": usage.model, "questions_version": Q.QUESTIONS_VERSION}
+            if link is not None:
+                raw[position] = {"link": link.p, "mech": mech.p if mech else None}
         usage_total["backend"], usage_total["model"] = usage.backend, usage.model
         for key in ("requests", "input_tokens", "usd"):
             usage_total[key] += getattr(usage, key)
+    return raw
+
+
+def adjudicate_pairs(vault: Path, pairs: list[tuple[str, str]], symmetric: bool = True) -> tuple[list[dict], dict]:
+    """P(a link between them would help a reader) for each (a, b) of vault-relative note paths.
+
+    Returns (adjudications aligned with `pairs`, usage). An entry is None where a note is
+    missing or the backend skipped the question. Raises judge.JudgmentUnavailable /
+    judge.JudgmentFailed like judge.judge(); callers decide how to degrade.
+
+    `symmetric` (default) asks every pair twice, the second time with the two notes swapped,
+    and averages; `order_gap` reports how far the two views disagreed. Measured 2026-09-22 on
+    105 pairs: swapping which note is `a` moves the answer by 0.08-0.10 on average and up to
+    0.4-0.5, enough to flip a third of the labels, while rerunning the identical request moves
+    it by 0.02-0.04. It is an order effect, not batch cross-talk: one pair per request shows
+    the same swing (0.08) as forty, and forty ranks at least as well, so the batch stays large
+    and the second view is what makes a label worth reading.
+    """
+    usage_total = {"backend": "", "model": "", "requests": 0, "input_tokens": 0, "usd": 0.0}
+    cache: dict[str, dict] = {}
+    passes = [_adjudicate_once(vault, pairs, cache, usage_total)]
+    if symmetric:
+        mirrored = _adjudicate_once(vault, [(b, a) for a, b in reversed(pairs)], cache, usage_total)
+        passes.append(mirrored[::-1])
+    policy = LINK_POLICY.get(usage_total["backend"], {})
+    results: list[dict | None] = []
+    for views in zip(*passes, strict=True):
+        seen = [v for v in views if v is not None]
+        if not seen:
+            results.append(None)
+            continue
+        link = sum(v["link"] for v in seen) / len(seen)
+        gap = max(v["link"] for v in seen) - min(v["link"] for v in seen)
+        mechs = [v["mech"] for v in seen if v["mech"] is not None]
+        mech = sum(mechs) / len(mechs) if mechs else None
+        results.append({"p": round(link, 3), "label": _link_label(link, mech, policy, gap),
+                        "p_same_mechanism": round(mech, 3) if mech is not None else None,
+                        "order_gap": round(gap, 3), "views": len(seen),
+                        "backend": usage_total["backend"], "model": usage_total["model"],
+                        "questions_version": Q.QUESTIONS_VERSION})
     usage_total["usd"] = round(usage_total["usd"], 6)
     return results, usage_total
 

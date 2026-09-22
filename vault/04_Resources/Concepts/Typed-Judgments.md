@@ -71,6 +71,16 @@ a backend's own answer as a label.
   0.75. Its scale is compressed (real matches at 0.10-0.30), so it is read against its own low
   cut and only once the broad probability clears a floor: ranking transfers, thresholds do
   not. Three single-condition rewordings ranked no better and were dropped.
+- **2026-09-22, stability.** The same pair asked again moves by 0.02-0.04. Asked with the two
+  notes swapped it moves by 0.08-0.10 on average and up to 0.4-0.5, enough to flip a third of
+  the labels. One pair per request shows the same swing as forty, so it is an order effect,
+  not cross-talk between pairs. Cause class: *none of the five; a property of the backend*.
+  Mitigation is code, not wording: every pair is asked in both orders and averaged, the gap is
+  reported as `order_gap`, and a gap of 0.30 or more reads UNDECIDED whatever the average says.
+  After averaging: 14 of 70 gaiafield suggestions read LIKELY-LINK (9 real of 11), 16 read
+  LIKELY-NOISE (0 real). The per-capture distill questions were checked the same way: rerun drift 0.008, and
+  asking twice with the candidates reversed changed nothing (54/60 vs 55/60), so they stay at
+  one request; treat any answer within 0.1 of a cut as undecided.
 - **2026-09-22, distill golden set 45 → 68 rows.** Eight fixture captures with answers known by
   construction. 50/54 tune, 13/14 held out. New miss is a threshold (same-source 0.68 vs a 0.80
   cut), reported for a human decision, not changed.
