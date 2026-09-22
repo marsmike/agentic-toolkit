@@ -21,3 +21,6 @@ vault/.gaiafield/
 .DS_Store
 .env
 *.local.json
+
+# claude plugin eval run outputs
+plugins/*/skill-evals/results/

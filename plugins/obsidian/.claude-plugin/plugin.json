@@ -13,5 +13,8 @@
     "knowledge-management",
     "distillation",
     "retrieval"
-  ]
+  ],
+  "experimental": {
+    "evals": "skill-evals"
+  }
 }

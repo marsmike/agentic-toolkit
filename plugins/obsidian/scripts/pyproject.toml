@@ -18,3 +18,9 @@ semantic = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+# This directory is its own uv root. Without it, `uv run --project scripts` walks up to the
+# repository's pyproject.toml to check for workspace membership, which fails wherever the
+# repo root is unreadable (the `claude plugin eval` sandbox grants only the plugin dir).
+[tool.uv.workspace]
+members = []
