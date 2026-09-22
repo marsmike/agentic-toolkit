@@ -53,6 +53,14 @@ per candidate whether opening it would give the asker what they wanted. Twelve t
 questions: search alone puts the answer first 5 times and never finds 3; widened and
 reranked, 11 first and all 12 found, for about $0.0006 a query.
 
+`scripts/vault_sweep.py` judges pairs of existing notes for "same original work" and "claims
+that cannot both be true" (candidates: shared source address, gaiafield's inferred pairs);
+on one 1,476-note vault it found eleven plan files kept twice and seven same-day spec/plan
+pairs whose decisions conflict, for $0.06. `distill_judge.py --passages` marks which passages
+of a capture carry its substance and how the pipeline's synthesis relates to the article. The
+`links` check, with a backend, proposes a target for each broken wikilink and applies only
+above p = 0.80 under `--fix` (41 of 191 broken links in a 100-note sample; 22 more proposed).
+
 Two more report-only scripts use the same seam: `scripts/link_judge.py` adjudicates
 gaiafield's suggested links (would a link help a reader; gaiafield's own score and label
 are never changed, and `AMBIGUOUS` rows still appear only on request), and

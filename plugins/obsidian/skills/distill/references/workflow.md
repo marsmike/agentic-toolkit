@@ -160,6 +160,14 @@ changes nothing in the vault.
   answer first for 11 of 12 questions where keyword search alone manages 5 and misses 3
   entirely. The advisory block already uses the same widening for its related-note list
   (`via` names the hit a note was reached through).
+- **Read the essence first.** With `--passages`, the block also says which passages of the
+  capture carry a claim, number, mechanism or example worth keeping (`essence_text`) and
+  which are the capture pipeline's own summary rather than the source; and it labels how the
+  pipeline's synthesis relates to the article (`faithful` / `adds_framing` / `overstates` /
+  `misstates`, plus `p_reverses`). Read the essence, dip into the rest only where a kept
+  passage points at it, and never quote the synthesis as if it were the source when the label
+  is `overstates` or `misstates`. On three real captures the essence held 24 of 24 key claims
+  in 77% of the text.
 - **The block is a candidate list, not a ceiling.** On a 1,476-note vault the strongest L2
   target for one capture sat at raw search rank 8 and another was reachable only through
   the capture's own in-text citations; both are now fed in, but still read the raw

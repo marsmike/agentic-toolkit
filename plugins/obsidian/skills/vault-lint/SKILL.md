@@ -82,5 +82,10 @@ With a judgment backend configured (`judgment_*` in the profile, a key in the en
 description, descriptions too vague or padded to pick the note out in search, and domains a
 note is clearly about but does not carry as a tag. It writes nothing: treat it as a reading
 list, fix what you agree with, and leave `vault_normalize.py --fix` as the only thing that
-edits notes. `scripts/link_judge.py` does the same for gaiafield's suggested links. No key
-prints `SKIPPED`.
+edits notes. `scripts/link_judge.py` does the same for gaiafield's suggested links, and
+`scripts/vault_sweep.py` asks, over notes that share a source address and over gaiafield's
+inferred pairs, whether two notes are the same work and whether they make claims that cannot
+both be true: duplicates to merge and contradictions where an L3 callout was never written.
+With a judgment backend the `links` check also proposes a target for each broken wikilink
+(`vault_normalize.py` audit shows `apply:` or `propose:`; `--fix` writes only `apply`, at
+p ≥ 0.80). No key prints `SKIPPED`.

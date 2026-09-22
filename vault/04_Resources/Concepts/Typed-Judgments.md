@@ -115,6 +115,14 @@ a backend's own answer as a label.
   the reader's. The lever is at write time, so the workflow gained a findability check
   (step 7b): ask the questions you would type a year from now, and put those words in the
   description, which search weights twice.
+- **2026-09-22, questions .4, maintenance.** Passages: a Noul "is the synthesis faithful"
+  scored every real Readwise synthesis 0.3-0.5, because a synthesis adds framing by design;
+  cause class *question too strict for the policy*. Replaced by a four-way Choice (faithful /
+  adds_framing / overstates / misstates) plus a "reverses" Noul: real syntheses read
+  adds_framing at 0.6-0.8, a planted inversion reads misstates with reverses 0.07 → 0.58.
+  Sweep: a shared `source:` address is a candidate, not a verdict (one folder of 252 notes
+  shares a repository URL). Links: shortlist by name overlap, judge as a Choice with `none`;
+  apply at 0.80 with margin 0.30, propose at 0.50.
 
 ## Related
 

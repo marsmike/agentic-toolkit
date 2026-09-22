@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from judge import Question
 
-QUESTIONS_VERSION = "2026-09-22.3"
+QUESTIONS_VERSION = "2026-09-22.4"
 
 # One-line meaning of each placement target, sent as `vault_map` so `para` can point at it.
 VAULT_MAP = {
@@ -230,3 +230,92 @@ def answers_query(nid: str) -> Question:
         },
     )
 
+
+# --- capture passages (distill_judge --passages) ---
+
+def passage_keep(pid: str) -> Question:
+    return Question(
+        kind="noul",
+        instructions=f"Does `passages.{pid}` carry something a reader would want preserved from `capture_title`: a specific claim, number, mechanism, named idea or example?",
+        criteria={
+            "true": "it states a fact, figure, argument, mechanism or example that would be lost if the passage were dropped",
+            "false": "it is navigation, greeting, promotion, repetition of another passage, or so general that nothing is lost without it",
+        },
+    )
+
+
+def passage_pipeline(pid: str) -> Question:
+    return Question(
+        kind="noul",
+        instructions=f"Is `passages.{pid}` text written by the capture pipeline about the source (a summary, synthesis, metadata or processing note), rather than the source's own text?",
+        criteria={
+            "true": "it summarises, introduces or annotates the article, or records how it was captured",
+            "false": "it is the article's own prose, quotes, data or code",
+        },
+    )
+
+
+def summary_relation() -> Question:
+    """How a capture pipeline's synthesis relates to the article it summarises. A Noul asking
+    "is it faithful" scored every real synthesis 0.3-0.5 because syntheses add framing by
+    design; this Choice reads them as `adds_framing` and a planted inversion as `misstates`
+    (2026-09-22)."""
+    return Question(
+        kind="choice",
+        instructions="How does `summary` relate to `source_text`?",
+        criteria={
+            "faithful": "states what the source says, at the source's strength",
+            "adds_framing": "adds the summariser's own emphasis, ranking or context, but no new facts",
+            "overstates": "presents tentative or scoped findings as stronger or broader than the source does",
+            "misstates": "says something the source does not say, or the opposite of what it says",
+        },
+    )
+
+
+def summary_reverses() -> Question:
+    return Question(
+        kind="noul",
+        instructions="Does `summary` state the opposite of something `source_text` says, or attribute to the source a finding it denies?",
+        criteria={
+            "true": "at least one claim in the summary is reversed or contradicted by the source",
+            "false": "the summary may add framing or emphasis, but reverses nothing",
+        },
+    )
+
+
+# --- vault sweep (vault_sweep.py) ---
+
+def same_work(pid: str) -> Question:
+    return Question(
+        kind="noul",
+        instructions=f"Are `pairs.{pid}.a` and `pairs.{pid}.b` write-ups of the same original article, talk, paper or thread?",
+        criteria={
+            "true": "same work: same author and title, or a mirror, repost or copy of it, even under different addresses or note titles",
+            "false": "different works, even on the same topic or by the same author",
+        },
+    )
+
+
+def contradicts(pid: str) -> Question:
+    return Question(
+        kind="noul",
+        instructions=f"Do `pairs.{pid}.a` and `pairs.{pid}.b` make claims about the same thing that cannot both be true?",
+        criteria={
+            "true": "one states, as fact or finding, something the other denies, reverses, or gives an incompatible figure for",
+            "false": "they agree, or address different questions, or differ only in emphasis, scope or date",
+        },
+    )
+
+
+# --- broken links (checks/links.py) ---
+
+def link_target(lid: str) -> Question:
+    """Filled per link: options are candidate note names plus `none`."""
+    return Question(
+        kind="choice",
+        instructions=(
+            f"`links.{lid}.text` is a broken wikilink in a note; `links.{lid}.context` is the sentence around it. "
+            "Which existing note in `links." + lid + ".candidates` did the author mean? Pick `none` if no candidate is that note."
+        ),
+        criteria={},
+    )
