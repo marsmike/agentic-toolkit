@@ -32,6 +32,8 @@ cause taxonomy: `references/workflow.md`.
 - **Label blind.** When labelling new rows, read the capture and the note and write
   `expect` *before* looking at the backend's `proposed` value.
 - **A backend's answer is never a label.** Your labels are `labelled_by: claude`,
-  `strength: should`. Only a human sets `labelled_by: human` or `strength: must`.
+  `strength: should`. Only a human sets `labelled_by: human` or `strength: must`. A row
+  labelled with the backend's answer in view is `labelled_by: claude-anchored`: reported
+  in its own split, never swept, never part of pass/fail.
 - Runs against `./vault` (or a sandbox copy), needs a judgment key in the environment,
   writes no vault content, never runs in CI. Stop for review before anything is committed.

@@ -633,7 +633,9 @@ def calibrate(golden: dict, raw: dict[str, dict], backend: str, show_holdout: bo
     report: dict[str, Any] = {"questions_version": Q.QUESTIONS_VERSION, "splits": {}, "disagreements": [], "missing": []}
     sweeps: dict[str, list[tuple[float, bool]]] = {}
     for row in golden["rows"]:
-        split = row.get("split", "tune")
+        # Rows labelled with the backend's answer in view cannot measure the backend; they are
+        # reported apart and never sweep a threshold (Copilot review, PR #12).
+        split = "anchored" if row.get("labelled_by") == "claude-anchored" else row.get("split", "tune")
         value = raw.get(row["capture"], {}).get(row["qid"])
         if value is None:
             report["missing"].append({"capture": row["capture"], "qid": row["qid"]})
@@ -647,7 +649,7 @@ def calibrate(golden: dict, raw: dict[str, dict], backend: str, show_holdout: bo
         s["must_failed"] += (not ok) and row.get("strength") == "must"
         if isinstance(value, float) and isinstance(row["expect"], bool) and split == "tune":
             sweeps.setdefault(family, []).append((value, row["expect"]))
-        if not ok and (split == "tune" or show_holdout):
+        if not ok and (split == "tune" or (show_holdout and split != "anchored")):
             report["disagreements"].append({**row, "got": got, "answer": value})
     report["threshold_sweep"] = {
         family: [

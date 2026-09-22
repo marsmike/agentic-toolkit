@@ -536,7 +536,10 @@ def adjudicate_pairs(vault: Path, pairs: list[tuple[str, str]], symmetric: bool 
         gap = max(v["link"] for v in seen) - min(v["link"] for v in seen)
         mechs = [v["mech"] for v in seen if v["mech"] is not None]
         mech = sum(mechs) / len(mechs) if mechs else None
-        results.append({"p": round(link, 3), "label": _link_label(link, mech, policy, gap),
+        # One view of a pair that was asked for two is not agreement: the order effect this
+        # mitigates is exactly what the missing view would have shown.
+        label = _link_label(link, mech, policy, gap) if len(seen) == len(passes) else "UNDECIDED"
+        results.append({"p": round(link, 3), "label": label,
                         "p_same_mechanism": round(mech, 3) if mech is not None else None,
                         "order_gap": round(gap, 3), "views": len(seen),
                         "backend": usage_total["backend"], "model": usage_total["model"],

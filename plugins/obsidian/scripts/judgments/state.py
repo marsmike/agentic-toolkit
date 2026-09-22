@@ -1,6 +1,7 @@
 """State builders shared by every caller of judge.py: what one note looks like on the wire."""
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, TypeVar
@@ -26,8 +27,16 @@ def note_payload(path: Path, vault: Path, chars: int = NOTE_CHARS) -> dict[str, 
 
 def domain_glosses(vault: Path, default: dict[str, str]) -> dict[str, str]:
     """The vault's domain taxonomy: profile key `domains` ({name: one-line meaning}, or a
-    plain list of names), else the shipped starter set. Names are the part after `domain/`."""
+    plain list of names), else the shipped starter set. Names are the part after `domain/`.
+    The env override `TOOLKIT_OBSIDIAN_DOMAINS` is a string like every env override: either a
+    JSON object/array, or a comma-separated list of names."""
     configured = profile_value(vault, "domains", None)
+    if isinstance(configured, str) and configured.strip():
+        text = configured.strip()
+        try:
+            configured = json.loads(text) if text[0] in "[{" else [n.strip() for n in text.split(",") if n.strip()]
+        except json.JSONDecodeError:
+            configured = [n.strip() for n in text.split(",") if n.strip()]
     if isinstance(configured, dict) and configured:
         return {str(k).removeprefix("domain/"): str(v or "") for k, v in configured.items()}
     if isinstance(configured, list) and configured:

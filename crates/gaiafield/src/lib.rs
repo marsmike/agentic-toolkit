@@ -1260,8 +1260,12 @@ fn vector_to_bytes(v: &[f32]) -> Vec<u8> {
 }
 
 fn bytes_to_vector(b: &[u8]) -> Vec<f32> {
-    b.chunks_exact(4)
-        .map(|c| f32::from_le_bytes(c.try_into().expect("chunks_exact(4) yields 4 bytes")))
+    // `as_chunks` is what clippy 1.98 asks for; the remainder of a non-multiple-of-4 blob is
+    // dropped exactly as `chunks_exact` dropped it. [earned: CI 2026-09-22, toolchain moved]
+    b.as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| f32::from_le_bytes(*c))
         .collect()
 }
 

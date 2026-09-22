@@ -21,7 +21,7 @@ corpus, [[Alex-Vega]] for the fictional persona the demo projects below belong t
 
 One line per active note in `02_Projects`, `03_Areas`, `04_Resources` — schema in
 `contract/VAULT_SCHEMA.md`. Excludes `00_Memory`, `01_Capture`, and `05_Archive` by
-convention (see [[Test-Corpus-Map]]). 79 entries.
+convention (see [[Test-Corpus-Map]]). 81 entries.
 
 ## 02_Projects
 

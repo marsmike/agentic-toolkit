@@ -210,12 +210,17 @@ def _live_phase(dj, sandbox: Path, saved_env: dict, problems: list[str]) -> str:
     golden["rows"] = [r for r in golden["rows"] if r.get("expect") is not None]
     run = dj.run_golden(golden, sandbox, top=8, exclude=[], base=GOLDEN.parent.parent)
     report = dj.calibrate(golden, run["raw"], run["usages"][0]["backend"], show_holdout=True)
-    n = sum(f["n"] for split in report["splits"].values() for f in split.values())
-    agree = sum(f["agree"] for split in report["splits"].values() for f in split.values())
-    must_failed = sum(f["must_failed"] for split in report["splits"].values() for f in split.values())
+    scored = {k: v for k, v in report["splits"].items() if k != "anchored"}
+    n = sum(f["n"] for split in scored.values() for f in split.values())
+    agree = sum(f["agree"] for split in scored.values() for f in split.values())
+    must_failed = sum(f["must_failed"] for split in scored.values() for f in split.values())
+    anchored = report["splits"].get("anchored", {})
+    an = sum(f["n"] for f in anchored.values())
+    aa = sum(f["agree"] for f in anchored.values())
     if must_failed:
         problems.append(f"live: {must_failed} 'must' row(s) disagreed: " +
                         ", ".join(f"{d['capture']}::{d['qid']}" for d in report["disagreements"] if d.get("strength") == "must"))
     if n and agree / n < 0.85:
         problems.append(f"live: agreement {agree}/{n} is below 0.85")
-    return f"live: {agree}/{n} agree, model {run['usages'][0]['model']}, questions {report['questions_version']}"
+    return (f"live: {agree}/{n} agree on unanchored rows ({aa}/{an} anchored, informational), "
+            f"model {run['usages'][0]['model']}, questions {report['questions_version']}")

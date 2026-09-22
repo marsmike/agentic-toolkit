@@ -178,9 +178,15 @@ def _parse_answer(raw: dict) -> Answer | None:
     kind = raw.get("type")
     if kind == "noul" and isinstance(raw.get("noul"), (int, float)):
         return Answer(kind="noul", p=float(raw["noul"]))
-    if kind == "choice" and isinstance(raw.get("probabilities"), dict):
-        probs = {str(k): float(v) for k, v in raw["probabilities"].items()}
-        return Answer(kind="choice", probs=probs, top=raw.get("choice") or max(probs, key=probs.get))
+    if kind == "choice" and isinstance(raw.get("probabilities"), dict) and raw["probabilities"]:
+        try:
+            probs = {str(k): float(v) for k, v in raw["probabilities"].items()}
+        except (TypeError, ValueError):
+            return None
+        top = raw.get("choice")
+        if top not in probs:  # a label the backend did not score is not a usable top
+            top = max(probs, key=probs.get)
+        return Answer(kind="choice", probs=probs, top=top)
     return None
 
 

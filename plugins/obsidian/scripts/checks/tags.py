@@ -111,11 +111,14 @@ def _parse_llm_response(raw: str, names: set[str] | None = None) -> list[str]:
     return result
 
 
-def _migrate_legacy_tags(tags: list[str]) -> list[str]:
+def _migrate_legacy_tags(tags: list[str], canonical: set[str] | None = None) -> list[str]:
+    """Map legacy free-form tags onto canonical domain tags. With a vault taxonomy
+    (`canonical`), a legacy tag whose starter target is not in it is left alone rather than
+    turned into a tag the vault does not use."""
     result: list[str] = []
     domains_added: set[str] = set()
     for tag in tags:
-        if tag in LEGACY_MIGRATION:
+        if tag in LEGACY_MIGRATION and (canonical is None or LEGACY_MIGRATION[tag] in canonical):
             domain_tag = LEGACY_MIGRATION[tag]
             if domain_tag not in domains_added:
                 result.append(domain_tag)
@@ -157,7 +160,8 @@ def fix(
     existing_tags: list[str] = list(fm.get("tags", []))
     results: list[FixResult] = []
 
-    migrated = _migrate_legacy_tags(existing_tags)
+    canonical = {f"domain/{n}" for n in domain_names(vault)}
+    migrated = _migrate_legacy_tags(existing_tags, canonical)
     if migrated != existing_tags:
         removed = set(existing_tags) - set(migrated)
         added = set(migrated) - set(existing_tags)
@@ -165,7 +169,7 @@ def fix(
         existing_tags = migrated
         results.append(FixResult(note_path, "tags", True, f"Migrated legacy tags: removed {removed}, added {added}"))
 
-    if any(t.startswith("domain/") for t in existing_tags):
+    if any(t in canonical for t in existing_tags):
         return fm, body, results
 
     title = note_path.stem
