@@ -93,6 +93,28 @@ a backend's own answer as a label.
   **11 first, 12 found**, 0.7 s, $0.0006. Lesson, same as the extraction pipelines report: the
   judge is only as good as its candidate list, and the graph is a second candidate generator
   that costs nothing.
+- **2026-09-22, questions .3, replay on a real vault.** Three archived captures re-distilled
+  with their old notes hidden, then judged blind against the old notes by a careful editor.
+  Preservation: 9/9 vs 9/9 in every case, so the writing is Claude's and the judgments
+  change nothing there. Linking decided all three: new wins two (9 vs 6, 8 vs 6; and it
+  caught a same-source duplicate the old run had created), old wins one (9 vs 4). The lost
+  case's good links were principle-level bridges (Observability, Self-Preference-Bias,
+  Representation-Steering) that share no vocabulary with the capture: search never proposed
+  them, gaiafield's static embeddings proposed five candidates that were all noise, and the
+  old run had them only because it distilled a batch together. Two causes fixed in code:
+  the capture query carried Readwise header boilerplate (stripped), and the relevance
+  question was topic-bound, scoring those bridges at 0.36-0.52 while a "same underlying
+  principle, even in another field" wording scores them 0.61-0.71 and non-links 0.33-0.45;
+  it is now a second channel (`p_principle`, rows it alone selects marked `bridge`). The
+  cause left open is candidate generation: nothing in the stack proposes a cross-domain
+  bridge for a fresh capture, and a judge cannot select what is not on the list.
+- **2026-09-22, findability.** Nine recall questions written from the captures alone, in a
+  reader's words: old notes found 7/9, new notes 5/9, plain search 6/9 and 5/9. Two of three
+  questions about one note found nothing under BM25, under BM25 plus bge-micro, and with
+  thirty candidates, although the note held every claim. Cause: the note's own words versus
+  the reader's. The lever is at write time, so the workflow gained a findability check
+  (step 7b): ask the questions you would type a year from now, and put those words in the
+  description, which search weights twice.
 
 ## Related
 

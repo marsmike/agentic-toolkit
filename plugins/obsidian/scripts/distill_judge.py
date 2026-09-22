@@ -41,7 +41,7 @@ from vault_utils import discover_notes, read_frontmatter, require_vault, write_d
 CAPTURE_CHARS = 6000
 BATCH_CAPTURE_CHARS = 2000
 MAX_BATCH = 12  # 12 captures -> 132 directed pairs in one request
-QUERY_BODY_CHARS = 400
+QUERY_BODY_CHARS = 600
 MAX_LISTED_FOLDERS = 60
 NOTES_PER_REQUEST = 8  # candidate notes per request; the capture rides along in each. A real
 # vault's capture plus 40 widened candidates exceeded the backend's input limit (2026-09-22).
@@ -58,6 +58,7 @@ THRESHOLDS: dict[str, dict[str, float]] = {
     "jev": {
         "T_TRIAGE": 0.60,            # below this top probability: no triage recommendation
         "T_RELEVANT": 0.50,          # rel_* at or above: enrichment candidate
+        "T_PRINCIPLE": 0.55,         # prin_* at or above: a cross-domain bridge, also a candidate
         "T_UPGRADE": 0.75,           # relation must be this sure before suggesting L2/L3 over L1
         "T_COVERS": 0.80,            # covers_* at or above: probably the same original work
         "T_DOMAIN": 0.50,
@@ -85,6 +86,19 @@ def _h1_or_stem(body: str, path: Path) -> str:
         if line.startswith("# "):
             return line[2:].strip()
     return path.stem
+
+
+HEADER_LINE_RE = re.compile(r"^\s*\*\*(Source|Author|Saved|Captured|Origin|Published|URL)\*\*\s*:", re.I)
+
+
+def query_text(capture: dict) -> str:
+    """What search sees for a capture: title, description, and the first content lines with
+    the capture pipeline's own header (**Source:** … **Saved:** …) and bare URLs stripped.
+    [earned: 2026-09-22 replay — a Readwise capture's first 400 chars were all header, and the
+    note that mattered ranked #2 on a clean query and nowhere on the boilerplate one]"""
+    lines = [ln for ln in capture["body"].splitlines() if ln.strip() and not HEADER_LINE_RE.match(ln) and not ln.startswith("# ")]
+    content = URL_RE.sub(" ", " ".join(lines))
+    return " ".join([capture["title"], capture["description"], content[:QUERY_BODY_CHARS]])
 
 
 def read_capture(path: Path) -> dict[str, Any]:
@@ -127,11 +141,27 @@ def _excluded(rel: str, exclude: list[str]) -> bool:
     return any(rel == e or rel.startswith(e.rstrip("/") + "/") for e in exclude)
 
 
+WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)")
+
+
+def cited_notes(capture: dict, vault: Path) -> list[str]:
+    """Notes the capture itself names with a wikilink (a Readwise capture often carries the
+    pipeline's own cross-references). [earned: 2026-09-22 replay on a real vault — the strongest
+    L2 target for one capture was reachable only through the capture's in-text citations]"""
+    by_stem: dict[str, str] = {}
+    for path in discover_notes(vault):
+        by_stem.setdefault(path.stem, path.relative_to(vault).as_posix())
+    return [by_stem[t.strip().split("/")[-1]] for t in WIKILINK_RE.findall(capture["body"]) if t.strip().split("/")[-1] in by_stem]
+
+
 def candidates(capture: dict, vault: Path, top: int, exclude: list[str], force: list[str]) -> tuple[list[dict], dict]:
-    """Search results, plus every URL hit, plus any path the caller forces in (calibration)."""
-    query = " ".join([capture["title"], capture["description"], capture["body"][:QUERY_BODY_CHARS]])
-    found = search(query, vault, top=top)
+    """Search results widened by their neighbours, the notes the capture cites, every URL hit,
+    and any path the caller forces in (calibration). On a large vault the right note is often
+    at search rank 8-12, so `top` is the *judged* count and search runs a little deeper."""
+    found = search(query_text(capture), vault, top=max(top, 12))
     hits = url_hits(capture, vault, exclude)
+    for rel in cited_notes(capture, vault):
+        hits.setdefault(rel, "cited")
     rows: dict[str, dict] = {}
     # Search hits, then the notes those hits link to (deterministic, free): the answer to
     # "which existing note is this capture really about" is often one link away from the
@@ -140,7 +170,7 @@ def candidates(capture: dict, vault: Path, top: int, exclude: list[str], force: 
         rows[r["path"]] = {"search_score": r.get("score"), "above_enrichment_gate": r.get("above_enrichment_gate"),
                            "via": r.get("via")}
     for rel in [*hits, *force]:
-        rows.setdefault(rel, {"search_score": None, "above_enrichment_gate": None})
+        rows.setdefault(rel, {"search_score": None, "above_enrichment_gate": None, "via": None})
     out = []
     for rel, extra in rows.items():
         path = vault / rel
@@ -180,7 +210,7 @@ def build_request(capture: dict, notes: list[dict], vault: Path, first: int = 0,
             questions[f"dom_{name}"] = Q.domain(name)
             stable[f"dom_{name}"] = f"dom|{name}"
     for nid, n in note_ids.items():
-        for family, make in (("rel", Q.relevant), ("relation", Q.relation), ("covers", Q.covers)):
+        for family, make in (("rel", Q.relevant), ("prin", Q.same_principle), ("relation", Q.relation), ("covers", Q.covers)):
             questions[f"{family}_{nid}"] = make(nid)
             stable[f"{family}_{nid}"] = f"{family}|{n['path']}"
     return state, questions, stable
@@ -199,7 +229,10 @@ def apply_policy(notes: list[dict], answers: dict[str, Answer], t: dict[str, flo
     for i, n in enumerate(notes, start=1):
         nid = f"N{i:02d}"
         rel, relation, covers = answers.get(f"rel_{nid}"), answers.get(f"relation_{nid}"), answers.get(f"covers_{nid}")
-        judged = rel is not None and rel.p >= t["T_RELEVANT"]
+        prin = answers.get(f"prin_{nid}")
+        by_topic = rel is not None and rel.p >= t["T_RELEVANT"]
+        by_principle = prin is not None and prin.p >= t["T_PRINCIPLE"]
+        judged = by_topic or by_principle
         level = None
         if judged and relation is not None:
             sure = relation.probs.get(relation.top, 0.0) >= t["T_UPGRADE"]
@@ -208,14 +241,15 @@ def apply_policy(notes: list[dict], answers: dict[str, Answer], t: dict[str, flo
         related.append({
             "path": n["path"], "title": n["title"], "search_score": n["search_score"], "via": n.get("via"),
             "above_enrichment_gate": n["above_enrichment_gate"], "url_hit": n["url_hit"],
-            "p_relevant": round(rel.p, 3) if rel else None, "judged_relevant": judged,
+            "p_relevant": round(rel.p, 3) if rel else None, "p_principle": round(prin.p, 3) if prin else None,
+            "judged_relevant": judged, "bridge": by_principle and not by_topic,
             "relation": relation.top if relation else None, "relation_probs": _probs(relation),
             "suggested_level": level,
             "p_covers": round(covers.p, 3) if covers else None,
         })
-    related.sort(key=lambda r: -(r["p_relevant"] or 0.0))
+    related.sort(key=lambda r: -max(r["p_relevant"] or 0.0, r["p_principle"] or 0.0))
 
-    canonical = [r["path"] for r in related if r["url_hit"] == "frontmatter"]
+    canonical = [r["path"] for r in related if r["url_hit"] == "frontmatter"]  # "cited" and "body" are not provenance
     covering = [r["path"] for r in related if (r["p_covers"] or 0.0) >= t["T_COVERS"] and r["path"] not in canonical]
     body_hit = [r["path"] for r in related if r["url_hit"] == "body"]
     if canonical:
@@ -273,7 +307,9 @@ def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: 
                   views: int = VIEWS) -> dict[str, Any]:
     capture = read_capture(path)
     notes, search_meta = candidates(capture, vault, top, exclude, force or [])
-    notes = notes[:MAX_CANDIDATES]
+    # Forced and URL-hit notes are never dropped by the cap; search rows after them are.
+    pinned = [n for n in notes if n.get("url_hit") or n["path"] in (force or [])]
+    notes = (pinned + [n for n in notes if n not in pinned])[:MAX_CANDIDATES]
     per_view, usages = [], []
     for view in range(views):
         ordered = notes if view % 2 == 0 else notes[::-1]
@@ -352,7 +388,7 @@ def _decide(key: str, value: Any, t: dict[str, float]) -> Any:
     family = key.split("|", 1)[0]
     if isinstance(value, dict):
         return max(value, key=value.get) if value else None
-    cut = {"rel": t["T_RELEVANT"], "covers": t["T_COVERS"], "dom": t["T_DOMAIN"], "adds": 1 - t["T_REDUNDANT"]}.get(family, 0.5)
+    cut = {"rel": t["T_RELEVANT"], "prin": t["T_PRINCIPLE"], "covers": t["T_COVERS"], "dom": t["T_DOMAIN"], "adds": 1 - t["T_REDUNDANT"]}.get(family, 0.5)
     return value >= cut
 
 
@@ -483,8 +519,8 @@ def _print_text(result: dict) -> None:
         print(f"place:  {b['placement']['folder'] or 'AMBIGUOUS'}  {b['placement']['probs']}")
         print(f"domains: {b['domains']}")
         for r in b["related"]:
-            flag = "*" if r["judged_relevant"] else " "
-            print(f" {flag} {r['p_relevant']}  {r['suggested_level'] or '--'}  {r['relation'] or '':<20} {r['path']}")
+            flag = "b" if r.get("bridge") else "*" if r["judged_relevant"] else " "
+            print(f" {flag} {r['p_relevant']} {r.get('p_principle')}  {r['suggested_level'] or '--'}  {r['relation'] or '':<20} {r['path']}")
     if result.get("batch"):
         for p in result["batch"].get("cluster", []):
             print(f"pair: {p['verdict']:<16} {p['a']} ({p['a_adds']}) <-> {p['b']} ({p['b_adds']})")
@@ -494,7 +530,7 @@ def _print_text(result: dict) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("captures", nargs="*", help="capture notes (vault-relative or absolute)")
-    ap.add_argument("--top", type=int, default=8, help="search results judged per capture")
+    ap.add_argument("--top", type=int, default=12, help="search results judged per capture (before widening)")
     ap.add_argument("--exclude", action="append", default=[], help="vault-relative prefix never sent to the backend (repeatable)")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--calibrate", metavar="GOLDEN", help="score the backend against a golden file instead of judging captures")

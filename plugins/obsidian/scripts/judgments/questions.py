@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from judge import Question
 
-QUESTIONS_VERSION = "2026-09-22.2"
+QUESTIONS_VERSION = "2026-09-22.3"
 
 # One-line meaning of each placement target, sent as `vault_map` so `para` can point at it.
 VAULT_MAP = {
@@ -62,6 +62,24 @@ def relevant(nid: str) -> Question:
                 f"`notes.{nid}` only shares vocabulary, a broad topic area, or a folder with `capture`, "
                 "or relates only to how captures are collected, named or processed"
             ),
+        },
+    )
+
+
+def same_principle(nid: str) -> Question:
+    """Second relevance channel: the cross-domain bridge an expert links by principle, which the
+    topic-bound `relevant()` under-rates. [earned: 2026-09-22 replay on a real vault — the notes
+    a careful editor prized in the old note (Observability, Representation-Steering, NN-Bytecode)
+    scored 0.36-0.52 on `relevant` and 0.61-0.71 on this wording; non-links stayed at 0.33-0.45]"""
+    return Question(
+        kind="noul",
+        instructions=(
+            f"Do `capture` and `notes.{nid}` illustrate the same underlying principle or pattern, "
+            "even if they are about different subjects or fields?"
+        ),
+        criteria={
+            "true": "a reader who understood one would recognise the same idea at work in the other",
+            "false": "no shared idea beyond a common domain or vocabulary",
         },
     )
 

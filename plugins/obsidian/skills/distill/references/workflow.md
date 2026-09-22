@@ -142,7 +142,8 @@ uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scri
 
 It sends the capture and the top search results to a typed-judgment backend (profile
 keys `judgment_*`, see `profile.example.md`) and returns one block: what kind of material
-the capture is, `p_relevant` and a suggested enrichment level per related note,
+the capture is, `p_relevant` (same subject) and `p_principle` (same idea in another field;
+rows it alone selects are marked `bridge`) with a suggested enrichment level per related note,
 `p_covers` (step 2), domains, and a placement with an explicit `ambiguous` flag. It
 changes nothing in the vault.
 
@@ -159,6 +160,10 @@ changes nothing in the vault.
   answer first for 11 of 12 questions where keyword search alone manages 5 and misses 3
   entirely. The advisory block already uses the same widening for its related-note list
   (`via` names the hit a note was reached through).
+- **The block is a candidate list, not a ceiling.** On a 1,476-note vault the strongest L2
+  target for one capture sat at raw search rank 8 and another was reachable only through
+  the capture's own in-text citations; both are now fed in, but still read the raw
+  `search.py` output past the top few and follow the capture's wikilinks yourself.
 - **No backend or no key** prints `SKIPPED` and exits 0: say so in one line and carry on
   exactly as before. This is the normal state of a fresh clone, not an error.
 - A configured backend that fails writes its own DLQ note and exits 1; mention it and
@@ -211,6 +216,16 @@ Confirm the `*Source:*` line and `source:` frontmatter both point at the externa
 original, never at `01_Capture/` or `05_Archive/`. If the capture carried other
 substantive URLs (papers, repos, docs), confirm each landed in the note or in a
 `## See also` section — a dropped link is unrecoverable once the capture is retired.
+
+## 7b. Findability check
+
+Before enriching, write down two or three questions you would type a year from now to find
+this note, in plain words that do not reuse its title, and run each through `search.py`
+(or `search_judge.py` when a judgment backend is available). If the note is not in the top
+three, its `description` is the lever: it is indexed with double weight, so put the words a
+future reader would use into it, not only the terms of art. A note nobody can find from
+memory has not been distilled, only filed. [earned: 2026-09-22 replay — two of three recall
+questions for one freshly distilled note found nothing, though the note held every claim]
 
 ## 8. Enrich related notes — three-level decision per note
 
