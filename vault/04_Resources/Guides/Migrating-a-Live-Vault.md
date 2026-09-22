@@ -29,6 +29,14 @@ Every step below runs against `$COPY` until the last section. Put the copy under
 control (`git init && git add -A && git commit -m baseline`) so every step's effect is a diff
 you can read.
 
+Before that first commit, two sweeps that no plugin check does for you. A long-lived vault
+collects **secrets** (an env file, an SSH private key, API keys pasted into a how-to note, a
+password next to a share link) and, if you use it for work too, **material that belongs to your
+employer**. Grep the text files for key-shaped strings, and read the hits; decide per file
+whether it leaves the vault or goes into `.gitignore`. On the first real migration (2026-09-22)
+this found a private key, five live API keys and a Jira export — none of which any lint reports,
+and all of which a `git add -A` would have committed.
+
 ## 2. Baselines
 
 What one real vault of about 1,500 notes showed at this step (2026-09-22), so you know what to
@@ -62,6 +70,16 @@ Run `vault_lint.py` and `vault_normalize.py` (audit only, no `--fix`) and look a
 of findings before anything else. A thousand "non-canonical domain tag" warnings means the
 `domains` key is wrong, not the vault. Then `vault_judge.py` for the quality reading list; it
 writes nothing.
+
+Then repair, each step dry-run first and its own commit:
+
+1. `vault_yaml_repair.py` — frontmatter that does not parse hides a note from every other check.
+2. `vault_normalize.py --check frontmatter --fix` — lifecycle words outside the contract
+   (`shipped`, `living`, `ready-to-paste`, …) map to the five statuses; the word is kept in `stage:`.
+3. Descriptions: `vault_judge.py`'s weak and missing lists are the work queue. A description is
+   what search weights and what Index.md shows, so rewrite each from the note's content.
+4. `vault_normalize.py --check links --fix` — writes only confident repairs; read the rest.
+5. `index_build.py` — Index.md from the descriptions; afterwards `vault_lint.py` shows no drift.
 
 ## 5. Search parity before you drop the old search
 
@@ -101,6 +119,10 @@ Snapshot the real vault (sync history, a tarball, or both). Point `TOOLKIT_VAULT
 `toolkit doctor`, distill **one** capture end to end with the Phase 1 checkpoint on, read the
 diff. Then the backlog, in batches small enough to review. Update the vault's own `CLAUDE.md`
 last, once it describes what actually runs.
+
+Keep git on the real vault too. Obsidian Sync does not sync hidden folders, so `.git/` lives beside
+Sync without conflict; a `.gitignore` for binaries, plugin state and any file that holds a secret
+keeps the repository small enough for a private remote. Every later agent edit is then a diff.
 
 ## Related
 

@@ -2,6 +2,18 @@
 
 Every release entry links the change to the research or the dated failure that motivated it — this file is the public ratchet.
 
+## [Unreleased] — tools from migrating a live vault
+
+What the first real migration (a ~1,200-note vault, 2026-09-22) needed that the plugin lacked. The
+normalize audit went from 810 issues to 370 and Index.md drift from 148 dangling / 73 missing /
+277 bootstrap entries to none.
+
+- **`scripts/vault_yaml_repair.py`** — frontmatter that does not parse is invisible to every other check; 81 notes on the real vault failed for two mechanical reasons (an unquoted `: ` or `@handle`, a corrupted opening delimiter). One-line repairs, bodies untouched, the archive only on request; anything else is reported. The eval caught a Templater `{{date}}` case the rehearsal script had missed.
+- **`scripts/index_build.py`** — Index.md from each note's own `description`, no model call. Replaces v1's Gemma pass, which produced a second summary per note that drifted from the description search actually weights. A note without a description keeps its previous line and is marked ⚙; ✓/⚠ carry over; a rebuild leaves vault_lint with no drift.
+- **`checks/links.py`** — `[[Note#Heading]]`, `[[Note^block]]`, `[[#Heading]]` and the table-escaped `[[Note\|alias]]` were all reported broken, and a repair rebuilt the link, dropping anchor and alias; a missing `[[Person]]` inside that person's article was repaired into a self-link. All three fixed, each with an eval phase shown to fail on the old code.
+- **`checks/frontmatter.py`** — sixteen lifecycle words on 80 real notes (`capture`, `living`, `shipped`, `ready-to-paste`, …) map to the contract's five statuses without a model, and the original word is kept in `stage:`. The fix label now says what decided it (it claimed "via LLM" for the no-model default).
+- **Measured on the real vault** — Jev reviewed 1,206 notes for $0.08: 124 confident domain suggestions (104 applied where a note still lacked the domain) and 179 weak plus 24 missing descriptions, which were then rewritten from each note's content and verified line-level.
+
 ## [2.9.0] — R9, typed judgments on suggested links, and a quality reading list
 
 - **plugins/obsidian 2.9.0: `graph.adjudicate_candidates()` and `scripts/link_judge.py`** — gaiafield's inferred candidates gain an advisory `adjudication` per pair from two narrow questions asked in one request: would a link help a reader (`p`), and are the two notes about the same underlying idea (`p_same_mechanism`). gaiafield's own score, label and order are never touched, the block stays report-only under KNOWLEDGE_API rule 1, AMBIGUOUS rows still appear only on request, and no key degrades silently (`GraphUnavailable("no-judgment")`). No Rust change; the crate neither knows about it nor depends on it.
