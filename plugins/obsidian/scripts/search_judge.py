@@ -24,13 +24,14 @@ import json
 import graph
 import judge
 from judgments import questions as Q
-from judgments.state import note_payload
+from judgments.state import in_chunks, note_payload
 from search import search
 from vault_utils import require_vault
 
 RERANK_CHARS = 1500
 EXPAND_FROM = 3  # top search hits whose wikilink neighbours join the candidate list
 MAX_CANDIDATES = 40
+NOTES_PER_REQUEST = 12  # a real vault's 40 candidates at 1,500 chars each exceeded the backend's input limit
 # Below this probability a candidate is shown but marked as not an answer. Policy, per backend.
 THRESHOLDS = {"jev": {"T_ANSWERS": 0.50}}
 
@@ -65,13 +66,24 @@ def rerank(query: str, vault, top: int, exclude: list[str], widen: bool = True) 
         rows = [r for r in expand(rows, vault) if not _excluded(r["path"], exclude)][:MAX_CANDIDATES]
     if not rows:
         return {**found, "results": rows, "reranked": False}
-    state = {"query": query, "notes": {}}
-    questions = {}
-    for i, r in enumerate(rows, start=1):
-        nid = f"N{i:02d}"
-        state["notes"][nid] = note_payload(vault / r["path"], vault, RERANK_CHARS)
-        questions[f"ans_{nid}"] = Q.answers_query(nid)
-    answers, usage = judge.judge(vault, state, questions)
+    usages = []
+
+    def ask(chunk, start):
+        state, questions = {"query": query, "notes": {}}, {}
+        for i, r in enumerate(chunk, start=start + 1):
+            nid = f"N{i:02d}"
+            state["notes"][nid] = note_payload(vault / r["path"], vault, RERANK_CHARS)
+            questions[f"ans_{nid}"] = Q.answers_query(nid)
+        got, used = judge.judge(vault, state, questions)
+        usages.append(used)
+        return got
+
+    answers = in_chunks(rows, NOTES_PER_REQUEST, ask)
+    usage = usages[0]
+    for used in usages[1:]:
+        usage.requests += used.requests
+        usage.input_tokens += used.input_tokens
+        usage.usd += used.usd
     t = THRESHOLDS[usage.backend]
     for i, r in enumerate(rows, start=1):
         a = answers.get(f"ans_N{i:02d}")

@@ -33,7 +33,7 @@ from typing import Any
 import judge
 from judge import Answer, JudgmentFailed, JudgmentUnavailable, Question
 from judgments import questions as Q
-from judgments.state import domain_glosses, note_payload
+from judgments.state import domain_glosses, in_chunks, note_payload
 from search import search
 from search_judge import expand
 from vault_utils import discover_notes, read_frontmatter, require_vault, write_dlq_note
@@ -43,6 +43,9 @@ BATCH_CAPTURE_CHARS = 2000
 MAX_BATCH = 12  # 12 captures -> 132 directed pairs in one request
 QUERY_BODY_CHARS = 400
 MAX_LISTED_FOLDERS = 60
+NOTES_PER_REQUEST = 8  # candidate notes per request; the capture rides along in each. A real
+# vault's capture plus 40 widened candidates exceeded the backend's input limit (2026-09-22).
+MAX_CANDIDATES = 24
 # Requests per capture; an even number also asks with the candidate notes in reverse order and
 # averages. Left at 1: measured 2026-09-22, an identical rerun moves a noul by 0.008 on average
 # (max 0.09) and two views by 0.006, with golden agreement unchanged (54/60 vs 55/60). Unlike
@@ -153,10 +156,13 @@ def candidates(capture: dict, vault: Path, top: int, exclude: list[str], force: 
 # ---------------------------------------------------------------------------
 
 
-def build_request(capture: dict, notes: list[dict], vault: Path) -> tuple[dict, dict[str, Question], dict[str, str]]:
-    """(state, questions, qid -> stable key). Stable keys name notes by path, not by the
-    per-run N01.. ids, so a golden file survives a change in search order."""
-    note_ids = {f"N{i:02d}": n for i, n in enumerate(notes, start=1)}
+def build_request(capture: dict, notes: list[dict], vault: Path, first: int = 0,
+                  capture_questions: bool = True) -> tuple[dict, dict[str, Question], dict[str, str]]:
+    """(state, questions, qid -> stable key) for `notes`, numbered from `first + 1`. Stable
+    keys name notes by path, not by the per-run N01.. ids, so a golden file survives a change
+    in search order. Capture-level questions (triage, placement, domains) go in one request
+    only; the per-note questions are asked in chunks that each carry the capture again."""
+    note_ids = {f"N{first + i:02d}": n for i, n in enumerate(notes, start=1)}
     state = {
         "capture": capture,
         "vault_map": Q.VAULT_MAP,
@@ -165,11 +171,14 @@ def build_request(capture: dict, notes: list[dict], vault: Path) -> tuple[dict, 
         "domains": domain_glosses(vault, Q.DOMAIN_GLOSS),
         "notes": {nid: {k: n[k] for k in ("title", "path", "description", "source", "body_head")} for nid, n in note_ids.items()},
     }
-    questions: dict[str, Question] = {"triage": Q.triage(), "para": Q.para(), "concept_vs_root": Q.concept_vs_root()}
-    stable = {"triage": "triage", "para": "para", "concept_vs_root": "concept_vs_root"}
-    for name in state["domains"]:
-        questions[f"dom_{name}"] = Q.domain(name)
-        stable[f"dom_{name}"] = f"dom|{name}"
+    questions: dict[str, Question] = {}
+    stable: dict[str, str] = {}
+    if capture_questions:
+        questions.update({"triage": Q.triage(), "para": Q.para(), "concept_vs_root": Q.concept_vs_root()})
+        stable.update({"triage": "triage", "para": "para", "concept_vs_root": "concept_vs_root"})
+        for name in state["domains"]:
+            questions[f"dom_{name}"] = Q.domain(name)
+            stable[f"dom_{name}"] = f"dom|{name}"
     for nid, n in note_ids.items():
         for family, make in (("rel", Q.relevant), ("relation", Q.relation), ("covers", Q.covers)):
             questions[f"{family}_{nid}"] = make(nid)
@@ -264,16 +273,22 @@ def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: 
                   views: int = VIEWS) -> dict[str, Any]:
     capture = read_capture(path)
     notes, search_meta = candidates(capture, vault, top, exclude, force or [])
+    notes = notes[:MAX_CANDIDATES]
     per_view, usages = [], []
     for view in range(views):
         ordered = notes if view % 2 == 0 else notes[::-1]
-        state, questions, stable = build_request(capture, ordered, vault)
-        raw, used = judge.judge(vault, state, questions)
-        per_view.append({stable[qid]: a for qid, a in raw.items()})
-        usages.append(used)
+        def ask(chunk, start):
+            state, questions, stable = build_request(capture, chunk, vault, first=start, capture_questions=(start == 0))
+            raw, used = judge.judge(vault, state, questions)
+            usages.append(used)
+            return {stable[qid]: a for qid, a in raw.items()}
+
+        per_view.append(in_chunks(ordered, NOTES_PER_REQUEST, ask) if ordered else ask([], 0))
     by_key = _average(per_view)
     # apply_policy() reads per-run ids in the order of `notes`; rebuild that view from the averages.
-    _, _, stable = build_request(capture, notes, vault)
+    stable = {}
+    for c in range(0, len(notes), NOTES_PER_REQUEST):
+        stable.update(build_request(capture, notes[c:c + NOTES_PER_REQUEST], vault, first=c, capture_questions=(c == 0))[2])
     answers = {qid: by_key[key] for qid, key in stable.items() if key in by_key}
     usage = usages[0]
     for extra in usages[1:]:

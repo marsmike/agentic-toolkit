@@ -97,6 +97,13 @@ class JudgmentFailed(RuntimeError):
     normal degrade path: the caller records it in the dead-letter queue."""
 
 
+class StateTooLarge(JudgmentFailed):
+    """The backend refused the request for its size. Halving the questions cannot help,
+    since every half carries the same state; the caller has to send less state per request.
+    [earned: 2026-09-22, first run on a 1,476-note vault — one capture with 40 widened
+    candidates hit `max_tokens_exceeded`, and the halving retried it seven times for nothing]"""
+
+
 class _CallError(RuntimeError):
     def __init__(self, detail: str, retryable_by_split: bool):
         super().__init__(detail)
@@ -152,7 +159,9 @@ def _post(url: str, payload: dict, headers: dict[str, str]) -> dict:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")[:300]
-        # 401/403 will not improve by asking less; everything else might (size, one bad question).
+        if "max_tokens_exceeded" in detail:
+            raise StateTooLarge(f"HTTP {e.code}: {detail}") from e
+        # 401/403 will not improve by asking less; everything else might (one bad question, a blip).
         raise _CallError(f"HTTP {e.code}: {detail}", retryable_by_split=e.code not in (401, 403)) from e
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
         raise _CallError(str(e), retryable_by_split=True) from e

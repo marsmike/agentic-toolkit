@@ -31,6 +31,12 @@ you can read.
 
 ## 2. Baselines
 
+What one real 1,476-note vault showed at this step (2026-09-22), so you know what to expect:
+81 notes with frontmatter that does not parse (an unquoted colon in `description:` is the usual
+cause), 1,633 dangling wikilinks, 18 links from active notes into the archive, and, once the
+graph was embedded, over 2,000 pairs above gaiafield's shipped gate. None of these is a reason
+to stop; all of them are reasons to run the read-only passes before any `--fix`.
+
 `toolkit engines install`, then `toolkit doctor`: note counts, dangling links, boundary
 violations, which vault and profile were resolved. Save the output; the later steps compare against it.
 

@@ -1,10 +1,14 @@
 """State builders shared by every caller of judge.py: what one note looks like on the wire."""
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
+import judge
 from vault_utils import profile_value, read_frontmatter
+
+T = TypeVar("T")
 
 NOTE_CHARS = 1500  # description + this much body is enough to tell what a note is about
 
@@ -29,3 +33,25 @@ def domain_glosses(vault: Path, default: dict[str, str]) -> dict[str, str]:
     if isinstance(configured, list) and configured:
         return {str(k).removeprefix("domain/"): "" for k in configured}
     return dict(default)
+
+
+def in_chunks(items: Sequence[T], size: int, ask: Callable[[Sequence[T], int], dict]) -> dict:
+    """Call `ask(chunk, offset)` per chunk of `items` and merge the dicts it returns. A chunk
+    the backend refuses for size (judge.StateTooLarge) is split in two and retried, down to a
+    single item, which is then dropped: state made of notes or pairs splits cleanly, so this is
+    the one place that knows how. [earned: 2026-09-22, first run on a 1,476-note vault, where
+    40 real-length notes per request exceeded the backend's input limit twice]"""
+    merged: dict = {}
+    for start in range(0, len(items), size):
+        merged.update(_ask_split(items[start:start + size], start, ask))
+    return merged
+
+
+def _ask_split(chunk: Sequence[T], offset: int, ask: Callable[[Sequence[T], int], dict]) -> dict:
+    try:
+        return ask(chunk, offset)
+    except judge.StateTooLarge:
+        if len(chunk) == 1:
+            return {}
+        mid = len(chunk) // 2
+        return _ask_split(chunk[:mid], offset, ask) | _ask_split(chunk[mid:], offset + mid, ask)

@@ -23,7 +23,7 @@ import json
 
 import judge
 from judgments import questions as Q
-from judgments.state import domain_glosses, note_payload
+from judgments.state import domain_glosses, in_chunks, note_payload
 from vault_utils import discover_notes, read_frontmatter, require_vault
 
 NOTES_PER_REQUEST = 10
@@ -41,8 +41,7 @@ def review(vault, scope: str | None, exclude: list[str]) -> dict:
     domains = domain_glosses(vault, Q.DOMAIN_GLOSS)
     weak, suggestions, missing = [], [], []
     usage_total = {"backend": "", "model": "", "requests": 0, "input_tokens": 0, "usd": 0.0}
-    for start in range(0, len(notes), NOTES_PER_REQUEST):
-        chunk = notes[start:start + NOTES_PER_REQUEST]
+    def ask(chunk, start):
         state = {"domains": domains, "notes": {}}
         questions, tags_of = {}, {}
         for i, path in enumerate(chunk, start=1):
@@ -59,6 +58,9 @@ def review(vault, scope: str | None, exclude: list[str]) -> dict:
                 questions[f"dom_{nid}_{name}"] = Q.domain(name, f"notes.{nid}")
         answers, usage = judge.judge(vault, state, questions)
         t = THRESHOLDS[usage.backend]
+        usage_total["backend"], usage_total["model"] = usage.backend, usage.model
+        for key in ("requests", "input_tokens", "usd"):
+            usage_total[key] += getattr(usage, key)
         for nid, payload in state["notes"].items():
             desc = answers.get(f"desc_{nid}")
             if desc is not None and desc.p <= t["T_DESCRIPTION_WEAK"]:
@@ -67,9 +69,9 @@ def review(vault, scope: str | None, exclude: list[str]) -> dict:
                 a = answers.get(f"dom_{nid}_{name}")
                 if a is not None and a.p >= t["T_DOMAIN_SUGGEST"] and f"domain/{name}" not in tags_of[nid]:
                     suggestions.append({"path": payload["path"], "suggest": f"domain/{name}", "p": round(a.p, 3)})
-        usage_total["backend"], usage_total["model"] = usage.backend, usage.model
-        for key in ("requests", "input_tokens", "usd"):
-            usage_total[key] += getattr(usage, key)
+        return {}
+
+    in_chunks(notes, NOTES_PER_REQUEST, ask)
     usage_total["usd"] = round(usage_total["usd"], 6)
     return {
         "advisory": True, "questions_version": Q.QUESTIONS_VERSION, "notes_reviewed": len(notes),

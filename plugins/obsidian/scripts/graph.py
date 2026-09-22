@@ -34,7 +34,7 @@ from typing import Any
 
 import judge
 from judgments import questions as Q
-from judgments.state import note_payload
+from judgments.state import in_chunks, note_payload
 from vault_utils import write_dlq_note
 
 GAIAFIELD_BIN_ENV = "TOOLKIT_GAIAFIELD_BIN"
@@ -425,7 +425,7 @@ def surprise_candidates(
 # Adjudication — a typed judgment per suggested pair (advisory, report-only)
 # ---------------------------------------------------------------------------
 
-MAX_PAIRS_PER_REQUEST = 40
+MAX_PAIRS_PER_REQUEST = 12  # real-length notes: 40 pairs exceeded the backend's input limit (2026-09-22)
 ADJUDICATION_CHARS = 1200
 
 # Policy per judgment backend, so it lives here and not in question text (contract/ROUTING.md,
@@ -475,9 +475,9 @@ def _adjudicate_once(vault: Path, pairs: list[tuple[str, str]], cache: dict, usa
             cache[rel] = note_payload(vault / rel, vault, ADJUDICATION_CHARS)
         return cache.get(rel)
 
-    for start in range(0, len(pairs), MAX_PAIRS_PER_REQUEST):
+    def ask(chunk, start):
         state, questions, index = {"pairs": {}}, {}, {}
-        for offset, (a, b) in enumerate(pairs[start:start + MAX_PAIRS_PER_REQUEST]):
+        for offset, (a, b) in enumerate(chunk):
             pa, pb = payload(a), payload(b)
             if pa is None or pb is None:
                 continue
@@ -487,15 +487,20 @@ def _adjudicate_once(vault: Path, pairs: list[tuple[str, str]], cache: dict, usa
             questions[f"mech_{pid}"] = Q.same_mechanism(pid)
             index[pid] = start + offset
         if not questions:
-            continue
+            return {}
         answers, usage = judge.judge(vault, state, questions)
-        for pid, position in index.items():
-            link, mech = answers.get(f"link_{pid}"), answers.get(f"mech_{pid}")
-            if link is not None:
-                raw[position] = {"link": link.p, "mech": mech.p if mech else None}
         usage_total["backend"], usage_total["model"] = usage.backend, usage.model
         for key in ("requests", "input_tokens", "usd"):
             usage_total[key] += getattr(usage, key)
+        out = {}
+        for pid, position in index.items():
+            link, mech = answers.get(f"link_{pid}"), answers.get(f"mech_{pid}")
+            if link is not None:
+                out[position] = {"link": link.p, "mech": mech.p if mech else None}
+        return out
+
+    for position, value in in_chunks(pairs, MAX_PAIRS_PER_REQUEST, ask).items():
+        raw[position] = value
     return raw
 
 
