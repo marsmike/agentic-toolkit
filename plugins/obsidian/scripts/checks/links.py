@@ -245,6 +245,9 @@ def fix(
     prose = _strip_code_blocks(body)
 
     index_set = set(index_list)
+    # A note is never its own repair: a missing [[Person]] inside an article by that person must
+    # not become a self-link. [earned: 2026-09-22, real vault — [[Martin Schröder]] in his article]
+    index_list = [s for s in index_list if s != note_path.stem]
     broken = []
     for match in WIKILINK_RE.finditer(prose):
         target = match.group(1).strip()

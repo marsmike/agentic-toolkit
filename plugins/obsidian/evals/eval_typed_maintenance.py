@@ -202,6 +202,14 @@ def run(vault: Path) -> dict:
         _, body3, _ = links.fix(forms, fm, body, sandbox)
         if "[[Eval-Check#Check\\|typo]]" not in body3 or "[[04_Resources/Eval-Check\\|the check]]" not in body3:
             problems.append("links: a repair must keep the anchor and the table-escaped alias")
+
+        # links: a note is never offered as the repair of a link inside itself
+        selfref = sandbox / "04_Resources" / "Eval-Selfref-Author.md"
+        write_frontmatter(selfref, {"description": "d", "status": "distilled"}, "\n# Essay\n\nBy [[Eval-Selfref-Autor]].\n")
+        fm, body = read_frontmatter(selfref)
+        _, body4, _ = links.fix(selfref, fm, body, sandbox)
+        if "[[Eval-Selfref-Author]]" in body4:
+            problems.append("links: a broken link was repaired into a self-link")
     finally:
         judge._post = real_post
         for k, v in saved.items():
