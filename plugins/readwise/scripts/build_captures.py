@@ -18,6 +18,7 @@ raw captures on every ingest run is this plugin's job.
 """
 from __future__ import annotations
 
+import http.client
 import re
 import urllib.error
 import urllib.request
@@ -46,7 +47,14 @@ def store_attachment(vault: Path, item: dict[str, Any], slug: str) -> Path | Non
         return None
     folder = vault / str(profile_value(vault, "attachments_folder", "04_Resources/Attachments"))
     folder.mkdir(parents=True, exist_ok=True)
-    dest = folder / f"{slug}.pdf"
+    # Keyed on the item's own doc_id, not the title-derived slug alone: two different PDF
+    # items can slugify to the same (or, both title-less, an identical "untitled") string, and
+    # unlike the capture note's own unique_path() call, this name must also stay stable across
+    # a re-run of the *same* item (an ingest interrupted after the download but before the
+    # capture note was written must not re-fetch it) -- the doc_id gives both at once.
+    doc_id = str(item.get("id") or "")
+    stem = f"{slug}-{_slugify(doc_id, maxlen=24)}" if doc_id else slug
+    dest = folder / f"{stem}.pdf"
     if dest.is_file():
         return dest.relative_to(vault)
     try:
@@ -55,7 +63,12 @@ def store_attachment(vault: Path, item: dict[str, Any], slug: str) -> Path | Non
             if "pdf" not in (resp.headers.get("Content-Type") or "").lower() and not url.lower().endswith(".pdf"):
                 return None
             data = resp.read(ATTACHMENT_MAX_BYTES + 1)
-    except (urllib.error.URLError, TimeoutError, OSError):
+    # A malformed source_url (a bad scheme, a stray space or control character, a broken
+    # IPv6-literal host — all seen from real API payloads) makes urlopen() raise a bare
+    # ValueError or http.client.InvalidURL instead of URLError; this function's contract is
+    # "a failed download returns None", not "crashes the whole capture write", so those must
+    # degrade the same way as a network failure.
+    except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError, ValueError):
         return None
     if len(data) > ATTACHMENT_MAX_BYTES or not data.startswith(b"%PDF"):
         return None

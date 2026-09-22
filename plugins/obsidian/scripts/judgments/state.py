@@ -36,7 +36,10 @@ def domain_glosses(vault: Path, default: dict[str, str]) -> dict[str, str]:
         try:
             configured = json.loads(text) if text[0] in "[{" else [n.strip() for n in text.split(",") if n.strip()]
         except json.JSONDecodeError:
-            configured = [n.strip() for n in text.split(",") if n.strip()]
+            # Not valid JSON despite looking like it (an unquoted list such as `[ai-ml,
+            # agent-systems]`): fall back to the same comma-separated reading, but strip the
+            # stray brackets/braces first so they don't end up glued onto the first/last name.
+            configured = [n.strip("[]{} ") for n in text.strip("[]{}").split(",") if n.strip("[]{} ")]
     if isinstance(configured, dict) and configured:
         return {str(k).removeprefix("domain/"): str(v or "") for k, v in configured.items()}
     if isinstance(configured, list) and configured:

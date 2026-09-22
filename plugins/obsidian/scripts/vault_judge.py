@@ -39,28 +39,33 @@ THRESHOLDS = {"jev": {"T_DESCRIPTION_WEAK": 0.78, "T_DOMAIN_SUGGEST": 0.80}}
 def review(vault, scope: str | None, exclude: list[str]) -> dict:
     notes = discover_notes(vault, scope=scope, exclude=exclude)
     domains = domain_glosses(vault, Q.DOMAIN_GLOSS)
-    weak, suggestions, missing = [], [], []
-    usage_total = {"backend": "", "model": "", "requests": 0, "input_tokens": 0, "usd": 0.0}
+    # Computed once, up front: whether a note has a description does not depend on
+    # judge.judge() succeeding, so it must not live inside the retryable ask() closure below
+    # (in_chunks()/_ask_split() re-invokes ask() on smaller sub-chunks of the same notes after
+    # a judge.StateTooLarge split, which would otherwise re-append the same paths).
+    payloads = {path: note_payload(path, vault, BODY_CHARS) for path in notes}
+    missing = [p["path"] for p in payloads.values() if not p["description"]]
+    weak, suggestions = [], []
+    usage_total = {"backend": "", "model": "", "requests": 0, "input_tokens": 0, "usd": 0.0, "splits": 0, "skipped": []}
     def ask(chunk, start):
         state = {"domains": domains, "notes": {}}
         questions, tags_of = {}, {}
         for i, path in enumerate(chunk, start=1):
             nid = f"N{i:02d}"
-            payload = note_payload(path, vault, BODY_CHARS)
+            payload = payloads[path]
             fm, _ = read_frontmatter(path)
             tags_of[nid] = {str(t) for t in (fm.get("tags") or []) if isinstance(t, str)}
             state["notes"][nid] = payload
             if payload["description"]:
                 questions[f"desc_{nid}"] = Q.description_specific(nid)
-            else:
-                missing.append(payload["path"])
             for name in domains:
                 questions[f"dom_{nid}_{name}"] = Q.domain(name, f"notes.{nid}")
         answers, usage = judge.judge(vault, state, questions)
-        t = THRESHOLDS[usage.backend]
+        t = judge.policy_for(THRESHOLDS, usage.backend)
         usage_total["backend"], usage_total["model"] = usage.backend, usage.model
-        for key in ("requests", "input_tokens", "usd"):
+        for key in ("requests", "input_tokens", "usd", "splits"):
             usage_total[key] += getattr(usage, key)
+        usage_total["skipped"].extend(usage.skipped)
         for nid, payload in state["notes"].items():
             desc = answers.get(f"desc_{nid}")
             if desc is not None and desc.p <= t["T_DESCRIPTION_WEAK"]:
@@ -96,6 +101,9 @@ def main() -> int:
     except judge.JudgmentFailed as e:
         print(f"judgment backend failed: {e}")
         return 1
+    except judge.JudgmentUnavailable as e:  # key vanished between the check above and a later chunk
+        print(f"SKIPPED — judgment backend unavailable ({e.reason})")
+        return 0
     if args.json:
         print(json.dumps(report, indent=2))
         return 0

@@ -64,7 +64,10 @@ def sweep(vault, max_pairs: int, exclude: list[str], include_graph: bool = True)
     pairs: list[tuple[str, str, str]] = [(a, b, "same-source") for a, b in by_source]
     seen = {tuple(sorted((a, b))) for a, b, _ in pairs}
     graph_rows = 0
-    if include_graph and graph.available():
+    # surprise_candidates() only reads the inferred-edges table; on a vault where `gaiafield
+    # infer` has never run that table is simply empty, so this must ensure it first or every
+    # run silently reports zero graph-derived pairs with nothing saying why.
+    if include_graph and graph.available() and not isinstance(graph.ensure_inferred(vault), graph.GraphUnavailable):
         rows = graph.surprise_candidates(vault, top=max_pairs, include_ambiguous=True)
         if not isinstance(rows, graph.GraphUnavailable):
             for r in rows:
@@ -100,7 +103,9 @@ def sweep(vault, max_pairs: int, exclude: list[str], include_graph: bool = True)
         usage.requests += extra.requests
         usage.input_tokens += extra.input_tokens
         usage.usd += extra.usd
-    t = THRESHOLDS[usage.backend] if usage else THRESHOLDS["jev"]
+        usage.splits += extra.splits
+        usage.skipped.extend(extra.skipped)
+    t = judge.policy_for(THRESHOLDS, usage.backend) if usage else THRESHOLDS[judge.DEFAULT_BACKEND]
     duplicates, contradictions, rows_out = [], [], []
     for i, (a, b, origin) in enumerate(pairs):
         same, contra = results.get(i, (None, None))
@@ -116,6 +121,10 @@ def sweep(vault, max_pairs: int, exclude: list[str], include_graph: bool = True)
         "pairs_from_same_source": len(by_source), "pairs_from_graph": graph_rows,
         "duplicates": sorted(duplicates, key=lambda r: -(r["p_same_work"] or 1.0)),
         "contradictions": sorted(contradictions, key=lambda r: -r["p_contradicts"]),
+        # Every judged pair, not just the ones that crossed a threshold -- otherwise a
+        # borderline score (e.g. just under T_SAME_WORK) is computed and then thrown away,
+        # leaving no way to see it when recalibrating these thresholds.
+        "pairs": rows_out,
         "judgment": usage.as_dict() if usage else {},
     }
 
@@ -137,6 +146,9 @@ def main() -> int:
     except judge.JudgmentFailed as e:
         print(f"judgment backend failed: {e}")
         return 1
+    except judge.JudgmentUnavailable as e:  # key vanished between the check above and a later chunk
+        print(f"SKIPPED — judgment backend unavailable ({e.reason})")
+        return 0
     if args.json:
         print(json.dumps(report, indent=2))
         return 0

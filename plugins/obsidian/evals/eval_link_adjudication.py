@@ -48,7 +48,7 @@ def run(vault: Path) -> dict:
     problems: list[str] = []
     saved_env = {k: os.environ.pop(k, None) for k in (*KEY_ENVS, "TOOLKIT_OBSIDIAN_JUDGMENT_BACKEND")}
     real_post = judge._post
-    sandbox = make_sandbox(vault)
+    sandbox = None  # set inside try: below, so a failed make_sandbox() still restores saved_env
     calls = []
 
     def stub_ok(url, payload, headers):
@@ -64,9 +64,10 @@ def run(vault: Path) -> dict:
         {"a": A, "b": C, "score": 0.69, "surprise": 0.4, "det_distance": 2, "same_subtree": True, "label": "AMBIGUOUS", "model": "m"},
     ]
     candidate_rows = [{"path": B, "score": 0.74, "label": "INFERRED"}, {"path": C, "score": 0.69, "label": "AMBIGUOUS"}]
-    dlq_dir = sandbox / "00_Memory" / "dlq"
 
     try:
+        sandbox = make_sandbox(vault)
+        dlq_dir = sandbox / "00_Memory" / "dlq"
         judge._post = stub_ok
         unavailable = graph.adjudicate_candidates(sandbox, surprise_rows)
         if not isinstance(unavailable, graph.GraphUnavailable) or unavailable.reason != "no-judgment" or calls:
@@ -117,7 +118,8 @@ def run(vault: Path) -> dict:
             os.environ.pop(k, None)
             if v is not None:
                 os.environ[k] = v
-        teardown_sandbox(sandbox)
+        if sandbox is not None:
+            teardown_sandbox(sandbox)
 
     if problems:
         return {"eval": NAME, "pass": False, "detail": "; ".join(problems)}

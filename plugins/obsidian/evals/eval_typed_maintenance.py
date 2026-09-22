@@ -67,7 +67,7 @@ def run(vault: Path) -> dict:
     problems = []
     saved = {k: os.environ.pop(k, None) for k in (*KEY_ENVS, "TOOLKIT_OBSIDIAN_JUDGMENT_BACKEND")}
     real_post = judge._post
-    sandbox = make_sandbox(vault)
+    sandbox = None  # set inside try: below, so a failed make_sandbox() still restores saved
     calls = []
 
     def stub(url, payload, headers):
@@ -99,6 +99,7 @@ def run(vault: Path) -> dict:
         return {"model": "stub-1", "usage": {"input_tokens": 100}, "answers": answers}
 
     try:
+        sandbox = make_sandbox(vault)
         cap = sandbox / "01_Capture" / "Readwise-Eval-Test-Article.md"
         cap.write_text(CAPTURE, encoding="utf-8")
         # no key: passages skip cleanly, sweep skips, links audit is the plain audit
@@ -192,7 +193,8 @@ def run(vault: Path) -> dict:
             os.environ.pop(k, None)
             if v is not None:
                 os.environ[k] = v
-        teardown_sandbox(sandbox)
+        if sandbox is not None:
+            teardown_sandbox(sandbox)
     if problems:
         return {"eval": NAME, "pass": False, "detail": "; ".join(problems)}
     return {"eval": NAME, "pass": True, "detail": f"passages, sweep and links ok ({len(calls)} stubbed requests)"}

@@ -146,6 +146,19 @@ def available(vault: Path) -> bool:
     return unavailable_reason(vault) is None
 
 
+def policy_for(table: dict[str, dict[str, float]], backend: str) -> dict[str, float]:
+    """A caller's per-backend policy/threshold table, looked up the same safe way everywhere:
+    raise JudgmentFailed — the same exception a backend that answers nothing raises, so every
+    existing caller's degrade path (a DLQ note, or SKIPPED/failed reporting) already handles
+    this too — instead of a bare KeyError, or silently substituting another backend's
+    calibration, when `backend` has no entry. `judge.judge()` only ever returns a `backend`
+    that is registered in `_BACKENDS`, but a table here can still lag behind `_BACKENDS`
+    when a new backend is added without updating every caller's table."""
+    if backend not in table:
+        raise JudgmentFailed(f"no policy for judgment backend {backend!r}; add one before using it")
+    return table[backend]
+
+
 # ---------------------------------------------------------------------------
 # jev backend (TypeSafe System One wire format)
 # ---------------------------------------------------------------------------

@@ -77,7 +77,7 @@ a backend's own answer as a label.
   not cross-talk between pairs. Cause class: *none of the five; a property of the backend*.
   Mitigation is code, not wording: every pair is asked in both orders and averaged, the gap is
   reported as `order_gap`, and a gap of 0.30 or more reads UNDECIDED whatever the average says.
-  After averaging: 14 of 70 gaiafield suggestions read LIKELY-LINK (9 real of 11), 16 read
+  After averaging: 11 of 70 gaiafield suggestions read LIKELY-LINK (8 real, base rate 16%), 16 read
   LIKELY-NOISE (0 real). The per-capture distill questions were checked the same way: rerun drift 0.008, and
   asking twice with the candidates reversed changed nothing (54/60 vs 55/60), so they stay at
   one request; treat any answer within 0.1 of a cut as undecided.

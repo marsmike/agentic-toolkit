@@ -490,8 +490,9 @@ def _adjudicate_once(vault: Path, pairs: list[tuple[str, str]], cache: dict, usa
             return {}
         answers, usage = judge.judge(vault, state, questions)
         usage_total["backend"], usage_total["model"] = usage.backend, usage.model
-        for key in ("requests", "input_tokens", "usd"):
+        for key in ("requests", "input_tokens", "usd", "splits"):
             usage_total[key] += getattr(usage, key)
+        usage_total["skipped"].extend(usage.skipped)
         out = {}
         for pid, position in index.items():
             link, mech = answers.get(f"link_{pid}"), answers.get(f"mech_{pid}")
@@ -519,13 +520,15 @@ def adjudicate_pairs(vault: Path, pairs: list[tuple[str, str]], symmetric: bool 
     the same swing (0.08) as forty, and forty ranks at least as well, so the batch stays large
     and the second view is what makes a label worth reading.
     """
-    usage_total = {"backend": "", "model": "", "requests": 0, "input_tokens": 0, "usd": 0.0}
+    usage_total = {"backend": "", "model": "", "requests": 0, "input_tokens": 0, "usd": 0.0, "splits": 0, "skipped": []}
     cache: dict[str, dict] = {}
     passes = [_adjudicate_once(vault, pairs, cache, usage_total)]
     if symmetric:
-        mirrored = _adjudicate_once(vault, [(b, a) for a, b in reversed(pairs)], cache, usage_total)
-        passes.append(mirrored[::-1])
-    policy = LINK_POLICY.get(usage_total["backend"], {})
+        passes.append(_adjudicate_once(vault, [(b, a) for a, b in pairs], cache, usage_total))
+    if not usage_total["backend"]:
+        policy: dict[str, float] = {}
+    else:
+        policy = judge.policy_for(LINK_POLICY, usage_total["backend"])
     results: list[dict | None] = []
     for views in zip(*passes, strict=True):
         seen = [v for v in views if v is not None]

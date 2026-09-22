@@ -148,7 +148,10 @@ def audit(note_path: Path, frontmatter: dict, body: str, vault: Path) -> list[Is
     if len(domain_tags) > MAX_DOMAINS:
         issues.append(Issue(note_path, "tags", "info", f"Domain tag count ({len(domain_tags)}) exceeds max ({MAX_DOMAINS})", "Reduce to most relevant 1-3 domains"))
     for t in tags:
-        if t in LEGACY_MIGRATION:
+        # Matches _migrate_legacy_tags()'s own guard: a legacy tag whose starter-taxonomy
+        # target the vault's own `domains` taxonomy doesn't carry is not something --fix will
+        # touch, so don't tell the user it will.
+        if t in LEGACY_MIGRATION and LEGACY_MIGRATION[t] in canonical:
             issues.append(Issue(note_path, "tags", "info", f"Legacy tag '{t}' should migrate to '{LEGACY_MIGRATION[t]}'", "Run --fix to auto-migrate"))
     return issues
 
@@ -160,7 +163,8 @@ def fix(
     existing_tags: list[str] = list(fm.get("tags", []))
     results: list[FixResult] = []
 
-    canonical = {f"domain/{n}" for n in domain_names(vault)}
+    names = domain_names(vault)
+    canonical = {f"domain/{n}" for n in names}
     migrated = _migrate_legacy_tags(existing_tags, canonical)
     if migrated != existing_tags:
         removed = set(existing_tags) - set(migrated)
@@ -176,7 +180,6 @@ def fix(
     user_content = f"Title: {title}\nDescription: {fm.get('description', '')}\n\nContent:\n{body[:CONTENT_TRUNCATE]}"
 
     try:
-        names = domain_names(vault)
         raw = llm_chat(_build_llm_prompt(names), user_content, vault=vault, max_tokens=100, response_schema=_domain_schema(names))
         new_domains = _parse_llm_response(raw, names)
     except NoModelConfigured:
@@ -187,7 +190,12 @@ def fix(
         return fm, body, results
 
     if new_domains:
-        fm["tags"] = existing_tags + [d for d in new_domains if d not in existing_tags]
+        # Every existing_tags entry here failed the canonical check above, so any domain/*
+        # among them is stale (predates the vault's current taxonomy) — drop it rather than
+        # pile the fresh classification on top: keeping it both left an unrecognized tag in
+        # place and let the note's domain-tag count grow past MAX_DOMAINS on every re-run.
+        kept = [t for t in existing_tags if not t.startswith("domain/")]
+        fm["tags"] = kept + [d for d in new_domains if d not in kept]
         results.append(FixResult(note_path, "tags", True, f"LLM classified: {', '.join(new_domains)}"))
     else:
         results.append(FixResult(note_path, "tags", False, "LLM returned no valid domains"))

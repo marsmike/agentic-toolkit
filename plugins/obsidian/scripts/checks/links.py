@@ -115,7 +115,10 @@ def judge_resolve(links: list[dict], candidates: list[str], vault: Path) -> list
     state, questions = {"links": {}}, {}
     for i, link in enumerate(links, start=1):
         lid = f"L{i:02d}"
-        short = _shortlist(link["target"], candidates)
+        # A candidate literally named "none" would collide with the sentinel "no match" key
+        # below (the dict-literal's own "none" wins the merge) and become unreachable as a
+        # pick; excluded here rather than risk that — the Levenshtein/LLM paths still cover it.
+        short = [c for c in _shortlist(link["target"], candidates) if c != "none"]
         if not short:
             continue
         state["links"][lid] = {"text": link["target"], "context": link["context"][:500], "candidates": short}
@@ -125,14 +128,21 @@ def judge_resolve(links: list[dict], candidates: list[str], vault: Path) -> list
         return [None] * len(links)
     try:
         answers, usage = judge.judge(vault, state, questions)
+        policy = judge.policy_for(LINK_POLICY, usage.backend)
     except (judge.JudgmentUnavailable, judge.JudgmentFailed):
         return [None] * len(links)
-    policy = LINK_POLICY.get(usage.backend, LINK_POLICY["jev"])
     out: list[dict | None] = []
     for i in range(1, len(links) + 1):
         a = answers.get(f"link_L{i:02d}")
-        if a is None or a.top == "none":
-            out.append({"pick": None, "p": round(a.probs.get("none", 0.0), 3) if a else None, "label": "none"})
+        if a is None:
+            # The backend answered other links in this batch but skipped this one (a malformed
+            # per-question response) — not the same as it confidently saying "none of these"
+            # matched. Leave it unresolved here, not "resolved to no match", so fix() still
+            # falls back to _llm_resolve() for it instead of silently giving up.
+            out.append(None)
+            continue
+        if a.top == "none":
+            out.append({"pick": None, "p": round(a.probs.get("none", 0.0), 3), "label": "none"})
             continue
         p, margin = a.probs[a.top], a.margin()
         label = "apply" if p >= policy["apply"] and margin >= policy["min_margin"] else "propose" if p >= policy["propose"] else "none"
@@ -254,6 +264,14 @@ def fix(
 
         if resolved:
             old_link = match.group(0)
+            if old_link not in new_body:
+                # str.replace() below has no notion of "just this occurrence": an earlier
+                # identical broken-link text in this same note already rewrote every instance
+                # of it. Nothing is left to change for this one — say so rather than claim a
+                # (possibly different) resolution was applied here too.
+                results.append(FixResult(note_path, "links", True,
+                                          f"[[{target}]] already replaced by an earlier identical occurrence in this note"))
+                continue
             alias_match = re.match(r"\[\[([^\]|]+)\|([^\]]+)\]\]", old_link)
             new_link = f"[[{resolved}|{alias_match.group(2)}]]" if alias_match else f"[[{resolved}]]"
             new_body = new_body.replace(old_link, new_link)

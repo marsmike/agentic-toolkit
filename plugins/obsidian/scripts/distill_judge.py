@@ -69,6 +69,7 @@ THRESHOLDS: dict[str, dict[str, float]] = {
         "T_SECOND_HOME": 0.25,       # a runner-up folder holding this much mass is worth naming (soft placement)
         "T_KEEP": 0.60,              # passage_keep at or above: part of the capture's essence
         "T_REVERSES": 0.40,          # summary_reverses at or above, or relation misstates/overstates on top: read the source, not the summary
+        "T_CONCEPT_UPGRADE": 0.50,   # concept_vs_root at or above: 04_Resources -> 04_Resources/Concepts
     },
 }
 
@@ -301,7 +302,7 @@ def apply_policy(notes: list[dict], answers: dict[str, Answer], t: dict[str, flo
     para, concept = answers.get("para"), answers.get("concept_vs_root")
     ambiguous = para is None or para.top == "no-clear-home" or para.margin() < t["T_PLACEMENT_MARGIN"]
     folder = None if ambiguous else para.top
-    if folder == "04_Resources" and concept is not None and concept.p >= 0.5:
+    if folder == "04_Resources" and concept is not None and concept.p >= t["T_CONCEPT_UPGRADE"]:
         folder = "04_Resources/Concepts"
     # Soft placement: a runner-up that holds real mass is not noise, it is a second home the
     # note may deserve a link from (the "block on the distribution, not the label" lesson).
@@ -331,7 +332,11 @@ def _average(views: list[dict[str, Answer]]) -> dict[str, Answer]:
         if seen[0].kind == "noul":
             merged[key] = Answer("noul", p=sum(a.p for a in seen) / len(seen))
         else:
-            labels = {label for a in seen for label in a.probs}
+            # Sorted, not the raw set: a set of strings iterates in an order that depends on
+            # the process's hash seed, and max()'s tie-break picks whichever label came first
+            # in that order — an exact probability tie would then make `top` non-reproducible
+            # from one run to the next for the same judgment data.
+            labels = sorted({label for a in seen for label in a.probs})
             probs = {label: sum(a.probs.get(label, 0.0) for a in seen) / len(seen) for label in labels}
             merged[key] = Answer("choice", probs=probs, top=max(probs, key=probs.get))
     return merged
@@ -343,7 +348,8 @@ def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: 
     notes, search_meta = candidates(capture, vault, top, exclude, force or [])
     # Forced and URL-hit notes are never dropped by the cap; search rows after them are.
     pinned = [n for n in notes if n.get("url_hit") or n["path"] in (force or [])]
-    notes = (pinned + [n for n in notes if n not in pinned])[:MAX_CANDIDATES]
+    rest = [n for n in notes if n not in pinned][:max(0, MAX_CANDIDATES - len(pinned))]
+    notes = pinned + rest
     per_view, usages = [], []
     for view in range(views):
         ordered = notes if view % 2 == 0 else notes[::-1]
@@ -360,6 +366,11 @@ def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: 
     for c in range(0, len(notes), NOTES_PER_REQUEST):
         stable.update(build_request(capture, notes[c:c + NOTES_PER_REQUEST], vault, first=c, capture_questions=(c == 0))[2])
     answers = {qid: by_key[key] for qid, key in stable.items() if key in by_key}
+    if not usages:
+        # Every chunk hit judge.StateTooLarge all the way down to a single note (or the
+        # capture-only state) and still failed: in_chunks() degrades that to {} rather than
+        # raising, so nothing here ever called judge.judge() successfully.
+        raise JudgmentFailed("capture state exceeded the backend's size limit, even alone")
     usage = usages[0]
     for extra in usages[1:]:
         usage.requests += extra.requests
@@ -423,7 +434,10 @@ def judge_passages(path: Path, vault: Path) -> dict[str, Any]:
         questions["relation"] = Q.summary_relation()
         questions["reverses"] = Q.summary_reverses()
     if not questions:
-        return {"capture": path.name, "passages": [], "essence_chars": 0, "total_chars": len(capture["body"])}
+        cfg = judge.load_config(vault)
+        empty_usage = judge.Usage(backend=cfg["backend"], model=cfg["model"])
+        return {"capture": path.name, "passages": [], "essence_chars": 0, "total_chars": len(capture["body"]),
+                "judgment": empty_usage.as_dict()}
     usages = []
 
     def ask(chunk, start):
@@ -435,6 +449,11 @@ def judge_passages(path: Path, vault: Path) -> dict[str, Any]:
         return raw
 
     answers = in_chunks(list(state["passages"]), 12, ask)
+    if not usages:
+        # Every chunk hit judge.StateTooLarge all the way down to a single passage and still
+        # failed: in_chunks() degrades that to {} rather than raising, so nothing here ever
+        # called judge.judge() successfully.
+        raise JudgmentFailed("passage state exceeded the backend's size limit, even alone")
     t = thresholds(usages[0].backend)
     rows, essence = [], 0
     for pid, text in state["passages"].items():
@@ -450,6 +469,8 @@ def judge_passages(path: Path, vault: Path) -> dict[str, Any]:
         usage.requests += extra.requests
         usage.input_tokens += extra.input_tokens
         usage.usd += extra.usd
+        usage.splits += extra.splits
+        usage.skipped.extend(extra.skipped)
     return {"capture": path.name, "passages": rows, "essence_chars": essence, "total_chars": sum(len(p) for p in state["passages"].values()),
             "summary_relation": relation.top if relation else None, "p_reverses": round(reverses.p, 3) if reverses else None,
             "summary_warning": warning,
@@ -527,6 +548,8 @@ def judge_batch(paths: list[Path], vault: Path, refs: list[str] | None = None) -
         usage.requests += extra.requests
         usage.input_tokens += extra.input_tokens
         usage.usd += extra.usd
+        usage.splits += extra.splits
+        usage.skipped.extend(extra.skipped)
     t = thresholds(usage.backend)
     pairs, raw = list(dup_rows), {}
     for a, b in pairs_to_ask:
@@ -556,7 +579,8 @@ def check_note(note: Path, capture: Path, vault: Path) -> dict[str, Any]:
     passages, _, _ = split_passages(full_body.strip()[:FULL_CAPTURE_CHARS])
     text_of = {f"P{i:02d}": p[:PASSAGE_CHARS] for i, p in enumerate(passages, start=1)}
     usages = [judge.Usage(backend=ps["judgment"]["backend"], model=ps["judgment"]["model"], requests=ps["judgment"]["requests"],
-                          input_tokens=ps["judgment"]["input_tokens"], usd=ps["judgment"]["usd"])]
+                          input_tokens=ps["judgment"]["input_tokens"], usd=ps["judgment"]["usd"],
+                          splits=ps["judgment"]["splits"], skipped=list(ps["judgment"]["skipped"]))]
 
     def ask(chunk, start):
         state = {"note": body[:30000], "passages": {r["id"]: text_of[r["id"]] for r in chunk}}
@@ -577,6 +601,8 @@ def check_note(note: Path, capture: Path, vault: Path) -> dict[str, Any]:
         usage.requests += extra.requests
         usage.input_tokens += extra.input_tokens
         usage.usd += extra.usd
+        usage.splits += extra.splits
+        usage.skipped.extend(extra.skipped)
     return {"note": note.as_posix(), "capture": capture.name, "kept_passages": len(kept), "carried": len(kept) - len(misses),
             "misses": misses, "judgment": usage.as_dict()}
 

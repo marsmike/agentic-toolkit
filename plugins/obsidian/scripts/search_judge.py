@@ -79,12 +79,19 @@ def rerank(query: str, vault, top: int, exclude: list[str], widen: bool = True) 
         return got
 
     answers = in_chunks(rows, NOTES_PER_REQUEST, ask)
+    if not usages:
+        # Every chunk hit judge.StateTooLarge all the way down to a single note and still
+        # failed: in_chunks() degrades that to {} rather than raising, so nothing here ever
+        # called judge.judge() successfully.
+        raise judge.JudgmentFailed("every candidate exceeded the backend's size limit, even alone")
     usage = usages[0]
     for used in usages[1:]:
         usage.requests += used.requests
         usage.input_tokens += used.input_tokens
         usage.usd += used.usd
-    t = THRESHOLDS[usage.backend]
+        usage.splits += used.splits
+        usage.skipped.extend(used.skipped)
+    t = judge.policy_for(THRESHOLDS, usage.backend)
     for i, r in enumerate(rows, start=1):
         a = answers.get(f"ans_N{i:02d}")
         r["search_rank"] = i if r.get("score") is not None else None
@@ -113,6 +120,9 @@ def main() -> int:
         except judge.JudgmentFailed as e:
             print(f"judgment backend failed: {e}")
             return 1
+        except judge.JudgmentUnavailable as e:  # key vanished between the check above and a later chunk
+            result = {**search(args.query, vault, top=args.top), "reranked": False,
+                      "note": f"judgment backend unavailable ({e.reason}); plain search order"}
     if args.json:
         print(json.dumps(result, indent=2))
         return 0
@@ -121,7 +131,8 @@ def main() -> int:
     for r in result["results"]:
         mark = "*" if r.get("judged_answer") else " "
         p = f"{r['p_answers']:.2f}" if r.get("p_answers") is not None else "  --"
-        origin = f"was #{r['search_rank']:<3}" if r.get("search_rank") else f"via {r.get('via', '?').rsplit('/', 1)[-1][:18]:<18}"[:8].ljust(8)
+        origin = (f"was #{r['search_rank']:<3}" if r.get("search_rank")
+                  else f"via {r.get('via', '?').rsplit('/', 1)[-1][:18]:<18}")
         print(f" {mark} {p}  {origin} {r['path']}")
     if result["reranked"]:
         print(f"\n${result['judgment']['usd']} · {result['judgment']['model']}")

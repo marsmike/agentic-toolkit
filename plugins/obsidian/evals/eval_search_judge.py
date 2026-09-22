@@ -57,7 +57,7 @@ def run(vault: Path) -> dict:
     problems: list[str] = []
     saved_env = {k: os.environ.pop(k, None) for k in (*KEY_ENVS, "TOOLKIT_OBSIDIAN_JUDGMENT_BACKEND")}
     real_post = judge._post
-    sandbox = make_sandbox(vault)
+    sandbox = None  # set inside try: below, so a failed make_sandbox() still restores saved_env
     calls = []
     query = "hybrid retrieval scoring"
 
@@ -69,6 +69,7 @@ def run(vault: Path) -> dict:
                 "answers": {qid: {"type": "noul", "noul": 0.95 if qid.endswith(last) else 0.1} for qid in payload["questions"]}}
 
     try:
+        sandbox = make_sandbox(vault)
         plain = search(query, sandbox, top=5)["results"]
         if judge.unavailable_reason(sandbox) != "no-key":
             problems.append("phase 3: expected no-key before a key is set")
@@ -117,7 +118,8 @@ def run(vault: Path) -> dict:
             os.environ.pop(k, None)
             if v is not None:
                 os.environ[k] = v
-        teardown_sandbox(sandbox)
+        if sandbox is not None:
+            teardown_sandbox(sandbox)
 
     if problems:
         return {"eval": NAME, "pass": False, "detail": "; ".join(problems)}

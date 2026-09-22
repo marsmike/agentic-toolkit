@@ -34,7 +34,13 @@ def main() -> int:
     args = ap.parse_args()
     vault = require_vault()
 
-    rows = (
+    # inferred_candidates()/surprise_candidates() only read the inferred-edges table; on a
+    # vault where `gaiafield infer` has never run that table is simply empty (not an error),
+    # so both must be ensured first or this silently reports "no candidates" with no reason.
+    ensured = graph.ensure_index(vault)
+    if not isinstance(ensured, graph.GraphUnavailable):
+        ensured = graph.ensure_inferred(vault)
+    rows = ensured if isinstance(ensured, graph.GraphUnavailable) else (
         graph.surprise_candidates(vault, top=args.top, include_ambiguous=args.include_ambiguous)
         if args.surprise
         else graph.inferred_candidates(vault, args.note, k=args.top, include_ambiguous=args.include_ambiguous)
