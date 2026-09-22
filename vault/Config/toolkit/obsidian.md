@@ -39,8 +39,8 @@ placeholders are obvious.
 - `inference_backend` / `inference_base_url` / `inference_model` configure the LLM the
   maintenance checks call for description generation and tag classification. With
   `inference_model` unset, LLM-assisted checks report a clear skip instead of guessing.
-- `enrichment_targets` names which profile note to flag when a distill run touches
-  maintenance-relevant material. Points at [[Alex-Vega]] in this example vault.
+- `enrichment_targets` names notes that `distill_judge.py` judges for every capture even when
+  search does not return them. Points at [[Alex-Vega]], the root-level profile note, here.
 
 The canonical field reference is the plugin's own `profile.example.md` — this note mirrors it and
 must stay in sync (CI does not yet enforce this; keep the shapes identical by hand).

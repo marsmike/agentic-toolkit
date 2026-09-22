@@ -35,8 +35,8 @@ running inline is the default path and does not need a subagent at all.
    pass its hard gates; answer every soft finding (dropped URLs, findability, passages
    not carried) by putting it in or naming it as deliberate.
 4. **Retire the capture** to `05_Archive/<Origin>-Captures-<YYYY-MM>/` as
-   `<stem>--FULLCAPTURE.md` (default) or delete (`trash` if present; duplicates and
-   empty stubs only). Update Index.md, journal to `00_Memory/journal/<today>.md`, log via
+   `<stem>--FULLCAPTURE.md` plus a line in that folder's `README.md` manifest (default), or
+   delete (`trash` if present; duplicates and empty stubs only). Update Index.md, journal to `00_Memory/journal/<today>.md`, log via
    `scripts/log_vault.py distill "Note Title"`.
 
 ## Batch processing

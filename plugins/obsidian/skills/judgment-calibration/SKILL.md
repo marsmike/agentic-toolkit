@@ -1,6 +1,6 @@
 ---
 name: judgment-calibration
-description: Tune the typed-judgment questions and golden labels behind distill's advisory judgments. Use after a questions or backend/model change, when advisory judgments look wrong in real distill runs, or to grow the golden set from new captures.
+description: Tune the typed-judgment questions and golden labels behind distill's advisory block. Use after a question, backend or model change, when judgments look wrong in real runs, or to grow the golden set.
 allowed-tools:
   - Bash
   - Read

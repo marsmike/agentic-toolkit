@@ -47,9 +47,10 @@ def check(note: Path, capture: Path, vault: Path, asks: list[str]) -> dict:
     cap = read_capture(capture)
     hard: dict[str, tuple[bool, str]] = {}
 
-    missing = [k for k in ("source", "status", "processed_date", "description") if not fm.get(k)]
+    # A literal `unknown` is the skill's forbidden placeholder: absent is honest, "unknown" is a guess dressed up.
+    missing = [k for k in ("source", "status", "processed_date", "description") if not fm.get(k) or str(fm.get(k)).strip().lower() == "unknown"]
     hard["frontmatter"] = (not missing and fm.get("status") == "distilled",
-                           f"missing {missing}" if missing else ("status must be distilled" if fm.get("status") != "distilled" else "ok"))
+                           f"missing or 'unknown': {missing}" if missing else ("status must be distilled" if fm.get("status") != "distilled" else "ok"))
     src_line = re.search(r"^\*Source:.*\*", body, re.M)
     own = cap.get("own_source") or ""
     line_urls = {_canonical(u) for u in URL_RE.findall(src_line.group(0))} if src_line else set()
@@ -79,7 +80,10 @@ def check(note: Path, capture: Path, vault: Path, asks: list[str]) -> dict:
             rows = search(q, vault, top=10)["results"]
             if judge.available(vault):
                 import search_judge
-                rows = search_judge.rerank(q, vault, 10, [], widen=True)["results"]
+                try:
+                    rows = search_judge.rerank(q, vault, 10, [], widen=True)["results"]
+                except (judge.JudgmentUnavailable, judge.JudgmentFailed) as e:
+                    soft["findability_note"] = f"plain search order used: {e}"
             ranks.append(next((i for i, r in enumerate(rows, 1) if r["path"] == target), None))
         soft["findability"] = {"questions": asks, "ranks": ranks, "top3": sum(1 for r in ranks if r and r <= 3)}
     if judge.available(vault):

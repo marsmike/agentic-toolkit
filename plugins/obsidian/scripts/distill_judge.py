@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -38,7 +39,7 @@ from judgments.policy import LEVEL_BY_RELATION, THRESHOLDS, thresholds  # noqa: 
 from judgments.state import domain_glosses, in_chunks, note_payload
 from search import search
 from search_judge import expand
-from vault_utils import discover_notes, read_frontmatter, require_vault, write_dlq_note
+from vault_utils import discover_notes, profile_value, read_frontmatter, require_vault, write_dlq_note
 
 MAX_LISTED_FOLDERS = 60
 
@@ -251,10 +252,30 @@ def _average(views: list[dict[str, Answer]]) -> dict[str, Answer]:
     return merged
 
 
+def enrichment_targets(vault: Path, exclude: list[str]) -> list[str]:
+    """Profile `enrichment_targets`: notes the owner wants judged for every capture whatever
+    search says (a personal profile note, a standing project). Wikilinks or vault-relative
+    paths; anything that does not resolve, or sits under an excluded prefix, is dropped."""
+    raw = profile_value(vault, "enrichment_targets", []) or []
+    if isinstance(raw, str):
+        raw = [t for t in re.split(r"[,\n]", raw) if t.strip()]
+    # A profile note usually sits at the vault root, outside the PARA folders search walks.
+    by_stem = {p.stem: p.relative_to(vault).as_posix() for p in discover_notes(vault, exclude=exclude)}
+    by_stem.update({p.stem: p.name for p in vault.glob("*.md")})
+    out = []
+    for t in raw:
+        name = str(t).strip().strip("[]").split("|", 1)[0].strip()
+        rel = name if name.endswith(".md") else by_stem.get(name.rsplit("/", 1)[-1], "")
+        if rel and (vault / rel).is_file() and not _excluded(rel, exclude) and rel not in out:
+            out.append(rel)
+    return out
+
+
 def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: list[str] | None = None,
                   views: int = VIEWS) -> dict[str, Any]:
     capture = read_capture(path)
-    notes, search_meta = candidates(capture, vault, top, exclude, force or [])
+    force = [*(force or []), *[t for t in enrichment_targets(vault, exclude) if t not in (force or [])]]
+    notes, search_meta = candidates(capture, vault, top, exclude, force)
     # Forced and URL-hit notes are never dropped by the cap; search rows after them are.
     pinned = [n for n in notes if n.get("url_hit") or n["path"] in (force or [])]
     rest = [n for n in notes if n not in pinned][:max(0, MAX_CANDIDATES - len(pinned))]
@@ -529,6 +550,9 @@ def main() -> int:
     except JudgmentUnavailable as e:  # key vanished between the check and the call
         print(f"SKIPPED — judgment backend unavailable ({e.reason})")
         return 0
+    except JudgmentFailed as e:  # --calibrate, --check-note and --passages reach the backend outside run_captures()
+        print(f"judgment backend failed: {e}", file=sys.stderr)
+        return 1
     if "failed" in result:
         print(f"judgment backend failed ({result['failed']}); recorded {result['dlq']}", file=sys.stderr)
         return 1

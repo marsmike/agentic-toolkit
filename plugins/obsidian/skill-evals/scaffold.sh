@@ -17,7 +17,7 @@ uv sync --project "$here/../scripts" --quiet
 # workspace is thrown away). Skipped silently when ~/.env has no key: the case then runs the
 # no-backend path and the soft findings are absent.
 # The harness runs this with a throwaway HOME, so ~ is not the user's home; ask the passwd db.
-real_home="$(eval echo "~$(id -un)")"
+real_home="$(eval echo "~$(id -un)" 2>/dev/null || echo "$HOME")"
 key="$( (grep -E '^(export )?OPENROUTER_API_KEY=' "$real_home/.env" 2>/dev/null || true) | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
 if [ -n "$key" ]; then
   mkdir -p .claude

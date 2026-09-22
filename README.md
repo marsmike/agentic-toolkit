@@ -133,7 +133,7 @@ cd /tmp/quartz && npm i && npx quartz build --serve
 - [`contract/`](contract/) — the constitution: vault schema, profile convention, knowledge API, model routing
 - [`core/`](core/) — the `toolkit` CLI (`vault init` · `doctor` · `profile`) and Python library
 - [`vault/`](vault/) — the example vault: docs, demo, test corpus, and eval substrate in one
-- [`plugins/`](plugins/) — curated plugins ([obsidian](plugins/obsidian/), [readwise](plugins/readwise/), [memory](plugins/memory/)), added one release at a time
+- [`plugins/`](plugins/) — curated plugins ([obsidian](plugins/obsidian/), [readwise](plugins/readwise/), [memory](plugins/memory/), [handoff](plugins/handoff/)), added one release at a time
 - [`crates/`](crates/) — the Rust engines
 - [`docs/PLAN.md`](docs/PLAN.md) — why everything is the way it is, with citations
 

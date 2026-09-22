@@ -2,6 +2,8 @@
 Numbers live here and nowhere else; question wording lives in questions.py."""
 from __future__ import annotations
 
+import judge
+
 # Initial priors, 2026-09-21, jev-latest, not yet calibrated against a labelled set.
 # Change only from `--calibrate` output a human accepted; record date + model here.
 THRESHOLDS: dict[str, dict[str, float]] = {
@@ -24,6 +26,6 @@ THRESHOLDS: dict[str, dict[str, float]] = {
 LEVEL_BY_RELATION = {"strengthens-passage": "L2", "contradicts-claim": "L3", "adjacent": "L1", "unrelated": None}
 
 def thresholds(backend: str) -> dict[str, float]:
-    if backend not in THRESHOLDS:
-        raise SystemExit(f"no threshold table for judgment backend {backend!r}; calibrate one before using it")
-    return THRESHOLDS[backend]
+    # JudgmentFailed, not SystemExit: a backend registered in judge.py but not calibrated here
+    # must take the callers' existing degrade path (DLQ note or "failed" report), not kill the process.
+    return judge.policy_for(THRESHOLDS, backend)

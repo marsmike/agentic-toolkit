@@ -55,9 +55,9 @@ or name it in the handoff as deliberate.
 5. **Cluster mode is member notes plus a hub.** One note per capture that has its own
    specifics, a hub that states the shared principle and links them. A synthesis alone
    dropped two thirds of the specifics [earned: 2026-09-22 acceptance run].
-6. **The capture leaves `01_Capture/`**: archived to `05_Archive/<Origin>-Captures-<YYYY-MM>/`
-   with a manifest line (default), or deleted (`trash` if present) only for duplicates and
-   stubs.
+6. **The capture leaves `01_Capture/`**: archived (default) as
+   `05_Archive/<Origin>-Captures-<YYYY-MM>/<stem>--FULLCAPTURE.md` plus one line in that
+   folder's `README.md` manifest, or deleted (`trash` if present) only for duplicates and stubs.
 7. **Ambiguity goes to the DLQ**, not a guess: `vault_utils.write_dlq_note()`, and say so.
 
 Placement, enrichment levels and the DLQ convention in detail: [rules.md](references/rules.md).

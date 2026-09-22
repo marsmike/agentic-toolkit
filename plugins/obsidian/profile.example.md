@@ -32,8 +32,9 @@ order (env var → this note → shipped default).
 - **`search_score_gate`** — overrides the 0.70 default for what counts as an enrichment-grade
   match in `scripts/search.py` and the distill skill. Recalibrate per embedding model if you enable
   the optional semantic layer.
-- **`default_capture_prefixes`** — origin prefixes the plugin recognizes when scanning
-  `01_Capture/` (used by `distill`'s triage mode and by `retrieval-verification`'s inbox summary).
+- **`default_capture_prefixes`** — the origin prefixes captures in `01_Capture/` carry
+  (`Readwise-`, `Research-`, …). Read by the agent running `distill` and `retrieval-verification`
+  to name and group captures; no script branches on it.
 - **`inference_backend` / `inference_base_url` / `inference_model`** — the LLM backend `checks/*.py`
   and `vault_normalize.py` call for description generation, tag classification, and broken-link
   resolution. `inference_backend` is `ollama` (default, talks to a local Ollama server) or
@@ -53,9 +54,9 @@ order (env var → this note → shipped default).
   plain list of names. Names are the part after `domain/`. When set, it replaces the starter
   taxonomy in `checks/tags.py` for the tag audit, the LLM tag classifier and the judgment
   questions alike. The one-line meanings matter: they are what a judgment backend reads.
-- **`enrichment_targets`** — vault-relative note names (as wikilinks) that `distill` treats as
-  mandatory enrichment candidates regardless of semantic score, e.g. a personal profile note that
-  should always learn about new maintenance-relevant material.
+- **`enrichment_targets`** — notes (wikilinks or vault-relative paths) that `distill_judge.py`
+  judges for every capture whatever search returns, e.g. a personal profile note at the vault
+  root that search never walks. They are pinned candidates, still judged, never auto-linked.
 
 ## Secrets
 

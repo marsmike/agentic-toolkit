@@ -131,6 +131,11 @@ def run(vault: Path) -> dict:
         block = result["captures"][0] if "captures" in result else {}
         if block.get("advisory") is not True or "questions_version" not in block:
             problems.append("phase 1: block is not labelled advisory with a questions_version")
+        # The bundled profile pins [[Alex-Vega]], a root-level note search never walks: it must
+        # reach the backend as a candidate for every capture (profile `enrichment_targets`).
+        judged = {n["path"] for c in calls for n in c["payload"]["state"].get("notes", {}).values()}
+        if "Alex-Vega.md" not in judged:
+            problems.append("phase 1: profile enrichment_targets note was not among the judged candidates")
 
         # Phase 3: policy, on synthetic answers.
         t = dj.THRESHOLDS["jev"]

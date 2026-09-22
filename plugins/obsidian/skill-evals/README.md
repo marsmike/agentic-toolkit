@@ -18,9 +18,11 @@ it in the workspace's project settings so the judgment backend works inside the 
 Without a key every case still runs, on the no-backend path.
 
 **Jev is the judge where it can be.** `distill-auto` grades the JSON that `distill_check.py`
-writes: the hard gates, findability of the agent's own questions, and the preservation
-check (kept passages carried), all typed judgments. The LLM grader is left for the one
-thing only a reader can judge: is the reply a proposal, does it say where things went.
+writes, with plain regex graders: the hard gates (deterministic Python), findability of the
+agent's own questions (widened rerank when a key is present, plain search without one), and
+the preservation check (kept passages carried: a typed judgment, skipped without a key). The
+LLM grader is left for the one thing only a reader can judge: is the reply a proposal, does
+it say where things went.
 Use `--judge-model claude-sonnet-5` for it; the default small judge failed a correct
 triage reply three votes to none.
 
