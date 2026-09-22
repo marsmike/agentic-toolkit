@@ -14,7 +14,7 @@ from datetime import datetime
 
 from vault_utils import require_vault
 
-VALID_ACTIONS = {"distill", "lint", "normalize", "search", "retrieval-verification", "file-insight"}
+VALID_ACTIONS = {"distill", "lint", "normalize", "index", "search", "retrieval-verification", "file-insight"}
 
 
 def main() -> int:

@@ -31,6 +31,7 @@ EVAL_MODULES = (
     "eval_link_adjudication",
     "eval_search_judge",
     "eval_typed_maintenance",
+    "eval_index_build",
 )
 
 
