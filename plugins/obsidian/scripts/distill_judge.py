@@ -116,24 +116,33 @@ def read_capture(path: Path) -> dict[str, Any]:
     return {
         "title": _h1_or_stem(body, path),
         "description": str(fm.get("description") or ""),
+        "own_source": str(fm["source"]) if str(fm.get("source") or "").startswith("http") else "",
         "source_urls": urls[:20],
         "body": body.strip()[:CAPTURE_CHARS],
     }
 
 
 def url_hits(capture: dict, vault: Path, exclude: list[str]) -> dict[str, str]:
-    """workflow.md step 2, in Python: {note rel path: "frontmatter" | "body"} for every
-    active note that mentions one of the capture's URLs."""
-    wanted = {_canonical(u) for u in capture["source_urls"]}
+    """workflow.md step 2, in Python: {note rel path: origin} for every active note that
+    mentions one of the capture's URLs. Only a note whose `source:` is the capture's *own*
+    source (its frontmatter URL) is "frontmatter", i.e. provenance; a note whose source is a
+    URL the capture merely links in its body is "body-cited", and a note that mentions a
+    capture URL in prose is "body". [earned: 2026-09-22 acceptance run — a capture linking
+    an example tool made that tool's note read as the capture's canonical distillation]"""
+    own = {_canonical(capture["own_source"])} if capture.get("own_source") else set()
+    cited = {_canonical(u) for u in capture["source_urls"]} - own
     hits: dict[str, str] = {}
-    if not wanted:
+    if not own and not cited:
         return hits
     for path in discover_notes(vault, exclude=exclude):
         fm, body = read_frontmatter(path)
         rel = path.relative_to(vault).as_posix()
-        if _canonical(str(fm.get("source") or "")) in wanted:
+        src = _canonical(str(fm.get("source") or ""))
+        if src and src in own:
             hits[rel] = "frontmatter"
-        elif any(_canonical(u) in wanted for u in URL_RE.findall(body)):
+        elif src and src in cited:
+            hits[rel] = "body-cited"
+        elif any(_canonical(u) in own | cited for u in URL_RE.findall(body)):
             hits[rel] = "body"
     return hits
 
@@ -259,7 +268,7 @@ def apply_policy(notes: list[dict], answers: dict[str, Answer], t: dict[str, flo
 
     canonical = [r["path"] for r in related if r["url_hit"] == "frontmatter"]  # "cited" and "body" are not provenance
     covering = [r["path"] for r in related if (r["p_covers"] or 0.0) >= t["T_COVERS"] and r["path"] not in canonical]
-    body_hit = [r["path"] for r in related if r["url_hit"] == "body"]
+    body_hit = [r["path"] for r in related if r["url_hit"] in ("body", "body-cited")]
     if canonical:
         mode = "enrich-only"  # deterministic: the source URL is already a note's provenance
     elif covering:

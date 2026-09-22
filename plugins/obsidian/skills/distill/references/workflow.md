@@ -55,6 +55,12 @@ candidates (step 8).
 
 ### Graph context (if a gaiafield binary is available)
 
+Availability is what `graph.available()` says (it also looks in the toolkit's engine
+directory, `~/.local/share/agentic-toolkit/bin`), not whether `gaiafield` is on your PATH:
+`uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 -c "import graph; print(graph.available())"`.
+[earned: 2026-09-22 acceptance run — an agent skipped this step for eight captures because
+`which gaiafield` found nothing while the binary was installed]
+
 `scripts/graph.py` mirrors `search.py`'s farsight preference chain: a `gaiafield` binary
 (`TOOLKIT_GAIAFIELD_BIN` env var, else PATH) is optional, deterministic-only (v1 scope —
 wikilinks/frontmatter/tags, no inferred edges), and this step must never block the
