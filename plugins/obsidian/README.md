@@ -39,6 +39,15 @@ normal, fully-functional state — LLM-assisted checks skip cleanly and say why;
 
 ## Advisory judgments
 
+```mermaid
+flowchart LR
+  C[01_Capture] --> DJ[distill_judge --dossier]
+  DJ --> A[agent reads, decides, writes]
+  A --> CK[distill_check]
+  CK -- pass --> AR[05_Archive + Index + log]
+  CK -- fail --> A
+```
+
 `scripts/distill_judge.py` asks a typed-judgment backend (`scripts/judge.py`; default `jev`,
 TypeSafe's System One model through OpenRouter) a batch of narrow questions per capture and
 prints an advisory block for distill's Phase 1 handoff: triage, which found notes are really
@@ -133,7 +142,7 @@ visible in `toolkit doctor`'s DLQ count rather than silently reducing the workfl
 
 The `distill` skill's phase 1 is the first consumer: after its search step, when the graph
 is available, it fetches depth-1 neighbors of the top matches and folds backlink/bridge
-candidates into the Phase 1 handoff (see `skills/distill/references/workflow.md`). When
+candidates into the Phase 1 handoff (see `skills/distill/references/dossier.md`). When
 the binary is absent, phase 1 runs exactly as it did before R3.
 
 `checks/links.py`'s broken-wikilink audit does **not** get a gaiafield-backed path this
@@ -179,7 +188,7 @@ A binary that predates v2 (no `infer` subcommand) degrades the same way an absen
 does: `GraphUnavailable("no-inference", ...)`, probed for via a side-effect-free `--help`
 call (`graph._supports_inference()`) rather than discovered by letting a real `infer`
 call fail and crash or wrongly earn a DLQ note. The `distill` skill's phase 1 is the
-consumer (see `skills/distill/references/workflow.md`'s "Inferred candidates" section):
+consumer (see `skills/distill/references/dossier.md`):
 after the deterministic graph-context step, it fetches inferred candidates for the
 proposed placement's top matches and presents them as a separately labeled, report-only
 block in the Phase 1 handoff — never merged into the deterministic backlink/bridge lists.
@@ -248,7 +257,7 @@ all. Same "surfaces, never mutates" character as the rest of doctor — it never
 | `scripts/ob-sync.sh`, `semantic-search.sh`, `semantic-search.ps1` | Obsidian-headless-server sync management and launchers for the dropped search engine. Vault sync (Obsidian Sync app, git, NAS) is the user's own concern, not this plugin's; `search.py` is invoked directly via `uv run`, no launcher script needed. |
 | `references/agent-prompt.md` | A separate launch-prompt template for the agent that could drift from the agent definition itself; folded directly into `agents/knowledge-distillation-agent.md`. |
 | `skills/distill/references/traps.md` | A failure catalog for tools this v2 plugin doesn't ship (Smart Connections, the Obsidian desktop CLI as a required path, Twitter/Readwise-specific URL handling). The two lessons that generalize — never trust a silent exit 0, never write `"unknown"` as a placeholder — are folded directly into `workflow.md`/`rules.md`. |
-| `skills/distill/references/triage-workflow.md`, `insight-workflow.md` | Folded into `workflow.md` as short Triage/Insight sections; each was small enough that a separate file cost more in the skill's reference-loading budget than it saved. |
+| `skills/distill/references/triage-workflow.md`, `insight-workflow.md` | Folded into `SKILL.md` (modes) as short Triage/Insight sections; each was small enough that a separate file cost more in the skill's reference-loading budget than it saved. |
 | `skills/obsidian-cli/references/daily-note-patterns.md`, `headless-sync.md`, `headless-sync-setup.md` | Machine-specific headless-server setup instructions, in tension with the filesystem-first stance (see `ob-sync.sh` above). |
 | `skills/distill/evals/` (`evals.json`, `mechanical_checks.py`, `setup_sandbox.py`, `fixtures/demo-vault/`) | A different eval-harness contract (pressure-test prompts + a private fixture vault) than v2's Graduation Pattern JSON shape (`{eval, pass, detail}`) targeting the shared example vault. The underlying idea — mechanical checks against a sandboxed copy — carried over into `evals/_sandbox.py`. |
 | `scripts/tests/`, `scripts/checks/tests/`, `scripts/tests/pipeline/` (the pytest suite, ~3,500 lines) | Not ported. The R0 capability evals cover the contract-facing guarantees of what actually shipped; porting a full unit-test suite for code this size was disproportionate to R0 scope. Open item for a follow-up PR if unit-level coverage is wanted alongside the evals. |

@@ -27,6 +27,21 @@ A **typed judgment** is the third option. One request carries a shared `state` (
 the found notes) and a dictionary of narrow questions; each comes back as a probability, never
 as text. `plugins/obsidian/scripts/judge.py` is the seam, `distill_judge.py` the first caller.
 
+```mermaid
+flowchart LR
+  subgraph callers["callers (report-only)"]
+    D[distill_judge<br/>dossier per capture]
+    L[link_judge<br/>suggested links]
+    S[search_judge<br/>search, widen, judge]
+    V[vault_judge / vault_sweep<br/>quality, duplicates, contradictions]
+  end
+  Q[(questions.py<br/>wording, versioned)] --> J
+  callers --> J{{judge.py<br/>state + questions → probabilities}}
+  J --> B[backend: jev today,<br/>a local model later]
+  J --> P[policy in code<br/>thresholds per backend]
+  P --> H[human at the checkpoint]
+```
+
 ## The division of labor
 
 - **The model supplies the number.** One judgment per question, worded so a high value means
@@ -49,6 +64,19 @@ wrong, the first suspect is the question, then the state, then the label, and on
 model: see the `judgment-calibration` skill, which classifies every disagreement by cause before
 proposing the smallest fix, keeps a held-out slice away from the tuning step, and never accepts
 a backend's own answer as a label.
+
+```mermaid
+flowchart LR
+  G[(golden rows<br/>human · construction · anchored)] --> C[--calibrate]
+  C --> X[disagreements +<br/>threshold sweep]
+  X --> R{cause?}
+  R -- wording --> W[edit questions.py<br/>bump version]
+  R -- state --> St[propose a state field]
+  R -- label --> Lb[fix the row]
+  R -- threshold --> T[report; human decides]
+  R -- model --> M[record it]
+  W --> C
+```
 
 ## Calibration log
 

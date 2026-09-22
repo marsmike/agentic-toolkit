@@ -417,6 +417,29 @@ def run_captures(vault: Path, paths: list[Path], top: int, exclude: list[str]) -
             "requests": sum(u["requests"] for u in usages)}
 
 
+def add_graph(block: dict, vault: Path) -> None:
+    """Graph context for the top related notes and, when a judgment backend is present,
+    adjudicated inferred candidates for the best one. Silent when no gaiafield binary."""
+    import graph  # local: the seam must stay importable without the graph module's subprocess machinery
+
+    top = [r["path"] for r in block.get("related", []) if r.get("judged_relevant")][:3]
+    if not top or not graph.available():
+        block["graph"] = {"available": False}
+        return
+    ctx = graph.graph_context(vault, top)
+    if isinstance(ctx, graph.GraphUnavailable):
+        block["graph"] = {"available": False, "reason": ctx.reason}
+        return
+    block["graph"] = {"available": True, "placement_folder": ctx.get("placement_folder"),
+                      "backlink_candidates": [c.get("path") or c.get("title") for c in ctx.get("backlink_candidates", [])][:10],
+                      "bridge_opportunities": [c.get("path") or c.get("title") for c in ctx.get("bridge_opportunities", [])][:5]}
+    graph.ensure_inferred(vault)
+    rows = graph.inferred_candidates(vault, top[0], k=8)
+    if not isinstance(rows, graph.GraphUnavailable):
+        judged = graph.adjudicate_candidates(vault, rows, note=top[0])
+        block["graph"]["inferred"] = judged if not isinstance(judged, graph.GraphUnavailable) else rows
+
+
 def _print_text(result: dict) -> None:
     for b in result["captures"]:
         print(f"\n## {b['capture']}  (advisory; {b['judgment']['backend']}/{b['judgment']['model']}, questions {b['questions_version']})")
@@ -452,6 +475,7 @@ def main() -> int:
     ap.add_argument("--emit-golden-skeleton", action="store_true", help="print unlabelled golden rows for these captures")
     ap.add_argument("--passages", action="store_true", help="also judge which passages carry the capture's substance, and whether its summary is faithful")
     ap.add_argument("--check-note", metavar="NOTE", help="preservation check: list the capture's kept passages this note does not carry")
+    ap.add_argument("--dossier", action="store_true", help="everything a distilling agent needs in one block: judgments, passages, graph context, adjudicated inferred candidates")
     args = ap.parse_args()
     vault = require_vault()
 
@@ -496,10 +520,12 @@ def main() -> int:
         if missing:
             ap.error(f"not a file: {', '.join(missing)}")
         result = run_captures(vault, paths, args.top, args.exclude)
-        if args.passages and "failed" not in result:
+        if (args.passages or args.dossier) and "failed" not in result:
             for block, path in zip(result["captures"], paths, strict=True):
                 block["passages"] = judge_passages(path, vault)
                 result["usd"] = round(result["usd"] + block["passages"].get("judgment", {}).get("usd", 0.0), 6)
+                if args.dossier:
+                    add_graph(block, vault)
     except JudgmentUnavailable as e:  # key vanished between the check and the call
         print(f"SKIPPED — judgment backend unavailable ({e.reason})")
         return 0

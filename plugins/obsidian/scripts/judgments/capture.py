@@ -15,7 +15,8 @@ QUERY_BODY_CHARS = 600
 
 URL_RE = re.compile(r"https?://[^\s<>\"')\]]+")
 
-TRACKING_PARAMS = {"is", "si", "feature", "t", "ref", "source", "fbclid", "gclid", "igshid", "s", "mc_cid", "mc_eid"}
+TRACKING_PARAMS = {"is", "si", "feature", "t", "ref", "source", "fbclid", "gclid", "igshid", "s", "mc_cid", "mc_eid",
+                   "rw_tt_thread", "ref_src", "ref_url"}
 
 def _canonical(url: str) -> str:
     """Same address, same key: lower-cased host, no scheme/www, tracking parameters dropped
