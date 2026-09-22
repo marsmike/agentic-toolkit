@@ -12,6 +12,17 @@ from checks import FixResult, Issue
 # Lifecycle values per contract/VAULT_SCHEMA.md. "capture" is deliberately absent — a note
 # under 01_Capture/ is out of scope for this check (discover_notes never walks 01_Capture).
 VALID_STATUSES = {"draft", "review", "distilled", "active", "archived"}
+
+# Lifecycle words people actually write, mapped to the contract's five without a model call.
+# The original word is kept in `stage:` so no nuance is lost. [earned: 2026-09-22, a real vault
+# carried 16 such words on 80 notes: capture, living, live, shipped, ready-to-paste, inbox, …]
+STATUS_ALIASES = {
+    "capture": "active", "living": "active", "live": "active", "aktiv": "active", "reference": "active",
+    "evergreen": "active", "ongoing": "active", "posted": "active", "posted-with-live-edits": "active",
+    "ready": "review", "ready-to-paste": "review", "ready-to-publish": "review", "ready-to-apply": "review",
+    "shipped": "archived", "done": "archived", "superseded": "archived", "frozen": "archived", "deprecated": "archived",
+    "inbox": "draft", "planning": "draft", "concept": "draft", "idea": "draft", "wip": "draft",
+}
 CONTENT_TRUNCATE = 4000
 
 DESCRIPTION_PROMPT = """Write a one-line description (max 15 words) for this vault note.
@@ -102,7 +113,11 @@ def fix(
     if status is None or status not in VALID_STATUSES:
         old_status = status
         new_status = "active"  # honest fallback — never guess "distilled" without evidence
-        if body.strip():
+        alias = STATUS_ALIASES.get(str(status).strip().lower()) if status is not None else None
+        decided_by_llm = False
+        if alias:
+            new_status = alias
+        elif body.strip():
             try:
                 result = llm_chat(
                     STATUS_PROMPT,
@@ -111,13 +126,15 @@ def fix(
                 )
                 candidate = result.strip().lower().strip("\"'")
                 if candidate in VALID_STATUSES:
-                    new_status = candidate
+                    new_status, decided_by_llm = candidate, True
             except NoModelConfigured:
                 pass  # fall through to the "active" default — no crash, no guess beyond it
             except RuntimeError:
                 pass
         fm["status"] = new_status
-        via = "" if new_status == "active" and old_status is None else " (via LLM)"
+        if old_status is not None and "stage" not in fm:
+            fm["stage"] = old_status
+        via = " (alias)" if alias else " (via LLM)" if decided_by_llm else " (default)"
         if old_status is None:
             results.append(FixResult(note_path, "frontmatter", True, f"Added status: {new_status}{via}"))
         else:

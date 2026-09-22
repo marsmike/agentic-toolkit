@@ -33,6 +33,7 @@ EVAL_MODULES = (
     "eval_typed_maintenance",
     "eval_index_build",
     "eval_yaml_repair",
+    "eval_status_aliases",
 )
 
 
