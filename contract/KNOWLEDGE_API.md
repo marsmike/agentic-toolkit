@@ -73,10 +73,11 @@ Rules, in order of importance:
 
 ## Judgments
 
-A typed judgment (`plugins/obsidian/scripts/judge.py`) is a probability about notes, not a fact
-in the graph. It is never an edge kind, is never stored in an engine's database, and rule 1
-above applies to it unchanged: nothing writes vault content from a judgment without explicit
-human confirmation in-session. A judgment is meaningless without the backend, model and
+A typed judgment (`plugins/obsidian/scripts/judge.py`, and its byte-identical copy in
+`plugins/radar/scripts/judge.py`, held together by a parity test in `core/tests/test_contract.py`)
+is a probability about notes or feed items, not a fact in the graph. It is never an edge kind,
+is never stored in an engine's database, and rule 1 above applies to it unchanged: nothing
+writes vault content from a judgment without explicit human confirmation in-session. A judgment is meaningless without the backend, model and
 `questions_version` that produced it, for the same reason a gate is meaningless without its
 model name (rule 3); every emitted block carries all three.
 

@@ -1,0 +1,16 @@
+[project]
+name = "radar-plugin-scripts"
+version = "2.10.0"
+description = "Standalone scripts for the radar plugin — stdlib plus pyyaml, run via `uv run`."
+requires-python = ">=3.11"
+dependencies = [
+  "pyyaml>=6",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+# Its own uv root, like plugins/obsidian/scripts: `uv run --project` must not walk up to the
+# repository's pyproject.toml (the `claude plugin eval` sandbox grants only the plugin dir).
+[tool.uv.workspace]
+members = []
