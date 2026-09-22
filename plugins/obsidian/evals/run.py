@@ -32,6 +32,7 @@ EVAL_MODULES = (
     "eval_search_judge",
     "eval_typed_maintenance",
     "eval_index_build",
+    "eval_yaml_repair",
 )
 
 
