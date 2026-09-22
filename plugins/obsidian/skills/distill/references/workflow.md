@@ -153,6 +153,12 @@ changes nothing in the vault.
   `above_enrichment_gate` is informational only, and `judged_relevant` is the enrichment
   gate for step 8. When search ran on the Python path, the score gate stands and
   `judged_relevant` is a second opinion.
+- **Looking for one specific note** (a question in your own words, not key terms):
+  `scripts/search_judge.py "<question>"` widens the search hits by the notes they link to and
+  reorders them by whether each note answers the question. On the example vault it finds the
+  answer first for 11 of 12 questions where keyword search alone manages 5 and misses 3
+  entirely. The advisory block already uses the same widening for its related-note list
+  (`via` names the hit a note was reached through).
 - **No backend or no key** prints `SKIPPED` and exits 0: say so in one line and carry on
   exactly as before. This is the normal state of a fresh clone, not an error.
 - A configured backend that fails writes its own DLQ note and exits 1; mention it and

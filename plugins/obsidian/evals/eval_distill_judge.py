@@ -16,7 +16,7 @@ Offline phases:
 4. no key          — SKIPPED, no request, no DLQ note
 5. partial failure — a request that fails is halved and the answers still arrive
 6. total failure   — exactly one DLQ note
-7. read-only       — judging changes nothing in the vault
+7. read-only       — judging changes no note in the vault (the graph index may be built)
 """
 from __future__ import annotations
 
@@ -52,7 +52,10 @@ def _canned(question: dict) -> dict:
 
 
 def _snapshot(vault: Path) -> dict[str, tuple[int, int]]:
-    return {p.relative_to(vault).as_posix(): (p.stat().st_size, p.stat().st_mtime_ns) for p in vault.rglob("*") if p.is_file()}
+    # `.gaiafield/` is the graph engine's own index, which candidate widening may build; it is
+    # not vault content, and the read-only claim is about notes.
+    return {p.relative_to(vault).as_posix(): (p.stat().st_size, p.stat().st_mtime_ns)
+            for p in vault.rglob("*") if p.is_file() and ".gaiafield" not in p.parts}
 
 
 def run(vault: Path) -> dict:

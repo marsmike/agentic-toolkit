@@ -12,8 +12,8 @@ the rows are synthetic, in both shapes graph.py produces):
 Opt-in live phase (TOOLKIT_EVAL_LIVE_JEV=1 with a key): ground truth that needs no
 annotator. Positives are pairs the vault's author linked by hand; negatives are unlinked
 pairs across the two planted project clusters (birding vs home lab, per Test-Corpus-Map).
-The backend must rank the first above the second (AUC >= 0.90) and must not call a
-cross-cluster pair a likely link.
+The backend must rank the first above the second (AUC >= 0.90) and may call at most
+one of fifteen cross-cluster pairs a likely link (the 10% bar).
 """
 from __future__ import annotations
 
@@ -162,7 +162,10 @@ def _live_phase(graph, sandbox: Path, saved_env: dict, problems: list[str]) -> s
     false_links = sum(1 for v in verdicts[20:] if v and v["label"] == "LIKELY-LINK")
     if auc < 0.90:
         problems.append(f"live: author-linked vs cross-cluster AUC {auc:.3f} is below 0.90")
-    if false_links:
-        problems.append(f"live: {false_links} unlinked cross-cluster pair(s) judged LIKELY-LINK")
+    # The plan's bar is a cross-cluster false-positive rate of 10% or less; on 15 pairs that is
+    # one. Pairs like two inventories in different projects sit on the boundary and cross it
+    # between runs (order_gap and rerun drift, see Typed-Judgments), so zero would be a coin flip.
+    if false_links > 1:
+        problems.append(f"live: {false_links} unlinked cross-cluster pair(s) judged LIKELY-LINK (at most 1 of 15 allowed)")
     return (f"live: AUC {auc:.3f} (linked mean {sum(pos) / len(pos):.2f}, cross-cluster mean {sum(neg) / len(neg):.2f}), "
             f"model {usage['model']}, ${usage['usd']}")

@@ -84,6 +84,15 @@ a backend's own answer as a label.
 - **2026-09-22, distill golden set 45 → 68 rows.** Eight fixture captures with answers known by
   construction. 50/54 tune, 13/14 held out. New miss is a threshold (same-source 0.68 vs a 0.80
   cut), reported for a human decision, not changed.
+- **2026-09-22, questions .2, retrieval.** Twelve questions in a reader's words, one known
+  answer each. Keyword search: 5 first, 3 never found. Rerank of the top ten by "would
+  opening this give the asker what they wanted": 9 first. A Jev-driven graph walk (Choice over
+  outgoing links, Noul "goal reached", beam 3, 4 hops): 4 first, 5 s and 3× the cost, dropped.
+  Its one useful observation: every note search missed was one wikilink from a note it found.
+  Widening the candidates by the top hits' neighbours (deterministic, free) and reranking once:
+  **11 first, 12 found**, 0.7 s, $0.0006. Lesson, same as the extraction pipelines report: the
+  judge is only as good as its candidate list, and the graph is a second candidate generator
+  that costs nothing.
 
 ## Related
 

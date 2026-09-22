@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from judge import Question
 
-QUESTIONS_VERSION = "2026-09-22.1"
+QUESTIONS_VERSION = "2026-09-22.2"
 
 # One-line meaning of each placement target, sent as `vault_map` so `para` can point at it.
 VAULT_MAP = {
@@ -199,3 +199,16 @@ def description_specific(nid: str) -> Question:
             ),
         },
     )
+
+
+def answers_query(nid: str) -> Question:
+    """search rerank: is this found note what the person asking `query` wants to open?"""
+    return Question(
+        kind="noul",
+        instructions=f"Would opening `notes.{nid}` give the person who asked `query` what they were looking for?",
+        criteria={
+            "true": "the note addresses the thing asked about directly: it states, explains or records it",
+            "false": "the note only shares words or a subject area with the question, or mentions the thing in passing on the way to something else",
+        },
+    )
+

@@ -47,6 +47,12 @@ pairwise uniqueness across a batch. It writes nothing to the vault. Wording live
 `scripts/judgments/questions.py`, policy in `distill_judge.py`, and the
 `judgment-calibration` skill tunes the first against `evals/golden/`.
 
+`scripts/search_judge.py` answers a question in the reader's words: keyword search, widened
+by the wikilink neighbours of the top hits (free, deterministic), then one request that asks
+per candidate whether opening it would give the asker what they wanted. Twelve test
+questions: search alone puts the answer first 5 times and never finds 3; widened and
+reranked, 11 first and all 12 found, for about $0.0006 a query.
+
 Two more report-only scripts use the same seam: `scripts/link_judge.py` adjudicates
 gaiafield's suggested links (would a link help a reader; gaiafield's own score and label
 are never changed, and `AMBIGUOUS` rows still appear only on request), and

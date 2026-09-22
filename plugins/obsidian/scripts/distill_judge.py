@@ -35,6 +35,7 @@ from judge import Answer, JudgmentFailed, JudgmentUnavailable, Question
 from judgments import questions as Q
 from judgments.state import domain_glosses, note_payload
 from search import search
+from search_judge import expand
 from vault_utils import discover_notes, read_frontmatter, require_vault, write_dlq_note
 
 CAPTURE_CHARS = 6000
@@ -59,6 +60,7 @@ THRESHOLDS: dict[str, dict[str, float]] = {
         "T_DOMAIN": 0.50,
         "T_PLACEMENT_MARGIN": 0.20,  # top-two gap below this: placement is ambiguous
         "T_REDUNDANT": 0.70,         # 1 - adds(a, b) at or above: a adds nothing over b
+        "T_SECOND_HOME": 0.25,       # a runner-up folder holding this much mass is worth naming (soft placement)
     },
 }
 
@@ -128,8 +130,12 @@ def candidates(capture: dict, vault: Path, top: int, exclude: list[str], force: 
     found = search(query, vault, top=top)
     hits = url_hits(capture, vault, exclude)
     rows: dict[str, dict] = {}
-    for r in found["results"]:
-        rows[r["path"]] = {"search_score": r["score"], "above_enrichment_gate": r["above_enrichment_gate"]}
+    # Search hits, then the notes those hits link to (deterministic, free): the answer to
+    # "which existing note is this capture really about" is often one link away from the
+    # note the keywords land on. Judged the same way; only the origin differs.
+    for r in expand(found["results"], vault):
+        rows[r["path"]] = {"search_score": r.get("score"), "above_enrichment_gate": r.get("above_enrichment_gate"),
+                           "via": r.get("via")}
     for rel in [*hits, *force]:
         rows.setdefault(rel, {"search_score": None, "above_enrichment_gate": None})
     out = []
@@ -191,7 +197,7 @@ def apply_policy(notes: list[dict], answers: dict[str, Answer], t: dict[str, flo
             level = LEVEL_BY_RELATION.get(relation.top) if sure else "L1"
             level = level or "L1"  # judged relevant but "unrelated" on top: still only a backlink
         related.append({
-            "path": n["path"], "title": n["title"], "search_score": n["search_score"],
+            "path": n["path"], "title": n["title"], "search_score": n["search_score"], "via": n.get("via"),
             "above_enrichment_gate": n["above_enrichment_gate"], "url_hit": n["url_hit"],
             "p_relevant": round(rel.p, 3) if rel else None, "judged_relevant": judged,
             "relation": relation.top if relation else None, "relation_probs": _probs(relation),
@@ -220,6 +226,12 @@ def apply_policy(notes: list[dict], answers: dict[str, Answer], t: dict[str, flo
     folder = None if ambiguous else para.top
     if folder == "04_Resources" and concept is not None and concept.p >= 0.5:
         folder = "04_Resources/Concepts"
+    # Soft placement: a runner-up that holds real mass is not noise, it is a second home the
+    # note may deserve a link from (the "block on the distribution, not the label" lesson).
+    alternatives = [
+        {"folder": label, "p": round(p, 3)} for label, p in sorted(para.probs.items(), key=lambda kv: -kv[1])[1:]
+        if label != "no-clear-home" and p >= t["T_SECOND_HOME"]
+    ] if para is not None else []
 
     return {
         "triage": {"recommendation": triage_top, "probs": _probs(triage),
@@ -228,7 +240,7 @@ def apply_policy(notes: list[dict], answers: dict[str, Answer], t: dict[str, flo
         "already_distilled": {"suggested_mode": mode, "canonical_by_url": canonical, "covers": covering, "url_in_body": body_hit},
         "domains": {"picked": [{"domain": n, "p": round(p, 3)} for n, p in picked],
                     "low_confidence_top": None if picked or not domains else {"domain": domains[0][0], "p": round(domains[0][1], 3)}},
-        "placement": {"folder": folder, "ambiguous": ambiguous, "probs": _probs(para),
+        "placement": {"folder": folder, "ambiguous": ambiguous, "alternatives": alternatives, "probs": _probs(para),
                       "p_single_concept": round(concept.p, 3) if concept else None,
                       "note": "ambiguous: follow rules.md and record a DLQ note if it stays 50/50" if ambiguous else ""},
     }

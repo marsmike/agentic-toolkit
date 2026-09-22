@@ -29,6 +29,7 @@ EVAL_MODULES = (
     "eval_inferred_candidates",
     "eval_distill_judge",
     "eval_link_adjudication",
+    "eval_search_judge",
 )
 
 
