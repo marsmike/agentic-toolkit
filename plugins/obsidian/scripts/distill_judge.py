@@ -24,120 +24,37 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
-from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
 import judge
 from judge import Answer, JudgmentFailed, JudgmentUnavailable, Question
 from judgments import questions as Q
+from judgments.batch import judge_batch  # noqa: F401  (re-exported for the skill docs and evals)
+from judgments.capture import CAPTURE_CHARS, URL_RE, WIKILINK_RE, _canonical, query_text, read_capture  # noqa: F401
+from judgments.passages import check_note, judge_passages, split_passages  # noqa: F401
+from judgments.policy import LEVEL_BY_RELATION, THRESHOLDS, thresholds  # noqa: F401
 from judgments.state import domain_glosses, in_chunks, note_payload
 from search import search
 from search_judge import expand
 from vault_utils import discover_notes, read_frontmatter, require_vault, write_dlq_note
 
-CAPTURE_CHARS = 6000
-BATCH_CAPTURE_CHARS = 2000
-MAX_BATCH = 12  # captures per full pairwise request; above that, pairs are blocked first
-PAIR_BLOCK_JACCARD = 0.34  # title-token overlap at or above: a pair worth judging
-NEAR_IDENTICAL = 0.85      # body similarity at or above (difflib, first 6000 chars): a duplicate, decided without a model
-QUERY_BODY_CHARS = 600
 MAX_LISTED_FOLDERS = 60
+
+
 NOTES_PER_REQUEST = 8  # candidate notes per request; the capture rides along in each. A real
+
+
 # vault's capture plus 40 widened candidates exceeded the backend's input limit (2026-09-22).
 MAX_CANDIDATES = 24
+
+
 # Requests per capture; an even number also asks with the candidate notes in reverse order and
 # averages. Left at 1: measured 2026-09-22, an identical rerun moves a noul by 0.008 on average
 # (max 0.09) and two views by 0.006, with golden agreement unchanged (54/60 vs 55/60). Unlike
 # the pairwise link question there is no order effect worth paying a second request for.
 VIEWS = 1
-
-# Initial priors, 2026-09-21, jev-latest, not yet calibrated against a labelled set.
-# Change only from `--calibrate` output a human accepted; record date + model here.
-THRESHOLDS: dict[str, dict[str, float]] = {
-    "jev": {
-        "T_TRIAGE": 0.60,            # below this top probability: no triage recommendation
-        "T_RELEVANT": 0.50,          # rel_* at or above: enrichment candidate
-        "T_PRINCIPLE": 0.55,         # prin_* at or above: a cross-domain bridge, also a candidate
-        "T_UPGRADE": 0.75,           # relation must be this sure before suggesting L2/L3 over L1
-        "T_COVERS": 0.80,            # covers_* at or above: probably the same original work
-        "T_DOMAIN": 0.50,
-        "T_PLACEMENT_MARGIN": 0.20,  # top-two gap below this: placement is ambiguous
-        "T_REDUNDANT": 0.70,         # 1 - adds(a, b) at or above: a adds nothing over b
-        "T_SECOND_HOME": 0.25,       # a runner-up folder holding this much mass is worth naming (soft placement)
-        "T_KEEP": 0.60,              # passage_keep at or above: part of the capture's essence
-        "T_REVERSES": 0.40,          # summary_reverses at or above, or relation misstates/overstates on top: read the source, not the summary
-        "T_CONCEPT_UPGRADE": 0.50,   # concept_vs_root at or above: 04_Resources -> 04_Resources/Concepts
-    },
-}
-
-URL_RE = re.compile(r"https?://[^\s<>\"')\]]+")
-MAX_PASSAGES = 200        # a 300 KB report is about 200 paragraphs; judged in chunks of 12
-MIN_PASSAGE_CHARS = 60
-PASSAGE_CHARS = 1200      # per passage on the wire
-SOURCE_TEXT_CHARS = 12000  # of the article itself, for the summary-faithfulness check
-FULL_CAPTURE_CHARS = 400000
-SUMMARY_HEADINGS = ("synthesis", "readwise summary", "summary", "tl;dr")
-LEVEL_BY_RELATION = {"strengthens-passage": "L2", "contradicts-claim": "L3", "adjacent": "L1", "unrelated": None}
-
-
-# ---------------------------------------------------------------------------
-# Reading captures and notes
-# ---------------------------------------------------------------------------
-
-
-TRACKING_PARAMS = {"is", "si", "feature", "t", "ref", "source", "fbclid", "gclid", "igshid", "s", "mc_cid", "mc_eid"}
-
-
-def _canonical(url: str) -> str:
-    """Same address, same key: lower-cased host, no scheme/www, tracking parameters dropped
-    (utm_*, share ids), fragment dropped, trailing slash dropped. [earned: 2026-09-22 — Reader
-    held one video twice under URLs differing only by `&is=`]"""
-    u = url.strip().rstrip("/.,;")
-    u = re.sub(r"^https?://(www\.)?", "", u, flags=re.I)
-    u, _, _ = u.partition("#")
-    path, _, query = u.partition("?")
-    keep = []
-    for part in query.split("&"):
-        key = part.split("=", 1)[0].lower()
-        if part and key not in TRACKING_PARAMS and not key.startswith("utm_"):
-            keep.append(part)
-    return (path.lower().rstrip("/") + ("?" + "&".join(sorted(keep)) if keep else ""))
-
-
-def _h1_or_stem(body: str, path: Path) -> str:
-    for line in body.splitlines():
-        if line.startswith("# "):
-            return line[2:].strip()
-    return path.stem
-
-
-HEADER_LINE_RE = re.compile(r"^\s*\*\*(Source|Author|Saved|Captured|Origin|Published|URL)\s*:?\*\*\s*:?", re.I)
-
-
-def query_text(capture: dict) -> str:
-    """What search sees for a capture: title, description, and the first content lines with
-    the capture pipeline's own header (**Source:** … **Saved:** …) and bare URLs stripped.
-    [earned: 2026-09-22 replay — a Readwise capture's first 400 chars were all header, and the
-    note that mattered ranked #2 on a clean query and nowhere on the boilerplate one]"""
-    lines = [ln for ln in capture["body"].splitlines() if ln.strip() and not HEADER_LINE_RE.match(ln) and not ln.startswith("# ")]
-    content = URL_RE.sub(" ", " ".join(lines))
-    return " ".join([capture["title"], capture["description"], content[:QUERY_BODY_CHARS]])
-
-
-def read_capture(path: Path) -> dict[str, Any]:
-    fm, body = read_frontmatter(path)
-    urls = [str(fm["source"])] if str(fm.get("source") or "").startswith("http") else []
-    urls += [u for u in URL_RE.findall(body) if u not in urls]
-    return {
-        "title": _h1_or_stem(body, path),
-        "description": str(fm.get("description") or ""),
-        "own_source": str(fm["source"]) if str(fm.get("source") or "").startswith("http") else "",
-        "source_urls": urls[:20],
-        "body": body.strip()[:CAPTURE_CHARS],
-    }
 
 
 def url_hits(capture: dict, vault: Path, exclude: list[str]) -> dict[str, str]:
@@ -176,9 +93,6 @@ def _excluded(rel: str, exclude: list[str]) -> bool:
     return any(rel == e or rel.startswith(e.rstrip("/") + "/") for e in exclude)
 
 
-WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)")
-
-
 def cited_notes(capture: dict, vault: Path) -> list[str]:
     """Notes the capture itself names with a wikilink (a Readwise capture often carries the
     pipeline's own cross-references). [earned: 2026-09-22 replay on a real vault — the strongest
@@ -214,11 +128,6 @@ def candidates(capture: dict, vault: Path, top: int, exclude: list[str], force: 
         out.append({**note_payload(path, vault), **extra, "url_hit": hits.get(rel)})
     meta = {"score_gate": found.get("score_gate"), "note": found.get("note", "")}
     return out, meta
-
-
-# ---------------------------------------------------------------------------
-# Questions + policy for one capture
-# ---------------------------------------------------------------------------
 
 
 def build_request(capture: dict, notes: list[dict], vault: Path, first: int = 0,
@@ -386,232 +295,6 @@ def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: 
     return block
 
 
-def thresholds(backend: str) -> dict[str, float]:
-    if backend not in THRESHOLDS:
-        raise SystemExit(f"no threshold table for judgment backend {backend!r}; calibrate one before using it")
-    return THRESHOLDS[backend]
-
-
-# ---------------------------------------------------------------------------
-# Batch: pairwise uniqueness (rules.md, cluster uniqueness gate)
-# ---------------------------------------------------------------------------
-
-
-def split_passages(body: str) -> tuple[list[str], str | None, str]:
-    """(passages, summary section text or None, source text). Paragraphs are blank-line
-    separated; the capture pipeline's header lines are dropped; a section headed Synthesis /
-    Summary is returned separately so its faithfulness can be checked against the rest."""
-    passages, summary, source_parts = [], [], []
-    section = None
-    for block in re.split(r"\n\s*\n", body):
-        block = block.strip()
-        if not block:
-            continue
-        if block.startswith("#"):
-            section = block.lstrip("# ").strip().lower()
-            continue
-        if HEADER_LINE_RE.match(block) or len(block) < MIN_PASSAGE_CHARS:
-            continue
-        is_summary = section is not None and any(section.startswith(h) for h in SUMMARY_HEADINGS)
-        (summary if is_summary else source_parts).append(block)
-        passages.append(block)
-    return passages[:MAX_PASSAGES], ("\n\n".join(summary) or None), "\n\n".join(source_parts)[:SOURCE_TEXT_CHARS]
-
-
-def judge_passages(path: Path, vault: Path) -> dict[str, Any]:
-    """Which passages of a capture carry its substance, and is its summary faithful to the source.
-    The essence is what a distilling agent reads first; the rest is there if it wants it."""
-    capture = read_capture(path)
-    _, full_body = read_frontmatter(path)  # the whole capture, not the judged-candidate cap
-    passages, summary, source = split_passages(full_body.strip()[:FULL_CAPTURE_CHARS])
-    state: dict[str, Any] = {"capture_title": capture["title"], "passages": {f"P{i:02d}": p[:PASSAGE_CHARS] for i, p in enumerate(passages, start=1)}}
-    questions: dict[str, Question] = {}
-    for pid in state["passages"]:
-        questions[f"keep_{pid}"] = Q.passage_keep(pid)
-        questions[f"pipe_{pid}"] = Q.passage_pipeline(pid)
-    if summary and source:
-        state["summary"], state["source_text"] = summary[:3000], source
-        questions["relation"] = Q.summary_relation()
-        questions["reverses"] = Q.summary_reverses()
-    if not questions:
-        cfg = judge.load_config(vault)
-        empty_usage = judge.Usage(backend=cfg["backend"], model=cfg["model"])
-        return {"capture": path.name, "passages": [], "essence_chars": 0, "total_chars": len(capture["body"]),
-                "judgment": empty_usage.as_dict()}
-    usages = []
-
-    def ask(chunk, start):
-        sub_state = {k: v for k, v in state.items() if k != "passages"}
-        sub_state["passages"] = {pid: state["passages"][pid] for pid in chunk}
-        sub_q = {qid: qq for qid, qq in questions.items() if qid[5:] in chunk or (qid in ("relation", "reverses") and start == 0)}
-        raw, used = judge.judge(vault, sub_state, sub_q)
-        usages.append(used)
-        return raw
-
-    answers = in_chunks(list(state["passages"]), 12, ask)
-    if not usages:
-        # Every chunk hit judge.StateTooLarge all the way down to a single passage and still
-        # failed: in_chunks() degrades that to {} rather than raising, so nothing here ever
-        # called judge.judge() successfully.
-        raise JudgmentFailed("passage state exceeded the backend's size limit, even alone")
-    t = thresholds(usages[0].backend)
-    rows, essence = [], 0
-    for pid, text in state["passages"].items():
-        keep, pipe = answers.get(f"keep_{pid}"), answers.get(f"pipe_{pid}")
-        kept = keep is not None and keep.p >= t["T_KEEP"]
-        essence += len(text) if kept else 0
-        rows.append({"id": pid, "keep": kept, "p_keep": round(keep.p, 3) if keep else None,
-                     "p_pipeline": round(pipe.p, 3) if pipe else None, "head": text[:100]})
-    relation, reverses = answers.get("relation"), answers.get("reverses")
-    warning = (reverses is not None and reverses.p >= t["T_REVERSES"]) or (relation is not None and relation.top in ("misstates", "overstates"))
-    usage = usages[0]
-    for extra in usages[1:]:
-        usage.requests += extra.requests
-        usage.input_tokens += extra.input_tokens
-        usage.usd += extra.usd
-        usage.splits += extra.splits
-        usage.skipped.extend(extra.skipped)
-    return {"capture": path.name, "passages": rows, "essence_chars": essence, "total_chars": sum(len(p) for p in state["passages"].values()),
-            "summary_relation": relation.top if relation else None, "p_reverses": round(reverses.p, 3) if reverses else None,
-            "summary_warning": warning,
-            "essence_text": "\n\n".join(state["passages"][r["id"]] for r in rows if r["keep"]),
-            "judgment": usage.as_dict()}
-
-
-def _title_tokens(text: str) -> set[str]:
-    return {w for w in re.findall(r"[a-z0-9]{3,}", text.lower()) if w not in ("the", "and", "for", "with", "how", "why", "what")}
-
-
-def candidate_pairs(caps: dict[str, dict]) -> list[tuple[str, str]]:
-    """Which capture pairs are worth a uniqueness judgment. Up to MAX_BATCH captures, all of
-    them. Above that, cheap blocking: the same own source, a shared URL, or title-token
-    overlap at or above PAIR_BLOCK_JACCARD. [earned: 2026-09-22 acceptance run — the batch
-    judged only the first twelve of 81 captures and missed a video Reader held twice]"""
-    ids = list(caps)
-    if len(ids) <= MAX_BATCH:
-        return [(a, b) for i, a in enumerate(ids) for b in ids[i + 1:]]
-    out = []
-    for i, a in enumerate(ids):
-        for b in ids[i + 1:]:
-            ca, cb = caps[a], caps[b]
-            same_source = ca["own_source"] and _canonical(ca["own_source"]) == _canonical(cb["own_source"])
-            shared_url = bool(set(map(_canonical, ca["source_urls"])) & set(map(_canonical, cb["source_urls"])))
-            ta, tb = _title_tokens(ca["title"]), _title_tokens(cb["title"])
-            jac = len(ta & tb) / len(ta | tb) if ta | tb else 0.0
-            if same_source or shared_url or jac >= PAIR_BLOCK_JACCARD:
-                out.append((a, b))
-    return out
-
-
-def judge_batch(paths: list[Path], vault: Path, refs: list[str] | None = None) -> dict[str, Any]:
-    """Pairwise uniqueness over a batch. `refs` name the captures in the output (default: file
-    names); golden files pass their own. Pairs are asked in both directions, in chunks that
-    carry only the captures they need."""
-    ids = {f"C{i:02d}": p for i, p in enumerate(paths, start=1)}
-    caps = {cid: read_capture(p) for cid, p in ids.items()}
-    names = {cid: (refs[i] if refs else p.name) for i, (cid, p) in enumerate(ids.items())}
-    pairs_to_ask = candidate_pairs(caps)
-    usages: list = []
-
-    def ask(chunk, start):
-        members = sorted({c for pair in chunk for c in pair})
-        state = {"captures": {c: {"title": caps[c]["title"], "description": caps[c]["description"],
-                                  "body": caps[c]["body"][:BATCH_CAPTURE_CHARS]} for c in members}}
-        questions = {}
-        for a, b in chunk:
-            questions[f"adds_{a}_{b}"] = Q.adds(a, b)
-            questions[f"adds_{b}_{a}"] = Q.adds(b, a)
-        got, used = judge.judge(vault, state, questions)
-        usages.append(used)
-        return got
-
-    # Reader holding one item twice is a fact, not a judgment: the same own source address, or
-    # near-identical text, settles the pair without a model call.
-    identical = {}
-    for a, b in pairs_to_ask:
-        same_source = caps[a]["own_source"] and _canonical(caps[a]["own_source"]) == _canonical(caps[b]["own_source"])
-        if same_source:
-            identical[(a, b)] = "same source"
-            continue
-        ratio = SequenceMatcher(None, caps[a]["body"][:6000], caps[b]["body"][:6000]).quick_ratio()
-        if ratio >= NEAR_IDENTICAL and SequenceMatcher(None, caps[a]["body"][:6000], caps[b]["body"][:6000]).ratio() >= NEAR_IDENTICAL:
-            identical[(a, b)] = round(ratio, 3)
-    pairs_to_ask = [pr for pr in pairs_to_ask if pr not in identical]
-    answers = in_chunks(pairs_to_ask, 6, ask) if pairs_to_ask else {}
-    dup_rows = [{"a": names[a], "b": names[b], "a_adds": None, "b_adds": None, "verdict": "duplicate",
-                 "adds_nothing": [names[b]], "similarity": r} for (a, b), r in identical.items()]
-    if not usages:
-        return {"cluster": dup_rows, "judgment": {}, "answers": {}, "pairs_considered": len(identical), "captures": len(paths),
-                "blocked": len(paths) > MAX_BATCH}
-    usage = usages[0]
-    for extra in usages[1:]:
-        usage.requests += extra.requests
-        usage.input_tokens += extra.input_tokens
-        usage.usd += extra.usd
-        usage.splits += extra.splits
-        usage.skipped.extend(extra.skipped)
-    t = thresholds(usage.backend)
-    pairs, raw = list(dup_rows), {}
-    for a, b in pairs_to_ask:
-        ab, ba = answers.get(f"adds_{a}_{b}"), answers.get(f"adds_{b}_{a}")
-        if ab is None or ba is None:
-            continue
-        raw[f"adds|{names[a]}|{names[b]}"] = round(ab.p, 4)
-        raw[f"adds|{names[b]}|{names[a]}"] = round(ba.p, 4)
-        redundant = [names[x] for x, ans in ((a, ab), (b, ba)) if 1 - ans.p >= t["T_REDUNDANT"]]
-        pairs.append({"a": names[a], "b": names[b], "a_adds": round(ab.p, 3), "b_adds": round(ba.p, 3),
-                      "verdict": "merge-candidate" if redundant else "distinct", "adds_nothing": redundant})
-    return {"cluster": pairs, "judgment": usage.as_dict(), "answers": raw,
-            "pairs_considered": len(pairs_to_ask) + len(identical), "captures": len(paths),
-            "blocked": len(paths) > MAX_BATCH}
-
-
-# ---------------------------------------------------------------------------
-# Preservation check: does a note carry the substance of a capture's kept passages?
-# ---------------------------------------------------------------------------
-
-
-def check_note(note: Path, capture: Path, vault: Path) -> dict[str, Any]:
-    ps = judge_passages(capture, vault)
-    kept = [r for r in ps["passages"] if r["keep"]]
-    _, body = read_frontmatter(note)
-    _, full_body = read_frontmatter(capture)
-    passages, _, _ = split_passages(full_body.strip()[:FULL_CAPTURE_CHARS])
-    text_of = {f"P{i:02d}": p[:PASSAGE_CHARS] for i, p in enumerate(passages, start=1)}
-    usages = [judge.Usage(backend=ps["judgment"]["backend"], model=ps["judgment"]["model"], requests=ps["judgment"]["requests"],
-                          input_tokens=ps["judgment"]["input_tokens"], usd=ps["judgment"]["usd"],
-                          splits=ps["judgment"]["splits"], skipped=list(ps["judgment"]["skipped"]))]
-
-    def ask(chunk, start):
-        state = {"note": body[:30000], "passages": {r["id"]: text_of[r["id"]] for r in chunk}}
-        questions = {f"carried_{r['id']}": judge.Question(
-            "noul", f"Does `note` carry the substance of `passages.{r['id']}`: the same claim, number, mechanism or example, in any wording?",
-            {"true": "a reader of the note would learn what that passage says, including its specific",
-             "false": "the passage's specific is absent from the note, or only a vaguer version is there"}) for r in chunk}
-        got, used = judge.judge(vault, state, questions)
-        usages.append(used)
-        return got
-
-    answers = in_chunks(kept, 12, ask) if kept else {}
-    t = thresholds(usages[0].backend)
-    misses = [{"id": r["id"], "p_carried": round(answers[f"carried_{r['id']}"].p, 3), "text": text_of[r["id"]][:300]}
-              for r in kept if f"carried_{r['id']}" in answers and answers[f"carried_{r['id']}"].p < t["T_KEEP"]]
-    usage = usages[0]
-    for extra in usages[1:]:
-        usage.requests += extra.requests
-        usage.input_tokens += extra.input_tokens
-        usage.usd += extra.usd
-        usage.splits += extra.splits
-        usage.skipped.extend(extra.skipped)
-    return {"note": note.as_posix(), "capture": capture.name, "kept_passages": len(kept), "carried": len(kept) - len(misses),
-            "misses": misses, "judgment": usage.as_dict()}
-
-
-# ---------------------------------------------------------------------------
-# Golden file: calibration and skeleton
-# ---------------------------------------------------------------------------
-
-
 def _decide(key: str, value: Any, t: dict[str, float]) -> Any:
     """The hard label policy would read off one raw answer."""
     family = key.split("|", 1)[0]
@@ -732,11 +415,6 @@ def run_captures(vault: Path, paths: list[Path], top: int, exclude: list[str]) -
     usages = [b["judgment"] for b in blocks] + ([batch["judgment"]] if batch else [])
     return {"captures": blocks, "batch": batch, "usd": round(sum(u["usd"] for u in usages), 6),
             "requests": sum(u["requests"] for u in usages)}
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 
 def _print_text(result: dict) -> None:
