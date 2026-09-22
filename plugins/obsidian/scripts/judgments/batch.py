@@ -10,9 +10,10 @@ from typing import Any
 import judge
 
 from judgments import questions as Q
-from judgments.capture import _canonical, read_capture
+from judgments.capture import read_capture
 from judgments.policy import thresholds
 from judgments.state import in_chunks
+from judgments.urls import _canonical
 
 BATCH_CAPTURE_CHARS = 2000
 

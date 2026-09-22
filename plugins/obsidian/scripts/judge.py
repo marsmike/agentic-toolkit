@@ -28,13 +28,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from vault_utils import profile_value
+from vault_utils import PROFILE_PLUGIN_NAME, profile_value
 
 DEFAULT_BACKEND = "jev"
 DEFAULT_BASE_URL = "https://openrouter.ai/api"
 DEFAULT_MODEL = "jev-latest"
 SYSTEM_ONE_PATH = "/v1/systemone"
-API_KEY_ENV = ("TOOLKIT_OBSIDIAN_JUDGMENT_API_KEY", "OPENROUTER_API_KEY")
+API_KEY_ENV = (f"TOOLKIT_{PROFILE_PLUGIN_NAME.upper()}_JUDGMENT_API_KEY", "OPENROUTER_API_KEY")
 USD_PER_M_INPUT = 0.042  # jev list price; output is free. Used only when the API reports no cost.
 MAX_CHOICE_OPTIONS = 255
 HTTP_TIMEOUT = 60

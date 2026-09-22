@@ -33,10 +33,11 @@ import judge
 from judge import Answer, JudgmentFailed, JudgmentUnavailable, Question
 from judgments import questions as Q
 from judgments.batch import judge_batch  # noqa: F401  (re-exported for the skill docs and evals)
-from judgments.capture import CAPTURE_CHARS, URL_RE, WIKILINK_RE, _canonical, query_text, read_capture  # noqa: F401
+from judgments.capture import CAPTURE_CHARS, URL_RE, WIKILINK_RE, query_text, read_capture  # noqa: F401
 from judgments.passages import check_note, judge_passages, split_passages  # noqa: F401
 from judgments.policy import LEVEL_BY_RELATION, THRESHOLDS, thresholds  # noqa: F401
 from judgments.state import domain_glosses, in_chunks, note_payload
+from judgments.urls import _canonical
 from search import search
 from search_judge import expand
 from vault_utils import discover_notes, profile_value, read_frontmatter, require_vault, write_dlq_note

@@ -15,24 +15,6 @@ QUERY_BODY_CHARS = 600
 
 URL_RE = re.compile(r"https?://[^\s<>\"')\]]+")
 
-TRACKING_PARAMS = {"is", "si", "feature", "t", "ref", "source", "fbclid", "gclid", "igshid", "s", "mc_cid", "mc_eid",
-                   "rw_tt_thread", "ref_src", "ref_url"}
-
-def _canonical(url: str) -> str:
-    """Same address, same key: lower-cased host, no scheme/www, tracking parameters dropped
-    (utm_*, share ids), fragment dropped, trailing slash dropped. [earned: 2026-09-22 — Reader
-    held one video twice under URLs differing only by `&is=`]"""
-    u = url.strip().rstrip("/.,;")
-    u = re.sub(r"^https?://(www\.)?", "", u, flags=re.I)
-    u, _, _ = u.partition("#")
-    path, _, query = u.partition("?")
-    keep = []
-    for part in query.split("&"):
-        key = part.split("=", 1)[0].lower()
-        if part and key not in TRACKING_PARAMS and not key.startswith("utm_"):
-            keep.append(part)
-    return (path.lower().rstrip("/") + ("?" + "&".join(sorted(keep)) if keep else ""))
-
 def _h1_or_stem(body: str, path: Path) -> str:
     for line in body.splitlines():
         if line.startswith("# "):
