@@ -36,6 +36,21 @@ def _should_ignore(target: str) -> bool:
     return any(p.search(target) for p in IGNORE_PATTERNS)
 
 
+def _note_part(target: str) -> str:
+    """The part of a link target that names a note: `Note#Heading`, `Note^block` and the
+    table-escaped `Note\\|alias` form all point at `Note`. [earned: 2026-09-22, first link pass
+    on a real vault — every `[[path\\|alias]]` inside a table and every heading link was
+    reported broken, and the fix would have dropped the alias and the anchor]"""
+    return re.split(r"[#^]", target, maxsplit=1)[0].rstrip("\\").strip()
+
+
+def _is_broken(target: str, index: set[str] | list[str]) -> bool:
+    note = _note_part(target)
+    if not note or _should_ignore(note):  # [[#Heading]] points into the same note
+        return False
+    return note.rsplit("/", 1)[-1] not in index
+
+
 def _strip_code_blocks(text: str) -> str:
     return CODE_BLOCK_RE.sub("", text)
 
@@ -198,11 +213,9 @@ def _audit_plain(note_path: Path, frontmatter: dict, body: str, vault: Path) -> 
 
     for match in WIKILINK_RE.finditer(prose):
         target = match.group(1).strip()
-        if _should_ignore(target):
+        if not _is_broken(target, index):
             continue
-        stem = target.rsplit("/", 1)[-1]
-        if stem in index:
-            continue
+        stem = _note_part(target).rsplit("/", 1)[-1]
 
         best_match, best_dist = None, float("inf")
         for candidate in sorted(index):
@@ -231,16 +244,17 @@ def fix(
     new_body = body
     prose = _strip_code_blocks(body)
 
+    index_set = set(index_list)
     broken = []
     for match in WIKILINK_RE.finditer(prose):
         target = match.group(1).strip()
-        if not _should_ignore(target) and target.rsplit("/", 1)[-1] not in index_list:
+        if _is_broken(target, index_set):
             broken.append({"match": match, "target": target, "context": _get_context_around(body, target)})
     verdicts = judge_resolve(broken, index_list, vault) if judge.available(vault) else [None] * len(broken)
 
     for link, verdict in zip(broken, verdicts, strict=True):
         match, target = link["match"], link["target"]
-        stem = target.rsplit("/", 1)[-1]
+        stem = _note_part(target).rsplit("/", 1)[-1]
 
         best_match, best_dist = None, float("inf")
         for candidate in index_list:
@@ -272,8 +286,10 @@ def fix(
                 results.append(FixResult(note_path, "links", True,
                                           f"[[{target}]] already replaced by an earlier identical occurrence in this note"))
                 continue
-            alias_match = re.match(r"\[\[([^\]|]+)\|([^\]]+)\]\]", old_link)
-            new_link = f"[[{resolved}|{alias_match.group(2)}]]" if alias_match else f"[[{resolved}]]"
+            # Swap only the note name: an alias (plain or table-escaped `\|`) and a #heading or
+            # ^block anchor stay exactly as written.
+            note = _note_part(target)
+            new_link = old_link.replace(note, resolved, 1)
             new_body = new_body.replace(old_link, new_link)
             results.append(FixResult(note_path, "links", True, f"Replaced [[{target}]] with [[{resolved}]] ({method})"))
         else:
