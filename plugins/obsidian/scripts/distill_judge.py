@@ -26,7 +26,7 @@ import argparse
 import json
 import re
 import sys
-from itertools import permutations
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +40,9 @@ from vault_utils import discover_notes, read_frontmatter, require_vault, write_d
 
 CAPTURE_CHARS = 6000
 BATCH_CAPTURE_CHARS = 2000
-MAX_BATCH = 12  # 12 captures -> 132 directed pairs in one request
+MAX_BATCH = 12  # captures per full pairwise request; above that, pairs are blocked first
+PAIR_BLOCK_JACCARD = 0.34  # title-token overlap at or above: a pair worth judging
+NEAR_IDENTICAL = 0.85      # body similarity at or above (difflib, first 6000 chars): a duplicate, decided without a model
 QUERY_BODY_CHARS = 600
 MAX_LISTED_FOLDERS = 60
 NOTES_PER_REQUEST = 8  # candidate notes per request; the capture rides along in each. A real
@@ -71,11 +73,11 @@ THRESHOLDS: dict[str, dict[str, float]] = {
 }
 
 URL_RE = re.compile(r"https?://[^\s<>\"')\]]+")
-MAX_PASSAGES = 40
+MAX_PASSAGES = 200        # a 300 KB report is about 200 paragraphs; judged in chunks of 12
 MIN_PASSAGE_CHARS = 60
 PASSAGE_CHARS = 1200      # per passage on the wire
 SOURCE_TEXT_CHARS = 12000  # of the article itself, for the summary-faithfulness check
-FULL_CAPTURE_CHARS = 60000
+FULL_CAPTURE_CHARS = 400000
 SUMMARY_HEADINGS = ("synthesis", "readwise summary", "summary", "tl;dr")
 LEVEL_BY_RELATION = {"strengthens-passage": "L2", "contradicts-claim": "L3", "adjacent": "L1", "unrelated": None}
 
@@ -85,8 +87,23 @@ LEVEL_BY_RELATION = {"strengthens-passage": "L2", "contradicts-claim": "L3", "ad
 # ---------------------------------------------------------------------------
 
 
+TRACKING_PARAMS = {"is", "si", "feature", "t", "ref", "source", "fbclid", "gclid", "igshid", "s", "mc_cid", "mc_eid"}
+
+
 def _canonical(url: str) -> str:
-    return url.strip().rstrip("/.,;").lower()
+    """Same address, same key: lower-cased host, no scheme/www, tracking parameters dropped
+    (utm_*, share ids), fragment dropped, trailing slash dropped. [earned: 2026-09-22 — Reader
+    held one video twice under URLs differing only by `&is=`]"""
+    u = url.strip().rstrip("/.,;")
+    u = re.sub(r"^https?://(www\.)?", "", u, flags=re.I)
+    u, _, _ = u.partition("#")
+    path, _, query = u.partition("?")
+    keep = []
+    for part in query.split("&"):
+        key = part.split("=", 1)[0].lower()
+        if part and key not in TRACKING_PARAMS and not key.startswith("utm_"):
+            keep.append(part)
+    return (path.lower().rstrip("/") + ("?" + "&".join(sorted(keep)) if keep else ""))
 
 
 def _h1_or_stem(body: str, path: Path) -> str:
@@ -440,30 +457,128 @@ def judge_passages(path: Path, vault: Path) -> dict[str, Any]:
             "judgment": usage.as_dict()}
 
 
+def _title_tokens(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]{3,}", text.lower()) if w not in ("the", "and", "for", "with", "how", "why", "what")}
+
+
+def candidate_pairs(caps: dict[str, dict]) -> list[tuple[str, str]]:
+    """Which capture pairs are worth a uniqueness judgment. Up to MAX_BATCH captures, all of
+    them. Above that, cheap blocking: the same own source, a shared URL, or title-token
+    overlap at or above PAIR_BLOCK_JACCARD. [earned: 2026-09-22 acceptance run — the batch
+    judged only the first twelve of 81 captures and missed a video Reader held twice]"""
+    ids = list(caps)
+    if len(ids) <= MAX_BATCH:
+        return [(a, b) for i, a in enumerate(ids) for b in ids[i + 1:]]
+    out = []
+    for i, a in enumerate(ids):
+        for b in ids[i + 1:]:
+            ca, cb = caps[a], caps[b]
+            same_source = ca["own_source"] and _canonical(ca["own_source"]) == _canonical(cb["own_source"])
+            shared_url = bool(set(map(_canonical, ca["source_urls"])) & set(map(_canonical, cb["source_urls"])))
+            ta, tb = _title_tokens(ca["title"]), _title_tokens(cb["title"])
+            jac = len(ta & tb) / len(ta | tb) if ta | tb else 0.0
+            if same_source or shared_url or jac >= PAIR_BLOCK_JACCARD:
+                out.append((a, b))
+    return out
+
+
 def judge_batch(paths: list[Path], vault: Path, refs: list[str] | None = None) -> dict[str, Any]:
-    """`refs` name the captures in the output (default: file names); golden files pass their own."""
-    ids = {f"C{i:02d}": p for i, p in enumerate(paths[:MAX_BATCH], start=1)}
-    state = {"captures": {}}
-    for cid, p in ids.items():
-        c = read_capture(p)
-        state["captures"][cid] = {"title": c["title"], "description": c["description"], "body": c["body"][:BATCH_CAPTURE_CHARS]}
-    questions = {f"adds_{a}_{b}": Q.adds(a, b) for a, b in permutations(ids, 2)}
-    answers, usage = judge.judge(vault, state, questions)
-    t = thresholds(usage.backend)
-    pairs, raw = [], {}
+    """Pairwise uniqueness over a batch. `refs` name the captures in the output (default: file
+    names); golden files pass their own. Pairs are asked in both directions, in chunks that
+    carry only the captures they need."""
+    ids = {f"C{i:02d}": p for i, p in enumerate(paths, start=1)}
+    caps = {cid: read_capture(p) for cid, p in ids.items()}
     names = {cid: (refs[i] if refs else p.name) for i, (cid, p) in enumerate(ids.items())}
-    for a, b in permutations(ids, 2):
-        if f"adds_{a}_{b}" in answers:
-            raw[f"adds|{names[a]}|{names[b]}"] = round(answers[f"adds_{a}_{b}"].p, 4)
-    for a, b in ((a, b) for a, b in permutations(ids, 2) if a < b):
+    pairs_to_ask = candidate_pairs(caps)
+    usages: list = []
+
+    def ask(chunk, start):
+        members = sorted({c for pair in chunk for c in pair})
+        state = {"captures": {c: {"title": caps[c]["title"], "description": caps[c]["description"],
+                                  "body": caps[c]["body"][:BATCH_CAPTURE_CHARS]} for c in members}}
+        questions = {}
+        for a, b in chunk:
+            questions[f"adds_{a}_{b}"] = Q.adds(a, b)
+            questions[f"adds_{b}_{a}"] = Q.adds(b, a)
+        got, used = judge.judge(vault, state, questions)
+        usages.append(used)
+        return got
+
+    # Reader holding one item twice is a fact, not a judgment: the same own source address, or
+    # near-identical text, settles the pair without a model call.
+    identical = {}
+    for a, b in pairs_to_ask:
+        same_source = caps[a]["own_source"] and _canonical(caps[a]["own_source"]) == _canonical(caps[b]["own_source"])
+        if same_source:
+            identical[(a, b)] = "same source"
+            continue
+        ratio = SequenceMatcher(None, caps[a]["body"][:6000], caps[b]["body"][:6000]).quick_ratio()
+        if ratio >= NEAR_IDENTICAL and SequenceMatcher(None, caps[a]["body"][:6000], caps[b]["body"][:6000]).ratio() >= NEAR_IDENTICAL:
+            identical[(a, b)] = round(ratio, 3)
+    pairs_to_ask = [pr for pr in pairs_to_ask if pr not in identical]
+    answers = in_chunks(pairs_to_ask, 6, ask) if pairs_to_ask else {}
+    dup_rows = [{"a": names[a], "b": names[b], "a_adds": None, "b_adds": None, "verdict": "duplicate",
+                 "adds_nothing": [names[b]], "similarity": r} for (a, b), r in identical.items()]
+    if not usages:
+        return {"cluster": dup_rows, "judgment": {}, "answers": {}, "pairs_considered": len(identical), "captures": len(paths),
+                "blocked": len(paths) > MAX_BATCH}
+    usage = usages[0]
+    for extra in usages[1:]:
+        usage.requests += extra.requests
+        usage.input_tokens += extra.input_tokens
+        usage.usd += extra.usd
+    t = thresholds(usage.backend)
+    pairs, raw = list(dup_rows), {}
+    for a, b in pairs_to_ask:
         ab, ba = answers.get(f"adds_{a}_{b}"), answers.get(f"adds_{b}_{a}")
         if ab is None or ba is None:
             continue
+        raw[f"adds|{names[a]}|{names[b]}"] = round(ab.p, 4)
+        raw[f"adds|{names[b]}|{names[a]}"] = round(ba.p, 4)
         redundant = [names[x] for x, ans in ((a, ab), (b, ba)) if 1 - ans.p >= t["T_REDUNDANT"]]
         pairs.append({"a": names[a], "b": names[b], "a_adds": round(ab.p, 3), "b_adds": round(ba.p, 3),
                       "verdict": "merge-candidate" if redundant else "distinct", "adds_nothing": redundant})
     return {"cluster": pairs, "judgment": usage.as_dict(), "answers": raw,
-            "truncated_to": MAX_BATCH if len(paths) > MAX_BATCH else None}
+            "pairs_considered": len(pairs_to_ask) + len(identical), "captures": len(paths),
+            "blocked": len(paths) > MAX_BATCH}
+
+
+# ---------------------------------------------------------------------------
+# Preservation check: does a note carry the substance of a capture's kept passages?
+# ---------------------------------------------------------------------------
+
+
+def check_note(note: Path, capture: Path, vault: Path) -> dict[str, Any]:
+    ps = judge_passages(capture, vault)
+    kept = [r for r in ps["passages"] if r["keep"]]
+    _, body = read_frontmatter(note)
+    _, full_body = read_frontmatter(capture)
+    passages, _, _ = split_passages(full_body.strip()[:FULL_CAPTURE_CHARS])
+    text_of = {f"P{i:02d}": p[:PASSAGE_CHARS] for i, p in enumerate(passages, start=1)}
+    usages = [judge.Usage(backend=ps["judgment"]["backend"], model=ps["judgment"]["model"], requests=ps["judgment"]["requests"],
+                          input_tokens=ps["judgment"]["input_tokens"], usd=ps["judgment"]["usd"])]
+
+    def ask(chunk, start):
+        state = {"note": body[:30000], "passages": {r["id"]: text_of[r["id"]] for r in chunk}}
+        questions = {f"carried_{r['id']}": judge.Question(
+            "noul", f"Does `note` carry the substance of `passages.{r['id']}`: the same claim, number, mechanism or example, in any wording?",
+            {"true": "a reader of the note would learn what that passage says, including its specific",
+             "false": "the passage's specific is absent from the note, or only a vaguer version is there"}) for r in chunk}
+        got, used = judge.judge(vault, state, questions)
+        usages.append(used)
+        return got
+
+    answers = in_chunks(kept, 12, ask) if kept else {}
+    t = thresholds(usages[0].backend)
+    misses = [{"id": r["id"], "p_carried": round(answers[f"carried_{r['id']}"].p, 3), "text": text_of[r["id"]][:300]}
+              for r in kept if f"carried_{r['id']}" in answers and answers[f"carried_{r['id']}"].p < t["T_KEEP"]]
+    usage = usages[0]
+    for extra in usages[1:]:
+        usage.requests += extra.requests
+        usage.input_tokens += extra.input_tokens
+        usage.usd += extra.usd
+    return {"note": note.as_posix(), "capture": capture.name, "kept_passages": len(kept), "carried": len(kept) - len(misses),
+            "misses": misses, "judgment": usage.as_dict()}
 
 
 # ---------------------------------------------------------------------------
@@ -630,6 +745,7 @@ def main() -> int:
     ap.add_argument("--show-holdout", action="store_true", help="with --calibrate: also list held-out disagreements")
     ap.add_argument("--emit-golden-skeleton", action="store_true", help="print unlabelled golden rows for these captures")
     ap.add_argument("--passages", action="store_true", help="also judge which passages carry the capture's substance, and whether its summary is faithful")
+    ap.add_argument("--check-note", metavar="NOTE", help="preservation check: list the capture's kept passages this note does not carry")
     args = ap.parse_args()
     vault = require_vault()
 
@@ -654,6 +770,19 @@ def main() -> int:
             print(json.dumps(report, indent=2))
             return 0
 
+        if args.check_note:
+            if len(args.captures) != 1:
+                ap.error("--check-note takes exactly one capture")
+            note = Path(args.check_note) if Path(args.check_note).is_absolute() else vault / args.check_note
+            cap = Path(args.captures[0]) if Path(args.captures[0]).is_absolute() else vault / args.captures[0]
+            report = check_note(note, cap, vault)
+            if args.json:
+                print(json.dumps(report, indent=2))
+            else:
+                print(f"{report['carried']}/{report['kept_passages']} kept passages carried by {report['note']}  (${report['judgment']['usd']})")
+                for m in report["misses"]:
+                    print(f"  MISSING p={m['p_carried']}  {m['text'][:160]}")
+            return 0
         if not args.captures:
             ap.error("name at least one capture, or use --calibrate")
         paths = [p if p.is_absolute() else vault / p for p in map(Path, args.captures)]

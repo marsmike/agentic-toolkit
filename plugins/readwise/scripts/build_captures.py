@@ -19,11 +19,48 @@ raw captures on every ingest run is this plugin's job.
 from __future__ import annotations
 
 import re
+import urllib.error
+import urllib.request
 from html import unescape
 from pathlib import Path
 from typing import Any
 
-from vault_utils import find_capture_by_doc_id, unique_path, write_dlq_note, write_frontmatter
+from vault_utils import find_capture_by_doc_id, profile_value, unique_path, write_dlq_note, write_frontmatter
+
+ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024
+ATTACHMENT_TIMEOUT = 120
+
+
+def store_attachment(vault: Path, item: dict[str, Any], slug: str) -> Path | None:
+    """For a `pdf` clipping, download the original file into the vault's attachment folder
+    (profile key `attachments_folder`, default `04_Resources/Attachments`) and return its
+    vault-relative path. The capture and later the distilled note link the file; the
+    extracted text stays in the capture. A file that is already there is reused; a failed
+    download returns None and the capture is written without an attachment.
+    [earned: 2026-09-22 acceptance run — a 300 KB extracted-text capture of a 150-page
+    report became one 10 KB note; the reader needs the document itself one click away]"""
+    if item.get("category") != "pdf":
+        return None
+    url = str(item.get("source_url") or "")
+    if not url.startswith("http"):
+        return None
+    folder = vault / str(profile_value(vault, "attachments_folder", "04_Resources/Attachments"))
+    folder.mkdir(parents=True, exist_ok=True)
+    dest = folder / f"{slug}.pdf"
+    if dest.is_file():
+        return dest.relative_to(vault)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "agentic-toolkit-readwise/1.0"})
+        with urllib.request.urlopen(req, timeout=ATTACHMENT_TIMEOUT) as resp:
+            if "pdf" not in (resp.headers.get("Content-Type") or "").lower() and not url.lower().endswith(".pdf"):
+                return None
+            data = resp.read(ATTACHMENT_MAX_BYTES + 1)
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return None
+    if len(data) > ATTACHMENT_MAX_BYTES or not data.startswith(b"%PDF"):
+        return None
+    dest.write_bytes(data)
+    return dest.relative_to(vault)
 
 CATEGORY_LABEL = {
     "tweet": "Tweet",
@@ -114,6 +151,7 @@ def write_capture(vault: Path, item: dict[str, Any]) -> tuple[Path | None, str]:
     capture_dir.mkdir(parents=True, exist_ok=True)
     dest = unique_path(capture_dir, f"Readwise-{label}-{slug}-{saved_at or 'undated'}")
 
+    attachment = store_attachment(vault, item, slug)
     fm = {
         "source": source_url,
         "origin": "readwise",
@@ -122,6 +160,7 @@ def write_capture(vault: Path, item: dict[str, Any]) -> tuple[Path | None, str]:
         "author": author or None,
         "saved_at": saved_at or None,
         "created": saved_at or None,
+        "attachment": attachment.as_posix() if attachment else None,
         "tags": ["readwise", category],
     }
     fm = {k: v for k, v in fm.items() if v is not None}
@@ -129,6 +168,8 @@ def write_capture(vault: Path, item: dict[str, Any]) -> tuple[Path | None, str]:
     body_lines = [f"# {title}", "", f"*Source: [{source_url}]({source_url})*"]
     if author:
         body_lines[-1] += f" — {author}"
+    if attachment:
+        body_lines += ["", f"**Document:** [[{attachment.as_posix()}]] (stored in the vault; the text below is the extraction)"]
     body_lines.append("")
     if summary:
         body_lines += ["## Readwise summary", "", summary, ""]

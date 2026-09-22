@@ -37,7 +37,23 @@ of them — complete all steps and note that you did so:
 **Decision rule:** 2+ sources, or a filename carrying an author/year/week stamp → root.
 A pure concept extracted as a reusable primitive → `Concepts/`.
 
-## Cluster mode (multiple captures → one synthesis)
+## Cluster mode (multiple captures → one hub, never one note)
+
+**A synthesis never replaces the captures' own notes.** Measured 2026-09-22: five captures
+merged into one 10 KB note kept 30 of 40 main points and 13 of 40 specifics (benchmark
+figures, API details, the one number a reader comes back for), and 8 of 11 unanswerable
+recall questions asked for exactly those. So:
+
+- **One note per capture that has its own specifics** (a number, a mechanism, a worked
+  example, a decision). It carries those specifics in full. A capture whose only unique
+  contribution is its URL or a restatement is folded into the hub with its URL preserved.
+- **One hub note for the cluster**: the shared principle, what each member adds in one
+  line, and a link to every member note. The hub is where the enrichment of *other* notes
+  points; the member notes are where the specifics live and are found.
+- **Preservation check before closing** (workflow step 7c): `distill_judge.py --check-note`
+  lists the capture's kept passages that the note does not carry; a member note closes
+  only when that list is empty or every miss is named in the handoff as deliberate.
+
 
 When a batch holds several captures on one topic, one note per capture creates
 near-duplicates that compete in search and dilute every score. Prefer a single

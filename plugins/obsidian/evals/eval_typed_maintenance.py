@@ -6,7 +6,10 @@
 2. sweep      — vault_sweep.sweep() takes same-source pairs as candidates (never verdicts),
                 ignores a shared address held by many notes, flags a pair only above the
                 cut, and writes nothing
-3. links      — checks.links.judge_resolve() asks one Choice per broken link over a
+3. batch      — above MAX_BATCH captures pairs are blocked; a same-source pair (tracking
+                parameters stripped) or near-identical text is a duplicate with no call
+4. check-note — a note that drops a kept passage is told which one
+5. links      — checks.links.judge_resolve() asks one Choice per broken link over a
                 shortlist plus `none`, and the fix path applies only at the `apply` label
                 while a `propose` verdict is reported, not written
 No key → every path degrades: SKIPPED / plain audit / no request.
@@ -85,6 +88,11 @@ def run(vault: Path) -> dict:
                     p = 0.9 if "pipeline" in text else 0.1
                 elif qid.startswith("same_"):
                     p = 0.95
+                elif qid.startswith("carried_"):
+                    ptext = payload["state"]["passages"][qid[8:]]
+                    p = 0.9 if ptext[:40] in payload["state"]["note"] else 0.1
+                elif qid.startswith("adds_"):
+                    p = 0.9
                 else:
                     p = 0.2
                 answers[qid] = {"type": "noul", "noul": p}
@@ -126,6 +134,29 @@ def run(vault: Path) -> dict:
             problems.append("sweep: the same-source pair must be judged, not assumed")
         if report["contradictions"]:
             problems.append("sweep: no contradiction should be flagged at p=0.2")
+
+        # batch: above MAX_BATCH captures, pairs are blocked; same-source and near-identical pairs are duplicates without a call
+        caps_dir = sandbox / "01_Capture"
+        words = ["harbour", "granite", "violin", "compost", "lantern", "ferry", "orchid", "kettle", "meadow", "anvil", "saffron", "tundra", "quartz", "pelican"]
+        for i in range(14):
+            w = words[i]
+            (caps_dir / f"Readwise-Eval-Batch-{i:02d}.md").write_text(
+                f"---\nsource: https://example.org/item/{i % 13}?utm_source=x\norigin: readwise\n---\n\n# Notes on the {w}\n\n"
+                f"Everything here is about the {w}: how a {w} is made, why the {w} matters, and what a {w} costs in {2000 + i}.\n", encoding="utf-8")
+        batch = dj.judge_batch(sorted(caps_dir.glob("Readwise-Eval-Batch-*.md")), sandbox)
+        dups = [r for r in batch["cluster"] if r["verdict"] == "duplicate"]
+        if not batch.get("blocked") or len(dups) != 1 or dups[0].get("similarity") != "same source":
+            problems.append(f"batch: expected blocking with one same-source duplicate (items 0 and 13), got blocked={batch.get('blocked')} dups={dups}")
+        if batch["pairs_considered"] >= 14 * 13 // 2:
+            problems.append("batch: blocking did not reduce the pair count")
+
+        # check-note: a note that drops a kept passage is told so
+        note_ok = sandbox / "04_Resources" / "Eval-Check.md"
+        write_frontmatter(note_ok, {"description": "d", "status": "distilled", "source": "https://example.org/article"},
+                          "\n# Check\n\nThe effect was measured at 0.42 in three of four settings; the authors call it moderate.\n")
+        chk = dj.check_note(note_ok, cap, sandbox)
+        if chk["kept_passages"] < 2 or chk["carried"] >= chk["kept_passages"]:
+            problems.append(f"check-note: expected at least one miss for a note that omits the cache finding, got {chk['carried']}/{chk['kept_passages']}")
 
         # links: a note with a broken link whose shortlist holds the right note
         note = sandbox / "04_Resources" / "Eval-Linker.md"

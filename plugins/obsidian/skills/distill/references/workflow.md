@@ -241,6 +241,26 @@ future reader would use into it, not only the terms of art. A note nobody can fi
 memory has not been distilled, only filed. [earned: 2026-09-22 replay — two of three recall
 questions for one freshly distilled note found nothing, though the note held every claim]
 
+## 7c. Preservation check
+
+```bash
+uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/distill_judge.py" \
+  --check-note "<note path>" "01_Capture/<capture>.md"
+```
+
+For every passage the passage judgment kept as substance, it asks whether the note carries
+that substance and lists the misses with their text. Each miss is either put into the note
+or named in the handoff as a deliberate omission (with the archive copy as the fallback).
+A note that silently drops a kept passage has not preserved the capture. [earned:
+2026-09-22 — a five-capture synthesis kept a third of the specifics; nothing flagged it]
+
+**PDF and other stored documents.** A capture with `attachment:` in its frontmatter (the
+readwise plugin stores `pdf` clippings under the vault's attachments folder) always yields
+a note, never only an enrichment, and that note links the file (`[[path/to/file.pdf]]`)
+in its Source line. The note is the map of the document: sections, the claims that matter,
+where each is in the file; the passages judgment covers up to 200 passages, so read its
+essence per section rather than the whole extraction.
+
 ## 8. Enrich related notes — three-level decision per note
 
 For each related note at or above the score gate (step 3), in `02_Projects`,
