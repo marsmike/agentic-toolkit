@@ -39,3 +39,4 @@ an explicit removal condition once it ships and has eval coverage.
 - [[The-Graduation-Pattern]]
 - [[Judgment-Calls-vs-Deterministic-Failures]]
 - [[Filesystem-vs-MCP-for-Agent-Tool-Access]]
+- [[Typed-Judgments]]

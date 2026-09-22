@@ -47,8 +47,9 @@ agentic-toolkit/                    # NEW public repo, fresh git history (privac
 4. **Two hook classes** — *ratchet hooks* (deterministic failures, auto-enforced) vs *stop-and-ask hooks* (judgment calls → decision log/ADR). *web3nomad's judgment-vs-bug counter in the Osmani note; arscontexta fix-vs-report gate.*
 5. **Dead-letter question as acceptance criterion** — every shipped automation names where its failures go; `toolkit doctor` surfaces the DLQ. Confidence labels gate auto-apply vs report (guards gaiafield against "successful corruption"). *arscontexta DLQ claim.*
 6. **Dual-channel descriptions** — retrieval-verification loop (predict-from-description, score 1–5, flag <3) ships as an obsidian-plugin maintenance skill; BM25 queries condensed to 3–5 high-IDF terms. *arscontexta BM25-dilution claims.*
-7. **Listing budget** — curated set capped by the ~25–30 item Tier-1 discovery ceiling; Osmani scope test as admission bar: "if you cannot name the behaviour a component delivers, remove it." *`Skills-Architecture-Redesign-Research-Findings`.*
-8. **Inter-plugin output contracts** — versioned, documented in `contract/` — the monorepo-native frontier no single-agent harness essay addresses. *@jsyqrt in Osmani note.*
+7. **Typed judgments** — a model answers narrow questions with probabilities, code owns every threshold, and the result is advice at the checkpoint, never a write; question wording is versioned data a reasoning model tunes against golden labels. *R8–R9; vault note Typed-Judgments.*
+8. **Listing budget** — curated set capped by the ~25–30 item Tier-1 discovery ceiling; Osmani scope test as admission bar: "if you cannot name the behaviour a component delivers, remove it." *`Skills-Architecture-Redesign-Research-Findings`.*
+9. **Inter-plugin output contracts** — versioned, documented in `contract/` — the monorepo-native frontier no single-agent harness essay addresses. *@jsyqrt in Osmani note.*
 
 ## Engines
 

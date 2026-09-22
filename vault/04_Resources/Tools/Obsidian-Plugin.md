@@ -41,3 +41,4 @@ ships that capability.
 - [[Capture-Conventions]]
 - [[Fill-From-Obsidian-Profiles]]
 - [[Retrieval-Verification-Loop]]
+- [[Typed-Judgments]]

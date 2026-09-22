@@ -277,6 +277,9 @@ for `--include-ambiguous`. The 5 `AMBIGUOUS` rows split 1 more same-cluster
 (`Reference-Library.md`) against 4 cross-cluster (a homelab `Weekly-Review.md`, the `Alex-Vega`
 bridge note, and two toolkit-concepts guides) — exactly the fuzzy-band mix `AMBIGUOUS` exists to
 hold: generic documentation-vocabulary overlap that a human, not a gate, should adjudicate.
+The obsidian plugin's `scripts/link_judge.py` can attach an advisory typed judgment to each row to
+order that human's reading list; it is an aid to the adjudicator, never a gate, and this crate
+neither knows about it nor depends on it.
 
 `intra_mean > cross_mean` is exercised by
 `infer_produces_inferred_edges_with_calibration_separation` in `tests/graph_test.rs`; the tightness

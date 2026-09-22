@@ -11,6 +11,9 @@ default_capture_prefixes:
 inference_backend: ollama
 inference_base_url: http://localhost:11434
 inference_model: null
+judgment_backend: jev
+judgment_base_url: https://openrouter.ai/api
+judgment_model: jev-latest
 enrichment_targets: []
 tags:
   - domain/toolkit-meta
@@ -29,22 +32,38 @@ order (env var → this note → shipped default).
 - **`search_score_gate`** — overrides the 0.70 default for what counts as an enrichment-grade
   match in `scripts/search.py` and the distill skill. Recalibrate per embedding model if you enable
   the optional semantic layer.
-- **`default_capture_prefixes`** — origin prefixes the plugin recognizes when scanning
-  `01_Capture/` (used by `distill`'s triage mode and by `retrieval-verification`'s inbox summary).
+- **`default_capture_prefixes`** — the origin prefixes captures in `01_Capture/` carry
+  (`Readwise-`, `Research-`, …). Read by the agent running `distill` and `retrieval-verification`
+  to name and group captures; no script branches on it.
 - **`inference_backend` / `inference_base_url` / `inference_model`** — the LLM backend `checks/*.py`
   and `vault_normalize.py` call for description generation, tag classification, and broken-link
   resolution. `inference_backend` is `ollama` (default, talks to a local Ollama server) or
   `openai-compatible` (any OpenAI-chat-compatible endpoint). Leave `inference_model` unset and the
   LLM-assisted checks report a clear "no model configured" skip rather than guessing one.
-- **`enrichment_targets`** — vault-relative note names (as wikilinks) that `distill` treats as
-  mandatory enrichment candidates regardless of semantic score, e.g. a personal profile note that
-  should always learn about new maintenance-relevant material.
+- **`judgment_backend` / `judgment_base_url` / `judgment_model`** — the typed-judgment backend
+  `scripts/distill_judge.py` asks for advisory probabilities during a distill run (is this found
+  note really related, which enrichment level, which folder, does this capture add anything over
+  its sibling). `jev` (default) is TypeSafe's System One model, reached through OpenRouter; `none`
+  switches the layer off. **With a key set, the text of the capture and of the related notes it
+  is compared with is sent to that hosted service.** With no key the layer prints `SKIPPED`,
+  sends nothing, and distill runs exactly as before. Thresholds are deliberately not profile
+  keys: they are policy, live in `distill_judge.py` per backend, and move only after a
+  calibration run (`judgment-calibration` skill).
+- **`domains`** (optional, not set above) — your vault's own domain taxonomy, as a mapping of
+  name to a one-line meaning (`ai-ml: "machine learning and language models themselves"`), or a
+  plain list of names. Names are the part after `domain/`. When set, it replaces the starter
+  taxonomy in `checks/tags.py` for the tag audit, the LLM tag classifier and the judgment
+  questions alike. The one-line meanings matter: they are what a judgment backend reads.
+- **`enrichment_targets`** — notes (wikilinks or vault-relative paths) that `distill_judge.py`
+  judges for every capture whatever search returns, e.g. a personal profile note at the vault
+  root that search never walks. They are pinned candidates, still judged, never auto-linked.
 
 ## Secrets
 
 No credential belongs in this file, ever — see `contract/PROFILE.md`'s Secrets section. An
 OpenAI-compatible API key is an environment variable (`TOOLKIT_OBSIDIAN_INFERENCE_API_KEY`),
-referenced here only by name if at all.
+referenced here only by name if at all. The judgment backend reads
+`TOOLKIT_OBSIDIAN_JUDGMENT_API_KEY`, falling back to `OPENROUTER_API_KEY`.
 
 ## Env var overrides
 

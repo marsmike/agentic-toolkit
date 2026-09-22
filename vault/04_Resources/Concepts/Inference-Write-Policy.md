@@ -60,3 +60,4 @@ one.
 - [[Dead-Letter-Queues-for-Automation]]
 - [[Gaiafield]]
 - [[Surprise-Scoring]]
+- [[Typed-Judgments]]

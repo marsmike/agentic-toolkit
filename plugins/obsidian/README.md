@@ -10,12 +10,13 @@ loop for description quality.
 | Skill | Purpose |
 |---|---|
 | `vault-ops` | Read/create/edit/search notes directly on the filesystem; wikilinks, callouts, properties, `.canvas`/`.base` file formats; the Obsidian desktop CLI as an optional enhancement, never a requirement |
-| `distill` | Process `01_Capture/` into linked, sourced knowledge notes — triage, single-file distill, or conversation-insight filing, all through one search-then-checkpoint-then-write workflow; graph-aware backlink/bridge candidates when a gaiafield binary is available, plus report-only inferred candidates when it supports gaiafield v2 |
+| `distill` | Turn `01_Capture/` into linked, sourced notes. Two tools carry the mechanics: `distill_judge.py --dossier` gathers everything known about a capture up front, `distill_check.py` is the definition of done; the agent decides in between and stops at a checkpoint. Triage the inbox, distill one capture, or file a conversation insight |
 | `vault-lint` | Vault health (orphans, stale pages, broken links, Index.md drift) and metadata normalization (frontmatter, tags, source, summaries), audit-only unless `--fix` |
 | `retrieval-verification` | Predict a note's content from title+description alone, score against the real body, flag weak descriptions for rewrite |
+| `judgment-calibration` | The loop that improves the typed-judgment questions: classify each disagreement with the golden labels by cause, change wording (never thresholds), keep a held-out slice |
 
 Plus `agents/knowledge-distillation-agent.md` for delegated/batch distillation runs, and
-`scripts/` (see below) that back all four skills.
+`scripts/` (see below) that back the skills.
 
 ## Vault resolution
 
@@ -30,11 +31,56 @@ this plugin's own eval suite.
 This plugin reads `$VAULT/Config/toolkit/obsidian.md` if present, per
 `contract/PROFILE.md`'s "fill from Obsidian" convention. See `profile.example.md` for
 the exact frontmatter shape (`search_score_gate`, `default_capture_prefixes`,
-`inference_backend`/`inference_base_url`/`inference_model`, `enrichment_targets`) and
+`inference_backend`/`inference_base_url`/`inference_model`,
+`judgment_backend`/`judgment_base_url`/`judgment_model`, `enrichment_targets`) and
 what each field controls. Every field also has a `TOOLKIT_OBSIDIAN_<FIELD>` environment
 variable that overrides the note. No profile note and no `inference_model` set is a
 normal, fully-functional state — LLM-assisted checks skip cleanly and say why; only
 `links`' auto-fix and every other rule-based check are unaffected.
+
+## Typed judgments
+
+Most of what distill and maintenance have to decide is small and semantic: is this found
+note about the same thing, backlink or merge, which folder, is this suggested link real,
+does this description say what the note is about. A **typed judgment** answers such a
+question with a probability instead of prose: one request carries a JSON `state` and a
+dictionary of narrow questions, and comes back with a number per question. The model
+supplies the number; the policy (thresholds, what a number leads to) is code, per backend.
+Nothing here writes to the vault; everything is advice to the person or agent at the
+checkpoint (`contract/KNOWLEDGE_API.md`, "Judgments").
+
+```mermaid
+flowchart LR
+  C[01_Capture] --> DJ["distill_judge --dossier<br/>judgments · essence · graph"]
+  DJ --> A[agent reads, decides, writes]
+  A --> CK["distill_check<br/>gates · findability · preservation"]
+  CK -- pass --> AR[05_Archive · Index · log]
+  CK -- fail --> A
+```
+
+| Script | Question it answers | Writes |
+|---|---|---|
+| `distill_judge.py --dossier` | per capture: what kind of material, which notes it is really about and at which enrichment level, is it already covered, where it goes, which passages carry its substance, how the pipeline's synthesis relates to the source; per batch: duplicates and near-duplicates | nothing |
+| `distill_check.py` | is this note done: frontmatter, own-source line, stored document linked, no forbidden or dangling links, Index line; softly: dropped URLs, findability of the reader's questions, kept passages carried | nothing |
+| `search_judge.py` | which note answers this question: keyword hits, widened by their wikilink neighbours, reranked by one judgment each | nothing |
+| `link_judge.py` | which of gaiafield's suggested links would help a reader | nothing |
+| `vault_judge.py` | which descriptions are too vague to find, which domain tags are missing | nothing |
+| `vault_sweep.py` | which pairs of notes are the same work, which make claims that cannot both be true | nothing |
+| `checks/links.py` (with a backend) | which existing note a broken wikilink meant | applies only at p ≥ 0.80 under `vault_normalize --fix` |
+
+The seam is `scripts/judge.py`: backend-neutral, stdlib only, Noul and Choice questions
+only, so a local model can replace the hosted one later. Question wording lives in
+`scripts/judgments/questions.py` under a version stamped on every block; thresholds live
+in the scripts that consume them. The `judgment-calibration` skill tunes the wording
+against `evals/golden/`. Measured results, calibration history and the reasoning are in
+the vault note [Typed-Judgments](../../vault/04_Resources/Concepts/Typed-Judgments.md).
+
+**Data leaves the machine only when you set a key** (`TOOLKIT_OBSIDIAN_JUDGMENT_API_KEY`
+or `OPENROUTER_API_KEY`): then the text of a capture and the heads of the notes it is
+compared with go to the hosted backend (Jev, TypeSafe's System One model, through
+OpenRouter by default). Without a key every script prints `SKIPPED` and sends nothing;
+`judgment_backend: none` switches the layer off. A capture costs about a tenth of a cent
+to judge; a whole 1,500-note vault, a dime.
 
 ## Dependencies
 
@@ -98,7 +144,7 @@ visible in `toolkit doctor`'s DLQ count rather than silently reducing the workfl
 
 The `distill` skill's phase 1 is the first consumer: after its search step, when the graph
 is available, it fetches depth-1 neighbors of the top matches and folds backlink/bridge
-candidates into the Phase 1 handoff (see `skills/distill/references/workflow.md`). When
+candidates into the Phase 1 handoff (see `skills/distill/references/dossier.md`). When
 the binary is absent, phase 1 runs exactly as it did before R3.
 
 `checks/links.py`'s broken-wikilink audit does **not** get a gaiafield-backed path this
@@ -144,7 +190,7 @@ A binary that predates v2 (no `infer` subcommand) degrades the same way an absen
 does: `GraphUnavailable("no-inference", ...)`, probed for via a side-effect-free `--help`
 call (`graph._supports_inference()`) rather than discovered by letting a real `infer`
 call fail and crash or wrongly earn a DLQ note. The `distill` skill's phase 1 is the
-consumer (see `skills/distill/references/workflow.md`'s "Inferred candidates" section):
+consumer (see `skills/distill/references/dossier.md`):
 after the deterministic graph-context step, it fetches inferred candidates for the
 proposed placement's top matches and presents them as a separately labeled, report-only
 block in the Phase 1 handoff — never merged into the deterministic backlink/bridge lists.
@@ -213,15 +259,22 @@ all. Same "surfaces, never mutates" character as the rest of doctor — it never
 | `scripts/ob-sync.sh`, `semantic-search.sh`, `semantic-search.ps1` | Obsidian-headless-server sync management and launchers for the dropped search engine. Vault sync (Obsidian Sync app, git, NAS) is the user's own concern, not this plugin's; `search.py` is invoked directly via `uv run`, no launcher script needed. |
 | `references/agent-prompt.md` | A separate launch-prompt template for the agent that could drift from the agent definition itself; folded directly into `agents/knowledge-distillation-agent.md`. |
 | `skills/distill/references/traps.md` | A failure catalog for tools this v2 plugin doesn't ship (Smart Connections, the Obsidian desktop CLI as a required path, Twitter/Readwise-specific URL handling). The two lessons that generalize — never trust a silent exit 0, never write `"unknown"` as a placeholder — are folded directly into `workflow.md`/`rules.md`. |
-| `skills/distill/references/triage-workflow.md`, `insight-workflow.md` | Folded into `workflow.md` as short Triage/Insight sections; each was small enough that a separate file cost more in the skill's reference-loading budget than it saved. |
+| `skills/distill/references/triage-workflow.md`, `insight-workflow.md` | Folded into `SKILL.md` (modes) as short Triage/Insight sections; each was small enough that a separate file cost more in the skill's reference-loading budget than it saved. |
 | `skills/obsidian-cli/references/daily-note-patterns.md`, `headless-sync.md`, `headless-sync-setup.md` | Machine-specific headless-server setup instructions, in tension with the filesystem-first stance (see `ob-sync.sh` above). |
 | `skills/distill/evals/` (`evals.json`, `mechanical_checks.py`, `setup_sandbox.py`, `fixtures/demo-vault/`) | A different eval-harness contract (pressure-test prompts + a private fixture vault) than v2's Graduation Pattern JSON shape (`{eval, pass, detail}`) targeting the shared example vault. The underlying idea — mechanical checks against a sandboxed copy — carried over into `evals/_sandbox.py`. |
 | `scripts/tests/`, `scripts/checks/tests/`, `scripts/tests/pipeline/` (the pytest suite, ~3,500 lines) | Not ported. The R0 capability evals cover the contract-facing guarantees of what actually shipped; porting a full unit-test suite for code this size was disproportionate to R0 scope. Open item for a follow-up PR if unit-level coverage is wanted alongside the evals. |
 
 ## Evals
 
-`evals/run.py` runs seven capability evals against `./vault`, emitting JSON
-`{eval, pass, detail}` per check:
+`evals/run.py` runs eleven capability evals against `./vault`, emitting JSON
+`{eval, pass, detail}` per check. The seven below cover search, graph and lint; the four
+judgment evals (`distill_judge`, `link_adjudication`, `search_judge`, `typed_maintenance`)
+run offline against a stubbed transport in CI and, with `TOOLKIT_EVAL_LIVE_JEV=1` and a
+key, a live phase scored against `evals/golden/`.
+
+A second suite, `skill-evals/`, runs a real model against the distill skill with
+`claude plugin eval` (three cases: auto run, checkpoint, triage). It costs money and runs by
+hand; see its README.
 
 | Eval | Asserts |
 |---|---|

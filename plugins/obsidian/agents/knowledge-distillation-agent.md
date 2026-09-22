@@ -24,38 +24,26 @@ running inline is the default path and does not need a subagent at all.
 
 ## When invoked
 
-1. **Read and analyze** the target capture(s) in `01_Capture/`. Identify the original
-   source (URL/citation) from frontmatter or body — every distilled note must carry it.
-2. **Search before writing** — both passes, not either:
-   - Read `Index.md` for a cheap topic-area overview.
-   - Run `uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/search.py" "<3-5 key concepts>" --top 10 --json`.
-     It degrades to keyword + Index.md-summary search with an explicit note when no
-     optional embeddings dependency is installed — that is a normal, correct state, not
-     a fallback to route around. A distill pass never proceeds with zero search.
-3. **Extract mechanics.** For each key idea, name the underlying principle it
-   demonstrates, and note which existing vault notes (from step 2) share that principle,
-   even across domains.
-4. **Create the distilled note and enrich related notes** — full mechanics in
-   `skills/distill/references/workflow.md` steps 6-8:
-   - New note gets `status: distilled`, `processed_date`, `source:` frontmatter, and a
-     `*Source: ...*` body line — never invented, never pointed at `01_Capture/`.
-   - Related notes at or above the vault's `search_score_gate` (default 0.70) get
-     exactly one enrichment level: L1 backlink (default), L2 inline merge (only with a
-     citable section), or L3 contradiction flag (never a silent overwrite).
-   - Only `02_Projects/03_Areas/04_Resources` are enrichment targets. Never
-     `05_Archive`.
-5. **Retire the capture** — archive to `05_Archive/<Origin>-Captures-<YYYY-MM>/` as
-   `<stem>--FULLCAPTURE.md` (default) or delete (duplicates/empty stubs only). Either
-   way it must leave `01_Capture/`.
-6. **Update Index.md**, journal to `00_Memory/journal/<today>.md`, and log via
+1. **Dossier first.** `distill_judge.py <capture> --dossier --json` (see the distill
+   skill's `references/dossier.md`): judgments, the capture's essence, graph context. Read
+   the notes it points at; look past the top of the raw `search.py` output as well. A
+   distill pass never proceeds with zero search.
+2. **Decide and write.** What the capture says in your words (mechanics, not summary),
+   where it goes (rules.md), which notes it enriches at which level (L1 default; L2/L3
+   need a cited sentence). Where you disagree with the dossier, say so.
+3. **Check before retiring.** `distill_check.py <note> <capture> --ask "…" --ask "…"` must
+   pass its hard gates; answer every soft finding (dropped URLs, findability, passages
+   not carried) by putting it in or naming it as deliberate.
+4. **Retire the capture** to `05_Archive/<Origin>-Captures-<YYYY-MM>/` as
+   `<stem>--FULLCAPTURE.md` plus a line in that folder's `README.md` manifest (default), or
+   delete (`trash` if present; duplicates and empty stubs only). Update Index.md, journal to `00_Memory/journal/<today>.md`, log via
    `scripts/log_vault.py distill "Note Title"`.
 
 ## Batch processing
 
-For a batch, run steps 1-3 **per capture** before deciding anything about clustering.
-If several captures cover the same topic, prefer one multi-source synthesis over
-near-duplicate notes that would compete in search — see distill's rules.md "Cluster
-mode" for the uniqueness-gate requirement before merging.
+For a batch, run the dossier over all captures at once (its `cluster` block names
+duplicates and near-duplicates) and judge each capture before deciding on clusters.
+Cluster mode is member notes plus a hub, never one synthesis (rules.md, "Cluster mode").
 
 ## Escalate, don't guess
 

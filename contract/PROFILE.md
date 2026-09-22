@@ -24,7 +24,9 @@ the answer.
 
 Secrets never live in the vault or in the repo — only in environment variables or a keychain. A
 profile note may reference that a credential exists and where to configure it; it never carries
-the credential's value.
+the credential's value. A plugin that calls a hosted service says so next to the profile key that
+enables it, names what leaves the machine, and does nothing over the network while the
+credential is absent.
 
 ## Shipping a profile
 

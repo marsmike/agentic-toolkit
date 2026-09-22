@@ -71,6 +71,15 @@ Rules, in order of importance:
    deterministic graph distance is large (or infinite) in different PARA subtrees — the
    cross-domain candidates worth a human look. Deterministic formula, documented in the crate.
 
+## Judgments
+
+A typed judgment (`plugins/obsidian/scripts/judge.py`) is a probability about notes, not a fact
+in the graph. It is never an edge kind, is never stored in an engine's database, and rule 1
+above applies to it unchanged: nothing writes vault content from a judgment without explicit
+human confirmation in-session. A judgment is meaningless without the backend, model and
+`questions_version` that produced it, for the same reason a gate is meaningless without its
+model name (rule 3); every emitted block carries all three.
+
 ## No cross-plugin imports
 
 Plugins depend on `core` and `contract` only, never on a sibling plugin. Composition across

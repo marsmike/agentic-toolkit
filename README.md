@@ -6,7 +6,7 @@
 [![CI](https://github.com/marsmike/agentic-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/marsmike/agentic-toolkit/actions/workflows/ci.yml)
 [![Docs](https://github.com/marsmike/agentic-toolkit/actions/workflows/docs.yml/badge.svg)](https://marsmike.github.io/agentic-toolkit/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Marketplace](https://img.shields.io/badge/claude--code_marketplace-2.6.0-8A2BE2)](.claude-plugin/marketplace.json)
+[![Marketplace](https://img.shields.io/badge/claude--code_marketplace-2.9.0-8A2BE2)](.claude-plugin/marketplace.json)
 
 **Your notes become an operating system for AI agents.** This toolkit turns an
 Obsidian-style markdown vault into the shared memory, knowledge graph, and
@@ -23,7 +23,14 @@ flowchart LR
     V --> G[gaiafield ⚙<br/><i>knowledge graph, Rust</i>]
     F --> O
     G --> O
+    J[jev ⚖<br/><i>typed judgments, hosted</i>] -. advice .-> O
 ```
+
+The dashed edge is new in R8/R9: a typed-judgment backend answers the small semantic
+questions distill and maintenance keep asking (is this note about the same thing, is
+this suggested link real, is this description findable) with a probability, and the
+plugins turn those numbers into advice at the checkpoint. Optional, off without a key,
+replaceable by a local model behind one seam.
 
 ## Pick your path
 
@@ -126,7 +133,7 @@ cd /tmp/quartz && npm i && npx quartz build --serve
 - [`contract/`](contract/) — the constitution: vault schema, profile convention, knowledge API, model routing
 - [`core/`](core/) — the `toolkit` CLI (`vault init` · `doctor` · `profile`) and Python library
 - [`vault/`](vault/) — the example vault: docs, demo, test corpus, and eval substrate in one
-- [`plugins/`](plugins/) — curated plugins ([obsidian](plugins/obsidian/), [readwise](plugins/readwise/), [memory](plugins/memory/)), added one release at a time
+- [`plugins/`](plugins/) — curated plugins ([obsidian](plugins/obsidian/), [readwise](plugins/readwise/), [memory](plugins/memory/), [handoff](plugins/handoff/)), added one release at a time
 - [`crates/`](crates/) — the Rust engines
 - [`docs/PLAN.md`](docs/PLAN.md) — why everything is the way it is, with citations
 

@@ -1,6 +1,6 @@
 ---
 name: distill
-description: Process captures into vault knowledge — triage the inbox, distill one file, or file a conversation insight. Use when working with 01_Capture/.
+description: Process captures into vault knowledge — triage the inbox, distill one or more captures, or file a conversation insight. Use when working with 01_Capture/.
 allowed-tools:
   - Bash
   - Read
@@ -10,53 +10,57 @@ allowed-tools:
   - Glob
 ---
 
-# Knowledge Distillation
+# Distill
 
-Transforms raw captures from `01_Capture/` into integrated, linked knowledge notes.
-Filesystem-first throughout — no CLI or embeddings store is required to run this
-workflow; `vault/CLAUDE.md`'s "Distilling captures" section states the two
-non-negotiable rules (two-phase checkpoint, source preservation) that hold even without
-this skill loaded. Read [rules.md](references/rules.md) before starting.
-
-## Modes
-
-| Mode | Use for | Reference |
-|------|---------|-----------|
-| **Distill** (default) | Full pipeline: capture → search → PARA placement → enrichment → write | [workflow.md](references/workflow.md) |
-| **Triage** | List and prioritize the inbox before distilling | [workflow.md](references/workflow.md) — Triage section |
-| **Insight** | File a conversation synthesis as a new capture, then distill it | [workflow.md](references/workflow.md) — Insight section |
-
-## Hard requirements (non-negotiable, see rules.md for the full list)
-
-1. **Two phases, one checkpoint.** Analyze and propose, then stop for review before
-   writing anything. Skip only on an explicit `--auto`/non-interactive instruction.
-2. **Search before writing.** Run `scripts/search.py` against the capture's key terms —
-   it degrades gracefully with no embeddings store present, but it must run; a distill
-   pass with zero search is a name for "guessing at what already exists." When a
-   `gaiafield` binary is available, `scripts/graph.py`'s `graph_context()` also adds
-   graph-derived backlink/bridge candidates the text search alone missed (see
-   workflow.md); its absence never blocks this step. When the binary supports gaiafield
-   v2, `graph.inferred_candidates()` adds a separately-labeled, **report-only** block of
-   statistical candidates (workflow.md's "Inferred candidates" section) — these are never
-   auto-applied, ever; see `contract/KNOWLEDGE_API.md`'s v2 section, rule 1.
-3. **Every distilled note carries its source** — a `*Source: ...*` line in the body and
-   a `source:` frontmatter field — and gets `status: distilled`.
-4. **The capture leaves `01_Capture/`** after distilling — archived (default, to
-   `05_Archive/<Origin>-Captures-<YYYY-MM>/`) or deleted (duplicates/empty stubs only).
-5. **Ambiguity goes to the DLQ, not a guess.** If placement, source, or search results
-   are genuinely unclear after one honest attempt, write a dead-letter note to
-   `00_Memory/dlq/` via `scripts/vault_utils.write_dlq_note()` and say so in the
-   Phase 1 report, rather than silently picking an answer.
-
-## Quick start
+A capture in `01_Capture/` becomes a note that keeps the best of it, sits where it belongs,
+is linked to what it draws on, and can be found from a vague question a year later. You
+decide how; two tools do the mechanical parts and check the result.
 
 ```bash
-uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/search.py" "key terms from the capture" --top 10 --json
+S="uv run --project $CLAUDE_PLUGIN_ROOT/scripts python3 $CLAUDE_PLUGIN_ROOT/scripts"
+$S/distill_judge.py 01_Capture/<capture>.md --dossier --json   # everything known about it, before you read it
+$S/distill_check.py <note> 01_Capture/<capture>.md --ask "<a question a reader would type>" --ask "…"
 ```
 
-Then follow [workflow.md](references/workflow.md)'s numbered steps.
+**The dossier** is one JSON block per capture: what kind of material it is, which existing
+notes it is really about (`related`, with `judged_relevant`, `bridge` for same-principle
+links across fields, `via` for notes reached through the graph, and a suggested L1/L2/L3),
+whether a note already covers the same source (`already_distilled`), placement, the
+capture's essence (`passages`: which paragraphs carry a claim or number, and how the
+pipeline's synthesis relates to the article), and graph context. Several captures at once
+add a pairwise `cluster` block: duplicates and near-duplicates. It is advice with numbers
+attached; you read the notes it points at and decide. Without a judgment backend it prints
+`SKIPPED` and you work from `search.py` alone. [Reading it](references/dossier.md).
 
-## References
+**The check** is the definition of done. Hard gates: frontmatter (`source`, `status:
+distilled`, `processed_date`, `description`), a `*Source: …*` line naming the capture's own
+source, a stored document linked when the capture has one, no wikilink into `01_Capture/`
+or `05_Archive/`, no dangling wikilink, an Index.md line. Soft, reported: which of the
+capture's other URLs the note dropped, whether your `--ask` questions find the note in the
+top three, and which of the capture's kept passages the note does not carry. A capture is
+retired only after the check passes and you have answered every soft finding: put it in,
+or name it in the handoff as deliberate.
 
-- [Workflow](references/workflow.md) — the full distill/triage/insight procedure
-- [Rules](references/rules.md) — PARA placement logic, enrichment levels, the DLQ convention, cluster mode
+## Invariants
+
+1. **Two phases, one checkpoint.** Propose (what you learned, where it goes, what it links
+   to and at which level, what you disagree with in the dossier and why), then stop for
+   review. Skip only on an explicit `--auto`.
+2. **Every note carries its source**, and never the string `unknown`: `(none — <context>)`
+   when there is none, today's date for `processed_date`.
+3. **Advice never writes.** Dossier rows, inferred edges, adjudications: candidates for your
+   decision, never applied by a script.
+4. **L1 is the default; L2 and L3 need a cited sentence** in the note being enriched. Never
+   overwrite existing text; a contradiction is a callout next to the claim.
+5. **Cluster mode is member notes plus a hub.** One note per capture that has its own
+   specifics, a hub that states the shared principle and links them. A synthesis alone
+   dropped two thirds of the specifics [earned: 2026-09-22 acceptance run].
+6. **The capture leaves `01_Capture/`**: archived (default) as
+   `05_Archive/<Origin>-Captures-<YYYY-MM>/<stem>--FULLCAPTURE.md` plus one line in that
+   folder's `README.md` manifest, or deleted (`trash` if present) only for duplicates and stubs.
+7. **Ambiguity goes to the DLQ**, not a guess: `vault_utils.write_dlq_note()`, and say so.
+
+Placement, enrichment levels and the DLQ convention in detail: [rules.md](references/rules.md).
+Modes: triage the inbox (run the dossier over `01_Capture/*.md`, decide distill / quick-file /
+discard per capture; a discard is always yours to make), or file a conversation insight as a
+capture first and distill it like any other.

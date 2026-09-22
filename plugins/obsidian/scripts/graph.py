@@ -32,6 +32,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import judge
+from judgments import questions as Q
+from judgments.state import in_chunks, note_payload
 from vault_utils import write_dlq_note
 
 GAIAFIELD_BIN_ENV = "TOOLKIT_GAIAFIELD_BIN"
@@ -51,6 +54,8 @@ class GraphUnavailable:
       "call-failed" — the binary was invoked and it (or the parse of its output) failed.
                       Abnormal — the caller that detected it has already written a DLQ
                       note under `00_Memory/dlq/` before returning this.
+      "no-judgment"  — adjudicate_candidates() only: no typed-judgment backend or key
+                       (normal pre-adoption state, silent)
       "no-inference" — binary present and index present, but it predates gaiafield v2
                       (no `infer` subcommand). Normal for any binary built before R5;
                       never logged, same as "no-binary"/"no-index".
@@ -414,3 +419,164 @@ def surprise_candidates(
     if include_ambiguous:
         return result
     return [row for row in result if row.get("label") != "AMBIGUOUS"]
+
+
+# ---------------------------------------------------------------------------
+# Adjudication — a typed judgment per suggested pair (advisory, report-only)
+# ---------------------------------------------------------------------------
+
+MAX_PAIRS_PER_REQUEST = 12  # real-length notes: 40 pairs exceeded the backend's input limit (2026-09-22)
+ADJUDICATION_CHARS = 1200
+
+# Policy per judgment backend, so it lives here and not in question text (contract/ROUTING.md,
+# "Typed-judgment models"). Two numbers per pair: `link` (would a link help a reader; runs on
+# the scale of the vault's own hand-made links, mean 0.75) and `mech` (same underlying idea; the
+# better ranker, AUC 0.95 against blind labels where gaiafield's cosine reaches 0.75, but on a
+# compressed scale where real matches sit at 0.10-0.30). `mech` therefore only counts once
+# `link` clears a floor. Priors, 2026-09-22, jev-1.13, fitted in-sample on 105 labelled pairs of
+# the bundled vault: 11 of 70 gaiafield suggestions read LIKELY-LINK (8 real, base rate 16%),
+# 16 read LIKELY-NOISE (0 real), 0 of 15 unlinked cross-cluster pairs read LIKELY-LINK.
+# Recalibrate on any other vault before trusting the labels; the ranking transfers, the cuts may not.
+LINK_POLICY: dict[str, dict[str, float]] = {
+    "jev": {"link_high": 0.70, "mech_high": 0.15, "link_floor": 0.35, "link_low": 0.30, "mech_low": 0.10,
+            "max_order_gap": 0.30},
+}
+
+
+def _link_label(link: float, mech: float | None, policy: dict[str, float], order_gap: float = 0.0) -> str:
+    """`order_gap` is how far the two views of a pair (a,b and b,a) disagreed. A pair the
+    backend cannot answer the same way twice is undecided, whatever the average says."""
+    mech = 0.0 if mech is None else mech
+    if order_gap >= policy["max_order_gap"]:
+        return "UNDECIDED"
+    if link >= policy["link_high"] or (mech >= policy["mech_high"] and link >= policy["link_floor"]):
+        return "LIKELY-LINK"
+    if link <= policy["link_low"] and mech < policy["mech_low"]:
+        return "LIKELY-NOISE"
+    return "UNDECIDED"
+
+
+def _pair_of(row: dict, note: str | None) -> tuple[str, str] | None:
+    """`surprise` rows are pair-shaped (a/b); `candidates` rows carry one `path` and are
+    relative to the note they were asked for."""
+    if "a" in row and "b" in row:
+        return row["a"], row["b"]
+    if note and "path" in row:
+        return note, row["path"]
+    return None
+
+
+def _adjudicate_once(vault: Path, pairs: list[tuple[str, str]], cache: dict, usage_total: dict) -> list[dict | None]:
+    """One pass: raw {link, mech} per pair, in order, None where a note is missing or skipped."""
+    raw: list[dict | None] = [None] * len(pairs)
+
+    def payload(rel: str) -> dict | None:
+        if rel not in cache and (vault / rel).is_file():
+            cache[rel] = note_payload(vault / rel, vault, ADJUDICATION_CHARS)
+        return cache.get(rel)
+
+    def ask(chunk, start):
+        state, questions, index = {"pairs": {}}, {}, {}
+        for offset, (a, b) in enumerate(chunk):
+            pa, pb = payload(a), payload(b)
+            if pa is None or pb is None:
+                continue
+            pid = f"P{offset + 1:02d}"
+            state["pairs"][pid] = {"a": pa, "b": pb}
+            questions[f"link_{pid}"] = Q.should_link(pid)
+            questions[f"mech_{pid}"] = Q.same_mechanism(pid)
+            index[pid] = start + offset
+        if not questions:
+            return {}
+        answers, usage = judge.judge(vault, state, questions)
+        usage_total["backend"], usage_total["model"] = usage.backend, usage.model
+        for key in ("requests", "input_tokens", "usd", "splits"):
+            usage_total[key] += getattr(usage, key)
+        usage_total["skipped"].extend(usage.skipped)
+        out = {}
+        for pid, position in index.items():
+            link, mech = answers.get(f"link_{pid}"), answers.get(f"mech_{pid}")
+            if link is not None:
+                out[position] = {"link": link.p, "mech": mech.p if mech else None}
+        return out
+
+    for position, value in in_chunks(pairs, MAX_PAIRS_PER_REQUEST, ask).items():
+        raw[position] = value
+    return raw
+
+
+def adjudicate_pairs(vault: Path, pairs: list[tuple[str, str]], symmetric: bool = True) -> tuple[list[dict], dict]:
+    """P(a link between them would help a reader) for each (a, b) of vault-relative note paths.
+
+    Returns (adjudications aligned with `pairs`, usage). An entry is None where a note is
+    missing or the backend skipped the question. Raises judge.JudgmentUnavailable /
+    judge.JudgmentFailed like judge.judge(); callers decide how to degrade.
+
+    `symmetric` (default) asks every pair twice, the second time with the two notes swapped,
+    and averages; `order_gap` reports how far the two views disagreed. Measured 2026-09-22 on
+    105 pairs: swapping which note is `a` moves the answer by 0.08-0.10 on average and up to
+    0.4-0.5, enough to flip a third of the labels, while rerunning the identical request moves
+    it by 0.02-0.04. It is an order effect, not batch cross-talk: one pair per request shows
+    the same swing (0.08) as forty, and forty ranks at least as well, so the batch stays large
+    and the second view is what makes a label worth reading.
+    """
+    usage_total = {"backend": "", "model": "", "requests": 0, "input_tokens": 0, "usd": 0.0, "splits": 0, "skipped": []}
+    cache: dict[str, dict] = {}
+    passes = [_adjudicate_once(vault, pairs, cache, usage_total)]
+    if symmetric:
+        passes.append(_adjudicate_once(vault, [(b, a) for a, b in pairs], cache, usage_total))
+    if not usage_total["backend"]:
+        policy: dict[str, float] = {}
+    else:
+        policy = judge.policy_for(LINK_POLICY, usage_total["backend"])
+    results: list[dict | None] = []
+    for views in zip(*passes, strict=True):
+        seen = [v for v in views if v is not None]
+        if not seen:
+            results.append(None)
+            continue
+        link = sum(v["link"] for v in seen) / len(seen)
+        gap = max(v["link"] for v in seen) - min(v["link"] for v in seen)
+        mechs = [v["mech"] for v in seen if v["mech"] is not None]
+        mech = sum(mechs) / len(mechs) if mechs else None
+        # One view of a pair that was asked for two is not agreement: the order effect this
+        # mitigates is exactly what the missing view would have shown.
+        label = _link_label(link, mech, policy, gap) if len(seen) == len(passes) else "UNDECIDED"
+        results.append({"p": round(link, 3), "label": label,
+                        "p_same_mechanism": round(mech, 3) if mech is not None else None,
+                        "order_gap": round(gap, 3), "views": len(seen),
+                        "backend": usage_total["backend"], "model": usage_total["model"],
+                        "questions_version": Q.QUESTIONS_VERSION})
+    usage_total["usd"] = round(usage_total["usd"], 6)
+    return results, usage_total
+
+
+def adjudicate_candidates(vault: Path, rows: list[dict], note: str | None = None) -> list[dict] | GraphUnavailable:
+    """Attach an advisory `adjudication` to rows from inferred_candidates()/surprise_candidates().
+
+    gaiafield's own `score`, `label` and order are never changed, and the contract is
+    unchanged too: the rows stay report-only, AMBIGUOUS rows are still fetched only when a
+    human asked for them. The adjudication helps that human; it is not a gate. No judgment
+    backend is a normal, silent degradation (`GraphUnavailable("no-judgment")`).
+    """
+    pairs = [_pair_of(row, note) for row in rows]
+    wanted = [(i, pair) for i, pair in enumerate(pairs) if pair is not None]
+    if not wanted:
+        return [dict(row) for row in rows]
+    try:
+        verdicts, _usage = adjudicate_pairs(vault, [pair for _, pair in wanted])
+    except judge.JudgmentUnavailable as e:
+        return GraphUnavailable("no-judgment", e.reason)
+    except judge.JudgmentFailed as e:
+        write_dlq_note(
+            vault, slug="link-adjudication-failed", title="typed-judgment backend answered nothing",
+            what_happened=f"`graph.adjudicate_candidates` reached a configured judgment backend but every request failed: {e}",
+            why_recorded="A configured backend that fails is not the normal 'no backend' degrade path; the inferred "
+                         "candidates were reported without adjudication and someone should check the key or endpoint.",
+            confidence="low",
+        )
+        return GraphUnavailable("call-failed", str(e))
+    out = [dict(row) for row in rows]
+    for (i, _), verdict in zip(wanted, verdicts, strict=True):
+        out[i]["adjudication"] = verdict
+    return out

@@ -7,6 +7,7 @@ enrichers:
   - github
   - youtube
 backlog_sweep: true
+attachments_folder: 04_Resources/Attachments
 tags:
   - domain/toolkit-meta
   - profile
@@ -41,3 +42,10 @@ Get a token at https://readwise.io/access_token.
 
 Every field above also has a `TOOLKIT_READWISE_<FIELD>` environment variable that wins over
 this note, per `contract/PROFILE.md`'s resolution order — e.g. `TOOLKIT_READWISE_BACKLOG_SWEEP=false`.
+
+## Attachments
+
+- **`attachments_folder`** — where a `pdf` clipping's original file is stored (vault-relative;
+  default `04_Resources/Attachments`). The capture gets `attachment:` in its frontmatter and a
+  `**Document:** [[path]]` line; the distilled note must keep that link (distill workflow, step
+  6). The extracted text stays in the capture and its archive copy; the note is the map.
