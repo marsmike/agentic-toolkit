@@ -4,6 +4,7 @@
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py scan --since 1d [--json]
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py replay --since 30d --out DIR
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py discover [--interest ID ...]
+    uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py feeds|trend|weekly
 
 `scan` fetches feed items saved since `--since`, drops those already seen (canonical URL, or the
 same title from the same feed: a repost under a new address) and a new feed's back catalogue
@@ -17,6 +18,8 @@ answers nothing at all is recorded once in the dead-letter queue.
 
 `replay` is the acceptance run (replay.py): own clips vs. feed items, Jev vs. BM25 vs. recency.
 `discover` (discover.py) finds feeds for the interests via Kagi and writes an OPML to import.
+`feeds`, `trend` and `weekly` (reports.py) read state.jsonl only: feed yield, rising interests,
+and the weekly capture `01_Capture/Radar-Week-YYYY-WW.md`.
 
 What leaves the machine: item titles, summaries and site names, and interest names and glosses,
 to the judgment backend (OpenRouter by default).
@@ -38,6 +41,7 @@ import interests as interests_mod
 import judge
 import reader
 import replay
+import reports
 from interests import Interest
 from judgments import policy
 from judgments import questions as Q
@@ -360,6 +364,24 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
             "note": str(note)}
 
 
+def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, force: bool = False) -> dict[str, Any]:
+    rows = read_jsonl(out / "state.jsonl")
+    if not rows:
+        return {"status": "empty", "detail": f"no radar state in {out}; run `scan` first"}
+    if cmd == "feeds":
+        return {"status": "ok", "feeds": reports.feeds(rows, now)}
+    if cmd == "trend":
+        wk = week or reports.week_of(now.date().isoformat())
+        return {"status": "ok", "week": wk, "interests": reports.trend(rows, wk), "terms": reports.emerging_terms(rows, wk)}
+    wk = week or reports.last_complete_week(now.date())
+    text = reports.render_weekly(wk, rows, interests_mod.load(vault), now)
+    try:
+        path = reports.write_weekly(vault, wk, text, force)
+    except FileExistsError as e:
+        return {"status": "exists", "detail": str(e)}
+    return {"status": "ok", "week": wk, "capture": path.relative_to(vault).as_posix()}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -383,11 +405,23 @@ def main(argv: list[str] | None = None) -> int:
     dp.add_argument("--queries", type=int, default=policy.QUERIES_PER_INTEREST, help="Kagi searches per interest; 0 = none")
     dp.add_argument("--out", type=Path, default=None, help="default: $VAULT/00_Memory/radar")
     dp.add_argument("--json", action="store_true")
+    for name, text in (("feeds", "per-feed yield and unsubscribe advice"), ("trend", "rising interests this week")):
+        rp_ = sub.add_parser(name, help=text)
+        rp_.add_argument("--week", default=None, help="ISO week YYYY-Www (trend; default: this week)")
+        rp_.add_argument("--out", type=Path, default=None)
+        rp_.add_argument("--json", action="store_true")
+    wp = sub.add_parser("weekly", help="write 01_Capture/Radar-Week-YYYY-WW.md from state.jsonl")
+    wp.add_argument("--week", default=None, help="ISO week YYYY-Www (default: the last complete week)")
+    wp.add_argument("--force", action="store_true", help="rewrite an existing weekly capture")
+    wp.add_argument("--out", type=Path, default=None)
+    wp.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     vault = require_vault()
     now = datetime.now(UTC)
-    if args.cmd == "discover":
+    if args.cmd in ("feeds", "trend", "weekly"):
+        result = report(vault, args.out or vault / RADAR_DIR, args.cmd, now, args.week, getattr(args, "force", False))
+    elif args.cmd == "discover":
         result = discover_mod.discover(vault, args.out or vault / RADAR_DIR, now, args.interest, args.seed, args.queries)
     elif args.cmd == "replay":
         result = replay.replay(vault, args.out, parse_since(args.since, now),
