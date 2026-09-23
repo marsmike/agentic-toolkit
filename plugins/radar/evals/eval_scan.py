@@ -143,7 +143,7 @@ def run(vault: Path) -> dict:
             if "strong:" in title and iid in title.split("strong:")[1].split("]")[0].split(","):
                 p = 0.9
             elif "worth:" in title and iid in title.split("worth:")[1].split("]")[0].split(","):
-                p = 0.65
+                p = 0.75
             answers[qid] = {"type": "noul", "noul": p}
         return {"model": "stub-1", "usage": {"input_tokens": 100}, "answers": answers}
 

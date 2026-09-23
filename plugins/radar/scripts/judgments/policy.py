@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import judge
 
-# Initial priors, 2026-09-22, jev-latest, from the R10 plan; not yet calibrated. They move only
-# after the acceptance replay (own clips vs. random feed items) and a human accepting the result.
+# Priors from the R10 plan (2026-09-22), moved only after an acceptance run and a human accepting
+# the result. T_WORTH 0.60 -> 0.70 on 2026-09-23: in the blind audit of the full 30-day replay
+# (1,200 item x interest pairs) only 23% of the 0.60-0.80 band held up as worth reading, while
+# the strong band held at 69%. Mike accepted the raise.
 THRESHOLDS: dict[str, dict[str, float]] = {
     "jev": {
-        "T_WORTH": 0.60,   # worth_reading at or above: listed for that interest
+        "T_WORTH": 0.70,   # worth_reading at or above: listed for that interest
         "T_STRONG": 0.80,  # at or above: strong, the only band --promote ever acts on
         "T_FEED": 0.75,    # feed_worth at or above, for any interest: the feed is proposed
     },
