@@ -4,6 +4,13 @@
 it comes from a typed-judgment backend (see [[Typed-Judgments]] in the vault) and is
 advice; the block is labelled `advisory` with its backend, model and `questions_version`.
 
+**Read it without writing code.** Leave out `--json` and the same run prints the summary per
+capture (triage, mode, placement, related notes with levels) and the batch's cluster pairs. With
+`--json` the top level is `{"captures": [ {"capture": "<path>", "triage": …,
+"already_distilled": …, "placement": …, "related": […], …}, … ], "batch": {"cluster": […]},
+"usd": …}`: `captures` is a **list**, each block names its capture in `"capture"`.
+[earned: 2026-09-23, a pipeline run's own summary script read `captures` as a dict and failed]
+
 ```mermaid
 flowchart LR
   C[capture] --> S[search.py<br/>keyword hits]

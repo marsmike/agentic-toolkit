@@ -1,6 +1,6 @@
 {
   "name": "obsidian",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Vault interface: filesystem-first operations and health, search, graph-aware distill, and the unattended pipeline that rebuilds Index, maps and Now.",
   "author": {
     "name": "agentic-toolkit contributors"
