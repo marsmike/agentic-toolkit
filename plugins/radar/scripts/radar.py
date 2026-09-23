@@ -3,6 +3,7 @@
 
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py scan --since 1d [--json]
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py replay --since 30d --out DIR
+    uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py discover [--interest ID ...]
 
 `scan` fetches feed items saved since `--since`, drops those already seen (canonical URL, or the
 same title from the same feed: a repost under a new address) and a new feed's back catalogue
@@ -15,6 +16,7 @@ item that could not be judged stays in the feed. Nothing is deleted; no active c
 answers nothing at all is recorded once in the dead-letter queue.
 
 `replay` is the acceptance run (replay.py): own clips vs. feed items, Jev vs. BM25 vs. recency.
+`discover` (discover.py) finds feeds for the interests via Kagi and writes an OPML to import.
 
 What leaves the machine: item titles, summaries and site names, and interest names and glosses,
 to the judgment backend (OpenRouter by default).
@@ -31,6 +33,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import discover as discover_mod
 import interests as interests_mod
 import judge
 import reader
@@ -374,11 +377,19 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--max-requests", type=int, default=policy.MAX_REQUESTS_PER_RUN)
     rp.add_argument("--out", type=Path, required=True, help="report dir; never the vault")
     rp.add_argument("--json", action="store_true")
+    dp = sub.add_parser("discover", help="find feeds for the interests (Kagi) and write an OPML for Reader")
+    dp.add_argument("--interest", action="append", default=None, help="interest id; repeat; default all")
+    dp.add_argument("--seed", action="append", default=None, help="a page or feed URL to validate and judge too")
+    dp.add_argument("--queries", type=int, default=policy.QUERIES_PER_INTEREST, help="Kagi searches per interest; 0 = none")
+    dp.add_argument("--out", type=Path, default=None, help="default: $VAULT/00_Memory/radar")
+    dp.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     vault = require_vault()
     now = datetime.now(UTC)
-    if args.cmd == "replay":
+    if args.cmd == "discover":
+        result = discover_mod.discover(vault, args.out or vault / RADAR_DIR, now, args.interest, args.seed, args.queries)
+    elif args.cmd == "replay":
         result = replay.replay(vault, args.out, parse_since(args.since, now),
                                now - timedelta(days=args.exclude_last_days), args.feed_sample, args.max_requests)
     else:

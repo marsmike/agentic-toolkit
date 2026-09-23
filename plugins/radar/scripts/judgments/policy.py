@@ -10,6 +10,7 @@ THRESHOLDS: dict[str, dict[str, float]] = {
     "jev": {
         "T_WORTH": 0.60,   # worth_reading at or above: listed for that interest
         "T_STRONG": 0.80,  # at or above: strong, the only band --promote ever acts on
+        "T_FEED": 0.75,    # feed_worth at or above, for any interest: the feed is proposed
     },
 }
 
@@ -23,3 +24,9 @@ BACKLOG_GRACE_DAYS = 7
 
 def thresholds(backend: str) -> dict[str, float]:
     return judge.policy_for(THRESHOLDS, backend)
+
+# discover
+QUERIES_PER_INTEREST = 2        # Kagi searches per interest per discover run ($0.025 each)
+PAGES_PER_QUERY = 8             # result pages fetched for feed autodiscovery
+FEED_MIN_ITEMS = 3
+FEED_MAX_SILENCE_DAYS = 45      # a feed whose latest item is older than this is dormant
