@@ -19,8 +19,9 @@ case "${1:-}" in
     : "${TOOLKIT_VAULT_REMOTE:?set TOOLKIT_VAULT_REMOTE to the git URL of the vault}"
     if [[ -d "$LIVE/.git" ]]; then
       # A clone of another vault must never be pulled or pushed under this remote's name.
-      origin="$(git -C "$LIVE" remote get-url origin 2>/dev/null || true)"
-      if [[ "$origin" != "$TOOLKIT_VAULT_REMOTE" ]]; then
+      # Fetch and every push URL: `git push` honours remote.origin.pushurl, so both must match.
+      urls="$(git -C "$LIVE" remote get-url origin 2>/dev/null; git -C "$LIVE" remote get-url --push --all origin 2>/dev/null)"
+      if [[ -z "$urls" ]] || grep -qvxF -- "$TOOLKIT_VAULT_REMOTE" <<<"$urls"; then
         # The remote URL is not printed: it can carry embedded credentials.
         echo "$LIVE is a clone of a different remote than TOOLKIT_VAULT_REMOTE; move it away and open again" >&2
         exit 1
@@ -40,8 +41,8 @@ case "${1:-}" in
     [[ -d "$LIVE/.git" ]] || { echo "no vault at $LIVE; run open first" >&2; exit 1; }
     shift
     # Exit non-zero unless `end` reports ok and the vault is in sync with its remote: `end` prints
-    # its result either way, but a refused commit (a key-shaped string) or a failed push is not a
-    # closed vault. A session that changed nothing closes fine with no commit.
+    # its result either way, but a refused commit (a key-shaped string), a failed commit or a
+    # failed push is not a closed vault. A session that changed nothing closes fine, no commit.
     result="$(TOOLKIT_VAULT="$LIVE" uv run -q --project "$SCRIPTS" python3 "$SCRIPTS/pipeline_run.py" end "$@" --json)"
     echo "$result"
     python3 -c 'import json,sys; r=json.loads(sys.stdin.read()); ok = r.get("status") == "ok" and (r.get("sync") or {}).get("pushed", False); sys.exit(0 if ok else 1)' <<<"$result"

@@ -27,11 +27,14 @@ writes a DLQ note that names the file and the kind of key, never the value (stat
 from __future__ import annotations
 
 import argparse
+import fcntl
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -85,53 +88,27 @@ def _order(vault: Path, path: Path) -> tuple[int, str]:
 def _claim(lock: Path, now: datetime) -> datetime | None:
     """Take the lock atomically; return the holder's start time if another run has it.
 
-    Linked into place atomically, so of two runs starting together exactly one gets past here,
-    before the slow commit-and-pull. A lock older than LOCK_STALE_HOURS is a crashed run and is
-    taken over.
+    Of two runs starting together exactly one gets past here, before the slow commit-and-pull.
+    A lock older than LOCK_STALE_HOURS is a crashed run and is taken over.
     [earned: 2026-09-23, PR #20 review — check-then-write let two runs both sync and both run]
     """
     lock.parent.mkdir(parents=True, exist_ok=True)
-    # The lock appears already holding its timestamp: written to a private file first, then
-    # hard-linked into place, which is atomic and fails if the lock exists. An exclusive create
-    # followed by a write showed an empty lock for a moment, which another caller read as stale.
-    # [earned: 2026-09-23, PR #24 second review]
-    new = lock.with_name(f"{lock.name}.new-{os.getpid()}-{time.time_ns()}")
-    new.write_text(now.isoformat() + "\n", encoding="utf-8")
-    try:
-        return _claim_with(lock, new, now)
-    finally:
-        new.unlink(missing_ok=True)
-
-
-def _claim_with(lock: Path, new: Path, now: datetime) -> datetime | None:
-    started = now
-    for _ in range(3):
-        try:
-            os.link(new, lock)
-        except FileExistsError:
+    key = hashlib.sha1(str(lock.resolve()).encode()).hexdigest()[:16]
+    guard = Path(tempfile.gettempdir()) / f"agentic-toolkit-{key}.guard"
+    # Claims are serialised by an OS lock on a guard file outside the vault (never committed):
+    # inside it, check-then-write is safe, including taking over a stale lock. The lock file
+    # itself appears complete through an atomic replace, so a reader never sees it empty.
+    # [earned: 2026-09-23, PR #24 reviews — O_EXCL, then rename-aside takeovers each left a race]
+    with open(guard, "a") as g:
+        fcntl.flock(g, fcntl.LOCK_EX)
+        if lock.exists():
             started = _lock_time(lock, now)
             if now - started < timedelta(hours=LOCK_STALE_HOURS):
                 return started
-            # Stale: move it aside atomically (only one caller's rename succeeds), then retry the
-            # exclusive create. A caller that moved a lock another run had just taken puts it back
-            # and reports busy. [earned: 2026-09-23, PR #24 review — overwrite let two take over]
-            grave = lock.with_name(f"{lock.name}.stale-{os.getpid()}-{time.time_ns()}")
-            try:
-                os.rename(lock, grave)
-            except FileNotFoundError:
-                continue
-            moved = _lock_time(grave, now)
-            if now - moved < timedelta(hours=LOCK_STALE_HOURS):
-                try:
-                    os.link(grave, lock)
-                except FileExistsError:
-                    pass
-                grave.unlink(missing_ok=True)
-                return moved
-            grave.unlink(missing_ok=True)
-            continue
+        new = lock.with_name(f"{lock.name}.new-{os.getpid()}-{time.time_ns()}")
+        new.write_text(now.isoformat() + "\n", encoding="utf-8")
+        os.replace(new, lock)
         return None
-    return started
 
 
 def _lock_time(path: Path, now: datetime) -> datetime:
@@ -151,6 +128,9 @@ def begin(vault: Path, now: datetime) -> dict[str, Any]:
     if sync.get("conflict") or sync.get("secrets"):
         lock.unlink(missing_ok=True)
         return {"status": "skipped", "detail": sync["detail"], "sync": sync}
+    # A pull that merely failed (offline, a transient auth error) does not stop the run, by design:
+    # distilling needs no network, the run's commit stays local, and the next run's pull and push
+    # reconcile it. A real conflict is the only reason to skip. `sync.pulled` says which it was.
     return {"status": "ok", "locked_at": now.isoformat(), "sync": sync}
 
 
@@ -235,8 +215,10 @@ def _commit(vault: Path, message: str, exclude: tuple[str, ...] = ()) -> dict[st
                                   "or add the file to .gitignore. The next run commits once the diff is clean.",
                        confidence="high")
         return {"commit": None, "secrets": hits}
-    if _git(vault, "commit", "-q", "-m", message).returncode != 0:
-        return {"commit": None, "secrets": []}
+    done = _git(vault, "commit", "-q", "-m", message)
+    if done.returncode != 0:
+        # Not a no-op: something was staged and did not commit (a hook, identity, index error).
+        return {"commit": None, "secrets": [], "error": (done.stderr.strip().splitlines() or ["?"])[-1][:200]}
     return {"commit": _git(vault, "rev-parse", "--short", "HEAD").stdout.strip(), "secrets": []}
 
 
@@ -321,6 +303,8 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
         result["commit"] = committed["commit"]
         if committed["secrets"]:
             result.update(status="refused", secrets=committed["secrets"])
+        elif committed.get("error"):
+            result.update(status="commit_failed", detail=committed["error"])
         else:
             result["sync"] = _push(vault, now)
     return result

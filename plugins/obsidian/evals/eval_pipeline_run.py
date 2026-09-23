@@ -9,6 +9,8 @@
               note that names the file, never the key; the next clean run commits
 5. sync     — with a bare upstream: a second clone's commit arrives with `begin`, `end` pushes, and a
               conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
+6. build    — a generator that fails is reported in `build_failed`, gets one DLQ note across runs,
+              and the run still commits
 """
 from __future__ import annotations
 
@@ -70,6 +72,39 @@ def _sync_phase(pr, sandbox: Path) -> list[str]:
         problems.append(f"phase 5: a conflict skips the run without the lock and writes one DLQ note, got {r.get('status')}")
     if pr._rebase_in_progress(sandbox) or "mac version" not in (sandbox / "04_Resources" / "Eval-From-Cloud.md").read_text(encoding="utf-8"):
         problems.append("phase 5: the aborted rebase must leave the Mac's own edit in place")
+    return problems
+
+
+def _build_failure_phase(pr, sandbox: Path) -> list[str]:
+    """map_build.py replaced by a script that fails: `end` still commits, reports `build_failed`,
+    and writes one DLQ note across two failing runs."""
+    import shutil
+    import tempfile
+    problems = []
+    stubs = Path(tempfile.mkdtemp(prefix="obsidian-plugin-eval-stubs-"))
+    saved = pr.SCRIPTS
+    try:
+        for name in ("index_build.py", "now_build.py", "log_vault.py", "vault_utils.py"):
+            shutil.copy(saved / name, stubs / name)
+        for name in ("map_build.py", "pipeline_run.py"):
+            shutil.copy(saved / name, stubs / name)
+        # Still importable (now_build uses its helpers); fails only when run as the build script.
+        real = (saved / "map_build.py").read_text(encoding="utf-8")
+        (stubs / "map_build.py").write_text(real.replace("sys.exit(main())", "sys.exit('map_build: boom')"), encoding="utf-8")
+        pr.SCRIPTS = stubs
+        _git(sandbox, "remote", "remove", "origin")
+        for hours in (24, 27):
+            pr.begin(sandbox, NOW + timedelta(hours=hours))
+            (sandbox / "04_Resources" / f"Eval-Build-Fail-{hours}.md").write_text("---\ndescription: x\n---\n", encoding="utf-8")
+            r = pr.end(sandbox, NOW + timedelta(hours=hours), 1, 0, [])
+            if [f["script"] for f in r.get("build_failed", [])] != ["map_build.py"] or not r.get("commit"):
+                problems.append(f"phase 6: a failing map_build is reported and the run still commits, got {r}")
+        dlq = list((sandbox / "00_Memory" / "dlq").glob("*pipeline-build-failed*.md"))
+        if len(dlq) != 1:
+            problems.append(f"phase 6: a failing build gets one DLQ note, got {len(dlq)}")
+    finally:
+        pr.SCRIPTS = saved
+        shutil.rmtree(stubs, ignore_errors=True)
     return problems
 
 
@@ -157,6 +192,9 @@ def run(vault: Path) -> dict:
 
         # 5. git sync through an upstream
         problems += _sync_phase(pr, sandbox)
+
+        # 6. a failing generator: reported, one DLQ note however often it fails, the run committed
+        problems += _build_failure_phase(pr, sandbox)
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
