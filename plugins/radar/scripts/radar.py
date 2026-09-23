@@ -11,9 +11,12 @@ same title from the same feed: a repost under a new address) and a new feed's ba
 (published more than BACKLOG_GRACE_DAYS before `--since`; recorded as seen, not judged), asks
 the judgment backend `worth_reading` per item x interest and `kind` per item, applies the
 policy, appends one row per item to `00_Memory/radar/state.jsonl`, renders that day's note
-`00_Memory/radar/YYYY-MM-DD.md` from the day's rows, and archives in Reader every fetched item
-it has now recorded as seen (judged, repost or back catalogue; `--keep-in-feed` skips this). An
-item that could not be judged stays in the feed. Nothing is deleted; no active content is written. Without a key it prints SKIPPED and sends nothing; a backend that
+`00_Memory/radar/YYYY-MM-DD.md` from the day's rows, and settles every fetched item it has now
+recorded as seen (judged, repost or back catalogue) in Reader: with `--promote`, a strong one moves
+to Later (profile `promote_location`) tagged `radar` and `radar/<interest>`, with a note when it
+has none; every other one is archived (`--keep-in-feed` skips archiving). An item that could not
+be judged, or whose promotion failed, stays in the feed for the next scan. Nothing is deleted; no
+active content is written. Without a key it prints SKIPPED and sends nothing; a backend that
 answers nothing at all is recorded once in the dead-letter queue.
 
 `replay` is the acceptance run (replay.py): own clips vs. feed items, Jev vs. BM25 vs. recency.
@@ -48,9 +51,10 @@ from judgments import questions as Q
 from judgments.state import in_chunks
 from judgments.urls import _canonical
 from reader import Item
-from vault_utils import atomic_write, read_frontmatter, require_vault, write_dlq_note
+from vault_utils import atomic_write, profile_value, read_frontmatter, require_vault, write_dlq_note
 
 RADAR_DIR = Path("00_Memory") / "radar"
+DEFAULT_PROMOTE_LOCATION = "later"
 NOT_CONTENT = {"00_Memory", ".obsidian", ".trash", ".smart-env", "Templates", "Config"}
 
 
@@ -281,22 +285,47 @@ def render_daily(run_date: str, rows: list[dict], interests: list[Interest], usa
 # ---------------------------------------------------------------------------
 
 
-def archive_recorded(fetched: list[Item], recorded: set[str]) -> dict[str, Any]:
-    """Archive in Reader every fetched feed item the radar has recorded (a repost shares a key
-    with its original). A failure here never fails the scan: the items stay in the feed and the
-    next scan archives them."""
-    ids = [it.id for it in fetched if keys_of(it) & recorded]
-    if not ids:
-        return {"archived": 0}
+def _apply(updates: list[dict], done_key: str) -> dict[str, Any]:
+    """`archived` -> archived / archive_error / archive_failed; `promoted` likewise."""
+    if not updates:
+        return {}
+    stem = done_key.removesuffix("d")
     try:
-        done, failed = reader.archive(ids)
+        done, failed = reader.bulk_update(updates)
     except reader.ReaderError as e:
-        return {"archived": 0, "archive_error": str(e)[:200]}
-    return {"archived": len(done), **({"archive_failed": len(failed)} if failed else {})}
+        return {done_key: 0, f"{stem}_error": str(e)[:200]}
+    return {done_key: len(done), **({f"{stem}_failed": len(failed)} if failed else {})}
+
+
+def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], names: dict[str, str],
+           run_date: str, archive: bool, promote: bool, location: str) -> dict[str, Any]:
+    """Move every fetched feed item the radar has recorded (a repost shares a key with its
+    original) out of the feed: strong ones to `location` when promoting, the rest to the archive.
+    Promotion is read from state, so an item whose promotion failed is promoted by the next scan;
+    it is never archived instead. A Reader failure here never fails the scan."""
+    strong: dict[str, dict[str, float]] = {}
+    if promote:
+        for r in state_rows:
+            s = reports.bands(r)[1]
+            if s:
+                strong[r["canonical"]] = {i: r["p"][i] for i in s}
+    promotions, archive_ids = [], []
+    for it in fetched:
+        if not keys_of(it) & recorded:
+            continue
+        if item_key(it) in strong:
+            p = strong[item_key(it)]
+            u: dict[str, Any] = {"id": it.id, "location": location, "tags": ["radar", *(f"radar/{i}" for i in sorted(p))]}
+            if not it.notes.strip():
+                u["notes"] = f"[radar {run_date}] " + "; ".join(f"{names.get(i, i)} p={v:.2f}" for i, v in sorted(p.items()))
+            promotions.append(u)
+        elif archive:
+            archive_ids.append({"id": it.id, "location": "archive"})
+    return {**_apply(promotions, "promoted"), **_apply(archive_ids, "archived")}
 
 
 def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | None = None,
-         max_requests: int = policy.MAX_REQUESTS_PER_RUN, archive: bool = True) -> dict[str, Any]:
+         max_requests: int = policy.MAX_REQUESTS_PER_RUN, archive: bool = True, promote: bool = False) -> dict[str, Any]:
     run_date = now.date().isoformat()
     interests = interests_mod.load(vault)
     if not interests:
@@ -325,7 +354,9 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
     recorded |= {k for it in backlog for k in keys_of(it)}
 
     def archived() -> dict[str, Any]:
-        return archive_recorded(fetched, recorded) if archive else {}
+        names = {i.id: i.name for i in interests}
+        location = str(profile_value(vault, "promote_location", DEFAULT_PROMOTE_LOCATION))
+        return settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote, location)
     append_jsonl(out / "seen.jsonl", [{"canonical": item_key(it), "title_key": title_key(it),
                                         "first_seen": run_date, "backlog": True} for it in backlog])
     result: dict[str, Any] = {"since": since.isoformat(), "fetched": len(fetched), "new": len(items),
@@ -391,6 +422,7 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--max-requests", type=int, default=policy.MAX_REQUESTS_PER_RUN)
     sp.add_argument("--out", type=Path, default=None, help="radar state dir (default: $VAULT/00_Memory/radar)")
     sp.add_argument("--keep-in-feed", action="store_true", help="do not archive recorded items in Reader")
+    sp.add_argument("--promote", action="store_true", help="move strong items to Later, tagged radar/<interest>")
     sp.add_argument("--json", action="store_true")
     rp = sub.add_parser("replay", help="acceptance: own clips vs. feed items, judgment vs. BM25 vs. recency")
     rp.add_argument("--since", default="30d")
@@ -428,7 +460,7 @@ def main(argv: list[str] | None = None) -> int:
                                now - timedelta(days=args.exclude_last_days), args.feed_sample, args.max_requests)
     else:
         result = scan(vault, args.out or vault / RADAR_DIR, parse_since(args.since, now), now, args.limit,
-                      args.max_requests, archive=not args.keep_in_feed)
+                      args.max_requests, archive=not args.keep_in_feed, promote=args.promote)
     if args.json:
         print(json.dumps(result, indent=2))
     else:

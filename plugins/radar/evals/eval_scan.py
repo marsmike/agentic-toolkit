@@ -12,6 +12,10 @@
 5. failure     — a backend answering nothing: one DLQ note, status failed, nothing but backlog marked seen
 6. epics       — Portfolio epics via `td`: wanted sections only, no subtasks, no completed tasks,
                  the `What:` sentence as gloss
+8. promote     — with --promote the strong item and its twin move to Later tagged radar and
+                 radar/<interest> with a note naming each interest and p, the rest are archived;
+                 a failed promotion leaves the item in the feed (not archived) and the next scan
+                 promotes it from state without a judgment request
 7. archive     — every recorded item (judged, repost, backlog) is archived in Reader in one
                  bulk_update and nothing else is: not with no key, not an item a failed or
                  --limit-ed run did not judge, not with --keep-in-feed; a Reader error while
@@ -103,17 +107,24 @@ def run(vault: Path) -> dict:
     calls: list[dict] = []
     reader_calls: list[str] = []
     archived: list[list[str]] = []
-    mode = {"too_large_above": None, "fail": False, "archive_status": 200}
+    promoted: list[dict] = []
+    mode = {"too_large_above": None, "fail": False, "archive_status": 200, "promote_status": 200}
     sandbox = None
 
     def reader_stub(method, url, data=None):
         if method == "PATCH" and url.endswith("/bulk_update/"):
             updates = data["updates"]
-            if any(set(u) != {"id", "location"} or u["location"] != "archive" for u in updates) or len(updates) > 50:
-                problems.append(f"reader: a write other than location=archive, or over 50: {updates[:2]}")
-            if mode["archive_status"] != 200:
-                return mode["archive_status"], {"detail": "stub"}, None
-            archived.append([u["id"] for u in updates])
+            if any(set(u) - {"id", "location", "tags", "notes"} or u["location"] not in ("archive", "later")
+                   or (u["location"] == "archive" and set(u) != {"id", "location"}) for u in updates) or len(updates) > 50:
+                problems.append(f"reader: a write other than archive or a tagged promotion, or over 50: {updates[:2]}")
+            to_later = [u for u in updates if u["location"] == "later"]
+            status = mode["promote_status"] if to_later else mode["archive_status"]
+            if status != 200:
+                return status, {"detail": "stub"}, None
+            if to_later:
+                promoted.extend(to_later)
+            else:
+                archived.append([u["id"] for u in updates])
             return 200, {"results": [{"id": u["id"], "success": True} for u in updates]}, None
         reader_calls.append(url)
         if method != "GET":
@@ -250,6 +261,25 @@ def run(vault: Path) -> dict:
         if r.get("status") != "ok" or "archive_error" not in r:
             problems.append(f"phase 7: a Reader error while archiving must leave the scan ok and say so, got {r.get('status')}")
 
+        # 8. promote
+        archived.clear()
+        out8 = sandbox.parent / "promote"
+        mode["promote_status"] = 500
+        r = radar.scan(sandbox, out8, since, NOW, promote=True)
+        mode["promote_status"] = 200
+        if "promote_error" not in r or any(i in ("doc1", "doc2") for a in archived for i in a):
+            problems.append(f"phase 8: a failed promotion must be reported and never archived instead, got {r}, {archived}")
+        n = len(calls)
+        promoted.clear()
+        r = radar.scan(sandbox, out8, since, NOW, promote=True)
+        by_id = {u["id"]: u for u in promoted}
+        if sorted(by_id) != ["doc1", "doc2"] or len(calls) != n or r.get("promoted") != 2:
+            problems.append(f"phase 8: the next scan should promote doc1 and its twin from state, no request; got {sorted(by_id)}, {len(calls) - n} calls")
+        u = by_id.get("doc1", {})
+        if u.get("tags") != ["radar", "radar/agent-memory", "radar/firmware"] or \
+                u.get("notes") != f"[radar {NOW.date().isoformat()}] Agent Memory p=0.90; Firmware p=0.90":
+            problems.append(f"phase 8: wrong tags or note on the promoted item: {u}")
+
         # 6. epics
         os.environ["TOOLKIT_RADAR_TODOIST_PROJECT_ID"] = "p1"
         interests_mod._run_td = lambda args: TD_SECTIONS if args[0] == "section" else TD_TASKS
@@ -266,4 +296,4 @@ def run(vault: Path) -> dict:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else f"7 offline phases ok ({len(calls)} stubbed judgment requests)"}
+            "detail": "; ".join(problems) if problems else f"8 offline phases ok ({len(calls)} stubbed judgment requests)"}

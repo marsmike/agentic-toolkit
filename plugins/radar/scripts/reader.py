@@ -3,8 +3,9 @@
 Radar's own stdlib client, not an import of the readwise plugin's (no cross-plugin imports,
 contract/KNOWLEDGE_API.md). It reads `location=feed`, the items the readwise plugin drops by
 design, and never fetches a body: title, summary, site and category are what gets judged. Its
-one write is `archive`: an item the radar has recorded leaves the feed (location=archive,
-reversible in the app); nothing is ever deleted. [Mike, 2026-09-23: judged items off the feed]
+one write is `bulk_update` of location, tags and notes: a recorded item leaves the feed for the
+archive, or with --promote a strong one for Later (both reversible in the app). Nothing is ever
+deleted. [Mike, 2026-09-23: judged items off the feed]
 
 A feed item carries no feed id: `source` is the constant "Reader RSS" and `url` is the Reader
 link, so the feed is `site_name` and the address is `source_url`. [verified against a live
@@ -52,6 +53,7 @@ class Item:
     published: str
     category: str
     saved_at: str
+    notes: str = ""
 
     def state(self) -> dict[str, str]:
         """What a judgment backend sees of an item: no ids, no reading signals."""
@@ -105,21 +107,31 @@ def _get(url: str) -> Any:
     return _call("GET", url)
 
 
-def archive(ids: list[str]) -> tuple[list[str], list[str]]:
-    """Move documents to location=archive, 50 per call. Returns (archived, failed) ids; a 207
-    reports per-item failures, which are returned rather than raised."""
-    archived: list[str] = []
+UPDATABLE = {"id", "location", "tags", "notes"}
+LOCATIONS = {"archive", "later", "shortlist", "new"}  # never "feed" back, never a delete
+
+
+def bulk_update(updates: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
+    """Apply `{id, location[, tags, notes]}` updates, 50 per call. Returns (done, failed) ids; a
+    207 reports per-item failures, which are returned rather than raised."""
+    for u in updates:
+        if set(u) - UPDATABLE or u.get("location") not in LOCATIONS:
+            raise ValueError(f"refusing a Reader update outside location/tags/notes: {u}")
+    done: list[str] = []
     failed: list[str] = []
-    for start in range(0, len(ids), BULK_MAX):
+    for start in range(0, len(updates), BULK_MAX):
         if start:
             time.sleep(PAGE_DELAY_S)
-        chunk = ids[start:start + BULK_MAX]
-        body = _call("PATCH", f"{READER_BASE}/bulk_update/",
-                     {"updates": [{"id": i, "location": "archive"} for i in chunk]}, ok=(200, 207)) or {}
-        done = {str(r.get("id")) for r in body.get("results") or [] if r.get("success")}
-        archived += [i for i in chunk if i in done]
-        failed += [i for i in chunk if i not in done]
-    return archived, failed
+        chunk = updates[start:start + BULK_MAX]
+        body = _call("PATCH", f"{READER_BASE}/bulk_update/", {"updates": chunk}, ok=(200, 207)) or {}
+        ok = {str(r.get("id")) for r in body.get("results") or [] if r.get("success")}
+        done += [u["id"] for u in chunk if u["id"] in ok]
+        failed += [u["id"] for u in chunk if u["id"] not in ok]
+    return done, failed
+
+
+def archive(ids: list[str]) -> tuple[list[str], list[str]]:
+    return bulk_update([{"id": i, "location": "archive"} for i in ids])
 
 
 def _published(raw: Any) -> str:
@@ -142,6 +154,7 @@ def to_item(doc: dict) -> Item:
         published=_published(doc.get("published_date")),
         category=str(doc.get("category") or ""),
         saved_at=str(doc.get("saved_at") or ""),
+        notes=str(doc.get("notes") or ""),
     )
 
 
