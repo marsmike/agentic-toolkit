@@ -30,6 +30,8 @@ flowchart LR
 | `feeds` | per-feed yield; "consider unsubscribing", "serves only <interest>" | none |
 | `trend [--week]` | interests rising above their baseline; emerging title terms (experimental) | none |
 | `discover [--interest ID] [--seed URL] [--queries N]` | candidate feeds from Kagi, URL shapes, autodiscovery and hnrss, validated and judged, as an OPML | Kagi, Reader (read), the candidate sites, judgment backend |
+| `gaps [--promote]` | once a week: recent posts per interest the feeds missed (Kagi news), judged; strong ones in the digest, optionally saved to Later | Kagi, judgment backend, Reader (save) |
+| `kagi search\|news\|answer\|summarize TEXT` | the kagi skill: one Kagi call under the ledger and weekly budget | Kagi |
 | `replay --since 30d --out DIR` | acceptance: own clips vs. feed items, Jev vs. BM25 vs. recency | Reader (read), judgment backend |
 
 The skill (`skills/radar/`) turns the daily and weekly runs into a short briefing;
@@ -67,6 +69,8 @@ from the environment only (`READWISE_TOKEN`, `KAGI_API_KEY`, `TOOLKIT_RADAR_JUDG
 
 ## Not yet
 
-`gaps` (Kagi search for strong items outside your feeds), `--todoist` (a dated comment on the
-Portfolio epic an item serves) and a Kagi skill are specified in `docs/R10-RADAR-PLAN.md` and not
-built. Reader has no feed-subscription API, so `discover` ends in an OPML, not a subscription.
+Nothing from the R10 plan is left unbuilt. Since the first release: `gaps` (once a week, Kagi's
+recent-posts index per interest, judged; strong finds in the weekly digest and, with `--promote`,
+saved to Later within the daily budget), the `kagi` skill (search, news, FastGPT answers, the
+Universal Summarizer, one ledger and budget), and `scan --todoist` (one dated comment a day on each
+Portfolio epic with strong items, never a new or completed task). Reader has no feed-subscription API, so `discover` ends in an OPML, not a subscription.

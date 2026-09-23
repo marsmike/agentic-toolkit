@@ -16,13 +16,16 @@ recorded as seen (judged, repost or back catalogue) in Reader: with `--promote`,
 to Later (profile `promote_location`) tagged `radar` and `radar/<interest>`, with a note when it
 has none; every other one is archived (`--keep-in-feed` skips archiving). An item that could not
 be judged, or whose promotion failed, stays in the feed for the next scan. Nothing is deleted; no
-active content is written. Without a key it prints SKIPPED and sends nothing; a backend that
+active content is written. With `--todoist`, each Portfolio epic (an interest from Todoist) that
+got a strong item this run gets one dated comment listing them, at most one per epic and day;
+never a new task, never a completed one. Without a key it prints SKIPPED and sends nothing; a backend that
 answers nothing at all is recorded once in the dead-letter queue.
 
 `replay` is the acceptance run (replay.py): own clips vs. feed items, Jev vs. BM25 vs. recency.
 `discover` (discover.py) finds feeds for the interests via Kagi and writes an OPML to import.
 `feeds`, `trend` and `weekly` (reports.py) read state.jsonl only: feed yield, rising interests,
-and the weekly capture `01_Capture/Radar-Week-YYYY-WW.md`.
+and the weekly capture `01_Capture/Radar-Week-YYYY-WW.md`. `gaps` (gaps.py) is the weekly search
+for what the feeds missed; `kagi search|news|answer|summarize` is the kagi skill's entry point.
 
 What leaves the machine: item titles, summaries and site names, and interest names and glosses,
 to the judgment backend (OpenRouter by default).
@@ -32,6 +35,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
+import subprocess
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
@@ -40,8 +45,10 @@ from pathlib import Path
 from typing import Any
 
 import discover as discover_mod
+import gaps as gaps_mod
 import interests as interests_mod
 import judge
+import kagi
 import reader
 import replay
 import reports
@@ -345,8 +352,51 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
     return {**result, **_apply(archive_ids, "archived")}
 
 
+TODOIST_ITEMS_PER_COMMENT = 5
+
+
+def _td_comment(task_id: str, text: str) -> None:
+    """The one write to Todoist. Evals replace it with a stub."""
+    if not shutil.which("td"):
+        raise FileNotFoundError("td")
+    subprocess.run(["td", "comment", "add", f"id:{task_id}", "--content", text, "--no-notify"],
+                   capture_output=True, text=True, timeout=60, check=True)
+
+
+def comment_epics(out: Path, rows: list[dict], interests: list[Interest], run_date: str) -> dict[str, Any]:
+    """One comment per epic with strong items in `rows`, idempotent per (task, date) through
+    `todoist.jsonl`. Without `td` or epics it does nothing and says nothing."""
+    epics = {i.id: i for i in interests if i.todoist_task_id}
+    if not epics:
+        return {}
+    ledger = out / "todoist.jsonl"
+    done = {(r.get("task"), r.get("date")) for r in read_jsonl(ledger)}
+    by_epic: dict[str, list[dict]] = {}
+    for r in rows:
+        for iid in reports.bands(r)[1] & epics.keys():
+            by_epic.setdefault(iid, []).append(r)
+    posted = 0
+    for iid, rs in sorted(by_epic.items()):
+        task = str(epics[iid].todoist_task_id)
+        if (task, run_date) in done:
+            continue
+        top = sorted(rs, key=lambda r: -r["p"][iid])[:TODOIST_ITEMS_PER_COMMENT]
+        text = "\n".join([f"[radar {run_date}] {len(rs)} strong feed item(s) for this epic:",
+                          *(f"- {_md_link(r)} (p={r['p'][iid]:.2f})" for r in top)])
+        try:
+            _td_comment(task, text)
+        except FileNotFoundError:
+            return {}
+        except (subprocess.SubprocessError, OSError) as e:
+            return {"todoist_comments": posted, "todoist_error": str(e)[:200]}
+        append_jsonl(ledger, [{"task": task, "date": run_date, "interest": iid, "items": len(rs)}])
+        posted += 1
+    return {"todoist_comments": posted}
+
+
 def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | None = None,
-         max_requests: int = policy.MAX_REQUESTS_PER_RUN, archive: bool = True, promote: bool = False) -> dict[str, Any]:
+         max_requests: int = policy.MAX_REQUESTS_PER_RUN, archive: bool = True, promote: bool = False,
+         todoist: bool = False) -> dict[str, Any]:
     run_date = now.date().isoformat()
     interests = interests_mod.load(vault)
     if not interests:
@@ -411,7 +461,8 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
     note = out / f"{run_date}.md"
     atomic_write(note, render_daily(run_date, day_rows, interests, run.as_dict()))
     recorded |= {k for i in judged for k in keys_of(items[i])}
-    return {**result, **archived(), "status": "ok", "judged": len(rows), "unjudged": len(items) - len(rows),
+    commented = comment_epics(out, rows, interests, run_date) if todoist else {}
+    return {**result, **archived(), **commented, "status": "ok", "judged": len(rows), "unjudged": len(items) - len(rows),
             "strong": sum(1 for r in rows if r["strong"]), "worth": sum(1 for r in rows if r["worth"]),
             "note": str(note)}
 
@@ -426,12 +477,30 @@ def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, fo
         wk = week or reports.week_of(now.date().isoformat())
         return {"status": "ok", "week": wk, "interests": reports.trend(rows, wk), "terms": reports.emerging_terms(rows, wk)}
     wk = week or reports.last_complete_week(now.date())
-    text = reports.render_weekly(wk, rows, interests_mod.load(vault), now)
+    text = reports.render_weekly(wk, rows, interests_mod.load(vault), now, gaps=gaps_mod.load_week(out, wk))
     try:
-        path = reports.write_weekly(vault, wk, text, force)
+        path = reports.write_weekly(vault, wk, text, force, out / "weekly.jsonl")
     except FileExistsError as e:
         return {"status": "exists", "detail": str(e)}
     return {"status": "ok", "week": wk, "capture": path.relative_to(vault).as_posix()}
+
+
+def kagi_cmd(vault: Path, out: Path, mode: str, text: str) -> dict[str, Any]:
+    """The kagi skill's entry point: one call, under the same ledger and weekly budget as discovery."""
+    ledger = kagi.Ledger(out / "kagi-ledger.jsonl",
+                         float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
+    call = {"search": kagi.search, "news": kagi.news, "answer": kagi.fastgpt, "summarize": kagi.summarize}[mode]
+    try:
+        answer = call(text, ledger)
+    except kagi.NoKey:
+        return {"status": "SKIPPED", "detail": "KAGI_API_KEY is not set; nothing sent"}
+    except kagi.OverBudget as e:
+        return {"status": "over-budget", "detail": str(e)}
+    except kagi.KagiError as e:
+        return {"status": "failed", "detail": str(e)}
+    last = ledger.rows()[-1]
+    return {"status": "ok", "mode": mode, "result": answer, "usd": last["usd"],
+            "spent_this_week": round(ledger.spent_this_week(datetime.now(UTC)), 4)}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -444,6 +513,7 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--out", type=Path, default=None, help="radar state dir (default: $VAULT/00_Memory/radar)")
     sp.add_argument("--keep-in-feed", action="store_true", help="do not archive recorded items in Reader")
     sp.add_argument("--promote", action="store_true", help="move strong items to Later, tagged radar/<interest>")
+    sp.add_argument("--todoist", action="store_true", help="comment strong items on the Portfolio epic they serve")
     sp.add_argument("--json", action="store_true")
     rp = sub.add_parser("replay", help="acceptance: own clips vs. feed items, judgment vs. BM25 vs. recency")
     rp.add_argument("--since", default="30d")
@@ -468,11 +538,24 @@ def main(argv: list[str] | None = None) -> int:
     wp.add_argument("--force", action="store_true", help="rewrite an existing weekly capture")
     wp.add_argument("--out", type=Path, default=None)
     wp.add_argument("--json", action="store_true")
+    gp = sub.add_parser("gaps", help="once a week: recent posts per interest the feeds missed (Kagi news), judged")
+    gp.add_argument("--promote", action="store_true", help="save the strongest to Reader Later, within the daily budget")
+    gp.add_argument("--out", type=Path, default=None)
+    gp.add_argument("--json", action="store_true")
+    kp = sub.add_parser("kagi", help="Kagi on demand: search, news, answer (FastGPT), summarize (a URL)")
+    kp.add_argument("mode", choices=("search", "news", "answer", "summarize"))
+    kp.add_argument("text", help="the query, or for summarize the URL")
+    kp.add_argument("--out", type=Path, default=None)
+    kp.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     vault = require_vault()
     now = datetime.now(UTC)
-    if args.cmd in ("feeds", "trend", "weekly"):
+    if args.cmd == "kagi":
+        result = kagi_cmd(vault, args.out or vault / RADAR_DIR, args.mode, args.text)
+    elif args.cmd == "gaps":
+        result = gaps_mod.gaps(vault, args.out or vault / RADAR_DIR, now, args.promote)
+    elif args.cmd in ("feeds", "trend", "weekly"):
         result = report(vault, args.out or vault / RADAR_DIR, args.cmd, now, args.week, getattr(args, "force", False))
     elif args.cmd == "discover":
         result = discover_mod.discover(vault, args.out or vault / RADAR_DIR, now, args.interest, args.seed, args.queries)
@@ -481,7 +564,7 @@ def main(argv: list[str] | None = None) -> int:
                                now - timedelta(days=args.exclude_last_days), args.feed_sample, args.max_requests)
     else:
         result = scan(vault, args.out or vault / RADAR_DIR, parse_since(args.since, now), now, args.limit,
-                      args.max_requests, archive=not args.keep_in_feed, promote=args.promote)
+                      args.max_requests, archive=not args.keep_in_feed, promote=args.promote, todoist=args.todoist)
     if args.json:
         print(json.dumps(result, indent=2))
     else:

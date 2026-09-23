@@ -17,6 +17,9 @@
                  a failed promotion leaves the item in the feed (not archived) and the next scan
                  promotes it from state without a judgment request; at most PROMOTE_PER_DAY a
                  day, counted across scans
+9. todoist     — with --todoist and Portfolio epics as interests, one comment per epic with strong
+                 items, dated, with links and p; a second scan the same day adds none; without
+                 `td` nothing happens and nothing fails
 7. archive     — every recorded item (judged, repost, backlog) is archived in Reader in one
                  bulk_update and nothing else is: not with no key, not an item a failed or
                  --limit-ed run did not judge, not with --keep-in-feed; a Reader error while
@@ -109,7 +112,7 @@ def run(vault: Path) -> dict:
     reader_calls: list[str] = []
     archived: list[list[str]] = []
     promoted: list[dict] = []
-    mode = {"too_large_above": None, "fail": False, "archive_status": 200, "promote_status": 200}
+    mode = {"too_large_above": None, "fail": False, "archive_status": 200, "promote_status": 200, "strong_prefix": None}
     sandbox = None
 
     def reader_stub(method, url, data=None):
@@ -152,7 +155,9 @@ def run(vault: Path) -> dict:
             title = state["items"][key]["title"]
             iid = ids[int(n)]
             p = 0.1
-            if "strong:" in title and iid in title.split("strong:")[1].split("]")[0].split(","):
+            if mode["strong_prefix"] and iid.startswith(mode["strong_prefix"]):
+                p = 0.9
+            elif "strong:" in title and iid in title.split("strong:")[1].split("]")[0].split(","):
                 p = 0.9
             elif "worth:" in title and iid in title.split("worth:")[1].split("]")[0].split(","):
                 p = 0.75
@@ -299,6 +304,32 @@ def run(vault: Path) -> dict:
         epics = [i for i in interests_mod.load(sandbox) if i.todoist_task_id]
         if [(e.todoist_task_id, e.gloss) for e in epics] != [("t1", "A plugin that judges feed items.")]:
             problems.append(f"phase 6: expected only epic t1 with its What: sentence, got {[(e.todoist_task_id, e.gloss) for e in epics]}")
+
+        # 9. todoist (epics are interests since phase 6)
+        comments: list[tuple[str, str]] = []
+        real_td = radar._td_comment
+        radar._td_comment = lambda task, text: comments.append((task, text))
+        mode["strong_prefix"] = "epic-"
+        try:
+            out9 = sandbox.parent / "todoist"
+            radar.scan(sandbox, out9, since, NOW, todoist=True)
+            first = list(comments)
+            radar.scan(sandbox, out9, since, NOW, todoist=True)
+            if len(first) != 1 or first[0][0] != "t1" or not first[0][1].startswith(f"[radar {NOW.date().isoformat()}]") \
+                    or "(p=0.90)" not in first[0][1]:
+                problems.append(f"phase 9: expected one dated comment with p on epic t1, got {first}")
+            if len(comments) != 1:
+                problems.append(f"phase 9: a second scan the same day must not comment again, got {len(comments)}")
+
+            def no_td(task, text):
+                raise FileNotFoundError("td")
+            radar._td_comment = no_td
+            r = radar.scan(sandbox, sandbox.parent / "todoist-no-td", since, NOW, todoist=True)
+            if r.get("status") != "ok" or "todoist_comments" in r or "todoist_error" in r:
+                problems.append(f"phase 9: without td the scan must stay ok and silent, got {r}")
+        finally:
+            radar._td_comment = real_td
+            mode["strong_prefix"] = None
     finally:
         judge._post, reader._request, reader.PAGE_DELAY_S, interests_mod._run_td, policy.ITEMS_PER_REQUEST = real
         for k, v in saved_env.items():
@@ -309,4 +340,4 @@ def run(vault: Path) -> dict:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else f"8 offline phases ok ({len(calls)} stubbed judgment requests)"}
+            "detail": "; ".join(problems) if problems else f"9 offline phases ok ({len(calls)} stubbed judgment requests)"}

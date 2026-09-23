@@ -15,6 +15,7 @@ items, seen at least 3 times from at least 2 feeds, ranked by smoothed log-ratio
 """
 from __future__ import annotations
 
+import json
 import math
 import re
 import statistics
@@ -169,7 +170,8 @@ def _vault_ref(path: str | None) -> str:
     return f" · already in vault: [[{path.removesuffix('.md')}]]"
 
 
-def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: datetime, per_interest: int = 3) -> str:
+def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: datetime, per_interest: int = 3,
+                  gaps: dict | None = None) -> str:
     names = {i.id: i.name for i in interests}
     wk_rows = [r for r in rows if week_of(r["run"]) == week]
     strong_rows = {iid: [] for iid in names}
@@ -190,6 +192,7 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
         f"source: Reader feed items judged by the radar, ISO week {week}",
         f"created: {now.date().isoformat()}",
         "kind: radar-digest",
+        "via: radar",
         "status: draft",
         "tags:",
         "  - radar",
@@ -235,6 +238,14 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
             w = sum(1 for r in wk if bands(r)[0])
             s = sum(1 for r in wk if bands(r)[1])
             lines.append(f"| {f['feed']} | {len(wk)} | {w} | {s} | {', '.join(f['advice'])} |")
+    if gaps:
+        strong_gaps = [g for g in gaps.get("rows", []) if g.get("strong")]
+        lines += ["", "## Found outside your feeds", ""]
+        lines += [f"- {_link(g)} — {g.get('site') or '?'} · p={max(g['p'].values()):.2f} · "
+                  f"{', '.join(names.get(i, i) for i in g['strong'])}" for g in strong_gaps[:10]] or ["Nothing strong this week."]
+        if gaps.get("sites"):
+            lines += ["", "Sites that carried them, candidates for `radar.py discover --seed`: "
+                      + ", ".join(f"{s} ({n})" for s, n in gaps["sites"][:8])]
     terms = emerging_terms(rows, week)
     lines += ["", "## Emerging terms (experimental)", ""]
     lines.append(" · ".join(f"{t['term']} ({t['count']})" for t in terms) if terms else "None yet.")
@@ -243,10 +254,17 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
     return "\n".join(lines)
 
 
-def write_weekly(vault: Path, week: str, text: str, force: bool = False) -> Path:
+def write_weekly(vault: Path, week: str, text: str, force: bool = False, written: Path | None = None) -> Path:
+    """Write the week's capture once. `written` (00_Memory/radar/weekly.jsonl) remembers the weeks
+    already written, so a digest distill has retired is not written again by the next run."""
     path = vault / "01_Capture" / f"Radar-Week-{week}.md"
-    if path.exists() and not force:
-        raise FileExistsError(f"{path.relative_to(vault)} exists (it may be half distilled); --force rewrites it")
+    done = written.is_file() and any(json.loads(ln).get("week") == week for ln in written.read_text(encoding="utf-8").splitlines() if ln.strip()) if written else False
+    if (path.exists() or done) and not force:
+        raise FileExistsError(f"the capture for {week} was already written (it may be distilled or half distilled); --force rewrites it")
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(path, text)
+    if written is not None:
+        written.parent.mkdir(parents=True, exist_ok=True)
+        with written.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"week": week, "capture": path.relative_to(vault).as_posix()}) + "\n")
     return path

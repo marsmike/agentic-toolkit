@@ -1,11 +1,15 @@
-"""Kagi Search API client for the radar: discovery only, never the daily scan.
+"""Kagi API client for the radar: feed discovery, the weekly gap search and the kagi skill; never
+the daily scan.
 
-Uses the v0 search endpoint (`Authorization: Bot`), which reports the account balance with every
-answer; the ledger records the balance delta as the call's cost, so spend is measured, not
-estimated. A weekly budget (`kagi_weekly_budget_usd`, default 1.00) is enforced from the ledger
-before every call. [v1 answered non-JSON on 2026-09-23; v0 is the documented stable shape]
+Uses the v0 endpoints (`Authorization: Bot`): search, enrich/news (recent small-web and news
+posts), fastgpt (an answer with references) and summarize (the Universal Summarizer). Every answer
+reports the account balance; the ledger records the balance delta as the call's cost, so spend is
+measured, not estimated. A weekly budget (`kagi_weekly_budget_usd`, default 1.00) is checked
+against the list price before every call. [v1 answered non-JSON on 2026-09-23; v0 is the
+documented stable shape]
 
-What leaves the machine: the search queries from the interests note.
+What leaves the machine: search queries (the interests' queries, or what the skill is asked),
+and for summarize the address of the page to summarise.
 """
 from __future__ import annotations
 
@@ -17,10 +21,14 @@ import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-SEARCH_URL = "https://kagi.com/api/v0/search"
+BASE = "https://kagi.com/api/v0"
 DEFAULT_WEEKLY_BUDGET_USD = 1.00
-USD_PER_SEARCH = 0.025  # list price; used only when the answer carries no balance
-HTTP_TIMEOUT = 30
+# List prices: the budget check before a call, and the cost when an answer carries no balance or
+# the balance has not moved yet. The summarizer bills per 1k tokens; a long page cost $0.315
+# [earned: 2026-09-23 probe], so it is budgeted at a long page's price.
+PRICES = {"search": 0.025, "news": 0.002, "fastgpt": 0.015, "summarize": 0.30}
+USD_PER_SEARCH = PRICES["search"]
+HTTP_TIMEOUT = 60
 
 
 class NoKey(RuntimeError):
@@ -35,12 +43,14 @@ class OverBudget(KagiError):
     pass
 
 
-def _request(url: str) -> dict:
-    """The one network call in this module. Evals replace it with a stub."""
+def _request(url: str, body: dict | None = None) -> dict:
+    """The one network call in this module (POST when `body` is given). Evals replace it with a stub."""
     key = os.environ.get("KAGI_API_KEY")
     if not key:
         raise NoKey("KAGI_API_KEY is not set")
-    req = urllib.request.Request(url, headers={"Authorization": f"Bot {key}"})
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    headers = {"Authorization": f"Bot {key}", **({"Content-Type": "application/json"} if data else {})}
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST" if data else "GET")
     try:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
             return json.loads(resp.read().decode("utf-8", errors="replace"))
@@ -51,7 +61,7 @@ def _request(url: str) -> dict:
 
 
 class Ledger:
-    """`kagi-ledger.jsonl` in the radar dir: one row per call, {at, query, usd, balance}."""
+    """`kagi-ledger.jsonl` in the radar dir: one row per call, {at, kind, query, usd, balance}."""
 
     def __init__(self, path: Path, weekly_budget: float):
         self.path, self.weekly_budget = path, weekly_budget
@@ -75,20 +85,54 @@ class Ledger:
             f.write(json.dumps(row) + "\n")
 
 
-def search(query: str, ledger: Ledger, limit: int = 10, now: datetime | None = None) -> list[dict[str, str]]:
-    """[{url, title, snippet}] for one query; raises OverBudget before the call if the week's
-    spend plus one search would pass the budget."""
+def _paid(kind: str, url: str, ledger: Ledger, label: str, now: datetime | None = None, body: dict | None = None) -> dict:
+    """One billed call: refused before it when the week's spend plus its list price would pass the
+    budget; recorded afterwards with what it actually cost."""
     now = now or datetime.now(UTC)
-    if ledger.spent_this_week(now) + USD_PER_SEARCH > ledger.weekly_budget:
+    price = PRICES[kind]
+    if ledger.spent_this_week(now) + price > ledger.weekly_budget:
         raise OverBudget(f"Kagi weekly budget ${ledger.weekly_budget:.2f} reached")
     before = ledger.last_balance()
-    data = _request(f"{SEARCH_URL}?{urllib.parse.urlencode({'q': query, 'limit': limit})}")
+    data = _request(url) if body is None else _request(url, body)
     if data.get("error"):
         raise KagiError(str(data["error"])[:200])
     balance = (data.get("meta") or {}).get("api_balance")
-    usd = USD_PER_SEARCH
-    if isinstance(balance, (int, float)) and before is not None and 0 <= before - balance < 1:
+    usd = price
+    if isinstance(balance, (int, float)) and before is not None and 0 < before - balance < 1:
         usd = round(before - balance, 6)
-    ledger.record({"at": now.isoformat(), "query": query, "usd": usd, "balance": balance})
-    return [{"url": str(r.get("url") or ""), "title": str(r.get("title") or ""), "snippet": str(r.get("snippet") or "")}
-            for r in data.get("data") or [] if r.get("t") == 0 and r.get("url")]
+    ledger.record({"at": now.isoformat(), "kind": kind, "query": label, "usd": usd, "balance": balance})
+    return data
+
+
+def _results(data: dict) -> list[dict]:
+    return [r for r in data.get("data") or [] if r.get("t") == 0 and r.get("url")]
+
+
+def search(query: str, ledger: Ledger, limit: int = 10, now: datetime | None = None) -> list[dict[str, str]]:
+    """Web search: [{url, title, snippet}]."""
+    data = _paid("search", f"{BASE}/search?{urllib.parse.urlencode({'q': query, 'limit': limit})}", ledger, query, now)
+    return [{"url": str(r["url"]), "title": str(r.get("title") or ""), "snippet": str(r.get("snippet") or "")}
+            for r in _results(data)]
+
+
+def news(query: str, ledger: Ledger, now: datetime | None = None) -> list[dict[str, str]]:
+    """Recent small-web and news posts (Kagi's enrichment index): [{url, title, snippet, published}]."""
+    data = _paid("news", f"{BASE}/enrich/news?{urllib.parse.urlencode({'q': query})}", ledger, query, now)
+    return [{"url": str(r["url"]), "title": str(r.get("title") or ""), "snippet": str(r.get("snippet") or ""),
+             "published": str(r.get("published") or "")} for r in _results(data)]
+
+
+def fastgpt(query: str, ledger: Ledger, now: datetime | None = None) -> dict:
+    """Kagi's answer engine: {output, references: [{title, url}]}."""
+    data = _paid("fastgpt", f"{BASE}/fastgpt", ledger, query, now, body={"query": query})
+    d = data.get("data") or {}
+    return {"output": str(d.get("output") or ""),
+            "references": [{"title": str(r.get("title") or ""), "url": str(r.get("url") or "")}
+                           for r in d.get("references") or []]}
+
+
+def summarize(url: str, ledger: Ledger, now: datetime | None = None) -> str:
+    """The Universal Summarizer on one page, video or document."""
+    q = urllib.parse.urlencode({"url": url, "summary_type": "summary"})
+    data = _paid("summarize", f"{BASE}/summarize?{q}", ledger, url, now)
+    return str((data.get("data") or {}).get("output") or "")

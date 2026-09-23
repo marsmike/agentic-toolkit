@@ -20,6 +20,7 @@ R weekly                              # Saturday: 01_Capture/Radar-Week-YYYY-Www
 R feeds --json                        # which feeds earn their place
 R trend --json                        # which interests are rising this week
 R discover [--interest ID] [--seed URL]   # new feeds via Kagi, as an OPML to import in Reader
+R gaps [--promote] --json              # weekly: what the feeds missed (Kagi news), judged
 ```
 
 **Daily.** Run `scan`, read `00_Memory/radar/<today>.md`, and reply with a five-line briefing:

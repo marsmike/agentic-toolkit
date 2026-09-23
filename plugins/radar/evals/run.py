@@ -17,6 +17,7 @@ EVAL_MODULES = (
     "eval_replay",
     "eval_discover",
     "eval_reports",
+    "eval_gaps",
 )
 
 
