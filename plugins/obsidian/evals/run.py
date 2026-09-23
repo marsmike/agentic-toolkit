@@ -37,6 +37,8 @@ EVAL_MODULES = (
     "eval_provenance",
     "eval_pipeline_run",
     "eval_distill_check_negative",
+    "eval_map_build",
+    "eval_now_build",
 )
 
 

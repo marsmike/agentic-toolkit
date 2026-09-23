@@ -29,6 +29,24 @@ conflict — the bridge persona note was unreachable under a literal reading, 20
 **Removal condition:** fold into the folder table above if root-level notes are ever migrated
 into a PARA folder.
 
+## Generated navigation
+
+Rebuilt by the pipeline's `end` step from the notes themselves, never edited by hand, and not
+active content: no search, enrichment or lint counts them, and a link from them is navigation,
+not a note's inbound link.
+
+| Path | Built by | What it is |
+|---|---|---|
+| `Index.md` | `index_build.py` | One line per active note, from its `description` |
+| `Now.md` | `now_build.py` | The homepage: this week's new and enriched notes, radar, stuck work, inbox |
+| `Maps/<domain>.md`, `.canvas` | `map_build.py` | One map per `domain/*` tag; `Maps/Overview` lists them |
+| `Boards/Pipeline.md` | `now_build.py` | The same state as Now.md as a Kanban board; drags are overwritten |
+| `Log.md` | `log_vault.py` | One line per run |
+
+A map's title, intro and sections come from `Config/toolkit/maps.md`; everything else comes from
+the notes' tags, `kind`, `description` and links. [earned: 2026-09-23, about 80 hand-made MOCs
+had gone stale] **Removal condition:** none while the vault forbids hand-maintained MOCs.
+
 ## Frontmatter field table
 
 Field names and meanings are stable — generated views, lint tooling, and plugin logic depend on

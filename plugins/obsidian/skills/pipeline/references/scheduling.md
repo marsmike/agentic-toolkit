@@ -33,8 +33,17 @@ launchctl start io.agentic-toolkit.pipeline                                  # o
 launchctl unload ~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist   # stop
 ```
 
+## Git is the sync channel
+
+When the vault's branch has an upstream, `begin` commits hand edits and pulls (`--rebase`), and
+`end` commits, pulls again and pushes. Cloud sessions write to the vault through the same remote,
+so their commits arrive with the next run. The pipeline is the only committer on the Mac: in
+Obsidian Git, turn auto-commit **off**, pull on startup **on**, push manual. A conflict aborts the
+rebase and skips the run with a DLQ note; nothing is resolved by guessing.
+
 ## Reading a run
 
+- `Now.md`: this week's new and enriched notes, radar, stuck work and inbox (rebuilt every run).
 - `Log.md`: one `pipeline |` line per run with distilled / retired / failed.
 - The vault's git log: one `pipeline YYYY-MM-DD HH:MM: …` commit per run; `git revert` undoes a run.
 - `00_Memory/dlq/`: parked captures (failed twice) and ingest gaps, each with what to do.

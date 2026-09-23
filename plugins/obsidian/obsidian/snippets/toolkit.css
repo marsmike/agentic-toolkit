@@ -1,0 +1,64 @@
+/* agentic-toolkit: the generated Now.md (cssclasses: dashboard) and Maps/ (cssclasses: map).
+   Installed by plugins/obsidian/scripts/vault_setup.py; enable it under Appearance → CSS snippets.
+   Uses theme variables only, so it follows AnuPpuccin's flavour and light/dark mode. */
+
+/* Now.md: callouts become a card grid, two columns on a wide pane, one on a narrow one. */
+.dashboard .markdown-preview-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(26rem, 1fr));
+  column-gap: var(--size-4-4);
+  align-items: start;
+}
+.dashboard .markdown-preview-section > div {
+  grid-column: 1 / -1;
+}
+.dashboard .markdown-preview-section > div:has(> .callout) {
+  grid-column: auto;
+}
+.dashboard .callout {
+  margin-block: var(--size-4-2);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-s);
+  max-height: 28rem;
+  overflow-y: auto;
+}
+.dashboard .callout-content ul {
+  padding-inline-start: var(--size-4-4);
+}
+.dashboard .callout-content li {
+  margin-block: 0.1em;
+  font-size: var(--font-ui-small);
+}
+.dashboard .callout-content pre {
+  font-size: var(--font-ui-smaller);
+  line-height: 1.25;
+}
+.dashboard h1 {
+  margin-block-end: 0;
+}
+
+/* Maps/: long lists stay compact; the domain title carries the accent. */
+.map h1 {
+  border-bottom: 2px solid var(--color-accent);
+  padding-block-end: var(--size-4-1);
+}
+.map h2 {
+  color: var(--color-accent);
+  margin-block-start: var(--size-4-6);
+}
+.map h3 {
+  font-size: var(--h5-size);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.map li {
+  margin-block: 0;
+  line-height: 1.45;
+}
+.map li > .internal-link {
+  font-weight: var(--font-semibold);
+}
+.map table {
+  font-size: var(--font-ui-small);
+}

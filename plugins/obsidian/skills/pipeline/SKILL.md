@@ -18,7 +18,8 @@ hours; a run that finds nothing is short and says so.
 
 ```bash
 P() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/$1" "${@:2}"; }
-P pipeline_run.py begin          # "busy": another run holds the lock; stop, say so
+P pipeline_run.py begin          # pulls the vault's upstream first; "busy" (another run holds the lock)
+                                 # or "skipped" (pull conflict, key in hand edits; DLQ note): stop, say so
 # sources, each optional; SKIPPED (no key, plugin absent) is fine, go on:
 #   radar skill:     radar.py scan --since 1d --promote --todoist --json
 #                    radar.py gaps --promote   (once a week: what the feeds missed; "exists" is normal)
@@ -44,12 +45,15 @@ not pass stays in `01_Capture/` and goes into `--failed`; after two failed runs 
 with a DLQ note for a human.
 
 **End, always.** Call `end` even when a step failed, with what did happen: it rebuilds the
-index, logs the run and commits the vault, which is the undo for everything the run wrote. The
+index, the maps (`Maps/`) and `Now.md` with its board, logs the run, commits the vault (the undo
+for everything the run wrote) and pushes it when the vault has an upstream. A staged key-shaped
+string makes `end` return `refused`: nothing is committed, a DLQ note names the file. The
 counts are disjoint: `--distilled` = captures that became a note or an enrichment (every one of
 them is also archived; that is not a drop), `--dropped` = captures that left *without* a note (a
 radar or newsletter discard; never a clip), `--failed` = captures still in `01_Capture/`.
 [earned: 2026-09-23, a run logged "10 distilled, 10 retired" for ten captures]
-Reply with one line: what came in, what was distilled or dropped, what failed, the commit.
+Reply with one line: what came in, what was distilled or dropped, what failed, the commit, and
+whether it was pushed.
 
 ## Hard requirements
 
@@ -57,7 +61,10 @@ Reply with one line: what came in, what was distilled or dropped, what failed, t
   commit to undo and holds the lock for hours.
 - **Never delete a clip, never discard one.** Only `radar` and `newsletter` captures may leave
   without a note, and only through distill's retirement.
-- **Nothing outside the vault changes** except Reader locations the radar sets (archive, Later).
-  Never delete in Reader, never push the vault's git remote from here.
+- **Nothing outside the vault changes** except Reader locations the radar sets (archive, Later)
+  and the vault's own git upstream, which `begin` pulls and `end` pushes. Never delete in Reader,
+  never run git in the vault yourself: `begin`/`end` are its one committer.
+- **Never edit the generated files** (`Index.md`, `Now.md`, `Maps/`, `Boards/`, `Log.md`); fix
+  the note or `Config/toolkit/maps.md` and let `end` rebuild them.
 - **Stay within the batch.** The backlog drains over several runs; a run that tries to do
   everything at once is the one that times out mid-write.

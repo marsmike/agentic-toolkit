@@ -2,6 +2,27 @@
 
 Every release entry links the change to the research or the dated failure that motivated it — this file is the public ratchet.
 
+## [Unreleased] — R12, generated navigation and git sync (plugins/obsidian)
+
+The vault had a flat 1,386-line Index.md and about 80 hand-made MOCs that its own rules forbid
+("no hand-maintained MOCs"); they had gone stale. Everything a person or an agent uses to find
+their way is now rebuilt by the pipeline's `end` step, with no model call.
+
+- **`map_build.py`** — one `Maps/<domain>.md` and `.canvas` per `domain/*` tag (Start here = the
+  most-linked notes, New = last 30 days, every note by `kind`, neighbouring domains by co-tags),
+  plus `Maps/Overview`. Titles, intros and sections come from `Config/toolkit/maps.md`.
+- **`now_build.py`** — `Now.md`, the homepage: this week's new and enriched notes from the
+  pipeline's own commits, the radar's strong items, parked captures and open DLQ notes, the inbox,
+  notes distilled per day, and live `Vault.base` views below. `Boards/Pipeline.md` is the same
+  state as a Kanban board.
+- **`vault_setup.py`** — installs `Vault.base`, the `toolkit.css` snippet and two Templater
+  capture templates; prints the settings only the owner can click.
+- **Git is the sync channel** — with an upstream, `begin` commits hand edits and pulls
+  (`--rebase`), `end` commits, pulls and pushes; a conflict aborts, writes a DLQ note and skips the
+  run. Cloud sessions write to the vault through the same remote.
+- **Secret scan before every commit** — a key-shaped string on the staged diff refuses the commit;
+  the DLQ note names the file and the kind of key, never the value.
+
 ## [Unreleased] — R10, the radar (plugins/radar 2.10.0)
 
 Everything before R10 ran *after* a clip. Measured on a real Reader account: 1,716 feed items in

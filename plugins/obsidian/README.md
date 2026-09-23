@@ -90,6 +90,21 @@ No vendored virtualenv, no Obsidian app requirement, no pre-existing embeddings 
 Run any script via `uv run --project scripts python3 scripts/<name>.py ...` from the
 plugin root.
 
+## Generated navigation: maps, Now, board
+
+The pipeline's `end` step rebuilds everything a person or an agent uses to find their way, from
+the notes alone and with no model call (`contract/VAULT_SCHEMA.md` → Generated navigation):
+
+| Script | Writes |
+|---|---|
+| `index_build.py` | `Index.md`, one line per active note |
+| `map_build.py` | `Maps/<domain>.md` and `.canvas` per `domain/*` tag, `Maps/Overview.md`/`.canvas`; titles, intros and sections from `Config/toolkit/maps.md` |
+| `now_build.py` | `Now.md` (the homepage: new and enriched this week, radar, stuck, inbox, distilled per day, embedded `Vault.base` views) and `Boards/Pipeline.md` (Kanban) |
+| `vault_setup.py` | once, by hand: copies `obsidian/` (`Vault.base`, the `toolkit.css` snippet, Templater capture templates) into the vault and prints the settings to click |
+
+Each Obsidian view has a Markdown equivalent in the same file, so an agent reading a clone of the
+vault sees what the owner sees.
+
 ## Dead-letter queue
 
 Every script that can fail ambiguously — rather than proceeding on a guess — writes a
@@ -285,6 +300,9 @@ hand; see its README.
 | `search_parity` | When a farsight binary is present, its top-3 results overlap `search.py`'s Python BM25 top-3 for fixed cross-cluster queries; passes with "farsight not present" otherwise |
 | `graph_context` (R3) | A stub binary that exits 1 makes `graph.ensure_index()` degrade to `GraphUnavailable("call-failed")` and write a DLQ note under `00_Memory/dlq/` (runs always); then, when a real gaiafield binary is present, `graph.graph_context()` proposes a correct backlink candidate and a non-empty bridge-opportunity list for a capture planted in the birding cluster — passes with "gaiafield not present" for that second phase otherwise |
 | `inferred_candidates` (v2) | Stub-binary-driven for its first three phases (crates/gaiafield v2 has no release binary as of R3/R4): a v2-shaped stub's inferred candidates come back labeled+separated from deterministic edges, an AMBIGUOUS row is excluded unless explicitly requested (for both `candidates` and pair-shaped `surprise` rows), and neither `ensure_inferred()` nor `inferred_candidates()`/`surprise_candidates()` writes any vault content; a v1-shaped stub (no `infer` subcommand) makes both degrade to `GraphUnavailable("no-inference")` silently, with no DLQ note. A fourth phase runs against a **real** gaiafield binary when `TOOLKIT_GAIAFIELD_BIN` points at a v2-capable one (skips with detail otherwise): asserts `surprise_candidates()` rows are actually pair-shaped and labeled against the real engine, not just the hand-written stub — closing the gap where a stub could silently drift from the real CLI's shape and every stub-driven assertion would still pass |
+| `map_build` (R12) | Hubs by in-degree lead Start here, New holds only the last 30 days, the config's title, intro and sections apply, every canvas is valid JSON Canvas on existing files, no map links into `00_Memory`/`01_Capture`, a stale generated map is removed, a second build changes nothing |
+| `now_build` (R12) | In a git sandbox: New/Enriched come from `pipeline …` commits only, the radar shows this week's strong items, Stuck holds parked captures and open DLQ notes, the board parses as Kanban, every embedded view exists in `Vault.base` |
+| `pipeline_run` (R11, R12) | Clips first, the lock, one commit per run, parking after two failures; a staged key-shaped string refuses the commit with one DLQ note that never holds the key; with a bare upstream a second clone's commit arrives at `begin`, `end` pushes, and a conflict skips the run and keeps the local edit |
 
 Read-only evals run directly against the resolved vault; anything that writes runs
 against a throwaway copy (`evals/_sandbox.py`) so the real `./vault` is never touched.

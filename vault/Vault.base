@@ -1,0 +1,111 @@
+formulas:
+  domain: 'tags.filter(value.startsWith("domain/")).map(value.replace("domain/", "")).join(", ")'
+properties:
+  file.name:
+    displayName: Title
+  note.description:
+    displayName: Description
+  note.processed_date:
+    displayName: Distilled
+  note.kind:
+    displayName: Kind
+  note.via:
+    displayName: Via
+  note.saved_at:
+    displayName: Saved
+  note.source:
+    displayName: Source
+  formula.domain:
+    displayName: Domain
+views:
+  - type: table
+    name: Recently distilled
+    filters:
+      and:
+        - note.processed_date != null
+        - or:
+            - file.inFolder("02_Projects")
+            - file.inFolder("03_Areas")
+            - file.inFolder("04_Resources")
+    order:
+      - processed_date
+      - file.name
+      - formula.domain
+      - kind
+      - description
+    sort:
+      - property: processed_date
+        direction: DESC
+    limit: 40
+  - type: table
+    name: Inbox
+    filters:
+      and:
+        - file.inFolder("01_Capture")
+        - file.ext == "md"
+    order:
+      - file.name
+      - via
+      - saved_at
+      - source
+    sort:
+      - property: saved_at
+        direction: ASC
+  - type: table
+    name: Stuck
+    filters:
+      and:
+        - file.inFolder("00_Memory/dlq")
+        - note.status == "active"
+    order:
+      - file.name
+      - description
+      - created
+    sort:
+      - property: created
+        direction: DESC
+  - type: table
+    name: Sourceless
+    filters:
+      and:
+        - note.source == null
+        - or:
+            - file.inFolder("03_Areas")
+            - file.inFolder("04_Resources")
+    order:
+      - file.name
+      - file.folder
+      - kind
+      - description
+    sort:
+      - property: file.mtime
+        direction: DESC
+  - type: cards
+    name: By domain
+    filters:
+      and:
+        - formula.domain != ""
+        - or:
+            - file.inFolder("02_Projects")
+            - file.inFolder("03_Areas")
+            - file.inFolder("04_Resources")
+    groupBy:
+      property: formula.domain
+      direction: ASC
+    order:
+      - file.name
+      - description
+      - kind
+  - type: cards
+    name: Captures by via
+    filters:
+      and:
+        - file.inFolder("01_Capture")
+        - file.ext == "md"
+    groupBy:
+      property: note.via
+      direction: ASC
+    order:
+      - file.name
+      - saved_at
+      - source

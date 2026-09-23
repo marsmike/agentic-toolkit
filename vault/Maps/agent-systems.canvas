@@ -1,0 +1,143 @@
+{
+	"nodes": [
+		{
+			"id": "e333dbe5abfe4bdc",
+			"type": "file",
+			"file": "Maps/agent-systems.md",
+			"x": -720,
+			"y": 0,
+			"width": 640,
+			"height": 900
+		},
+		{
+			"id": "9bd3e59eab78588b",
+			"type": "group",
+			"label": "Concept",
+			"x": 0,
+			"y": 0,
+			"width": 1120,
+			"height": 620
+		},
+		{
+			"id": "98e456141ed84ee9",
+			"type": "file",
+			"file": "04_Resources/Concepts/Vault-First-Architecture.md",
+			"x": 40,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "6c188879027bddf7",
+			"type": "file",
+			"file": "04_Resources/Concepts/Hybrid-Retrieval.md",
+			"x": 400,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "33d92a5ae6eccab9",
+			"type": "file",
+			"file": "04_Resources/Concepts/Typed-Judgments.md",
+			"x": 760,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "274ce7e9bcd2bb5c",
+			"type": "file",
+			"file": "04_Resources/Concepts/Filesystem-vs-MCP-for-Agent-Tool-Access.md",
+			"x": 40,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "2c53174ae580ecd2",
+			"type": "file",
+			"file": "04_Resources/Concepts/Progressive-Disclosure.md",
+			"x": 400,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "e97584190031e31a",
+			"type": "file",
+			"file": "04_Resources/Concepts/Model-Tiering-for-Agent-Fleets.md",
+			"x": 760,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "27a1cdd2fff5b29e",
+			"type": "file",
+			"file": "04_Resources/Concepts/Active-Radar.md",
+			"x": 40,
+			"y": 440,
+			"width": 320,
+			"height": 140
+		}
+	],
+	"edges": [
+		{
+			"id": "f315503ed5b111b3",
+			"fromNode": "27a1cdd2fff5b29e",
+			"fromSide": "right",
+			"toNode": "33d92a5ae6eccab9",
+			"toSide": "left"
+		},
+		{
+			"id": "c59dcfbba54b2334",
+			"fromNode": "274ce7e9bcd2bb5c",
+			"fromSide": "right",
+			"toNode": "98e456141ed84ee9",
+			"toSide": "left"
+		},
+		{
+			"id": "f185aa5a392bf8ff",
+			"fromNode": "e97584190031e31a",
+			"fromSide": "right",
+			"toNode": "274ce7e9bcd2bb5c",
+			"toSide": "left"
+		},
+		{
+			"id": "4a107a0158ee6cc9",
+			"fromNode": "e97584190031e31a",
+			"fromSide": "right",
+			"toNode": "33d92a5ae6eccab9",
+			"toSide": "left"
+		},
+		{
+			"id": "ffc399cfca7d3910",
+			"fromNode": "2c53174ae580ecd2",
+			"fromSide": "right",
+			"toNode": "98e456141ed84ee9",
+			"toSide": "left"
+		},
+		{
+			"id": "e0bacc337a293f06",
+			"fromNode": "33d92a5ae6eccab9",
+			"fromSide": "right",
+			"toNode": "27a1cdd2fff5b29e",
+			"toSide": "left"
+		},
+		{
+			"id": "2cde18f06d5c98e2",
+			"fromNode": "33d92a5ae6eccab9",
+			"fromSide": "right",
+			"toNode": "e97584190031e31a",
+			"toSide": "left"
+		},
+		{
+			"id": "18ea443bd494ed34",
+			"fromNode": "98e456141ed84ee9",
+			"fromSide": "right",
+			"toNode": "274ce7e9bcd2bb5c",
+			"toSide": "left"
+		}
+	]
+}
