@@ -4,10 +4,13 @@
 2. ingest      — a clip, a newsletter and a radar-promoted feed item become captures with
                  `via: clip | newsletter | radar` (and `radar_interests`); a feed item, a feed item
                  the radar archived without promoting, and a highlight child are not ingested; a
-                 clip whose address a vault note already has is recorded, not captured; only
+                 clip whose address a vault note already has is recorded, not captured; one tweet
+                 saved twice (twitter.com and x.com?s=12) in the same run is one capture; only
                  01_Capture/ and 00_Memory/ change; nothing in Reader is written
 3. gap         — an item whose full text fails: status failed, one DLQ note, the watermark stays
 4. rerun       — the next run captures the missing item and nothing twice; the watermark moves
+5. copies      — when the first save of a page can never be fetched, its copy is captured instead
+                 and the unfetchable save is recorded as its duplicate
 """
 from __future__ import annotations
 
@@ -46,6 +49,8 @@ DOCS = [
     _doc("hl1", "a highlight", "new", category="highlight", parent_id="clip1"),
     _doc("known1", "Clipped again", "archive", url="https://example.org/known-post"),
     _doc("flaky1", "Full text fails once", "later"),
+    _doc("tw1", "A tweet", "new", category="tweet", url="https://twitter.com/someone/status/42"),
+    _doc("tw2", "The same tweet saved again", "new", category="tweet", url="https://x.com/someone/status/42?s=12"),
 ]
 
 
@@ -62,7 +67,7 @@ def run(vault: Path) -> dict:
     real = (rw._request, ingest.GET_DELAY_S)
     saved_tok = os.environ.pop("READWISE_TOKEN", None)
     calls: list[tuple[str, str]] = []
-    mode = {"flaky": True}
+    mode = {"flaky": True, "gone": set()}
     sandbox = None
 
     def stub(method, url, token, data=None, timeout=30):
@@ -71,7 +76,7 @@ def run(vault: Path) -> dict:
             problems.append(f"reader: ingest must not write to Reader, got {method} {url}")
         q = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(url).query))
         if "id" in q:
-            if q["id"] == "flaky1" and mode["flaky"]:
+            if (q["id"] == "flaky1" and mode["flaky"]) or q["id"] in mode["gone"]:
                 return 500, {"detail": "stub"}
             d = next(d for d in DOCS if d["id"] == q["id"])
             return 200, {"results": [{**d, "html_content": f"<p>full text of {d['id']}</p>"}]}
@@ -100,14 +105,17 @@ def run(vault: Path) -> dict:
             fm, _ = read_frontmatter(p)
             if fm.get("readwise_doc_id") in {d["id"] for d in DOCS}:
                 caps[str(fm["readwise_doc_id"])] = fm
-        if sorted(caps) != ["clip1", "news1", "radar1"]:
-            problems.append(f"phase 2: expected captures for clip1, news1, radar1, got {sorted(caps)}")
+        if sorted(caps) != ["clip1", "news1", "radar1", "tw1"]:
+            problems.append(f"phase 2: expected captures for clip1, news1, radar1, tw1 (tw2 is the same tweet), got {sorted(caps)}")
         if caps.get("clip1", {}).get("via") != "clip" or caps.get("news1", {}).get("via") != "newsletter":
             problems.append("phase 2: a clip and a newsletter must say so in `via`")
         if caps.get("radar1", {}).get("via") != "radar" or caps.get("radar1", {}).get("radar_interests") != ["claude-code", "dev-tooling"]:
             problems.append(f"phase 2: the radar item needs via: radar and its interests, got {caps.get('radar1')}")
-        if r.get("already_in_vault") != 1:
-            problems.append(f"phase 2: the clip whose address a note has should be recorded as known, got {r.get('already_in_vault')}")
+        if r.get("already_in_vault") != 1 or r.get("duplicates") != 1:
+            problems.append(f"phase 2: one clip a note already has, one same-run duplicate; got {r.get('already_in_vault')}, {r.get('duplicates')}")
+        ledger = {row["doc_id"]: row for row in ingest.read_ledger(sandbox).values()}
+        if ledger.get("tw2", {}).get("duplicate_of") != "tw1" or "tw1" not in ledger:
+            problems.append(f"phase 2: the ledger must record tw2 as duplicate_of tw1, got {ledger.get('tw2')}")
         changed = {p for p, m in snap(sandbox).items() if before.get(p) != m} - {"04_Resources/Known-Post.md"}
         if any(not (p.startswith("01_Capture/") or p.startswith("00_Memory/")) for p in changed):
             problems.append(f"phase 2: ingest wrote outside 01_Capture/ and 00_Memory/: {sorted(changed)}")
@@ -129,6 +137,17 @@ def run(vault: Path) -> dict:
         r = ingest.ingest(sandbox, NOW)
         if r.get("written") != 0 or r.get("new") != 0:
             problems.append(f"phase 4: a third run must find nothing new, got new={r.get('new')}")
+
+        # 5. the first save of a page can never be fetched: its copy carries the page
+        DOCS.extend([_doc("gone1", "A post saved twice", "new", url="https://example.org/twice"),
+                     _doc("copy1", "A post saved twice", "new", url="https://www.example.org/twice/?utm_source=x")])
+        mode["gone"].add("gone1")
+        r = ingest.ingest(sandbox, NOW)
+        ledger = ingest.read_ledger(sandbox)
+        if r.get("status") != "ok" or r.get("written") != 1 or ledger.get("gone1", {}).get("duplicate_of") != "copy1" \
+                or not ledger.get("copy1", {}).get("capture"):
+            problems.append(f"phase 5: the copy must be captured and the unfetchable save recorded as its duplicate, "
+                            f"got {r.get('status')}, written={r.get('written')}, {ledger.get('gone1')}")
     finally:
         rw._request, ingest.GET_DELAY_S = real
         os.environ.pop("READWISE_TOKEN", None)
@@ -138,4 +157,4 @@ def run(vault: Path) -> dict:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else f"4 offline phases ok ({len(calls)} stubbed Reader calls, all GET)"}
+            "detail": "; ".join(problems) if problems else f"5 offline phases ok ({len(calls)} stubbed Reader calls, all GET)"}

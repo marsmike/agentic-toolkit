@@ -175,17 +175,29 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
     ledger = read_ledger(vault)
     ids, sources = vault_index(vault)
     new_items, known_rows = [], []
+    # One page saved twice in Reader is one capture: the first save of an address is the item, the
+    # others are its copies, tried in turn if it cannot be fetched. [earned: 2026-09-23 — one tweet
+    # saved as twitter.com/… and x.com/…?s=12 became two captures]
+    batch: dict[str, str] = {}
+    copies: dict[str, list[dict]] = {}
     for doc_id, it in unique.items():
         if doc_id in ledger:
             continue
-        where = ids.get(doc_id) or sources.get(norm_url(str(it.get("source_url") or "")))
+        address = norm_url(str(it.get("source_url") or ""))
+        where = ids.get(doc_id) or sources.get(address)
         if where:
             known_rows.append({"doc_id": doc_id, "found": where, "date": now.date().isoformat()})
+        elif address and address in batch:
+            copies[batch[address]].append(it)
         else:
+            if address:
+                batch[address] = doc_id
+            copies[doc_id] = []
             new_items.append(it)
 
     result: dict[str, Any] = {"since": since, "fetched": len(items), "eligible": len(unique),
-                              "already_in_vault": len(known_rows), "new": len(new_items)}
+                              "already_in_vault": len(known_rows), "new": len(new_items),
+                              "duplicates": sum(len(c) for c in copies.values())}
     if dry_run:
         by_via: dict[str, int] = {}
         for it in new_items:
@@ -193,25 +205,33 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
             by_via[v] = by_via.get(v, 0) + 1
         return {**result, "status": "dry-run", "by_via": by_via}
 
-    written, rows, errors = [], [], []
+    written, rows, errors, missing = [], [], [], []
+    today = now.date().isoformat()
     for n, it in enumerate(new_items):
         if n:
             time.sleep(GET_DELAY_S)
-        prov = provenance(it)
-        try:
-            full = fetch_full(str(it["id"]))
-            item = {**it, **{k: v for k, v in full.items() if v not in (None, "")}}
-            path, status = bc.write_capture(vault, item, prov)
-        except rw.ReadwiseAPIError as e:
-            errors.append(f"{it['id']}: {e}"[:200])
+        saves = [it, *copies[str(it["id"])]]
+        for cand in saves:
+            prov = provenance(cand)
+            try:
+                full = fetch_full(str(cand["id"]))
+                item = {**cand, **{k: v for k, v in full.items() if v not in (None, "")}}
+                path, status = bc.write_capture(vault, item, prov)
+                break
+            except rw.ReadwiseAPIError as e:
+                errors.append(f"{cand['id']}: {e}"[:200])
+        else:
+            # No save of this page could be captured: nothing is settled, the next run tries again.
+            missing.append(str(it["id"]))
             continue
-        capture = path.relative_to(vault).as_posix() if path else ids.get(str(it["id"]), "")
-        rows.append({"doc_id": str(it["id"]), "capture": capture, "via": prov["via"], "date": now.date().isoformat()})
+        capture = path.relative_to(vault).as_posix() if path else ids.get(str(cand["id"]), "")
+        rows.append({"doc_id": str(cand["id"]), "capture": capture, "via": prov["via"], "date": today})
+        rows += [{"doc_id": str(o["id"]), "duplicate_of": str(cand["id"]), "date": today} for o in saves if o is not cand]
         if status == "written":
             written.append({"capture": capture, "via": prov["via"]})
 
     append_ledger(vault, known_rows + rows)
-    missing = sorted({str(it["id"]) for it in new_items} - {r["doc_id"] for r in rows})
+    missing.sort()
     result |= {"written": len(written), "by_via": {v: sum(1 for w in written if w["via"] == v) for v in ("clip", "newsletter", "radar")},
                "captures": [w["capture"] for w in written]}
     if missing:
