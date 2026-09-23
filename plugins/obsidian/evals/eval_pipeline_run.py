@@ -103,7 +103,7 @@ def run(vault: Path) -> dict:
         later = NOW + timedelta(hours=pr.LOCK_STALE_HOURS + 1)
         if pr._claim(sandbox / pr.LOCK, later) is not None or \
                 (sandbox / pr.LOCK).read_text(encoding="utf-8").strip() != later.isoformat() or \
-                list((sandbox / pr.LOCK).parent.glob("pipeline.lock.stale-*")):
+                list((sandbox / pr.LOCK).parent.glob("pipeline.lock.*-*")):
             problems.append("phase 1: a stale lock must be taken over atomically, leaving no moved-aside copy")
         if pr._claim(sandbox / pr.LOCK, later + timedelta(minutes=1)) != later:
             problems.append("phase 1: right after a takeover the lock is fresh again: busy")

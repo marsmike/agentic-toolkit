@@ -85,15 +85,29 @@ def _order(vault: Path, path: Path) -> tuple[int, str]:
 def _claim(lock: Path, now: datetime) -> datetime | None:
     """Take the lock atomically; return the holder's start time if another run has it.
 
-    Created with O_EXCL, so of two runs starting together exactly one gets past here, before the
-    slow commit-and-pull. A lock older than LOCK_STALE_HOURS is a crashed run and is taken over.
+    Linked into place atomically, so of two runs starting together exactly one gets past here,
+    before the slow commit-and-pull. A lock older than LOCK_STALE_HOURS is a crashed run and is
+    taken over.
     [earned: 2026-09-23, PR #20 review — check-then-write let two runs both sync and both run]
     """
     lock.parent.mkdir(parents=True, exist_ok=True)
+    # The lock appears already holding its timestamp: written to a private file first, then
+    # hard-linked into place, which is atomic and fails if the lock exists. An exclusive create
+    # followed by a write showed an empty lock for a moment, which another caller read as stale.
+    # [earned: 2026-09-23, PR #24 second review]
+    new = lock.with_name(f"{lock.name}.new-{os.getpid()}-{time.time_ns()}")
+    new.write_text(now.isoformat() + "\n", encoding="utf-8")
+    try:
+        return _claim_with(lock, new, now)
+    finally:
+        new.unlink(missing_ok=True)
+
+
+def _claim_with(lock: Path, new: Path, now: datetime) -> datetime | None:
     started = now
     for _ in range(3):
         try:
-            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            os.link(new, lock)
         except FileExistsError:
             started = _lock_time(lock, now)
             if now - started < timedelta(hours=LOCK_STALE_HOURS):
@@ -116,8 +130,6 @@ def _claim(lock: Path, now: datetime) -> datetime | None:
                 return moved
             grave.unlink(missing_ok=True)
             continue
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(now.isoformat() + "\n")
         return None
     return started
 
