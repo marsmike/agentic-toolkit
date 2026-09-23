@@ -175,13 +175,20 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
     ledger = read_ledger(vault)
     ids, sources = vault_index(vault)
     new_items, known_rows = [], []
+    batch: dict[str, str] = {}  # address -> doc id: one page saved twice in Reader is one capture
     for doc_id, it in unique.items():
         if doc_id in ledger:
             continue
-        where = ids.get(doc_id) or sources.get(norm_url(str(it.get("source_url") or "")))
+        address = norm_url(str(it.get("source_url") or ""))
+        where = ids.get(doc_id) or sources.get(address)
         if where:
             known_rows.append({"doc_id": doc_id, "found": where, "date": now.date().isoformat()})
+        elif address and address in batch:
+            # [earned: 2026-09-23 — one tweet saved as twitter.com/… and x.com/…?s=12, two captures]
+            known_rows.append({"doc_id": doc_id, "duplicate_of": batch[address], "date": now.date().isoformat()})
         else:
+            if address:
+                batch[address] = doc_id
             new_items.append(it)
 
     result: dict[str, Any] = {"since": since, "fetched": len(items), "eligible": len(unique),

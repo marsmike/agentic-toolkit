@@ -4,7 +4,8 @@
 2. ingest      — a clip, a newsletter and a radar-promoted feed item become captures with
                  `via: clip | newsletter | radar` (and `radar_interests`); a feed item, a feed item
                  the radar archived without promoting, and a highlight child are not ingested; a
-                 clip whose address a vault note already has is recorded, not captured; only
+                 clip whose address a vault note already has is recorded, not captured; one tweet
+                 saved twice (twitter.com and x.com?s=12) in the same run is one capture; only
                  01_Capture/ and 00_Memory/ change; nothing in Reader is written
 3. gap         — an item whose full text fails: status failed, one DLQ note, the watermark stays
 4. rerun       — the next run captures the missing item and nothing twice; the watermark moves
@@ -46,6 +47,8 @@ DOCS = [
     _doc("hl1", "a highlight", "new", category="highlight", parent_id="clip1"),
     _doc("known1", "Clipped again", "archive", url="https://example.org/known-post"),
     _doc("flaky1", "Full text fails once", "later"),
+    _doc("tw1", "A tweet", "new", category="tweet", url="https://twitter.com/someone/status/42"),
+    _doc("tw2", "The same tweet saved again", "new", category="tweet", url="https://x.com/someone/status/42?s=12"),
 ]
 
 
@@ -100,14 +103,14 @@ def run(vault: Path) -> dict:
             fm, _ = read_frontmatter(p)
             if fm.get("readwise_doc_id") in {d["id"] for d in DOCS}:
                 caps[str(fm["readwise_doc_id"])] = fm
-        if sorted(caps) != ["clip1", "news1", "radar1"]:
-            problems.append(f"phase 2: expected captures for clip1, news1, radar1, got {sorted(caps)}")
+        if sorted(caps) != ["clip1", "news1", "radar1", "tw1"]:
+            problems.append(f"phase 2: expected captures for clip1, news1, radar1, tw1 (tw2 is the same tweet), got {sorted(caps)}")
         if caps.get("clip1", {}).get("via") != "clip" or caps.get("news1", {}).get("via") != "newsletter":
             problems.append("phase 2: a clip and a newsletter must say so in `via`")
         if caps.get("radar1", {}).get("via") != "radar" or caps.get("radar1", {}).get("radar_interests") != ["claude-code", "dev-tooling"]:
             problems.append(f"phase 2: the radar item needs via: radar and its interests, got {caps.get('radar1')}")
-        if r.get("already_in_vault") != 1:
-            problems.append(f"phase 2: the clip whose address a note has should be recorded as known, got {r.get('already_in_vault')}")
+        if r.get("already_in_vault") != 2:
+            problems.append(f"phase 2: a clip a note already has and a same-run duplicate are both known, got {r.get('already_in_vault')}")
         changed = {p for p, m in snap(sandbox).items() if before.get(p) != m} - {"04_Resources/Known-Post.md"}
         if any(not (p.startswith("01_Capture/") or p.startswith("00_Memory/")) for p in changed):
             problems.append(f"phase 2: ingest wrote outside 01_Capture/ and 00_Memory/: {sorted(changed)}")
