@@ -59,9 +59,9 @@ def run(vault: Path) -> dict:
 
         # 2. end
         failed = "01_Capture/Readwise-Newsletter-news.md"
-        r = pr.end(sandbox, NOW, distilled=2, retired=1, failed=[failed])
+        r = pr.end(sandbox, NOW, distilled=2, dropped=1, failed=[failed])
         log = _git(sandbox, "log", "--format=%s", f"{head0}..HEAD").splitlines()
-        if len(log) != 1 or "2 distilled, 1 retired, 1 failed" not in log[0]:
+        if len(log) != 1 or "2 distilled, 1 dropped, 1 failed" not in log[0]:
             problems.append(f"phase 2: expected one commit with the summary, got {log}")
         committed = _git(sandbox, "show", "--name-only", "--format=", "HEAD").split()
         if "00_Memory/pipeline.lock" in committed or (sandbox / pr.LOCK).exists():
@@ -71,7 +71,7 @@ def run(vault: Path) -> dict:
 
         # 3. parking
         pr.begin(sandbox, NOW + timedelta(hours=3))
-        pr.end(sandbox, NOW + timedelta(hours=3), distilled=0, retired=0, failed=[failed])
+        pr.end(sandbox, NOW + timedelta(hours=3), distilled=0, dropped=0, failed=[failed])
         pr.begin(sandbox, NOW + timedelta(hours=6))
         r = pr.queue(sandbox)
         if failed in r.get("batch", []) or r.get("parked_now") != [failed]:

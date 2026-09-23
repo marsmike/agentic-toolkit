@@ -55,7 +55,11 @@ def check(note: Path, capture: Path, vault: Path, asks: list[str]) -> dict:
     src_line = re.search(r"^\*Source:.*\*", body, re.M)
     own = cap.get("own_source") or ""
     line_urls = {_canonical(u) for u in URL_RE.findall(src_line.group(0))} if src_line else set()
-    names_own = not own or _canonical(own) in line_urls or _canonical(own) == _canonical(str(fm.get("source") or ""))
+    # A Source line that names addresses must name the capture's own; the frontmatter only stands in
+    # for a line with no address at all (a title, "(none — …)"). [earned: 2026-09-23, negative eval —
+    # a line naming another address passed because the frontmatter was right]
+    names_own = not own or _canonical(own) in line_urls or (
+        not line_urls and _canonical(own) == _canonical(str(fm.get("source") or "")))
     hard["source-line"] = (bool(src_line) and names_own,
                            "add a `*Source: …*` line" if not src_line else ("the Source line must name the capture's own source" if not names_own else "ok"))
     note_text = body + "\n" + json.dumps(fm, default=str)

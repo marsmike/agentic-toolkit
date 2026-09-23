@@ -5,7 +5,8 @@
 2. clip     — a discard-candidate clip becomes quick-file: the owner's clips never drop
 3. arrived  — a discard-candidate radar or newsletter capture stays discard-candidate with the
               retire-with-reason note; every other recommendation passes through unchanged
-4. address  — a Readwise capture's twitter.com source and a note's x.com source are one address
+4. address  — a twitter.com and an x.com source are one address, and so is one YouTube video under
+              youtu.be, watch?v=, shorts or the mobile host
               (distill_check's source-line gate reads them through the same canonical form)
 """
 from __future__ import annotations
@@ -57,6 +58,10 @@ def run(vault: Path) -> dict:
     # 4. address
     if _canonical("https://twitter.com/trq212/status/123?s=20") != _canonical("https://x.com/trq212/status/123"):
         problems.append("phase 4: twitter.com and x.com addresses of one tweet must canonicalise alike")
+    video = {_canonical(u) for u in ("https://youtu.be/5NX_qkr4qRQ?si=a", "https://www.youtube.com/watch?v=5NX_qkr4qRQ&t=9",
+                                     "https://m.youtube.com/watch?feature=share&v=5NX_qkr4qRQ", "https://youtube.com/shorts/5NX_qkr4qRQ")}
+    if len(video) != 1:
+        problems.append(f"phase 4: one YouTube video under four spellings must be one address, got {video}")
 
     return {"eval": NAME, "pass": not problems,
             "detail": "; ".join(problems) if problems else "clips never discarded; radar and newsletter captures may be retired with a reason"}

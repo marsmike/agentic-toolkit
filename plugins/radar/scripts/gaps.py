@@ -3,7 +3,8 @@ judged like feed items; the strong ones are the signal that a feed is missing.
 
     radar.py gaps [--promote] [--json]
 
-For every interest, its first query (or its name) goes to Kagi `enrich/news`; results published in
+For every interest, its first query (or, for an epic with a gloss, its name) goes to Kagi
+`enrich/news`; an interest with neither queries nor a gloss is not searched. Results published in
 the last 7 days whose address the radar has not seen and the vault does not hold are judged
 `worth_reading` per item x interest, exactly as `scan` judges feed items. The week's result is
 `00_Memory/radar/gaps-YYYY-Www.json` (run once per ISO week; a second run that week is `exists`)
@@ -67,6 +68,8 @@ def gaps(vault: Path, out: Path, now: datetime, promote: bool = False) -> dict[s
     items: dict[str, Item] = {}
     searched, notes = 0, []
     for it in interests:
+        if not it.queries and not it.gloss:
+            continue  # nothing to search by but a task title [earned: 2026-09-23, "Archive sweep — let go cleanly" as a query]
         try:
             found = kagi.news(it.queries[0] if it.queries else it.name, ledger, now)
         except kagi.NoKey:
