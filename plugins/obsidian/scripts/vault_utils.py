@@ -229,9 +229,13 @@ def git_ignored(vault: Path) -> frozenset[str]:
     probe = subprocess.run(["git", "-C", str(vault), "rev-parse", "--is-inside-work-tree"],
                            capture_output=True, text=True, check=False)
     if probe.returncode != 0:
-        if "not a git repository" in probe.stderr.lower():
-            return frozenset()  # not a git vault: nothing is ignored
-        # A broken repository or git's ownership check: fail closed, never guess "nothing ignored".
+        # "Not a git vault" only when no `.git` marker exists here or above: a corrupt `.git` prints
+        # the same "not a git repository" message. Anything else (a broken repository, git's
+        # ownership check) fails closed, never guessing "nothing ignored". [earned: 2026-09-23,
+        # PR #24 reviews]
+        resolved = Path(vault).resolve()
+        if not any((p / ".git").exists() for p in (resolved, *resolved.parents)):
+            return frozenset()
         raise RuntimeError(f"git rev-parse failed in {vault}: {probe.stderr.strip()[:200]}")
     if probe.stdout.strip() != "true":
         return frozenset()

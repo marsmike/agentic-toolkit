@@ -48,6 +48,11 @@ LOCK_STALE_HOURS = 6
 MAX_ATTEMPTS = 2
 DEFAULT_BATCH = 10
 SCRIPTS = Path(__file__).resolve().parent
+GENERATORS = {  # script → the vault paths it writes
+    "index_build.py": ("Index.md",),
+    "map_build.py": ("Maps",),
+    "now_build.py": ("Now.md", "Boards"),
+}
 SECRET_PATTERNS = {
     "OpenRouter key": r"sk-or-v1-[0-9a-f]{32,}",
     "Anthropic key": r"sk-ant-[A-Za-z0-9_-]{20,}",
@@ -276,14 +281,16 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
 
     summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed" + (f"; {note}" if note else "")
     env = {**os.environ, "TOOLKIT_VAULT": str(vault)}
-    # Each generator writes its files atomically, so one that fails leaves the previous version in
-    # place, never a half-written one. The run is still committed (it is the undo for the notes it
-    # wrote); the failure is reported and gets a DLQ note. [earned: 2026-09-23, PR #20 review]
+    # A generator that fails may have replaced some of its files and not others, so its outputs go
+    # back to the last commit: navigation is either this run's or the previous run's, never a mix.
+    # The run is still committed (it is the undo for the notes it wrote); the failure is reported
+    # and gets a DLQ note. [earned: 2026-09-23, PR #20 and #24 reviews]
     failed_builds = []
-    for script in ("index_build.py", "map_build.py", "now_build.py"):
+    for script in GENERATORS:
         run = subprocess.run([sys.executable, str(SCRIPTS / script)], capture_output=True, text=True, check=False, env=env)
         if run.returncode != 0:
             failed_builds.append({"script": script, "error": (run.stderr.strip().splitlines() or ["?"])[-1][:200]})
+            _restore(vault, GENERATORS[script])
     if failed_builds:
         _dlq_once(vault, slug="pipeline-build-failed", title="A navigation build failed at the end of a pipeline run",
                   what_happened="; ".join(f"{f['script']}: {f['error']}" for f in failed_builds),
@@ -294,20 +301,33 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
         summary += f"; build failed: {', '.join(f['script'] for f in failed_builds)}"
     subprocess.run([sys.executable, str(SCRIPTS / "log_vault.py"), "pipeline", summary], capture_output=True, check=False, env=env)
 
-    (vault / LOCK).unlink(missing_ok=True)  # released before the commit, so it is never committed
     result: dict[str, Any] = {"status": "ok", "summary": summary, "commit": None}
     if failed_builds:
         result["build_failed"] = failed_builds
-    if _is_repo(vault):
-        committed = _commit(vault, f"pipeline {now.strftime('%Y-%m-%d %H:%M')}: {summary}")
-        result["commit"] = committed["commit"]
-        if committed["secrets"]:
-            result.update(status="refused", secrets=committed["secrets"])
-        elif committed.get("error"):
-            result.update(status="commit_failed", detail=committed["error"])
-        else:
-            result["sync"] = _push(vault, now)
+    # The lock is held through commit and push (and never staged), so no other run starts its
+    # pull while this one is still writing to git. [earned: 2026-09-23, PR #24 review]
+    try:
+        if _is_repo(vault):
+            committed = _commit(vault, f"pipeline {now.strftime('%Y-%m-%d %H:%M')}: {summary}", exclude=(LOCK.as_posix(),))
+            result["commit"] = committed["commit"]
+            if committed["secrets"]:
+                result.update(status="refused", secrets=committed["secrets"])
+            elif committed.get("error"):
+                result.update(status="commit_failed", detail=committed["error"])
+            else:
+                result["sync"] = _push(vault, now)
+    finally:
+        (vault / LOCK).unlink(missing_ok=True)
     return result
+
+
+def _restore(vault: Path, paths: tuple[str, ...]) -> None:
+    """Put generated paths back to the last commit, dropping files the failed build added."""
+    if not _is_repo(vault):
+        return
+    for rel in paths:
+        _git(vault, "checkout", "HEAD", "--", rel)
+        _git(vault, "clean", "-fdq", "--", rel)
 
 
 def main(argv: list[str] | None = None) -> int:

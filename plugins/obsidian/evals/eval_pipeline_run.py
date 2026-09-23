@@ -9,8 +9,8 @@
               note that names the file, never the key; the next clean run commits
 5. sync     — with a bare upstream: a second clone's commit arrives with `begin`, `end` pushes, and a
               conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
-6. build    — a generator that fails is reported in `build_failed`, gets one DLQ note across runs,
-              and the run still commits
+6. build    — a generator that fails is reported in `build_failed` and gets one DLQ note across
+              runs; its outputs go back to the last commit (no half-written maps); the run commits
 """
 from __future__ import annotations
 
@@ -93,12 +93,18 @@ def _build_failure_phase(pr, sandbox: Path) -> list[str]:
         (stubs / "map_build.py").write_text(real.replace("sys.exit(main())", "sys.exit('map_build: boom')"), encoding="utf-8")
         pr.SCRIPTS = stubs
         _git(sandbox, "remote", "remove", "origin")
+        overview = sandbox / "Maps" / "Overview.md"
         for hours in (24, 27):
             pr.begin(sandbox, NOW + timedelta(hours=hours))
             (sandbox / "04_Resources" / f"Eval-Build-Fail-{hours}.md").write_text("---\ndescription: x\n---\n", encoding="utf-8")
+            overview.write_text("half-written by a build that then failed\n", encoding="utf-8")
+            (sandbox / "Maps" / "stray.md").write_text("added by the failed build\n", encoding="utf-8")
             r = pr.end(sandbox, NOW + timedelta(hours=hours), 1, 0, [])
             if [f["script"] for f in r.get("build_failed", [])] != ["map_build.py"] or not r.get("commit"):
                 problems.append(f"phase 6: a failing map_build is reported and the run still commits, got {r}")
+            if "half-written" in overview.read_text(encoding="utf-8") or (sandbox / "Maps" / "stray.md").exists() or \
+                    "Maps/stray.md" in _git(sandbox, "show", "--name-only", "--format=", "HEAD"):
+                problems.append("phase 6: a failed build's outputs go back to the last commit before committing")
         dlq = list((sandbox / "00_Memory" / "dlq").glob("*pipeline-build-failed*.md"))
         if len(dlq) != 1:
             problems.append(f"phase 6: a failing build gets one DLQ note, got {len(dlq)}")
