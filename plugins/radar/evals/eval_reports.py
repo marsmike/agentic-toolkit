@@ -7,10 +7,12 @@
               strong items all serve a: "serves only a"; a productive feed gets no advice
 3. weekly   — 01_Capture/Radar-Week-YYYY-Www.md with parseable frontmatter, the rising interest
               first and marked, a vault link for an item the vault has, no link into 00_Memory;
-              a second write is refused, --force rewrites; nothing else in the vault changes
+              a second write is refused, --force rewrites; nothing else in the vault changes; a
+              week the radar never scanned gets no digest at all
 """
 from __future__ import annotations
 
+import json
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -78,6 +80,14 @@ def run(vault: Path) -> dict:
     try:
         sandbox = make_sandbox(vault)
         before = snapshot(sandbox)
+        # a week the radar never scanned has no digest (radar.report is what the CLI and the pipeline call)
+        import radar
+        state_dir = sandbox.parent / "radar-state"
+        state_dir.mkdir()
+        (state_dir / "state.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+        r = radar.report(sandbox, state_dir, "weekly", NOW, "2026-W10")
+        if r.get("status") != "empty" or snapshot(sandbox) != before:
+            problems.append(f"phase 3: a week without scans must write nothing, got {r.get('status')}")
         interests = [Interest("a", "Agent Memory"), Interest("b", "Firmware"), Interest("c", "Birding")]
         text = reports.render_weekly(week, rows, interests, NOW)
         written = sandbox / "00_Memory" / "radar" / "weekly.jsonl"
