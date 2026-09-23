@@ -1,9 +1,11 @@
 """Eval: `radar.py replay`, the acceptance run, offline (stubbed `judge._post` and `reader._request`).
 
-1. arithmetic — AUC with ties, recall at a budget and BM25 ranking on hand-made numbers
+1. arithmetic — AUC with ties, same-day AUC ignoring cross-day pairs, recall at a budget and BM25
+                 ranking on hand-made numbers
 2. no key      — SKIPPED, no request, nothing written
-3. replay      — clips from every clip location are positives; feed items that were also clipped,
-                 back catalogue and items after --exclude-last-days are not negatives; `category`
+3. replay      — clips from every clip location are positives, delivered newsletters are not;
+                 feed items that were also clipped, back catalogue and items after
+                 --exclude-last-days are not negatives; `category`
                  never reaches the backend (it would give the label away); a judge that tells
                  clips apart scores AUC 1.0; Reader is only read; nothing in the vault changes;
                  exactly the two report files are written to --out
@@ -47,16 +49,16 @@ def _doc(i: int, title: str, location: str, days_ago: float, category: str = "ar
 
 
 DOCS = {
-    "new": [_doc(1, "Agent memory survey CLIP", "new", 10)],
+    "new": [_doc(1, "Agent memory survey CLIP", "new", 10), _doc(5, "Weekly newsletter", "new", 10, category="email")],
     "later": [_doc(2, "Zephyr RTOS release notes CLIP", "later", 12, url="https://example.org/shared")],
     "shortlist": [],
     "archive": [_doc(3, "A thread on agent recall CLIP", "archive", 15, category="tweet"),
                 _doc(4, "Too recent CLIP", "archive", 2)],
-    "feed": [_doc(10, "Local weather", "feed", 11, category="rss"),
-             _doc(11, "Celebrity news", "feed", 13, category="rss"),
+    "feed": [_doc(10, "Local weather", "feed", 10.2, category="rss"),
+             _doc(11, "Celebrity news", "feed", 12.2, category="rss"),
              _doc(12, "Same page as a clip", "feed", 12, category="rss", url="https://example.org/shared"),
              _doc(13, "Back catalogue", "feed", 14, category="rss", published="2019-01-01"),
-             _doc(14, "Sports results", "feed", 16, category="rss"),
+             _doc(14, "Sports results", "feed", 15.2, category="rss"),
              _doc(15, "Too recent feed", "feed", 1, category="rss")],
 }
 
@@ -77,6 +79,9 @@ def run(vault: Path) -> dict:
         problems.append("phase 1: AUC wrong on separable, tied or inverted scores")
     if replay.auc([2, 1], [1, 0]) != 0.875:
         problems.append(f"phase 1: AUC with a partial tie should be 0.875, got {replay.auc([2, 1], [1, 0])}")
+    # day 1 separates perfectly, day 2 is inverted; the cross-day pairs would say 0.75
+    if replay.same_day_auc([("d1", 0.9), ("d2", 0.1)], [("d1", 0.5), ("d2", 0.2)]) != 0.5:
+        problems.append("phase 1: same-day AUC must only compare items from the same day")
     if replay.recall_at_budget([5, 1], [4, 3, 2, 0], 0.25) != 0.5:
         problems.append("phase 1: recall at a 25% budget of [4,3,2,0] should admit 5 and not 1")
     docs = [replay.tokens("firmware release for the rtos"), replay.tokens("a recipe for soup"), replay.tokens("soup again")]
@@ -118,12 +123,12 @@ def run(vault: Path) -> dict:
         # 3. replay
         os.environ["TOOLKIT_RADAR_JUDGMENT_API_KEY"] = "stub-key-not-a-secret"
         r = replay.replay(sandbox, out, since, until, feed_sample=0)
-        if r.get("status") != "ok" or r.get("clips") != 3 or r.get("feed_in_window") != 3:
+        if r.get("status") != "ok" or r.get("clips") != 3 or r.get("delivered_not_clipped") != 1 or r.get("feed_in_window") != 3:
             problems.append(f"phase 3: expected ok, 3 clips, 3 feed items, got "
                             f"{json.dumps({k: r.get(k) for k in ('status', 'clips', 'feed_in_window', 'feed_dropped', 'detail')})}")
         if r.get("feed_dropped") != {"also clipped": 1, "backlog": 1, "outside window": 1}:
             problems.append(f"phase 3: wrong drop reasons {r.get('feed_dropped')}")
-        if r.get("metrics", {}).get("jev", {}).get("auc") != 1.0 or r.get("jev_beats_bm25") is None:
+        if r.get("metrics", {}).get("jev", {}).get("auc_same_day") != 1.0 or r.get("jev_beats_bm25") is None:
             problems.append(f"phase 3: a separating judge must score AUC 1.0, got {r.get('metrics')}")
         for payload in calls:
             if any(it.get("category") for it in payload["state"]["items"].values()):

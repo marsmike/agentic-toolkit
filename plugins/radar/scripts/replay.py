@@ -12,7 +12,10 @@ away. Three scorers are compared on the same items:
   bm25     max over interests of BM25(title+summary; name, gloss and queries), local, no call
   recency  saved_at, the order Reader already shows
 
-Metrics per scorer: AUC, and recall at the daily budget: the share of clips scoring at or above
+Metrics per scorer: AUC over clips and feed items saved on the same day (the radar only ever
+ranks one day's items; pooled over the window, recency just finds the day a batch of bookmarks
+was imported [earned: 2026-09-23 replay, 18 of 27 clips on two days, recency AUC 0.68 pooled]),
+pooled AUC, and recall at the daily budget: the share of clips scoring at or above
 the score that lets `BUDGET_PER_DAY` feed items a day through. The judgment ships only if it
 beats BM25. Writes `replay-rows.jsonl` and `replay-report.json` to `--out` and nothing else:
 not the vault, not Reader.
@@ -36,6 +39,9 @@ import reader
 from judgments import policy
 
 CLIP_LOCATIONS = ("new", "later", "shortlist", "archive")
+# Delivered, not clipped: newsletters land in the library on their own. [earned: 2026-09-23
+# replay, three Wisereads issues counted as clips]
+NOT_A_CLIP_CATEGORIES = {"email"}
 BUDGET_PER_DAY = 20
 SEED = 20260922
 BM25_K1, BM25_B = 1.2, 0.75
@@ -56,6 +62,19 @@ def auc(pos: list[float], neg: list[float]) -> float | None:
         rank_sum += mid * sum(lbl for _, lbl in ranked[i:j])
         i = j
     return (rank_sum - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg))
+
+
+def same_day_auc(pos: list[tuple[str, float]], neg: list[tuple[str, float]]) -> float | None:
+    """AUC over (day, score) pairs, comparing only positives and negatives from the same day;
+    each day weighted by its number of pairs."""
+    num = den = 0.0
+    for day in {d for d, _ in pos}:
+        p = [s for d, s in pos if d == day]
+        n = [s for d, s in neg if d == day]
+        if p and n:
+            num += auc(p, n) * len(p) * len(n)
+            den += len(p) * len(n)
+    return num / den if den else None
 
 
 def recall_at_budget(pos: list[float], neg: list[float], fraction: float) -> float | None:
@@ -103,12 +122,14 @@ def collect(since: datetime, until: datetime, feed_sample: int, seed: int = SEED
         ts = _saved_ts(it)
         return since.timestamp() <= ts < until.timestamp()
 
-    clips, clip_keys = [], set()
+    clips, clip_keys, not_clips = [], set(), 0
     for loc in CLIP_LOCATIONS:
         for doc in reader.list_documents(loc, since):
             it = reader.to_item(doc)
             keys = {item_key(it), title_key(it)} - {""}
-            if in_window(it) and not keys & clip_keys:
+            if it.category in NOT_A_CLIP_CATEGORIES:
+                not_clips += 1
+            elif in_window(it) and not keys & clip_keys:
                 clip_keys |= keys
                 clips.append(it)
     feed, feed_keys, dropped = [], set(), Counter()
@@ -126,7 +147,7 @@ def collect(since: datetime, until: datetime, feed_sample: int, seed: int = SEED
             feed_keys |= keys
             feed.append(it)
     sample = feed if not feed_sample or feed_sample >= len(feed) else random.Random(seed).sample(feed, feed_sample)
-    counts = {"clips": len(clips), "clip_categories": dict(Counter(c.category or "?" for c in clips)),
+    counts = {"clips": len(clips), "delivered_not_clipped": not_clips, "clip_categories": dict(Counter(c.category or "?" for c in clips)),
               "feed_in_window": len(feed), "feed_sampled": len(sample), "feed_dropped": dict(dropped)}
     return clips, sample, counts
 
@@ -169,7 +190,11 @@ def replay(vault: Path, out: Path, since: datetime, until: datetime, feed_sample
     for name, s in scores.items():
         pos = [s[n] for n in keep if labels[n]]
         neg = [s[n] for n in keep if not labels[n]]
-        metrics[name] = {"auc": _r(auc(pos, neg)), "recall_at_budget": _r(recall_at_budget(pos, neg, fraction))}
+        day = [items[n].saved_at[:10] for n in range(len(items))]
+        metrics[name] = {
+            "auc_same_day": _r(same_day_auc([(day[n], s[n]) for n in keep if labels[n]],
+                                            [(day[n], s[n]) for n in keep if not labels[n]])),
+            "auc": _r(auc(pos, neg)), "recall_at_budget": _r(recall_at_budget(pos, neg, fraction))}
 
     t = policy.thresholds(run.backend)
     neg_judged = [judged[n] for n in keep if not labels[n]]
@@ -194,7 +219,7 @@ def replay(vault: Path, out: Path, since: datetime, until: datetime, feed_sample
         "judged": len(keep), "unjudged": len(items) - len(keep),
         "budget": {"per_day": BUDGET_PER_DAY, "fraction_of_feed": round(fraction, 4)},
         "metrics": metrics,
-        "jev_beats_bm25": (metrics["jev"]["auc"] or 0) > (metrics["bm25"]["auc"] or 0),
+        "jev_beats_bm25": (metrics["jev"]["auc_same_day"] or 0) > (metrics["bm25"]["auc_same_day"] or 0),
         "feed_estimate": {"in_window": counts["feed_in_window"],
                           "worth": round(scale * feed_worth), "strong": round(scale * feed_strong)},
         "per_interest": per_interest, "thresholds": t,
