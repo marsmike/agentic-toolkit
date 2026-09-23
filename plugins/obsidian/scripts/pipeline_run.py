@@ -48,10 +48,10 @@ LOCK_STALE_HOURS = 6
 MAX_ATTEMPTS = 2
 DEFAULT_BATCH = 10
 SCRIPTS = Path(__file__).resolve().parent
-GENERATORS = {  # script → the vault paths it writes
+GENERATORS = {  # script → the files it owns (Maps/: only files carrying its `generated_by` marker)
     "index_build.py": ("Index.md",),
-    "map_build.py": ("Maps",),
-    "now_build.py": ("Now.md", "Boards"),
+    "map_build.py": ("Maps/",),
+    "now_build.py": ("Now.md", "Boards/Pipeline.md"),
 }
 SECRET_PATTERNS = {
     "OpenRouter key": r"sk-or-v1-[0-9a-f]{32,}",
@@ -90,53 +90,78 @@ def _order(vault: Path, path: Path) -> tuple[int, str]:
     return (0 if clip else 1, str(fm.get("saved_at") or fm.get("created") or fm.get("captured") or path.name))
 
 
-def _claim(lock: Path, now: datetime) -> datetime | None:
-    """Take the lock atomically; return the holder's start time if another run has it.
+def _guard(lock: Path):
+    """An OS lock on a guard file outside the vault (never committed), serialising every claim and
+    release: inside it, check-then-write is safe, including taking over a stale lock.
+    [earned: 2026-09-23, PR #24 reviews — O_EXCL, then rename-aside takeovers each left a race]"""
+    key = hashlib.sha1(str(lock.resolve()).encode()).hexdigest()[:16]
+    g = open(Path(tempfile.gettempdir()) / f"agentic-toolkit-{key}.guard", "a")  # noqa: SIM115 — closed by the caller's with
+    fcntl.flock(g, fcntl.LOCK_EX)
+    return g
+
+
+def _claim(lock: Path, now: datetime, token: str) -> datetime | None:
+    """Take the lock for `token`; return the holder's start time if another run has it.
 
     Of two runs starting together exactly one gets past here, before the slow commit-and-pull.
-    A lock older than LOCK_STALE_HOURS is a crashed run and is taken over.
+    A lock older than LOCK_STALE_HOURS is a crashed run and is taken over. The lock holds the start
+    time and the run's token, and appears complete through an atomic replace, never empty.
     [earned: 2026-09-23, PR #20 review — check-then-write let two runs both sync and both run]
     """
     lock.parent.mkdir(parents=True, exist_ok=True)
-    key = hashlib.sha1(str(lock.resolve()).encode()).hexdigest()[:16]
-    guard = Path(tempfile.gettempdir()) / f"agentic-toolkit-{key}.guard"
-    # Claims are serialised by an OS lock on a guard file outside the vault (never committed):
-    # inside it, check-then-write is safe, including taking over a stale lock. The lock file
-    # itself appears complete through an atomic replace, so a reader never sees it empty.
-    # [earned: 2026-09-23, PR #24 reviews — O_EXCL, then rename-aside takeovers each left a race]
-    with open(guard, "a") as g:
-        fcntl.flock(g, fcntl.LOCK_EX)
+    with _guard(lock):
         if lock.exists():
             started = _lock_time(lock, now)
             if now - started < timedelta(hours=LOCK_STALE_HOURS):
                 return started
         new = lock.with_name(f"{lock.name}.new-{os.getpid()}-{time.time_ns()}")
-        new.write_text(now.isoformat() + "\n", encoding="utf-8")
+        new.write_text(f"{now.isoformat()}\n{token}\n", encoding="utf-8")
         os.replace(new, lock)
         return None
+
+
+def _release(lock: Path, token: str | None) -> None:
+    """Remove the lock, but only if it is still this run's: a run that outlived LOCK_STALE_HOURS
+    must not delete the lock of the run that took over. No token (a manual `end`) removes it.
+    [earned: 2026-09-23, PR #24 review]"""
+    if not lock.exists():
+        return
+    with _guard(lock):
+        if token is None or _lock_token(lock) == token:
+            lock.unlink(missing_ok=True)
+
+
+def _lock_token(path: Path) -> str:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    return lines[1].strip() if len(lines) > 1 else ""
 
 
 def _lock_time(path: Path, now: datetime) -> datetime:
     """When the run holding `path` started; unreadable or garbled counts as stale."""
     try:
-        return datetime.fromisoformat(path.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
+        return datetime.fromisoformat(path.read_text(encoding="utf-8").splitlines()[0].strip())
+    except (OSError, ValueError, IndexError):
         return now - timedelta(hours=LOCK_STALE_HOURS + 1)
 
 
 def begin(vault: Path, now: datetime) -> dict[str, Any]:
     lock = vault / LOCK
-    holder = _claim(lock, now)
+    token = f"{os.getpid()}-{time.time_ns()}"
+    holder = _claim(lock, now, token)
     if holder is not None:
         return {"status": "busy", "detail": f"another run holds the lock since {holder.isoformat()}"}
     sync = _pull(vault, now)
     if sync.get("conflict") or sync.get("secrets"):
-        lock.unlink(missing_ok=True)
+        _release(lock, token)
         return {"status": "skipped", "detail": sync["detail"], "sync": sync}
     # A pull that merely failed (offline, a transient auth error) does not stop the run, by design:
     # distilling needs no network, the run's commit stays local, and the next run's pull and push
     # reconcile it. A real conflict is the only reason to skip. `sync.pulled` says which it was.
-    return {"status": "ok", "locked_at": now.isoformat(), "sync": sync}
+    # Pass `token` to `end --token` so it releases only this run's lock.
+    return {"status": "ok", "locked_at": now.isoformat(), "token": token, "sync": sync}
 
 
 def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
@@ -264,13 +289,18 @@ def _push(vault: Path, now: datetime) -> dict[str, Any]:
     sync = _pull(vault, now)
     if not sync.get("pulled"):
         return {"pushed": False, "detail": sync["detail"]}
-    push = _git(vault, "push", "-q")
+    # Push explicitly to the upstream (the remote `begin` pulled from), never where pushRemote or
+    # pushDefault would send a bare `git push`. [earned: 2026-09-23, PR #24 review]
+    upstream = _git(vault, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}").stdout.strip()
+    remote, _, branch = upstream.partition("/")
+    push = _git(vault, "push", "-q", remote, f"HEAD:{branch}")
     if push.returncode != 0:
         return {"pushed": False, "detail": "push failed: " + (push.stderr.strip().splitlines() or ["?"])[-1]}
     return {"pushed": True}
 
 
-def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "") -> dict[str, Any]:
+def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "",
+        token: str | None = None) -> dict[str, Any]:
     state = _state(vault)
     attempts: dict[str, int] = state.get("attempts", {})
     for rel in failed:
@@ -317,17 +347,31 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
             else:
                 result["sync"] = _push(vault, now)
     finally:
-        (vault / LOCK).unlink(missing_ok=True)
+        _release(vault / LOCK, token)
     return result
 
 
 def _restore(vault: Path, paths: tuple[str, ...]) -> None:
-    """Put generated paths back to the last commit, dropping files the failed build added."""
+    """Put a failed generator's own files back to the last commit. Only files it owns: a map it
+    added is removed only if it carries map_build's marker, so a hand-made file in Maps/ or
+    Boards/ is never touched. [earned: 2026-09-23, PR #24 review — `git clean` of the folders]"""
     if not _is_repo(vault):
         return
     for rel in paths:
-        _git(vault, "checkout", "HEAD", "--", rel)
-        _git(vault, "clean", "-fdq", "--", rel)
+        if not rel.endswith("/"):
+            if _git(vault, "cat-file", "-e", f"HEAD:{rel}").returncode == 0:
+                _git(vault, "checkout", "HEAD", "--", rel)
+            continue
+        folder = vault / rel
+        for md in sorted(folder.glob("*.md")):
+            if read_frontmatter(md)[0].get("generated_by") != "map_build.py":
+                continue
+            for path in (md, md.with_suffix(".canvas")):
+                p = path.relative_to(vault).as_posix()
+                if _git(vault, "cat-file", "-e", f"HEAD:{p}").returncode == 0:
+                    _git(vault, "checkout", "HEAD", "--", p)
+                else:
+                    path.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -343,6 +387,7 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--dropped", type=int, default=0, help="captures that left WITHOUT a note (a radar or newsletter discard); never a clip")
     e.add_argument("--failed", nargs="*", default=[])
     e.add_argument("--note", default="")
+    e.add_argument("--token", default=None, help="the token `begin` returned; the lock is released only if it is still this run's")
     e.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     vault, now = require_vault(), datetime.now(UTC)
@@ -351,7 +396,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "queue":
         result = queue(vault, args.batch)
     else:
-        result = end(vault, now, args.distilled, args.dropped, args.failed, args.note)
+        result = end(vault, now, args.distilled, args.dropped, args.failed, args.note, args.token)
     print(json.dumps(result, indent=2 if args.json else None))
     return 0
 

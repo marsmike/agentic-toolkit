@@ -94,17 +94,23 @@ def _build_failure_phase(pr, sandbox: Path) -> list[str]:
         pr.SCRIPTS = stubs
         _git(sandbox, "remote", "remove", "origin")
         overview = sandbox / "Maps" / "Overview.md"
+        mine = sandbox / "Maps" / "My-Own-Map.md"
+        mine.write_text("# made by hand\n", encoding="utf-8")
         for hours in (24, 27):
-            pr.begin(sandbox, NOW + timedelta(hours=hours))
+            token = pr.begin(sandbox, NOW + timedelta(hours=hours)).get("token")
             (sandbox / "04_Resources" / f"Eval-Build-Fail-{hours}.md").write_text("---\ndescription: x\n---\n", encoding="utf-8")
-            overview.write_text("half-written by a build that then failed\n", encoding="utf-8")
-            (sandbox / "Maps" / "stray.md").write_text("added by the failed build\n", encoding="utf-8")
-            r = pr.end(sandbox, NOW + timedelta(hours=hours), 1, 0, [])
+            overview.write_text("---\ngenerated_by: map_build.py\n---\nhalf-written by a build that then failed\n", encoding="utf-8")
+            (sandbox / "Maps" / "stray.md").write_text("---\ngenerated_by: map_build.py\n---\nadded by the failed build\n", encoding="utf-8")
+            r = pr.end(sandbox, NOW + timedelta(hours=hours), 1, 0, [], token=token)
             if [f["script"] for f in r.get("build_failed", [])] != ["map_build.py"] or not r.get("commit"):
                 problems.append(f"phase 6: a failing map_build is reported and the run still commits, got {r}")
             if "half-written" in overview.read_text(encoding="utf-8") or (sandbox / "Maps" / "stray.md").exists() or \
                     "Maps/stray.md" in _git(sandbox, "show", "--name-only", "--format=", "HEAD"):
                 problems.append("phase 6: a failed build's outputs go back to the last commit before committing")
+            if not mine.is_file():
+                problems.append("phase 6: rolling back a failed build must never touch a hand-made file in Maps/")
+            if (sandbox / pr.LOCK).exists():
+                problems.append("phase 6: end with the run's own token releases the lock")
         dlq = list((sandbox / "00_Memory" / "dlq").glob("*pipeline-build-failed*.md"))
         if len(dlq) != 1:
             problems.append(f"phase 6: a failing build gets one DLQ note, got {len(dlq)}")
@@ -142,13 +148,16 @@ def run(vault: Path) -> dict:
         if pr.begin(sandbox, NOW + timedelta(minutes=5))["status"] != "busy":
             problems.append("phase 1: a second begin while the lock is held must be busy")
         later = NOW + timedelta(hours=pr.LOCK_STALE_HOURS + 1)
-        if pr._claim(sandbox / pr.LOCK, later) is not None or \
-                (sandbox / pr.LOCK).read_text(encoding="utf-8").strip() != later.isoformat() or \
-                list((sandbox / pr.LOCK).parent.glob("pipeline.lock.*-*")):
-            problems.append("phase 1: a stale lock must be taken over atomically, leaving no moved-aside copy")
-        if pr._claim(sandbox / pr.LOCK, later + timedelta(minutes=1)) != later:
+        lock = sandbox / pr.LOCK
+        if pr._claim(lock, later, "taker") is not None or pr._lock_time(lock, later) != later or \
+                pr._lock_token(lock) != "taker" or list(lock.parent.glob("pipeline.lock.*-*")):
+            problems.append("phase 1: a stale lock must be taken over atomically, leaving no temporary copy")
+        if pr._claim(lock, later + timedelta(minutes=1), "third") != later:
             problems.append("phase 1: right after a takeover the lock is fresh again: busy")
-        (sandbox / pr.LOCK).write_text(NOW.isoformat() + "\n", encoding="utf-8")
+        pr._release(lock, "the-run-that-was-taken-over")
+        if not lock.exists():
+            problems.append("phase 1: a run must not release a lock another run took over")
+        lock.write_text(NOW.isoformat() + "\n", encoding="utf-8")
 
         # 2. end
         failed = "01_Capture/Readwise-Newsletter-news.md"

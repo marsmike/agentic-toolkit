@@ -29,7 +29,7 @@ P pipeline_run.py begin          # pulls the vault's upstream first; "busy" (ano
 #   uv run --project "$TOOLKIT_REPO/plugins/readwise/scripts" python3 "$TOOLKIT_REPO/plugins/readwise/scripts/ingest.py" --json
 P pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first
 # distill each one with the distill skill, --auto
-P pipeline_run.py end --distilled N --dropped N --failed <captures that failed distill_check>
+P pipeline_run.py end --token <begin's token> --distilled N --dropped N --failed <captures that failed distill_check>
 ```
 
 **Sources.** The radar judges the feed and promotes at most five strong items a day to Reader's
