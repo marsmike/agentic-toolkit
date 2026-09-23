@@ -24,13 +24,17 @@ flowchart LR
     F --> O
     G --> O
     J[jev ⚖<br/><i>typed judgments, hosted</i>] -. advice .-> O
+    RD[radar<br/><i>judge every feed item</i>] --> V
+    J -. judgments .-> RD
 ```
 
 The dashed edge is new in R8/R9: a typed-judgment backend answers the small semantic
 questions distill and maintenance keep asking (is this note about the same thing, is
 this suggested link real, is this description findable) with a probability, and the
 plugins turn those numbers into advice at the checkpoint. Optional, off without a key,
-replaceable by a local model behind one seam.
+replaceable by a local model behind one seam. R10 adds the radar: the same judgments applied
+*before* the clip, to every item Reader aggregates, so the feed is read in full and only what
+matters reaches you.
 
 ## Pick your path
 
@@ -133,7 +137,7 @@ cd /tmp/quartz && npm i && npx quartz build --serve
 - [`contract/`](contract/) — the constitution: vault schema, profile convention, knowledge API, model routing
 - [`core/`](core/) — the `toolkit` CLI (`vault init` · `doctor` · `profile`) and Python library
 - [`vault/`](vault/) — the example vault: docs, demo, test corpus, and eval substrate in one
-- [`plugins/`](plugins/) — curated plugins ([obsidian](plugins/obsidian/), [readwise](plugins/readwise/), [memory](plugins/memory/), [handoff](plugins/handoff/)), added one release at a time
+- [`plugins/`](plugins/) — curated plugins ([obsidian](plugins/obsidian/), [readwise](plugins/readwise/), [memory](plugins/memory/), [handoff](plugins/handoff/), [radar](plugins/radar/)), added one release at a time
 - [`crates/`](crates/) — the Rust engines
 - [`docs/PLAN.md`](docs/PLAN.md) — why everything is the way it is, with citations
 

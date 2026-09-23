@@ -1,10 +1,19 @@
 ---
-status: proposed
+status: accepted
 created: 2026-09-22
+updated: 2026-09-23
 supersedes: legacy research:kagi launcher, workflows:trend-radar
 ---
 
 # Radar: agentic-toolkit as an active research tool (R10)
+
+> **Where it landed (2026-09-23).** Built: `scan` (with archiving, which Mike asked for after the
+> replay, and `--promote`), `replay`, `discover` (Kagi plus `--seed`), `feeds`, `trend`, `weekly`,
+> the radar skill with scheduling, and four offline evals. Acceptance: steps 1–3 and 5 ran on the
+> real account (numbers in `plugins/radar/README.md`); step 4 ran as discovery plus 14 feeds
+> subscribed. Changed on evidence: `T_WORTH` 0.60 → 0.70 (blind audit), same-day AUC as the
+> headline metric (a bookmark import made pooled recency look good), Reader archiving instead of
+> "never touch Reader". Not built: `gaps`, `--todoist`, the Kagi skill.
 
 ## Context
 

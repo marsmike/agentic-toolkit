@@ -1,5 +1,8 @@
 # Ingest Workflow
 
+> `scripts/ingest.py` implements steps 1–7 (Classic v2 books excepted: the vault is Reader-only since
+> 2026-07-24). The steps stay here as the reasoning behind it; step 8 is never automatic.
+
 ## 1. Read state
 
 ```bash

@@ -1,0 +1,17 @@
+{
+  "name": "radar",
+  "version": "2.10.0",
+  "description": "Active research radar: judges every Reader feed item against your interests with typed judgments, reports which feeds earn their place, and proposes new feeds via Kagi.",
+  "author": {
+    "name": "agentic-toolkit contributors"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/marsmike/agentic-toolkit",
+  "keywords": [
+    "radar",
+    "research",
+    "reader",
+    "feeds",
+    "typed-judgments"
+  ]
+}

@@ -27,8 +27,9 @@ import time
 from pathlib import Path
 
 import judge
-from judgments.capture import URL_RE, _canonical, read_capture
+from judgments.capture import URL_RE, read_capture
 from judgments.passages import check_note
+from judgments.urls import _canonical
 from search import search
 from vault_utils import discover_notes, read_frontmatter, require_vault
 

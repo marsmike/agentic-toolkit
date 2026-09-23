@@ -33,10 +33,11 @@ import judge
 from judge import Answer, JudgmentFailed, JudgmentUnavailable, Question
 from judgments import questions as Q
 from judgments.batch import judge_batch  # noqa: F401  (re-exported for the skill docs and evals)
-from judgments.capture import CAPTURE_CHARS, URL_RE, WIKILINK_RE, _canonical, query_text, read_capture  # noqa: F401
+from judgments.capture import CAPTURE_CHARS, URL_RE, WIKILINK_RE, query_text, read_capture  # noqa: F401
 from judgments.passages import check_note, judge_passages, split_passages  # noqa: F401
 from judgments.policy import LEVEL_BY_RELATION, THRESHOLDS, thresholds  # noqa: F401
 from judgments.state import domain_glosses, in_chunks, note_payload
+from judgments.urls import _canonical
 from search import search
 from search_judge import expand
 from vault_utils import discover_notes, profile_value, read_frontmatter, require_vault, write_dlq_note
@@ -271,6 +272,39 @@ def enrichment_targets(vault: Path, exclude: list[str]) -> list[str]:
     return out
 
 
+OWNER_SOURCES = {"clip"}  # `via` values a person chose; anything else arrived on its own
+
+
+def capture_provenance(path: Path) -> dict[str, Any]:
+    """How the capture reached the inbox. `via` comes from the capture's frontmatter (the readwise
+    plugin writes clip / newsletter / radar); a capture without it (research, bookmarks, older
+    captures) was put there by the owner and counts as a clip."""
+    try:
+        fm, _ = read_frontmatter(path)
+    except Exception:  # an unparseable capture is distill_check's problem, not triage's
+        fm = {}
+    via = str(fm.get("via") or "clip")
+    prov: dict[str, Any] = {"via": via, "owner_chose_it": via in OWNER_SOURCES}
+    if fm.get("radar_interests"):
+        prov["radar_interests"] = list(fm["radar_interests"])
+    return prov
+
+
+def apply_provenance(triage: dict[str, Any], prov: dict[str, Any]) -> dict[str, Any]:
+    """The one place provenance changes the pipeline: whether a capture may leave without a note.
+    A clip never does [Mike, 2026-09-23: own clips never drop and get enhanced]; anything that
+    arrived on its own (radar, newsletter) may be retired when triage says discard."""
+    out = dict(triage)
+    if out.get("recommendation") != "discard-candidate":
+        return out
+    if prov["owner_chose_it"]:
+        out["recommendation"] = "quick-file"
+        out["note"] = "the owner saved this: never discarded; file it at least"
+    else:
+        out["note"] = f"arrived via {prov['via']}, not chosen by the owner: may be retired without a note, with the reason in the archive manifest"
+    return out
+
+
 def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: list[str] | None = None,
                   views: int = VIEWS) -> dict[str, Any]:
     capture = read_capture(path)
@@ -311,6 +345,8 @@ def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: 
     block = {"capture": path.relative_to(vault).as_posix() if path.is_relative_to(vault) else str(path), "advisory": True,
              "questions_version": Q.QUESTIONS_VERSION, "search": search_meta}
     block.update(apply_policy(notes, answers, thresholds(usage.backend)))
+    block["provenance"] = capture_provenance(path)
+    block["triage"] = apply_provenance(block["triage"], block["provenance"])
     block["judgment"] = {**usage.as_dict(), "views": views}
     block["answers"] = {stable[qid]: (round(a.p, 4) if a.kind == "noul" else _probs(a)) for qid, a in answers.items()}
     return block

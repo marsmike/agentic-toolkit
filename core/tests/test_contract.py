@@ -106,7 +106,7 @@ def test_core_and_plugin_frontmatter_implementations_agree(tmp_path):
     # Both plugins ship a same-named `vault_utils` module in their own scripts/ dir — pop
     # the cached module between imports so each iteration loads the plugin under test's
     # own copy rather than a stale sys.modules hit from the previous one.
-    for plugin_name in ("obsidian", "readwise"):
+    for plugin_name in ("obsidian", "readwise", "radar"):
         scripts_dir = EXAMPLE_VAULT.parent / "plugins" / plugin_name / "scripts"
         sys.path.insert(0, str(scripts_dir))
         sys.modules.pop("vault_utils", None)
@@ -121,6 +121,25 @@ def test_core_and_plugin_frontmatter_implementations_agree(tmp_path):
         assert plugin_fm == core_fm, f"plugins/{plugin_name}/scripts/vault_utils.read_frontmatter disagreed"
         assert plugin_body.strip() == core_body.strip()
         assert plugin_fm["unknown_field"] == "keep-me"
+
+
+def test_shared_judgment_modules_are_byte_identical():
+    """The judgment client and its helpers exist twice, in obsidian and radar, because a plugin
+    never imports a sibling (contract/KNOWLEDGE_API.md). The copies are only safe while they are
+    the same bytes [R10 plan, 2026-09-22 — the first module shared by copy rather than by note].
+    Remove when the judgment client moves into core and both plugins depend on it there."""
+    import hashlib
+
+    plugins = EXAMPLE_VAULT.parent / "plugins"
+    drifted = []
+    for rel in ("judge.py", "judgments/urls.py", "judgments/state.py"):
+        digests = {
+            name: hashlib.sha256((plugins / name / "scripts" / rel).read_bytes()).hexdigest()
+            for name in ("obsidian", "radar")
+        }
+        if len(set(digests.values())) != 1:
+            drifted.append(rel)
+    assert not drifted, f"copy the obsidian version over the radar one (or back): {drifted}"
 
 
 def test_core_and_plugin_graph_discovery_agree(tmp_path, monkeypatch):
