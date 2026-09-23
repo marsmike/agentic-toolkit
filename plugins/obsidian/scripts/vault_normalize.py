@@ -90,7 +90,7 @@ def run_fix(
                 title=f"Unparseable frontmatter: {note.name}",
                 what_happened=f"vault_normalize.py --fix skipped {note.relative_to(vault)} rather than risk duplicating its frontmatter block.",
                 why_recorded="Writing through a lenient parse would silently drop the note's real metadata behind a second, shadowing frontmatter block — a corruption, not a skip, if left unrecorded.",
-                resolution="Fix the YAML by hand (usually an unquoted value containing ': '), then re-run vault_normalize.py --fix.",
+                resolution="Run vault_yaml_repair.py (it quotes values containing ': ' and restores broken delimiters), or fix the YAML by hand; then re-run vault_normalize.py --fix.",
                 confidence="high",
             )
             continue

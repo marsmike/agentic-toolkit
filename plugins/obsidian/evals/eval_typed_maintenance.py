@@ -187,6 +187,29 @@ def run(vault: Path) -> dict:
         _, body2, results2 = links.fix(note, fm, body, sandbox)
         if "[[Fusion Of Keyword And Vector Search]]" not in body2 or not any("Proposed" in r.description for r in results2):
             problems.append("links: a 0.6 pick must be proposed, not applied")
+
+        # links: heading, block and table-escaped alias forms of a valid link are not broken, and a
+        # repaired typo keeps its anchor and its escaped alias
+        judge._post = stub
+        forms = sandbox / "04_Resources" / "Eval-Link-Forms.md"
+        write_frontmatter(forms, {"description": "d", "status": "distilled"},
+                          "\n# Forms\n\n[[Eval-Check#Check]] and [[Eval-Check^abc]] and [[#Forms]].\n\n"
+                          "| a | b |\n|---|---|\n| [[04_Resources/Eval-Check\\|the check]] | [[Eval-Chek#Check\\|typo]] |\n")
+        fm, body = read_frontmatter(forms)
+        broken = [i.description for i in links.audit(forms, fm, body, sandbox) if i.description.startswith("Broken")]
+        if broken != ["Broken wikilink [[Eval-Chek#Check\\]]"]:
+            problems.append(f"links: only the typo should be broken, got {broken}")
+        _, body3, _ = links.fix(forms, fm, body, sandbox)
+        if "[[Eval-Check#Check\\|typo]]" not in body3 or "[[04_Resources/Eval-Check\\|the check]]" not in body3:
+            problems.append("links: a repair must keep the anchor and the table-escaped alias")
+
+        # links: a note is never offered as the repair of a link inside itself
+        selfref = sandbox / "04_Resources" / "Eval-Selfref-Author.md"
+        write_frontmatter(selfref, {"description": "d", "status": "distilled"}, "\n# Essay\n\nBy [[Eval-Selfref-Autor]].\n")
+        fm, body = read_frontmatter(selfref)
+        _, body4, _ = links.fix(selfref, fm, body, sandbox)
+        if "[[Eval-Selfref-Author]]" in body4:
+            problems.append("links: a broken link was repaired into a self-link")
     finally:
         judge._post = real_post
         for k, v in saved.items():
