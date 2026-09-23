@@ -5,6 +5,8 @@ with the obsidian and radar plugins loaded from the repo (readwise ingest runs a
 instruction. launchd runs it; a Claude Desktop scheduled task with the same instruction works too
 (pick one, never both: the run lock turns the second into a no-op, but it still costs a start).
 
+To run it as a Claude cloud routine instead (no Mac needed), see `docs/cloud-routine.md`.
+
 ## launchd
 
 `~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist`:
