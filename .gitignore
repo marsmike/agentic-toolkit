@@ -27,3 +27,6 @@ plugins/*/skill-evals/results/
 
 # Claude Code worktrees of this repo (EnterWorktree, claude -w)
 .claude/worktrees/
+
+# The real vault, cloned by scripts/cloud-vault.sh open; never committed here
+.vault-live/

@@ -1,0 +1,16 @@
+{
+  "extraKnownMarketplaces": {
+    "agentic-toolkit": {
+      "source": {
+        "source": "directory",
+        "path": "."
+      }
+    }
+  },
+  "enabledPlugins": {
+    "obsidian@agentic-toolkit": true,
+    "radar@agentic-toolkit": true,
+    "handoff@agentic-toolkit": true,
+    "memory@agentic-toolkit": true
+  }
+}
