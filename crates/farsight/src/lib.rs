@@ -138,7 +138,7 @@ fn shellexpand_home(value: &str) -> String {
 /// directly at the vault root whose own frontmatter declares `status: active`
 /// (contract/VAULT_SCHEMA.md's root-level-note clause). Mirrors
 /// `crates/gaiafield::discover_nodes`'s narrow reading: only a root file that opts in via
-/// `status: active` joins the set — `Index.md`/`CLAUDE.md` naturally stay out since neither
+/// `status: active` joins the set — `Index.md`/`AGENTS.md` naturally stay out since neither
 /// carries frontmatter at all, and `Config/`/`Templates/` are separate top-level dirs, not
 /// root-level files, so they're never considered here.
 pub fn discover_notes(vault: &Path) -> Vec<PathBuf> {

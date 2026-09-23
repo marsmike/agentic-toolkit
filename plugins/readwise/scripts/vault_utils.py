@@ -1,7 +1,7 @@
 """Shared vault utilities for the readwise plugin's scripts.
 
 Vault resolution, frontmatter I/O, and the dead-letter-queue (DLQ) convention — used by
-build_captures.py, daily_digest.py, and status.py.
+build_captures.py and ingest.py.
 
 Self-contained by design (no import of `core`, no import of a sibling plugin): a plugin's
 scripts must run standalone via `uv run` even if only `plugins/readwise/` is present, per
@@ -256,7 +256,7 @@ def iter_captures(vault: Path, prefix: str = "Readwise-") -> list[Path]:
 def find_capture_by_doc_id(vault: Path, doc_id: str, prefix: str = "Readwise-") -> Path | None:
     """Return the existing capture carrying this `readwise_doc_id`, if any.
 
-    The dedup-before-distill rule (contract/templates/VAULT_CLAUDE.md, earned by the
+    The dedup-before-distill rule (contract/templates/VAULT_AGENTS.md, earned by the
     2026-07-26 X-Bookmark/Readwise double-distill collision) is primarily distill's job at
     the cross-origin level. Within readwise's own ingest, the equivalent responsibility is
     idempotency: a re-run must never write a second capture for a doc_id already present.

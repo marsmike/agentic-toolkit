@@ -41,7 +41,7 @@ root, not under a PARA folder) joins active content — is eligible for search, 
 generated index — only if its own frontmatter explicitly declares `status: active`. Skip that
 field and the note isn't rejected or flagged; it just silently doesn't count, with no error to
 notice. `contract/VAULT_SCHEMA.md`'s folder-layout section names this explicitly (`Index.md` and
-`CLAUDE.md` never qualify regardless, since they carry no frontmatter at all). [[Alex-Vega]] is
+`AGENTS.md` never qualify regardless, since they carry no frontmatter at all). [[Alex-Vega]] is
 this vault's own example of a root note that does it correctly.
 
 ## Related

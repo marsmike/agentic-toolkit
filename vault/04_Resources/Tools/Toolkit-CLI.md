@@ -16,7 +16,7 @@ tags:
 [[Scope-Discipline-for-Curated-Systems]] for why that's a feature, not a gap):
 
 - **`toolkit vault init <path>`** — scaffolds a new vault from this example vault's template:
-  the PARA folders, `Templates/`, and a `CLAUDE.md` copied from `contract/templates/VAULT_CLAUDE.md`.
+  the PARA folders, `Templates/`, and a `AGENTS.md` copied from `contract/templates/VAULT_AGENTS.md`.
   `path` is a required positional argument — there is no default. That's deliberate, not an
   oversight: this repo's own `./vault` is the example/test-corpus vault (see
   [[Test-Corpus-Map]]), so a default that quietly pointed `init` at `./vault` would risk

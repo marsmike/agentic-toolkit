@@ -48,7 +48,7 @@ order (env var → this note → shipped default).
   is compared with is sent to that hosted service.** With no key the layer prints `SKIPPED`,
   sends nothing, and distill runs exactly as before. Thresholds are deliberately not profile
   keys: they are policy, live in `distill_judge.py` per backend, and move only after a
-  calibration run (`judgment-calibration` skill).
+  calibration run (the judgment-calibration loop, `docs/MAINTAINING.md`).
 - **`domains`** (optional, not set above) — your vault's own domain taxonomy, as a mapping of
   name to a one-line meaning (`ai-ml: "machine learning and language models themselves"`), or a
   plain list of names. Names are the part after `domain/`. When set, it replaces the starter

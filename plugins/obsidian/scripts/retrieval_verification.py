@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sampling and reporting scaffold for the retrieval-verification skill.
+"""Sampling and reporting scaffold for the retrieval-verification loop (docs/MAINTAINING.md).
 
 The predict-then-score step is done by the calling agent, not this script — it reads
 only a note's title+description (never the body), writes down what it expects the note

@@ -1,6 +1,6 @@
 """Eval: the dedup-before-distill acceptance criterion — running ingest's capture-write
 step twice over the same clipping never produces a second file. This is readwise's own
-share of the rule in contract/templates/VAULT_CLAUDE.md ("check for prior distillation
+share of the rule in contract/templates/VAULT_AGENTS.md ("check for prior distillation
 before writing... overlapping capture sources collide more often than expected"), earned
 by the 2026-07-26 X-Bookmark/Readwise double-distill collision: cross-origin dedup is
 distill's job, but readwise re-emitting a duplicate raw capture on every re-ingest would

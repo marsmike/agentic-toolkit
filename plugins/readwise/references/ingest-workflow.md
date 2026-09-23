@@ -5,10 +5,6 @@
 
 ## 1. Read state
 
-```bash
-uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/status.py" --json
-```
-
 `lastSyncedAt` in `00_Memory/readwise-state.md` is the watermark for step 2. If the state
 note doesn't exist, this is a first sync — default to 30 days ago and rely on the backlog
 sweep (step 3) to catch anything older.
@@ -107,8 +103,7 @@ chat output.
 
 ## 7. Update state
 
-Write/update `00_Memory/readwise-state.md`'s frontmatter: `lastSyncedAt` (now),
-`lastProcessedAt` (only after enrichment + cleanup, in the `process` flow). This note is
+Write/update `00_Memory/readwise-state.md`'s frontmatter: `lastSyncedAt` (now). This note is
 `00_Memory/` — operational state, never distilled into, never enriched from
 (`contract/VAULT_SCHEMA.md`).
 
@@ -118,11 +113,8 @@ Delete from **both** APIs — a Reader v3 delete does not remove a Classic v2 mi
 Ask "Delete N items from Readwise? [archive/delete/keep]" unless the original request
 already authorized it.
 
-## Status mode
+## Status
 
-Run `scripts/status.py --json` for last sync, unprocessed count, and DLQ count — see the
-`status` skill for the full presentation.
-
-## Daily mode
-
-Digesting today's captures is a separate, smaller capability — see the `daily` skill.
+There is no separate status command: `Now.md` (inbox, stuck work) and `Log.md` (one line per
+pipeline run) show where ingest stands, and `ingest.py --dry-run` counts what the next run would
+fetch. [earned: 2026-09-23, R12 — status and daily skills removed]

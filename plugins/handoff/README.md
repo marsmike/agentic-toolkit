@@ -29,9 +29,7 @@ you stop mid-task or context compacts. That's what this plugin captures.
 
 | Component | Purpose |
 |---|---|
-| `skills/handoff` | Save mode — writes the narrative to `_handoff/.draft.md`, then runs the script to assemble frontmatter, git state, chain link, and the vault index line. |
-| `skills/handoff-resume` | Resume mode — prints the latest handoff (and any newer auto-snapshot) for a fresh session to orient from. |
-| `commands/handoff.md`, `commands/handoff-resume.md` | Thin slash-command entry points, each pointing at its skill — same pattern `plugins/readwise/commands/` uses. |
+| `skills/handoff` | Save mode writes the narrative to `_handoff/.draft.md`, then runs the script to assemble frontmatter, git state, chain link, and the vault index line. Resume mode prints the latest handoff (and any newer auto-snapshot) for a fresh session to orient from. |
 | `hooks/` (`PreCompact`) | Auto-snapshot git state before context compaction. |
 | `scripts/handoff.py` | All deterministic mechanics: repo resolution, git state, chain sequencing, vault resolution, profile reads, the vault index, and the DLQ. |
 
@@ -133,16 +131,12 @@ v1 was already lean, tool-agnostic, and carried no persona-specific content — 
   resolution (`OBSIDIAN_VAULT_PATH` → `TOOLKIT_VAULT`/`./vault`, `contract/PROFILE.md`),
   a profile reader (`autosnapshot`, `index_path`, `default_visibility`), and the DLQ
   writer (see above).
-- `skills/handoff` (save) and `skills/handoff-resume` — v1 bundled both modes into one
-  skill; split into two here to match this repo's convention of one skill per mode of
-  use, with the narrative template kept nearly verbatim in `references/template.md` (it
+- `skills/handoff` (save and resume) — v1 bundled both modes into one skill; R0 split them,
+  and R12 joined them again as two sections of one skill, since every skill costs a slot in
+  every session's skill list [earned: 2026-09-23, R12 — 15 skills cut to six], with the narrative template kept nearly verbatim in `references/template.md` (it
   was already good) and the deeper procedure detail (listing, cross-tool notes,
   auto-snapshot, chain integrity) moved to `references/workflow.md` to keep `SKILL.md`
   itself lean.
-- `commands/handoff.md`, `commands/handoff-resume.md` — kept as thin slash-command
-  wrappers pointing at the skills, rewritten to the one-line `Use the
-  <plugin>:<skill> skill.` shape `plugins/readwise/commands/` established, rather than
-  duplicating the skill's own instructions.
 - `hooks/precompact.sh` + `hooks/hooks.json` — kept the thin-bash-launcher shape;
   `snapshot` now checks the `autosnapshot` profile field before writing, is
   byte-bounded, degrades silently with no project repo, and records a failure to the
@@ -158,8 +152,8 @@ v1 was already lean, tool-agnostic, and carried no persona-specific content — 
 
 ### Dropped
 
-Nothing substantive. v1's `commands/` were kept (see above, rewritten thin rather than
-dropped); there was no persona, no vendored environment variable beyond the vault path,
+v1's `commands/` were kept as thin wrappers until R12 dropped them: a skill is invoked by its
+own name, so a command that only says "use the skill" adds nothing. There was no persona, no vendored environment variable beyond the vault path,
 and no component that failed the admission bar on its own merits.
 
 ## Evals

@@ -31,7 +31,7 @@ ported).
 
 Phase 1 (analyze) proposes and stops; Phase 2 (write) only runs after the user
 confirms. Skip the checkpoint only on an explicit `--auto`/non-interactive
-instruction. This is the same discipline `contract/templates/VAULT_CLAUDE.md` requires
+instruction. This is the same discipline `contract/templates/VAULT_AGENTS.md` requires
 of every vault-write workflow — see `references/workflow.md` for the full procedure.
 
 ## References

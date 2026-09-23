@@ -1,7 +1,7 @@
 # Judgment calibration workflow
 
-`$S` below is `uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/distill_judge.py"`,
-`$G` is `$CLAUDE_PLUGIN_ROOT/evals/golden/distill_judge.golden.json`.
+`$S` below is `uv run --project plugins/obsidian/scripts python3 plugins/obsidian/scripts/distill_judge.py`,
+`$G` is `plugins/obsidian/evals/golden/distill_judge.golden.json`.
 
 ## 1. Baseline
 

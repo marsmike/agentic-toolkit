@@ -48,7 +48,7 @@ persona, links into all three clusters"), and excluding it would make the plante
 this vault was built to test unreachable. The note's own frontmatter already opts in
 (`status: active` — the note-lifecycle meaning of "active" in the same schema's frontmatter table,
 distinct from the folder-level filter), so this crate honors that self-declaration narrowly:
-nothing else at the root joins the node set (`Index.md` and `CLAUDE.md` carry no frontmatter at
+nothing else at the root joins the node set (`Index.md` and `AGENTS.md` carry no frontmatter at
 all), and `Config/`/`Templates/` are never scanned — they hold plugin config and templates, not
 vault content.
 
@@ -71,7 +71,7 @@ Each wikilink target resolves one of four ways:
 2. **Boundary violation** — resolves to a real file inside `00_Memory`/`01_Capture`/`05_Archive`;
    recorded with a flag, counted separately in `stats`.
 3. **Out of scope** — resolves to a real vault file that simply isn't a node (`Config/`,
-   `Templates/`, a root note without `status: active`, `Index.md`, `CLAUDE.md`). Not an error, not
+   `Templates/`, a root note without `status: active`, `Index.md`, `AGENTS.md`). Not an error, not
    flagged — just outside what this graph models, the same way search's active-content filter
    silently doesn't surface it either. No edge row is written.
 4. **Dangling** — doesn't resolve to any file anywhere in the vault; recorded with a flag. The

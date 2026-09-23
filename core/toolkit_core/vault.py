@@ -141,7 +141,7 @@ def update_note_frontmatter(path: Path, updates: dict) -> dict:
 def _root_active_notes(vault_path: Path) -> list[Path]:
     """Root-level *.md files whose own frontmatter declares `status: active` — the
     root-note clause in contract/VAULT_SCHEMA.md (e.g. a persona/profile note). `Index.md`
-    and `CLAUDE.md` never qualify since neither carries frontmatter. Malformed frontmatter
+    and `AGENTS.md` never qualify since neither carries frontmatter. Malformed frontmatter
     is skipped here rather than raised — `frontmatter_parse_errors()` is the dedicated
     surface for that failure mode.
     """
@@ -252,8 +252,8 @@ def append_capture(vault_path: Path, origin: str, title: str, content: str) -> P
 # --- vault init scaffold ---------------------------------------------------------------
 
 
-def scaffold_vault(path: Path, claude_md_template: Path, force: bool = False) -> None:
-    """Scaffold a new vault at `path`: PARA folders, Config/toolkit/, CLAUDE.md, Index.md.
+def scaffold_vault(path: Path, agents_md_template: Path, force: bool = False) -> None:
+    """Scaffold a new vault at `path`: PARA folders, Config/toolkit/, AGENTS.md, Index.md.
 
     Refuses a non-empty target directory unless `force` is set.
     """
@@ -268,8 +268,8 @@ def scaffold_vault(path: Path, claude_md_template: Path, force: bool = False) ->
         (path / folder).mkdir(parents=True, exist_ok=True)
     (path / "Config" / "toolkit").mkdir(parents=True, exist_ok=True)
 
-    claude_md_template = Path(claude_md_template)
-    (path / "CLAUDE.md").write_text(claude_md_template.read_text(encoding="utf-8"), encoding="utf-8")
+    agents_md_template = Path(agents_md_template)
+    (path / "AGENTS.md").write_text(agents_md_template.read_text(encoding="utf-8"), encoding="utf-8")
 
     index_path = path / "Index.md"
     if not index_path.exists():

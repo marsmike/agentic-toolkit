@@ -93,7 +93,7 @@ class Doc:
 def _root_active_notes(vault: Path) -> list[Path]:
     """Root-level *.md files whose own frontmatter declares `status: active` —
     contract/VAULT_SCHEMA.md's root-note clause (e.g. a persona/profile note). `Index.md`
-    and `CLAUDE.md` never qualify since neither carries frontmatter."""
+    and `AGENTS.md` never qualify since neither carries frontmatter."""
     notes = []
     for p in sorted(vault.glob("*.md")):
         try:

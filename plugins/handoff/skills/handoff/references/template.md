@@ -43,7 +43,7 @@ How to confirm the next step worked (test command, expected output, manual check
 
 ## Quick Start
 
-The literal first move for the next session (e.g. run the `handoff-resume` skill, then
+The literal first move for the next session (e.g. run the handoff skill in resume mode, then
 `open generate_html.py:412`).
 ```
 

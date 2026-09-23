@@ -3,9 +3,6 @@ description: Example profile for the readwise plugin — copy the frontmatter sh
 kind: profile
 status: active
 plugin: readwise
-enrichers:
-  - github
-  - youtube
 backlog_sweep: true
 attachments_folder: 04_Resources/Attachments
 tags:
@@ -22,14 +19,10 @@ resolution order (env var → this note → shipped default).
 
 ## Fields
 
-- **`enrichers`** — which optional enrichment steps the `enrich` skill runs by default:
-  `github` (repo metadata via the `gh` CLI) and/or `youtube` (metadata + transcript via
-  `yt-dlp`). Both degrade cleanly and independently when their CLI isn't installed — this
-  field only controls which ones are *attempted*, not a hard requirement.
 - **`backlog_sweep`** — whether `ingest` runs the mandatory reconciliation pass over
   `location=new`/`later` in addition to the windowed `updatedAfter` sync. Defaults to `true`;
   set `false` only if you have an external reason to trust the watermark alone (not
-  recommended — see `skills/ingest/references/ingest-workflow.md` for why the watermark
+  recommended — see `references/ingest-workflow.md` for why the watermark
   alone missed a real clipping for two months in the source project this was ported from).
 
 ## Secrets

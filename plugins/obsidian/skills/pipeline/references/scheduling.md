@@ -1,7 +1,7 @@
 # Scheduling the pipeline
 
 The pipeline runs unattended every 3 hours: `scripts/run-pipeline.sh` starts Claude Code headless
-with the obsidian, readwise and radar plugins loaded from the repo and the pipeline skill as the
+with the obsidian and radar plugins loaded from the repo (readwise ingest runs as a script) and the pipeline skill as the
 instruction. launchd runs it; a Claude Desktop scheduled task with the same instruction works too
 (pick one, never both: the run lock turns the second into a no-op, but it still costs a start).
 

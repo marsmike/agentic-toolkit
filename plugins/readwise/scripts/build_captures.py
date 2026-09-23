@@ -12,7 +12,7 @@ Two entry points:
 
 Both are dedup-safe: re-running ingest over the same clipping is a no-op rather than a
 second file, which is the readwise plugin's own share of the dedup-before-distill rule
-(contract/templates/VAULT_CLAUDE.md, earned by the 2026-07-26 X-Bookmark/Readwise
+(contract/templates/VAULT_AGENTS.md, earned by the 2026-07-26 X-Bookmark/Readwise
 double-distill collision) — cross-origin dedup is distill's job; not re-emitting duplicate
 raw captures on every ingest run is this plugin's job.
 """

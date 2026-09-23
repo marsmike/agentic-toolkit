@@ -8,7 +8,7 @@
 #
 # Filesystem-first by design (contract/KNOWLEDGE_API.md) — there is no app-CLI mode to
 # probe here, unlike v1. If you want the optional Obsidian desktop CLI enhancement, see
-# vault-ops/references/commands.md's silent-exit-0 trap before trusting its exit code.
+# vault/references/obsidian-syntax.md's silent-exit-0 trap before trusting its exit code.
 
 # --- vault ---------------------------------------------------------------
 if [[ -n "${TOOLKIT_VAULT:-}" ]]; then

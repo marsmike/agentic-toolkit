@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Save a portable handoff of current work to _handoff/ so another session, machine, or tool (Codex, Gemini) can continue without re-deriving context.
+description: Save a portable handoff of current work to _handoff/ so another session, machine, or tool (Codex, Gemini) can continue without re-deriving context — or resume from the latest one. Use for "save a handoff", "hand this off", "resume" or "continue from the handoff".
 allowed-tools: Bash, Read, Write
 ---
 
@@ -15,7 +15,7 @@ The deterministic mechanics live in `../../scripts/handoff.py`. Your job is the
 **narrative** — the part only conversation context can produce. Write **forward**: for
 what the *next* window needs to act, not a log of finished work.
 
-## Quick start
+## Save
 
 > Save a handoff of what we're doing so I can continue later
 
@@ -38,6 +38,17 @@ what the *next* window needs to act, not a log of finished work.
    script's own `Suggested:` line — it already reads the profile's `default_visibility`
    (`commit` for team/cross-machine continuity, `gitignore` for private single-machine
    use) so you don't have to guess.
+
+## Resume
+
+> Resume from the handoff / continue where we left off
+
+1. Run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/handoff.py" resume`. It prints the latest
+   handoff, plus any newer PreCompact auto-snapshot (only when it postdates the handoff).
+2. **Orient** in 3–5 lines: the goal, what is done, what was ruled out.
+3. Announce the plan and continue from the **Next Step**. Don't redo settled work.
+
+No `_handoff/`, or no handoff in it, prints "nothing to resume": a normal state, not an error.
 
 Full procedure detail — listing existing handoffs, cross-tool (Codex/Gemini) handoff,
 the auto-snapshot safety net, chain integrity, and the storage model — lives in

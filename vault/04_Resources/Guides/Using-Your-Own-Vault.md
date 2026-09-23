@@ -20,7 +20,7 @@ environment variable first, `./vault` as fallback, documented normatively in
 ## Scaffolding a fresh personal vault
 
 `toolkit vault init /path/to/new` (see [[Toolkit-CLI]]) copies this vault's structure — the PARA
-folders, `Templates/`, and a `CLAUDE.md` from `contract/templates/VAULT_CLAUDE.md` — into a new
+folders, `Templates/`, and a `AGENTS.md` from `contract/templates/VAULT_AGENTS.md` — into a new
 location, empty of content, ready to start capturing into.
 
 ## Tests never touch it
