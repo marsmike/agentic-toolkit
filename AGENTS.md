@@ -29,6 +29,23 @@ plugin installed (`$CLAUDE_PLUGIN_ROOT` in a skill is its plugin folder, e.g. `p
 
 Readwise has no skill: the pipeline runs `plugins/readwise/scripts/ingest.py`.
 
+## Working on a real vault
+
+A session in this repo (a Claude cloud task, or any machine) reaches the owner's vault through
+git, never through a copy of the code in the vault:
+
+```bash
+scripts/cloud-vault.sh open                  # clone or update $TOOLKIT_VAULT_REMOTE into .vault-live/
+export TOOLKIT_VAULT="$PWD/.vault-live"      # every script and skill now targets it
+# read .vault-live/AGENTS.md first, then Now.md → Index.md → Maps/; work with the skills
+scripts/cloud-vault.sh close --distilled N --note "cloud: <what>"   # rebuild, secret scan, commit, push
+```
+
+- `.vault-live/` is git-ignored here: never commit the vault into the toolkit.
+- Keys come from the environment, never from a file; check them by name only (`open` prints
+  which are set). Without a key, each script prints `SKIPPED` and the work goes on without it.
+- Tests and evals still run against `./vault` only, never `.vault-live/`.
+
 ## Hard rules
 
 Plugins depend on `core`/`contract` only, never on a sibling plugin.

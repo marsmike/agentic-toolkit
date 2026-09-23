@@ -44,7 +44,8 @@ not a note's inbound link.
 | `Log.md` | `log_vault.py` | One line per run |
 
 A map's title, intro and sections come from `Config/toolkit/maps.md`; everything else comes from
-the notes' tags, `kind`, `description` and links. [earned: 2026-09-23, about 80 hand-made MOCs
+the notes' tags, `kind`, `description` and links. In a vault under git, a note git ignores is in
+no generated view and no lint report: a clone never has it, and a build on each side must agree. [earned: 2026-09-23, about 80 hand-made MOCs
 had gone stale] **Removal condition:** none while the vault forbids hand-maintained MOCs.
 
 ## Frontmatter field table

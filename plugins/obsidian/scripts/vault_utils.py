@@ -12,10 +12,12 @@ independence rule. Its conventions deliberately mirror `core/toolkit_core/vault.
 from __future__ import annotations
 
 import copy
+import functools
 import io
 import json
 import os
 import re
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -215,6 +217,20 @@ def atomic_write(path: Path, content: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+@functools.lru_cache(maxsize=8)
+def git_ignored(vault: Path) -> frozenset[str]:
+    """Vault-relative paths git ignores in the active folders (empty outside a git repo).
+
+    A note git does not track exists on one machine only: a clone of the vault never sees it. The
+    generated views and lint skip it, or a build on the Mac and one in a clone disagree and the
+    maps flip on every sync. [earned: 2026-09-23, R12 cloud-vault test — notes kept out of git
+    because they hold a secret appeared in the Mac's maps and not in the clone's]
+    """
+    out = subprocess.run(["git", "-C", str(vault), "ls-files", "--others", "--ignored", "--exclude-standard", "-z",
+                          "--", *ACTIVE_CONTENT_FOLDERS], capture_output=True, text=True, check=False)
+    return frozenset(p for p in out.stdout.split("\0") if p) if out.returncode == 0 else frozenset()
+
+
 def _has_index_false(path: Path) -> bool:
     try:
         with path.open("r", encoding="utf-8", errors="replace") as f:
@@ -264,6 +280,7 @@ def discover_notes(
     exclude = tuple(exclude or ())
     cutoff_ts = time.mktime(time.strptime(since, "%Y-%m-%d")) if since else None
 
+    ignored = git_ignored(vault)
     found: list[Path] = []
     for folder in folders:
         root = vault / folder
@@ -278,7 +295,7 @@ def discover_notes(
                 if _has_index_false(p):
                     continue
                 rel = p.relative_to(vault).as_posix()
-                if any(rel == e or rel.startswith(e.rstrip("/") + "/") for e in exclude):
+                if rel in ignored or any(rel == e or rel.startswith(e.rstrip("/") + "/") for e in exclude):
                     continue
                 if cutoff_ts is not None and not _is_recent(p, cutoff_ts, since, distilled_only):
                     continue

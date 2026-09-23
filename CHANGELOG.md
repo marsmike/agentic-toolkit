@@ -2,6 +2,20 @@
 
 Every release entry links the change to the research or the dated failure that motivated it — this file is the public ratchet.
 
+## [Unreleased] — R12, the vault from a cloud session
+
+A Claude cloud task runs in this repo, where the code and skills are, and reaches the vault through
+git; the vault stays knowledge only and gets no copy of the code.
+
+- **`scripts/cloud-vault.sh`** — `open` clones (or updates) `$TOOLKIT_VAULT_REMOTE` into the
+  git-ignored `.vault-live/`, syncs the scripts' environment and reports keys by name;
+  `close` is the pipeline's own `end` (index, maps, Now, secret scan, commit, pull, push).
+- **Git-ignored notes leave every generated view and lint.** Tested end to end against a bare
+  clone of the real vault: three notes kept out of git because they hold a secret sat in the
+  Mac's maps and Index and not in the clone's, so every sync would have flipped them. Now a build
+  on the Mac and one in a clone produce identical maps. [earned: 2026-09-23]
+- `AGENTS.md` gains "Working on a real vault".
+
 ## [Unreleased] — R12, six skills and one entry file (marketplace 3.0.0)
 
 Fifteen skills, six wrapper commands and a duplicate distill agent cost a slot in every session's

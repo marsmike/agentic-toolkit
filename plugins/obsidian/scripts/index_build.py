@@ -36,6 +36,7 @@ from vault_utils import (
     WARNING,
     UnparseableFrontmatter,
     atomic_write,
+    git_ignored,
     parse_existing_index,
     read_frontmatter,
     require_vault,
@@ -59,12 +60,15 @@ def _first_prose_line(body: str) -> str:
 
 def collect(vault: Path) -> dict[str, Path]:
     notes: dict[str, Path] = {}
+    ignored = git_ignored(vault)
     for folder in ACTIVE_CONTENT_FOLDERS:
         root = vault / folder
         if not root.exists():
             continue
         for md in root.rglob("*.md"):
             if any(part in EXCLUDE_DIRS for part in md.relative_to(vault).parts[:-1]):
+                continue
+            if md.relative_to(vault).as_posix() in ignored:
                 continue
             notes[md.relative_to(vault).with_suffix("").as_posix()] = md
     return notes

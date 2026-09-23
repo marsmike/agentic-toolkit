@@ -12,6 +12,7 @@ config block gives the domain a title, an intro and a "Concepts" section. After 
 5. hygiene   — no map links into 00_Memory/ or 01_Capture/; a map this generator wrote for a
                domain that no longer exists is removed
 6. idempotent — a second build changes no file
+7. untracked — a note git ignores is on no map and not in Index.md (a clone never has it)
 """
 from __future__ import annotations
 
@@ -120,6 +121,20 @@ def run(vault: Path) -> dict:
         after = {p.name: p.stat().st_mtime_ns for p in maps.iterdir()}
         if changed["changed"] or changed["removed"] or before != after:
             problems.append(f"phase 6: a second build changed {changed}")
+        # 7. untracked by git: a note git ignores is on no map and not in Index.md
+        import subprocess
+
+        import index_build
+        from vault_utils import git_ignored
+        (sandbox / ".gitignore").write_text("04_Resources/EvalHub/Loner.md\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(sandbox), "init", "-q"], check=False)
+        git_ignored.cache_clear()
+        map_build.main(["--today", TODAY])
+        index_build.main([])
+        if "|Loner]]" in (maps / "evalhub.md").read_text(encoding="utf-8") or \
+                "EvalHub/Loner|" in (sandbox / "Index.md").read_text(encoding="utf-8"):
+            problems.append("phase 7: a git-ignored note must be on no map and not in Index.md")
+        git_ignored.cache_clear()
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
