@@ -428,7 +428,7 @@ def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, fo
     wk = week or reports.last_complete_week(now.date())
     text = reports.render_weekly(wk, rows, interests_mod.load(vault), now)
     try:
-        path = reports.write_weekly(vault, wk, text, force)
+        path = reports.write_weekly(vault, wk, text, force, out / "weekly.jsonl")
     except FileExistsError as e:
         return {"status": "exists", "detail": str(e)}
     return {"status": "ok", "week": wk, "capture": path.relative_to(vault).as_posix()}

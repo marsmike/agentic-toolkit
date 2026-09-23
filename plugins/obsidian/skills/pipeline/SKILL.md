@@ -21,6 +21,7 @@ P() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROO
 P pipeline_run.py begin          # "busy": another run holds the lock; stop, say so
 # sources, each optional; SKIPPED (no key, plugin absent) is fine, go on:
 #   radar skill:     radar.py scan --since 1d --promote --json
+#                    radar.py weekly   (last week's digest, written once; "exists" is normal)
 #   readwise:ingest: ingest.py --json
 P pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first
 # distill each one with the distill skill, --auto
@@ -28,7 +29,7 @@ P pipeline_run.py end --distilled N --retired N --failed <captures that failed d
 ```
 
 **Sources.** The radar judges the feed and promotes at most five strong items a day to Reader's
-Later; ingest turns every new library item (your clips, newsletters, promoted items) into a
+Later, and once a week writes the digest capture (`via: radar`); ingest turns every new library item (your clips, newsletters, promoted items) into a
 capture that says how it arrived (`via`). Run them in that order so promoted items land in this
 run's queue.
 

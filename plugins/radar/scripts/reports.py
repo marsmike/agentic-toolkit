@@ -15,6 +15,7 @@ items, seen at least 3 times from at least 2 feeds, ranked by smoothed log-ratio
 """
 from __future__ import annotations
 
+import json
 import math
 import re
 import statistics
@@ -190,6 +191,7 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
         f"source: Reader feed items judged by the radar, ISO week {week}",
         f"created: {now.date().isoformat()}",
         "kind: radar-digest",
+        "via: radar",
         "status: draft",
         "tags:",
         "  - radar",
@@ -243,10 +245,17 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
     return "\n".join(lines)
 
 
-def write_weekly(vault: Path, week: str, text: str, force: bool = False) -> Path:
+def write_weekly(vault: Path, week: str, text: str, force: bool = False, written: Path | None = None) -> Path:
+    """Write the week's capture once. `written` (00_Memory/radar/weekly.jsonl) remembers the weeks
+    already written, so a digest distill has retired is not written again by the next run."""
     path = vault / "01_Capture" / f"Radar-Week-{week}.md"
-    if path.exists() and not force:
-        raise FileExistsError(f"{path.relative_to(vault)} exists (it may be half distilled); --force rewrites it")
+    done = written.is_file() and any(json.loads(ln).get("week") == week for ln in written.read_text(encoding="utf-8").splitlines() if ln.strip()) if written else False
+    if (path.exists() or done) and not force:
+        raise FileExistsError(f"the capture for {week} was already written (it may be distilled or half distilled); --force rewrites it")
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(path, text)
+    if written is not None:
+        written.parent.mkdir(parents=True, exist_ok=True)
+        with written.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"week": week, "capture": path.relative_to(vault).as_posix()}) + "\n")
     return path

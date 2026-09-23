@@ -80,7 +80,8 @@ def run(vault: Path) -> dict:
         before = snapshot(sandbox)
         interests = [Interest("a", "Agent Memory"), Interest("b", "Firmware"), Interest("c", "Birding")]
         text = reports.render_weekly(week, rows, interests, NOW)
-        path = reports.write_weekly(sandbox, week, text)
+        written = sandbox / "00_Memory" / "radar" / "weekly.jsonl"
+        path = reports.write_weekly(sandbox, week, text, written=written)
         if path.relative_to(sandbox).as_posix() != f"01_Capture/Radar-Week-{week}.md":
             problems.append(f"phase 3: wrong capture path {path}")
         try:
@@ -88,7 +89,7 @@ def run(vault: Path) -> dict:
         except UnparseableFrontmatter:
             fm, body = {}, ""
             problems.append("phase 3: the capture's frontmatter does not parse")
-        if fm.get("status") != "draft" or fm.get("kind") != "radar-digest" or not fm.get("description"):
+        if fm.get("status") != "draft" or fm.get("kind") != "radar-digest" or fm.get("via") != "radar" or not fm.get("description"):
             problems.append(f"phase 3: frontmatter should be a draft radar-digest with a description, got {fm}")
         if "### 1. Agent Memory (rising)" not in body:
             problems.append("phase 3: the rising interest should come first and be marked")
@@ -101,10 +102,16 @@ def run(vault: Path) -> dict:
             problems.append("phase 3: a second write must be refused without --force")
         except FileExistsError:
             pass
-        reports.write_weekly(sandbox, week, text + "\n", force=True)
+        path.unlink()  # distill retired it
+        try:
+            reports.write_weekly(sandbox, week, text, written=written)
+            problems.append("phase 3: a week already written must not be written again after distill retired it")
+        except FileExistsError:
+            pass
+        reports.write_weekly(sandbox, week, text + "\n", force=True, written=written)
         changed = {p for p in snapshot(sandbox).keys() ^ before.keys()} | {
             p for p in before if snapshot(sandbox).get(p) != before[p]}
-        if changed != {f"01_Capture/Radar-Week-{week}.md"}:
+        if changed != {f"01_Capture/Radar-Week-{week}.md", "00_Memory/radar/weekly.jsonl"}:
             problems.append(f"phase 3: weekly wrote more than its capture: {sorted(changed)}")
     finally:
         if sandbox is not None:
