@@ -20,7 +20,7 @@ hours; a run that finds nothing is short and says so.
 P() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/$1" "${@:2}"; }
 P pipeline_run.py begin          # "busy": another run holds the lock; stop, say so
 # sources, each optional; SKIPPED (no key, plugin absent) is fine, go on:
-#   radar skill:     radar.py scan --since 1d --promote --json
+#   radar skill:     radar.py scan --since 1d --promote --todoist --json
 #                    radar.py weekly   (last week's digest, written once; "exists" is normal)
 #   readwise:ingest: ingest.py --json
 P pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first

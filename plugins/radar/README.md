@@ -67,6 +67,6 @@ from the environment only (`READWISE_TOKEN`, `KAGI_API_KEY`, `TOOLKIT_RADAR_JUDG
 
 ## Not yet
 
-`gaps` (Kagi search for strong items outside your feeds), `--todoist` (a dated comment on the
-Portfolio epic an item serves) and a Kagi skill are specified in `docs/R10-RADAR-PLAN.md` and not
-built. Reader has no feed-subscription API, so `discover` ends in an OPML, not a subscription.
+`gaps` (Kagi search for strong items outside your feeds) and a Kagi skill are specified in
+`docs/R10-RADAR-PLAN.md` and not built. `scan --todoist` is built: with `todoist_project_id` set,
+each Portfolio epic with strong items gets one dated comment a day, never a new or completed task. Reader has no feed-subscription API, so `discover` ends in an OPML, not a subscription.
