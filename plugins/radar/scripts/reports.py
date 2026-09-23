@@ -170,7 +170,8 @@ def _vault_ref(path: str | None) -> str:
     return f" · already in vault: [[{path.removesuffix('.md')}]]"
 
 
-def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: datetime, per_interest: int = 3) -> str:
+def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: datetime, per_interest: int = 3,
+                  gaps: dict | None = None) -> str:
     names = {i.id: i.name for i in interests}
     wk_rows = [r for r in rows if week_of(r["run"]) == week]
     strong_rows = {iid: [] for iid in names}
@@ -237,6 +238,14 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
             w = sum(1 for r in wk if bands(r)[0])
             s = sum(1 for r in wk if bands(r)[1])
             lines.append(f"| {f['feed']} | {len(wk)} | {w} | {s} | {', '.join(f['advice'])} |")
+    if gaps:
+        strong_gaps = [g for g in gaps.get("rows", []) if g.get("strong")]
+        lines += ["", "## Found outside your feeds", ""]
+        lines += [f"- {_link(g)} — {g.get('site') or '?'} · p={max(g['p'].values()):.2f} · "
+                  f"{', '.join(names.get(i, i) for i in g['strong'])}" for g in strong_gaps[:10]] or ["Nothing strong this week."]
+        if gaps.get("sites"):
+            lines += ["", "Sites that carried them, candidates for `radar.py discover --seed`: "
+                      + ", ".join(f"{s} ({n})" for s, n in gaps["sites"][:8])]
     terms = emerging_terms(rows, week)
     lines += ["", "## Emerging terms (experimental)", ""]
     lines.append(" · ".join(f"{t['term']} ({t['count']})" for t in terms) if terms else "None yet.")

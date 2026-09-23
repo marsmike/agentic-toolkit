@@ -24,7 +24,8 @@ answers nothing at all is recorded once in the dead-letter queue.
 `replay` is the acceptance run (replay.py): own clips vs. feed items, Jev vs. BM25 vs. recency.
 `discover` (discover.py) finds feeds for the interests via Kagi and writes an OPML to import.
 `feeds`, `trend` and `weekly` (reports.py) read state.jsonl only: feed yield, rising interests,
-and the weekly capture `01_Capture/Radar-Week-YYYY-WW.md`.
+and the weekly capture `01_Capture/Radar-Week-YYYY-WW.md`. `gaps` (gaps.py) is the weekly search
+for what the feeds missed; `kagi search|news|answer|summarize` is the kagi skill's entry point.
 
 What leaves the machine: item titles, summaries and site names, and interest names and glosses,
 to the judgment backend (OpenRouter by default).
@@ -44,8 +45,10 @@ from pathlib import Path
 from typing import Any
 
 import discover as discover_mod
+import gaps as gaps_mod
 import interests as interests_mod
 import judge
+import kagi
 import reader
 import replay
 import reports
@@ -474,12 +477,30 @@ def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, fo
         wk = week or reports.week_of(now.date().isoformat())
         return {"status": "ok", "week": wk, "interests": reports.trend(rows, wk), "terms": reports.emerging_terms(rows, wk)}
     wk = week or reports.last_complete_week(now.date())
-    text = reports.render_weekly(wk, rows, interests_mod.load(vault), now)
+    text = reports.render_weekly(wk, rows, interests_mod.load(vault), now, gaps=gaps_mod.load_week(out, wk))
     try:
         path = reports.write_weekly(vault, wk, text, force, out / "weekly.jsonl")
     except FileExistsError as e:
         return {"status": "exists", "detail": str(e)}
     return {"status": "ok", "week": wk, "capture": path.relative_to(vault).as_posix()}
+
+
+def kagi_cmd(vault: Path, out: Path, mode: str, text: str) -> dict[str, Any]:
+    """The kagi skill's entry point: one call, under the same ledger and weekly budget as discovery."""
+    ledger = kagi.Ledger(out / "kagi-ledger.jsonl",
+                         float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
+    call = {"search": kagi.search, "news": kagi.news, "answer": kagi.fastgpt, "summarize": kagi.summarize}[mode]
+    try:
+        answer = call(text, ledger)
+    except kagi.NoKey:
+        return {"status": "SKIPPED", "detail": "KAGI_API_KEY is not set; nothing sent"}
+    except kagi.OverBudget as e:
+        return {"status": "over-budget", "detail": str(e)}
+    except kagi.KagiError as e:
+        return {"status": "failed", "detail": str(e)}
+    last = ledger.rows()[-1]
+    return {"status": "ok", "mode": mode, "result": answer, "usd": last["usd"],
+            "spent_this_week": round(ledger.spent_this_week(datetime.now(UTC)), 4)}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -517,11 +538,24 @@ def main(argv: list[str] | None = None) -> int:
     wp.add_argument("--force", action="store_true", help="rewrite an existing weekly capture")
     wp.add_argument("--out", type=Path, default=None)
     wp.add_argument("--json", action="store_true")
+    gp = sub.add_parser("gaps", help="once a week: recent posts per interest the feeds missed (Kagi news), judged")
+    gp.add_argument("--promote", action="store_true", help="save the strongest to Reader Later, within the daily budget")
+    gp.add_argument("--out", type=Path, default=None)
+    gp.add_argument("--json", action="store_true")
+    kp = sub.add_parser("kagi", help="Kagi on demand: search, news, answer (FastGPT), summarize (a URL)")
+    kp.add_argument("mode", choices=("search", "news", "answer", "summarize"))
+    kp.add_argument("text", help="the query, or for summarize the URL")
+    kp.add_argument("--out", type=Path, default=None)
+    kp.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     vault = require_vault()
     now = datetime.now(UTC)
-    if args.cmd in ("feeds", "trend", "weekly"):
+    if args.cmd == "kagi":
+        result = kagi_cmd(vault, args.out or vault / RADAR_DIR, args.mode, args.text)
+    elif args.cmd == "gaps":
+        result = gaps_mod.gaps(vault, args.out or vault / RADAR_DIR, now, args.promote)
+    elif args.cmd in ("feeds", "trend", "weekly"):
         result = report(vault, args.out or vault / RADAR_DIR, args.cmd, now, args.week, getattr(args, "force", False))
     elif args.cmd == "discover":
         result = discover_mod.discover(vault, args.out or vault / RADAR_DIR, now, args.interest, args.seed, args.queries)

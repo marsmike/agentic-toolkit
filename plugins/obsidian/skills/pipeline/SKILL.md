@@ -21,6 +21,7 @@ P() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROO
 P pipeline_run.py begin          # "busy": another run holds the lock; stop, say so
 # sources, each optional; SKIPPED (no key, plugin absent) is fine, go on:
 #   radar skill:     radar.py scan --since 1d --promote --todoist --json
+#                    radar.py gaps --promote   (once a week: what the feeds missed; "exists" is normal)
 #                    radar.py weekly   (last week's digest, written once; "exists" is normal)
 #   readwise:ingest: ingest.py --json
 P pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first

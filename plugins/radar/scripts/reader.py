@@ -130,6 +130,16 @@ def bulk_update(updates: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
     return done, failed
 
 
+def save(url: str, location: str, tags: list[str], notes: str = "") -> str:
+    """Save a page found outside the feeds into the library (the gap search's promotion). Returns
+    the new document's id. Same guard as bulk_update: a library location, never the feed."""
+    if location not in LOCATIONS or not url.startswith("http"):
+        raise ValueError(f"refusing a Reader save to {location!r} of {url!r}")
+    body = _call("POST", f"{READER_BASE}/save/", {"url": url, "location": location, "tags": tags,
+                                                   **({"notes": notes} if notes else {})}, ok=(200, 201)) or {}
+    return str(body.get("id") or "")
+
+
 def archive(ids: list[str]) -> tuple[list[str], list[str]]:
     return bulk_update([{"id": i, "location": "archive"} for i in ids])
 
