@@ -39,6 +39,17 @@ updates:
       rust-deps:
         patterns:
           - "*"
+    ignore:
+      # model2vec-rs pins tokenizers 0.21: a second, newer tokenizers compiles without a regex
+      # backend and fails the build [earned: PR #10, rust CI, 2026-08]. Move with model2vec-rs.
+      - dependency-name: "tokenizers"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # Breaking API changes (ureq 3 agent/error types, sha2 0.11): a deliberate upgrade of
+      # gaiafield's download path, not a grouped weekly bump.
+      - dependency-name: "ureq"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sha2"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     commit-message:
       prefix: "deps"
       include: "scope"
