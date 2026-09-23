@@ -5,10 +5,11 @@
                  spellings deduped to one item; every question names only state that exists; state
                  carries no search queries and no reading signals; an item strong for two interests
                  is strong for both; an item whose source a vault note already has is marked; only
-                 00_Memory/radar/ changes
+                 00_Memory/radar/ changes; a repost (same feed, same title, new URL) is not judged
+                 again; a new feed's back catalogue is marked seen as backlog, never judged
 3. rerun       — the same items are seen: no request, status empty
 4. split       — a backend refusing the state for size gets smaller chunks; every item is still judged
-5. failure     — a backend answering nothing: one DLQ note, status failed, nothing marked seen
+5. failure     — a backend answering nothing: one DLQ note, status failed, nothing but backlog marked seen
 6. epics       — Portfolio epics via `td`: wanted sections only, no subtasks, no completed tasks,
                  the `What:` sentence as gloss
 """
@@ -53,10 +54,11 @@ source: https://example.org/posts/known
 """
 
 
-def _doc(i: int, title: str, url: str, hours_ago: float = 1, parent: str | None = None, site: str = "Example Feed") -> dict:
+def _doc(i: int, title: str, url: str, hours_ago: float = 1, parent: str | None = None, site: str = "Example Feed",
+         published: str = "2026-09-22") -> dict:
     return {"id": f"doc{i}", "title": title, "summary": f"summary of {title}", "source_url": url,
             "url": f"https://read.readwise.io/read/doc{i}", "site_name": site, "category": "rss",
-            "location": "feed", "parent_id": parent, "published_date": "2026-09-22",
+            "location": "feed", "parent_id": parent, "published_date": published,
             "saved_at": (NOW - timedelta(hours=hours_ago)).isoformat(), "reading_progress": 0.5}
 
 
@@ -70,6 +72,8 @@ PAGE_2 = [
     _doc(5, "a highlight", "https://example.org/h", parent="doc4"),
     _doc(6, "Old item [strong:birding]", "https://example.org/old", hours_ago=48),
     _doc(7, "Known post again [worth:agent-memory]", "https://example.org/posts/known?utm_medium=rss"),
+    _doc(8, "Zephyr 4.3 Released! [worth:firmware]", "https://example.org/mirror/zephyr-4-3"),
+    _doc(9, "From the new feed's archive [strong:birding]", "https://example.org/archive/2019", published="2019-03-01"),
 ]
 
 TD_SECTIONS = [{"id": "s-doing", "name": "Doing"}, {"id": "s-ideas", "name": "Ideas"}]
@@ -149,8 +153,8 @@ def run(vault: Path) -> dict:
         os.environ["TOOLKIT_RADAR_JUDGMENT_API_KEY"] = "stub-key-not-a-secret"
         before = snapshot(sandbox)
         r = radar.scan(sandbox, out, since, NOW)
-        if r.get("status") != "ok" or r.get("judged") != 4 or r.get("fetched") != 5:
-            problems.append(f"phase 2: expected ok, fetched 5, judged 4, got {json.dumps({k: r.get(k) for k in ('status', 'fetched', 'judged', 'detail')})}")
+        if r.get("status") != "ok" or r.get("judged") != 4 or r.get("fetched") != 7 or r.get("backlog") != 1:
+            problems.append(f"phase 2: expected ok, fetched 7, judged 4, backlog 1, got {json.dumps({k: r.get(k) for k in ('status', 'fetched', 'judged', 'backlog', 'detail')})}")
         if len(reader_calls) != 2:
             problems.append(f"phase 2: expected two Reader pages, got {len(reader_calls)}")
         for payload in calls:
@@ -167,6 +171,10 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 2: doc1 should be strong for both interests, got {rows.get('doc1', {}).get('strong')}")
         if "doc2" in rows:
             problems.append("phase 2: the pdf spelling of doc1's paper was judged again")
+        if "doc8" in rows or "doc9" in rows:
+            problems.append("phase 2: a repost or a back-catalogue item was judged")
+        if not any(r_.get("backlog") and "archive/2019" in r_["canonical"] for r_ in radar.read_jsonl(out / "seen.jsonl")):
+            problems.append("phase 2: the back-catalogue item was not recorded as seen")
         if rows.get("doc3", {}).get("worth") != ["firmware"] or rows.get("doc3", {}).get("strong"):
             problems.append(f"phase 2: doc3 should be worth (not strong) for firmware, got {rows.get('doc3')}")
         if rows.get("doc7", {}).get("in_vault") != "04_Resources/Known-Post.md":
@@ -205,7 +213,7 @@ def run(vault: Path) -> dict:
         r = radar.scan(sandbox, out5, since, NOW)
         mode["fail"] = False
         dlq_new = set((sandbox / "00_Memory" / "dlq").glob("*.md")) - dlq_before
-        if r.get("status") != "failed" or len(dlq_new) != 1 or (out5 / "seen.jsonl").exists():
+        if r.get("status") != "failed" or len(dlq_new) != 1 or any(not x.get("backlog") for x in radar.read_jsonl(out5 / "seen.jsonl")):
             problems.append(f"phase 5: expected failed + one DLQ note + nothing seen, got {r.get('status')}, {len(dlq_new)} DLQ")
 
         # 6. epics

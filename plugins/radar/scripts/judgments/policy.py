@@ -15,6 +15,10 @@ THRESHOLDS: dict[str, dict[str, float]] = {
 
 ITEMS_PER_REQUEST = 8           # every interest is asked about every item in one request
 MAX_REQUESTS_PER_RUN = 300      # a daily scan needs ~10; the 30-day replay ~220
+# An item published this long before --since is a newly subscribed feed's back catalogue, not
+# news: recorded as seen, never judged. [earned: 2026-09-22 smoke run, a new feed's archive
+# arrived as that day's items]
+BACKLOG_GRACE_DAYS = 7
 
 
 def thresholds(backend: str) -> dict[str, float]:

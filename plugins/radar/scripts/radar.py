@@ -2,13 +2,18 @@
 """Radar: judge every Reader feed item against the owner's interests.
 
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py scan --since 1d [--json]
+    uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py replay --since 30d --out DIR
 
-`scan` fetches feed items saved since `--since`, drops those already seen (canonical URL), asks
+`scan` fetches feed items saved since `--since`, drops those already seen (canonical URL, or the
+same title from the same feed: a repost under a new address) and a new feed's back catalogue
+(published more than BACKLOG_GRACE_DAYS before `--since`; recorded as seen, not judged), asks
 the judgment backend `worth_reading` per item x interest and `kind` per item, applies the
 policy, appends one row per item to `00_Memory/radar/state.jsonl` and renders that day's note
 `00_Memory/radar/YYYY-MM-DD.md` from the day's rows. It writes nothing else: not to Reader,
 not to active content. Without a key it prints SKIPPED and sends nothing; a backend that
 answers nothing at all is recorded once in the dead-letter queue.
+
+`replay` is the acceptance run (replay.py): own clips vs. feed items, Jev vs. BM25 vs. recency.
 
 What leaves the machine: item titles, summaries and site names, and interest names and glosses,
 to the judgment backend (OpenRouter by default).
@@ -28,6 +33,7 @@ from typing import Any
 import interests as interests_mod
 import judge
 import reader
+import replay
 from interests import Interest
 from judgments import policy
 from judgments import questions as Q
@@ -53,6 +59,21 @@ def parse_since(text: str, now: datetime) -> datetime:
 
 def item_key(item: Item) -> str:
     return item.canonical or f"reader:{item.id}"
+
+
+def title_key(item: Item) -> str:
+    """feed + normalised title: a repost under a different URL. Empty for an untitled item."""
+    words = re.sub(r"[^\w]+", " ", item.title.casefold()).split()
+    return f"{item.feed.casefold()}|{' '.join(words)}" if words else ""
+
+
+def is_backlog(item: Item, since: datetime) -> bool:
+    """Published well before the window it was saved in: a newly subscribed feed's archive."""
+    try:
+        published = datetime.fromisoformat(item.published).replace(tzinfo=UTC)
+    except ValueError:
+        return False
+    return published < since - timedelta(days=policy.BACKLOG_GRACE_DAYS)
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -264,15 +285,21 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
     except reader.ReaderError as e:
         return {"status": "failed", "detail": f"Reader: {e}"}
 
-    seen = {r["canonical"] for r in read_jsonl(out / "seen.jsonl")}
+    seen_rows = read_jsonl(out / "seen.jsonl")
+    seen = {r["canonical"] for r in seen_rows} | {r["title_key"] for r in seen_rows if r.get("title_key")}
     items: list[Item] = []
+    backlog: list[Item] = []
     for it in fetched:
-        if item_key(it) not in seen:
-            seen.add(item_key(it))
-            items.append(it)
+        keys = {item_key(it), title_key(it)} - {""}
+        if keys & seen:
+            continue
+        seen |= keys
+        (backlog if is_backlog(it, since) else items).append(it)
     items = items[:limit] if limit else items
+    append_jsonl(out / "seen.jsonl", [{"canonical": item_key(it), "title_key": title_key(it),
+                                        "first_seen": run_date, "backlog": True} for it in backlog])
     result: dict[str, Any] = {"since": since.isoformat(), "fetched": len(fetched), "new": len(items),
-                              "interests": len(interests)}
+                              "backlog": len(backlog), "interests": len(interests)}
     if not items:
         return {**result, "status": "empty"}
 
@@ -295,7 +322,8 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
     sources = vault_sources(vault)
     rows = [to_row(items[i], j, run_date, run, t, sources.get(items[i].canonical)) for i, j in sorted(judged.items())]
     append_jsonl(out / "state.jsonl", rows)
-    append_jsonl(out / "seen.jsonl", [{"canonical": r["canonical"], "first_seen": run_date} for r in rows])
+    append_jsonl(out / "seen.jsonl", [{"canonical": item_key(items[i]), "title_key": title_key(items[i]),
+                                        "first_seen": run_date} for i in sorted(judged)])
 
     day_rows = [r for r in read_jsonl(out / "state.jsonl") if r.get("run") == run_date]
     note = out / f"{run_date}.md"
@@ -314,16 +342,27 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--max-requests", type=int, default=policy.MAX_REQUESTS_PER_RUN)
     sp.add_argument("--out", type=Path, default=None, help="radar state dir (default: $VAULT/00_Memory/radar)")
     sp.add_argument("--json", action="store_true")
+    rp = sub.add_parser("replay", help="acceptance: own clips vs. feed items, judgment vs. BM25 vs. recency")
+    rp.add_argument("--since", default="30d")
+    rp.add_argument("--exclude-last-days", type=int, default=7, help="keep the most recent days out of the labels")
+    rp.add_argument("--feed-sample", type=int, default=300, help="feed items to judge as negatives; 0 = all")
+    rp.add_argument("--max-requests", type=int, default=policy.MAX_REQUESTS_PER_RUN)
+    rp.add_argument("--out", type=Path, required=True, help="report dir; never the vault")
+    rp.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     vault = require_vault()
-    out = args.out or vault / RADAR_DIR
     now = datetime.now(UTC)
-    result = scan(vault, out, parse_since(args.since, now), now, args.limit, args.max_requests)
+    if args.cmd == "replay":
+        result = replay.replay(vault, args.out, parse_since(args.since, now),
+                               now - timedelta(days=args.exclude_last_days), args.feed_sample, args.max_requests)
+    else:
+        result = scan(vault, args.out or vault / RADAR_DIR, parse_since(args.since, now), now, args.limit, args.max_requests)
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        detail = result.get("detail") or ", ".join(f"{k}={v}" for k, v in result.items() if k not in ("status", "usage"))
+        hide = ("status", "usage", "per_interest", "thresholds")
+        detail = result.get("detail") or ", ".join(f"{k}={v}" for k, v in result.items() if k not in hide)
         print(f"{result['status'].upper()}  {detail}")
     return 1 if result["status"] == "failed" else 0
 
