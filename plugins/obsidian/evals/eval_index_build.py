@@ -2,9 +2,10 @@
 
 In a sandbox copy of the example vault, the existing Index.md is given one entry for a deleted
 note and one real entry carrying a retrieval-verification mark (✓); one note loses its
-description. After the rebuild: no dangling and no missing entries per vault_lint, the note
+description, and one note's frontmatter does not parse. After the rebuild: no dangling and no missing entries per vault_lint, the note
 without a description is marked ⚙ and keeps its previous summary, the ✓ carries over, every
-other summary is the note's own description, and nothing but Index.md (and Log.md) changed.
+other summary is the note's own description, the unparseable note is summarised from its prose
+and not its YAML, and nothing but Index.md (and Log.md) changed.
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from _sandbox import make_sandbox, teardown_sandbox
 NAME = "index_build"
 MARKED = "04_Resources/Concepts/Hybrid-Retrieval"
 UNDESCRIBED = "04_Resources/Concepts/BM25-Dilution"
+UNPARSEABLE = "04_Resources/Concepts/Eval-Unparseable-Yaml"
 
 
 def run(vault: Path) -> dict:
@@ -41,6 +43,7 @@ def run(vault: Path) -> dict:
         fm, body = read_frontmatter(sandbox / f"{UNDESCRIBED}.md")
         fm.pop("description", None)
         write_frontmatter(sandbox / f"{UNDESCRIBED}.md", fm, body)
+        (sandbox / f"{UNPARSEABLE}.md").write_text("---\nstatus: [active\n---\n\nThe prose line.\n", encoding="utf-8")
         before = {p.relative_to(sandbox).as_posix(): p.stat().st_mtime_ns for p in sandbox.rglob("*") if p.is_file()}
 
         index_build.main([])
@@ -55,6 +58,8 @@ def run(vault: Path) -> dict:
         und = built.get(UNDESCRIBED, "")
         if "⚙" not in und or (prev_summary and prev_summary.rstrip(" ⚙✓⚠") not in und):
             problems.append(f"a note without a description must keep its previous summary and be marked ⚙, got {und!r}")
+        if "The prose line." not in built.get(UNPARSEABLE, "") or "status" in built.get(UNPARSEABLE, ""):
+            problems.append(f"an unparseable note must be summarised from its prose, got {built.get(UNPARSEABLE)!r}")
         sample = "04_Resources/Concepts/Calibration-Bias"
         desc = read_frontmatter(sandbox / f"{sample}.md")[0].get("description", "")
         if " ".join(str(desc).split()) not in built.get(sample, ""):

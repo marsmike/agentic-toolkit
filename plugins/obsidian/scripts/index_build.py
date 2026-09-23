@@ -28,11 +28,13 @@ from datetime import date
 from pathlib import Path
 
 from vault_utils import (
+    _FRONTMATTER_RE,
     ACTIVE_CONTENT_FOLDERS,
     CHECK_MARK,
     COG,
     EXCLUDE_DIRS,
     WARNING,
+    UnparseableFrontmatter,
     atomic_write,
     parse_existing_index,
     read_frontmatter,
@@ -71,9 +73,16 @@ def collect(vault: Path) -> dict[str, Path]:
 def build(vault: Path) -> tuple[str, dict]:
     previous = parse_existing_index(vault / "Index.md")
     groups: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
-    stats = {"entries": 0, "from_description": 0, "kept_previous": 0, "first_line": 0, "empty": 0}
+    stats = {"entries": 0, "from_description": 0, "kept_previous": 0, "first_line": 0, "empty": 0,
+             "unparseable": []}
     for rel, path in sorted(collect(vault).items(), key=lambda kv: kv[0].casefold()):
-        fm, body = read_frontmatter(path)
+        try:
+            fm, body = read_frontmatter(path, strict=True)
+        except UnparseableFrontmatter:
+            # Its metadata lines are not prose; summarise from what follows the block.
+            text = path.read_text(encoding="utf-8", errors="replace")
+            fm, body = {}, text[_FRONTMATTER_RE.match(text).end():]
+            stats["unparseable"].append(rel)
         prev_summary, prev_markers = previous.get(rel, ("", ""))
         markers = "".join(m for m in prev_markers if m in (CHECK_MARK, WARNING))
         desc = fm.get("description")
@@ -132,6 +141,10 @@ def main(argv: list[str] | None = None) -> int:
           f"{'would write' if args.dry_run else 'wrote'} Index.md: {stats['entries']} entries "
           f"({stats['from_description']} from descriptions, {stats['entries'] - stats['from_description']} {COG}); "
           f"+{stats['added']} new, -{stats['dropped']} dropped")
+    if stats["unparseable"] and not args.json:
+        print(f"{len(stats['unparseable'])} notes with unparseable frontmatter (run vault_yaml_repair.py):")
+        for rel in stats["unparseable"]:
+            print(f"  {rel}")
     return 0
 
 

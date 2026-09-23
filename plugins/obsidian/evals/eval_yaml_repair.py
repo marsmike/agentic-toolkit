@@ -1,8 +1,9 @@
 """Eval: vault_yaml_repair.py makes broken frontmatter parse with the smallest edit.
 
 In a sandbox: a description with an unquoted `: `, an `author: @handle`, a Templater
-`created: {{date}}`, a corrupted opening delimiter, and one block no rule can repair. After
---apply the first four parse, their bodies are byte-identical, only frontmatter lines changed,
+`created: {{date}}`, a Windows path with `: ` and backslashes, a corrupted opening delimiter,
+one block no rule can repair and one that parses to a list. After --apply the first five parse,
+the path reads back byte for byte, their bodies are byte-identical, only frontmatter lines changed,
 the archive copy is untouched without --include-archive, and the unrepairable note is reported,
 not written.
 """
@@ -19,9 +20,11 @@ CASES = {
     "04_Resources/Eval-Yaml-Colon.md": "---\nstatus: distilled\ndescription: The claim: it works in three of four cases\n---" + BODY,
     "04_Resources/Eval-Yaml-Handle.md": "---\nstatus: active\nauthor: @someone\n---" + BODY,
     "04_Resources/Eval-Yaml-Template.md": "---\nstatus: draft\ncreated: {{date}}\n---" + BODY,
+    "04_Resources/Eval-Yaml-Backslash.md": "---\nstatus: active\ndescription: C:\\temp\\new: a path\n---" + BODY,
     "04_Resources/Eval-Yaml-Delimiter.md": "x---\nstatus: active\ndescription: fine\n---" + BODY,
 }
 BROKEN = ("04_Resources/Eval-Yaml-Hopeless.md", "---\nstatus: [active\ndescription: fine\n---" + BODY)
+LISTED = ("04_Resources/Eval-Yaml-List.md", "---\n- active\n---" + BODY)
 ARCHIVED = ("05_Archive/Eval-Yaml-Archived.md", "---\nauthor: @frozen\n---" + BODY)
 
 
@@ -38,7 +41,7 @@ def run(vault: Path) -> dict:
     try:
         sandbox = make_sandbox(vault)
         os.environ["TOOLKIT_VAULT"] = str(sandbox)
-        for rel, text in {**CASES, BROKEN[0]: BROKEN[1], ARCHIVED[0]: ARCHIVED[1]}.items():
+        for rel, text in {**CASES, BROKEN[0]: BROKEN[1], LISTED[0]: LISTED[1], ARCHIVED[0]: ARCHIVED[1]}.items():
             (sandbox / rel).parent.mkdir(parents=True, exist_ok=True)
             (sandbox / rel).write_text(text, encoding="utf-8")
 
@@ -58,8 +61,14 @@ def run(vault: Path) -> dict:
                 problems.append(f"{rel}: expected exactly one changed line")
         if read_frontmatter(sandbox / "04_Resources/Eval-Yaml-Colon.md")[0].get("description") != "The claim: it works in three of four cases":
             problems.append("the repaired description does not read back as written")
+        if read_frontmatter(sandbox / "04_Resources/Eval-Yaml-Backslash.md")[0].get("description") != "C:\\temp\\new: a path":
+            problems.append("a backslash in a repaired value did not read back as written")
         if (sandbox / BROKEN[0]).read_text(encoding="utf-8") != BROKEN[1]:
             problems.append("an unrepairable note was written")
+        if (sandbox / LISTED[0]).read_text(encoding="utf-8") != LISTED[1]:
+            problems.append("a list-shaped block was written")
+        if not vault_yaml_repair.repair(LISTED[1])[1].startswith("unrepairable"):
+            problems.append("a list-shaped block was not reported")
         if (sandbox / ARCHIVED[0]).read_text(encoding="utf-8") != ARCHIVED[1]:
             problems.append("the archive was touched without --include-archive")
     finally:
@@ -70,4 +79,4 @@ def run(vault: Path) -> dict:
         if sandbox is not None:
             teardown_sandbox(sandbox)
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "4 repairs, one line each, bodies intact; archive and unrepairable untouched"}
+            "detail": "; ".join(problems) if problems else "5 repairs, one line each, bodies intact; archive and unrepairable untouched"}

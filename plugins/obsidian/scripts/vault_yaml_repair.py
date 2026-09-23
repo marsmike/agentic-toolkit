@@ -14,7 +14,9 @@ reports anything else untouched:
      character (`@`, `&`, `*`, `!`, `%`, backtick)                     -> double-quote it
   2. a corrupted opening delimiter (junk around the first `---`)       -> restore `---`
 
-Only lines inside the frontmatter change; a `"` inside a newly quoted value becomes `'`. The
+Only lines inside the frontmatter change; a newly quoted value is JSON-escaped, so backslashes
+and `"` read back exactly as written. A block that parses but not to a mapping (a bare list) is
+reported, never repaired: every other script refuses it too. The
 archive is frozen by contract, so it is skipped unless asked for; quoting changes no content.
 [earned: 2026-09-22 — 81 notes on a real vault, 25 active and 56 archived, all one of these two]
 """
@@ -26,12 +28,17 @@ import re
 import sys
 
 import yaml
-from vault_utils import require_vault
+from vault_utils import atomic_write, require_vault
 
 # A value opening a real flow sequence/mapping or a block scalar is left alone; `{{` is a Templater
 # placeholder, not a mapping, so it is quoted like any other scalar.
 NEEDS_QUOTE = re.compile(r"^(?P<key>[A-Za-z_][\w-]*):\s+(?P<val>(?![\"'\[|>])(?!\{(?!\{))(?:[&*!%@`].*|.*(?:: |\s#|\{\{).*))$")
 SKIP_PARTS = {".obsidian", ".trash", ".smart-env", ".git"}
+
+
+def _parses_to_mapping(block: str) -> bool:
+    """True when the block loads as a mapping (or is empty) — what read_frontmatter(strict=True) accepts."""
+    return isinstance(yaml.safe_load(block), (dict, type(None)))
 
 
 def repair(text: str) -> tuple[str | None, str]:
@@ -51,8 +58,7 @@ def repair(text: str) -> tuple[str | None, str]:
     except ValueError:
         return None, "no closing delimiter"
     try:
-        yaml.safe_load("\n".join(lines[1:end]))
-        if cause is None:
+        if _parses_to_mapping("\n".join(lines[1:end])) and cause is None:
             return None, ""
     except yaml.YAMLError:
         pass
@@ -60,10 +66,11 @@ def repair(text: str) -> tuple[str | None, str]:
     for i in range(1, end):
         m = NEEDS_QUOTE.match(lines[i])
         if m:
-            lines[i] = f'{m.group("key")}: "{m.group("val").rstrip().replace(chr(34), chr(39))}"'
+            lines[i] = f'{m.group("key")}: {json.dumps(m.group("val").rstrip(), ensure_ascii=False)}'
             quoted.append(m.group("key"))
     try:
-        yaml.safe_load("\n".join(lines[1:end]))
+        if not _parses_to_mapping("\n".join(lines[1:end])):
+            return None, "unrepairable: frontmatter is not a mapping"
     except yaml.YAMLError as e:
         return None, "unrepairable: " + str(e).splitlines()[0][:80]
     return "\n".join(lines), cause or "quoted " + ",".join(quoted)
@@ -87,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         if new is not None:
             fixed.append({"path": rel, "fix": why})
             if args.apply:
-                path.write_text(new, encoding="utf-8")
+                atomic_write(path, new)
         elif why:
             reported.append({"path": rel, "problem": why})
 
