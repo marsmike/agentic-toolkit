@@ -8,9 +8,10 @@ REPO="${TOOLKIT_REPO:-$HOME/Developer/agentic-toolkit}"
 [[ -f "$HOME/.env" ]] && { set -a; source "$HOME/.env"; set +a; }
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 cd "$REPO"
-exec claude -p \
+# The prompt goes first: --allowedTools takes several values and would swallow it.
+exec claude -p "Run the obsidian:pipeline skill against the vault in TOOLKIT_VAULT ($TOOLKIT_VAULT). Reply with the one-line run summary." \
   --plugin-dir plugins/obsidian --plugin-dir plugins/readwise --plugin-dir plugins/radar \
   --add-dir "$TOOLKIT_VAULT" \
   --permission-mode acceptEdits \
-  --allowedTools "Bash(uv run:*),Bash(uv:*),Bash(env:*),Bash(python3:*),Bash(git -C:*),Bash(trash:*),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Read,Write,Edit,Glob,Grep,Skill" \
-  "Run the obsidian:pipeline skill against the vault in TOOLKIT_VAULT ($TOOLKIT_VAULT). Reply with the one-line run summary."
+  --allowedTools "Bash(uv run:*),Bash(uv:*),Bash(env:*),Bash(python3:*),Bash(git -C:*),Bash(trash:*),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Read,Write,Edit,Glob,Grep,Skill,WebFetch" \
+  < /dev/null
