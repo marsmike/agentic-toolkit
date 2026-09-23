@@ -5,6 +5,8 @@
 2. clip     — a discard-candidate clip becomes quick-file: the owner's clips never drop
 3. arrived  — a discard-candidate radar or newsletter capture stays discard-candidate with the
               retire-with-reason note; every other recommendation passes through unchanged
+4. address  — a Readwise capture's twitter.com source and a note's x.com source are one address
+              (distill_check's source-line gate reads them through the same canonical form)
 """
 from __future__ import annotations
 
@@ -20,6 +22,7 @@ def run(vault: Path) -> dict:
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
     from distill_judge import apply_provenance, capture_provenance
+    from judgments.urls import _canonical
 
     problems: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
@@ -50,6 +53,10 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 3: provenance must not change a {rec!r} recommendation")
     if discard["recommendation"] != "discard-candidate":
         problems.append("phase 3: apply_provenance mutated its input")
+
+    # 4. address
+    if _canonical("https://twitter.com/trq212/status/123?s=20") != _canonical("https://x.com/trq212/status/123"):
+        problems.append("phase 4: twitter.com and x.com addresses of one tweet must canonicalise alike")
 
     return {"eval": NAME, "pass": not problems,
             "detail": "; ".join(problems) if problems else "clips never discarded; radar and newsletter captures may be retired with a reason"}

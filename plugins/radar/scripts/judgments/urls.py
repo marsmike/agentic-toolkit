@@ -18,12 +18,15 @@ ARXIV_RE = re.compile(r"^(?:export\.)?arxiv\.org/(?:abs|pdf|html)/(.+?)(?:v\d+)?
 
 
 def _canonical(url: str) -> str:
-    """Same address, same key: lower-cased host, no scheme/www, tracking parameters dropped
+    """Same address, same key: lower-cased host, no scheme/www, twitter.com as x.com, tracking parameters dropped
     (utm_*, share ids), fragment dropped, trailing slash dropped; GitHub repo roots and arXiv
     papers collapsed to one form each. [earned: 2026-09-22 — Reader held one video twice under
     URLs differing only by `&is=`]"""
     u = url.strip().rstrip("/.,;")
     u = re.sub(r"^https?://(www\.)?", "", u, flags=re.I)
+    # One tweet, two hosts: Readwise captures say twitter.com, hand-written notes x.com
+    # [earned: 2026-09-23 first pipeline run, distill_check's source-line gate]
+    u = re.sub(r"^(mobile\.)?twitter\.com/", "x.com/", u, flags=re.I)
     u, _, _ = u.partition("#")
     path, _, query = u.partition("?")
     keep = []

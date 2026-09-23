@@ -1,0 +1,41 @@
+# Scheduling the pipeline
+
+The pipeline runs unattended every 3 hours: `scripts/run-pipeline.sh` starts Claude Code headless
+with the obsidian, readwise and radar plugins loaded from the repo and the pipeline skill as the
+instruction. launchd runs it; a Claude Desktop scheduled task with the same instruction works too
+(pick one, never both: the run lock turns the second into a no-op, but it still costs a start).
+
+## launchd
+
+`~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>io.agentic-toolkit.pipeline</string>
+  <key>ProgramArguments</key><array>
+    <string>/bin/zsh</string><string>-c</string>
+    <string>$HOME/Developer/agentic-toolkit/plugins/obsidian/scripts/run-pipeline.sh</string>
+  </array>
+  <key>EnvironmentVariables</key><dict>
+    <key>TOOLKIT_VAULT</key><string>/Users/YOU/Documents/YourVault</string>
+  </dict>
+  <key>StartInterval</key><integer>10800</integer>
+  <key>StandardOutPath</key><string>/tmp/agentic-toolkit-pipeline.log</string>
+  <key>StandardErrorPath</key><string>/tmp/agentic-toolkit-pipeline.log</string>
+</dict></plist>
+```
+
+```bash
+launchctl load ~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist     # start
+launchctl start io.agentic-toolkit.pipeline                                  # one run now
+launchctl unload ~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist   # stop
+```
+
+## Reading a run
+
+- `Log.md`: one `pipeline |` line per run with distilled / retired / failed.
+- The vault's git log: one `pipeline YYYY-MM-DD HH:MM: …` commit per run; `git revert` undoes a run.
+- `00_Memory/dlq/`: parked captures (failed twice) and ingest gaps, each with what to do.
+- `00_Memory/radar/<date>.md`: the day's feed judgments, for reading.

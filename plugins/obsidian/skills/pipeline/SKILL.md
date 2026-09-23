@@ -17,14 +17,14 @@ and links through the same distill for all of it, and the vault commits. It runs
 hours; a run that finds nothing is short and says so.
 
 ```bash
-P="uv run --project $CLAUDE_PLUGIN_ROOT/scripts python3 $CLAUDE_PLUGIN_ROOT/scripts"
-$P/pipeline_run.py begin          # "busy": another run holds the lock; stop, say so
+P() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/$1" "${@:2}"; }
+P pipeline_run.py begin          # "busy": another run holds the lock; stop, say so
 # sources, each optional; SKIPPED (no key, plugin absent) is fine, go on:
 #   radar skill:     radar.py scan --since 1d --promote --json
 #   readwise:ingest: ingest.py --json
-$P/pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first
+P pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first
 # distill each one with the distill skill, --auto
-$P/pipeline_run.py end --distilled N --retired N --failed <captures that failed distill_check>
+P pipeline_run.py end --distilled N --retired N --failed <captures that failed distill_check>
 ```
 
 **Sources.** The radar judges the feed and promotes at most five strong items a day to Reader's
@@ -34,7 +34,8 @@ run's queue.
 
 **Distill.** Each capture in the queue goes through the distill skill in `--auto` mode, exactly as
 it would by hand: dossier, read the related notes, write or enrich, `distill_check`, retire the
-capture. The source changes one thing only (distill invariant 8): a `clip` always ends as a note
+capture. Rebuild the index (`P index_build.py`) after writing a note and before
+`distill_check`, whose Index gate needs the new line. The source changes one thing only (distill invariant 8): a `clip` always ends as a note
 or an enrichment; a `radar` or `newsletter` capture may be retired without one when the dossier
 triage says discard, with the reason in the manifest line. A capture whose `distill_check` does
 not pass stays in `01_Capture/` and goes into `--failed`; after two failed runs `queue` parks it

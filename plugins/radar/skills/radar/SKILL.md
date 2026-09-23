@@ -14,12 +14,12 @@ the thresholds, and the result lands where you already look. You run the command
 human; you never clip, and you never write active content.
 
 ```bash
-R="uv run --project $CLAUDE_PLUGIN_ROOT/scripts python3 $CLAUDE_PLUGIN_ROOT/scripts/radar.py"
-$R scan --since 1d [--promote] --json   # daily: judge, write 00_Memory/radar/, settle items in Reader
-$R weekly                              # Saturday: 01_Capture/Radar-Week-YYYY-Www.md for distill
-$R feeds --json                        # which feeds earn their place
-$R trend --json                        # which interests are rising this week
-$R discover [--interest ID] [--seed URL]   # new feeds via Kagi, as an OPML to import in Reader
+R() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/radar.py" "$@"; }
+R scan --since 1d [--promote] --json   # daily: judge, write 00_Memory/radar/, settle items in Reader
+R weekly                              # Saturday: 01_Capture/Radar-Week-YYYY-Www.md for distill
+R feeds --json                        # which feeds earn their place
+R trend --json                        # which interests are rising this week
+R discover [--interest ID] [--seed URL]   # new feeds via Kagi, as an OPML to import in Reader
 ```
 
 **Daily.** Run `scan`, read `00_Memory/radar/<today>.md`, and reply with a five-line briefing:

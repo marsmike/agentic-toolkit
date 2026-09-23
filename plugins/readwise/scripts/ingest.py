@@ -40,6 +40,7 @@ SWEEP_LOCATIONS = ("new", "later", "shortlist")
 FIRST_SYNC_DAYS = 30
 GET_DELAY_S = 3.1  # Reader's list endpoint (which reader_get uses) allows 20 requests a minute
 MAX_429_RETRIES = 4
+RETRY_429_S = 15.0
 TRACKING = re.compile(r"^(utm_|ref$|ref_src$|s$|t$|si$|fbclid$|gclid$|mc_)")
 NOT_CONTENT = {".obsidian", ".trash", ".git", ".smart-env", "00_Memory"}
 
@@ -138,23 +139,30 @@ def set_last_synced(vault: Path, stamp: str) -> None:
     write_frontmatter(path, fm, body)
 
 
-def fetch_full(doc_id: str) -> dict:
+def _patient(call, *args, **kwargs):
+    """Retry a Reader call on 429: the list endpoint allows 20 requests a minute, and a run makes
+    several list calls back to back [earned: 2026-09-23, first run against the real account]."""
     for attempt in range(MAX_429_RETRIES + 1):
         try:
-            return rw.reader_get(doc_id)
+            return call(*args, **kwargs)
         except rw.ReadwiseAPIError as e:
             if e.status != 429 or attempt == MAX_429_RETRIES:
                 raise
-            time.sleep(60)
+            time.sleep(RETRY_429_S * (attempt + 1))
     raise AssertionError("unreachable")
+
+
+def fetch_full(doc_id: str) -> dict:
+    return _patient(rw.reader_get, doc_id)
 
 
 def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
     since = last_synced(vault, now)
     try:
-        items = rw.reader_list_all(updated_after=since)
+        items = _patient(rw.reader_list_all, updated_after=since)
         for loc in SWEEP_LOCATIONS:
-            items += rw.reader_list_all(location=loc)
+            time.sleep(GET_DELAY_S)
+            items += _patient(rw.reader_list_all, location=loc)
     except rw.NoTokenConfigured:
         return {"status": "SKIPPED", "detail": "READWISE_TOKEN is not set; nothing fetched"}
     except rw.ReadwiseAPIError as e:

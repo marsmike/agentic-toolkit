@@ -17,9 +17,9 @@ is linked to what it draws on, and can be found from a vague question a year lat
 decide how; two tools do the mechanical parts and check the result.
 
 ```bash
-S="uv run --project $CLAUDE_PLUGIN_ROOT/scripts python3 $CLAUDE_PLUGIN_ROOT/scripts"
-$S/distill_judge.py 01_Capture/<capture>.md --dossier --json   # everything known about it, before you read it
-$S/distill_check.py <note> 01_Capture/<capture>.md --ask "<a question a reader would type>" --ask "…"
+S() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/$1" "${@:2}"; }  # a function, not a string: zsh does not word-split [earned: 2026-09-23 first pipeline run]
+S distill_judge.py 01_Capture/<capture>.md --dossier --json   # everything known about it, before you read it
+S distill_check.py <note> 01_Capture/<capture>.md --ask "<a question a reader would type>" --ask "…"
 ```
 
 **The dossier** is one JSON block per capture: what kind of material it is, which existing
