@@ -9,7 +9,14 @@ skill, and pushes the vault back. Everything the next run needs is committed in 
 
 ## Routine prompt
 
-Paste this as the routine's instruction.
+The routine runs in this repo, so its instruction can be one line, and this file stays the one
+place to change:
+
+```text
+Follow the "Routine prompt" in docs/cloud-routine.md exactly: run the TheVoid pipeline once, unattended.
+```
+
+The prompt it points at (paste it in full instead if you prefer the routine to be self-contained):
 
 ```text
 Run the TheVoid knowledge pipeline once, unattended, then stop. Ask no questions: if something
@@ -35,7 +42,7 @@ SETUP
      uv run --project plugins/readwise/scripts python3 plugins/readwise/scripts/ingest.py --json
 
 RUN, in the skill's order
-- pipeline_run.py begin. "busy" or "skipped": stop and report why.
+- pipeline_run.py begin. "busy" or "skipped": stop and report why. Keep the "token" it returns.
 - Radar: scan --since 1d --promote --json. Once a week (Saturday): gaps --promote and weekly
   ("exists" is normal).
 - Readwise ingest.
@@ -48,7 +55,7 @@ RUN, in the skill's order
     "[radar YYYY-MM-DD] N strong feed item(s) for this epic:" plus up to 5 "- [title](url) (p=0.xx)"
   Skip a task if 00_Memory/radar/todoist.jsonl already has {"task": id, "date": today}.
   After posting, append that line to the file.
-- pipeline_run.py end --distilled N --dropped N --failed <captures>. ALWAYS call it, even
+- pipeline_run.py end --token <token> --distilled N --dropped N --failed <captures>. ALWAYS call it, even
   after a failure. It rebuilds Index, Maps and Now, runs the secret scan, commits TheVoid,
   pulls and pushes. Status "refused" = a key-shaped string; the DLQ note says where.
 

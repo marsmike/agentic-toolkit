@@ -226,9 +226,26 @@ def git_ignored(vault: Path) -> frozenset[str]:
     maps flip on every sync. [earned: 2026-09-23, R12 cloud-vault test — notes kept out of git
     because they hold a secret appeared in the Mac's maps and not in the clone's]
     """
+    probe = subprocess.run(["git", "-C", str(vault), "rev-parse", "--is-inside-work-tree"],
+                           capture_output=True, text=True, check=False)
+    if probe.returncode != 0:
+        # "Not a git vault" only when no `.git` marker exists here or above: a corrupt `.git` prints
+        # the same "not a git repository" message. Anything else (a broken repository, git's
+        # ownership check) fails closed, never guessing "nothing ignored". [earned: 2026-09-23,
+        # PR #24 reviews]
+        resolved = Path(vault).resolve()
+        if not any((p / ".git").exists() for p in (resolved, *resolved.parents)):
+            return frozenset()
+        raise RuntimeError(f"git rev-parse failed in {vault}: {probe.stderr.strip()[:200]}")
+    if probe.stdout.strip() != "true":
+        return frozenset()
     out = subprocess.run(["git", "-C", str(vault), "ls-files", "--others", "--ignored", "--exclude-standard", "-z",
                           "--", *ACTIVE_CONTENT_FOLDERS], capture_output=True, text=True, check=False)
-    return frozenset(p for p in out.stdout.split("\0") if p) if out.returncode == 0 else frozenset()
+    if out.returncode != 0:
+        # Fail closed: an empty set here would put notes kept out of git for holding a secret
+        # into Index.md and the maps, which are committed and pushed.
+        raise RuntimeError(f"git ls-files failed in {vault}: {out.stderr.strip()[:200]}")
+    return frozenset(p for p in out.stdout.split("\0") if p)
 
 
 def _has_index_false(path: Path) -> bool:

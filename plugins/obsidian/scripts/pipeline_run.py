@@ -5,12 +5,13 @@
     uv run scripts/pipeline_run.py queue [--batch N]      # after the sources ran: this run's captures
     uv run scripts/pipeline_run.py end --distilled N --dropped N [--failed CAPTURE ...]
 
-`begin` takes the run lock (`00_Memory/pipeline.lock`; a lock younger than LOCK_STALE_HOURS means
-another run is still going: status `busy`, do nothing). When the vault's git branch has an
-upstream, `begin` first commits any hand edits and pulls (`--rebase`), so work pushed from a cloud
-session arrives before the run; a conflict aborts the rebase, writes a DLQ note and returns
-`skipped` without taking the lock. Git is the sync channel and the pipeline is its one committer
-on the Mac. [earned: 2026-09-23, R12 — cloud sessions write to the vault through GitHub]
+`begin` takes the run lock (`00_Memory/pipeline.lock`, created atomically; a lock younger than
+LOCK_STALE_HOURS means another run is still going: status `busy`, do nothing). The lock is local
+to one checkout, so exactly one scheduler may run the pipeline. With an upstream, `begin` then
+commits any hand edits and pulls (`--rebase`), so work pushed from a cloud session arrives before
+the run; a conflict aborts the rebase, writes a DLQ note, releases the lock and returns `skipped`.
+Git is the sync channel and the pipeline is its one committer. [earned: 2026-09-23, R12 — cloud
+sessions write to the vault through GitHub]
 
 `queue` picks this run's batch from `01_Capture/`: the owner's clips first, then everything else,
 oldest first, at most `--batch` (profile `pipeline_batch`, default 10). A capture that has failed
@@ -26,11 +27,15 @@ writes a DLQ note that names the file and the kind of key, never the value (stat
 from __future__ import annotations
 
 import argparse
+import fcntl
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -43,6 +48,11 @@ LOCK_STALE_HOURS = 6
 MAX_ATTEMPTS = 2
 DEFAULT_BATCH = 10
 SCRIPTS = Path(__file__).resolve().parent
+GENERATORS = {  # script → the files it writes (a trailing / = every file directly in that folder)
+    "index_build.py": ("Index.md",),
+    "map_build.py": ("Maps/",),
+    "now_build.py": ("Now.md", "Boards/Pipeline.md"),
+}
 SECRET_PATTERNS = {
     "OpenRouter key": r"sk-or-v1-[0-9a-f]{32,}",
     "Anthropic key": r"sk-ant-[A-Za-z0-9_-]{20,}",
@@ -80,21 +90,79 @@ def _order(vault: Path, path: Path) -> tuple[int, str]:
     return (0 if clip else 1, str(fm.get("saved_at") or fm.get("created") or fm.get("captured") or path.name))
 
 
+def _guard(lock: Path):
+    """An OS lock on a guard file outside the vault (never committed), serialising every claim and
+    release: inside it, check-then-write is safe, including taking over a stale lock.
+    [earned: 2026-09-23, PR #24 reviews — O_EXCL, then rename-aside takeovers each left a race]"""
+    key = hashlib.sha1(str(lock.resolve()).encode()).hexdigest()[:16]
+    g = open(Path(tempfile.gettempdir()) / f"agentic-toolkit-{key}.guard", "a")  # noqa: SIM115 — closed by the caller's with
+    fcntl.flock(g, fcntl.LOCK_EX)
+    return g
+
+
+def _claim(lock: Path, now: datetime, token: str) -> datetime | None:
+    """Take the lock for `token`; return the holder's start time if another run has it.
+
+    Of two runs starting together exactly one gets past here, before the slow commit-and-pull.
+    A lock older than LOCK_STALE_HOURS is a crashed run and is taken over. The lock holds the start
+    time and the run's token, and appears complete through an atomic replace, never empty.
+    [earned: 2026-09-23, PR #20 review — check-then-write let two runs both sync and both run]
+    """
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    with _guard(lock):
+        if lock.exists():
+            started = _lock_time(lock, now)
+            if now - started < timedelta(hours=LOCK_STALE_HOURS):
+                return started
+        new = lock.with_name(f"{lock.name}.new-{os.getpid()}-{time.time_ns()}")
+        new.write_text(f"{now.isoformat()}\n{token}\n", encoding="utf-8")
+        os.replace(new, lock)
+        return None
+
+
+def _release(lock: Path, token: str | None) -> None:
+    """Remove the lock, but only if it is still this run's: a run that outlived LOCK_STALE_HOURS
+    must not delete the lock of the run that took over. An `end` without a token removes only a
+    lock that carries none (an old one); a tokened lock waits for its run or goes stale.
+    [earned: 2026-09-23, PR #24 reviews]"""
+    if not lock.exists():
+        return
+    with _guard(lock):
+        if _lock_token(lock) == (token or ""):
+            lock.unlink(missing_ok=True)
+
+
+def _lock_token(path: Path) -> str:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    return lines[1].strip() if len(lines) > 1 else ""
+
+
+def _lock_time(path: Path, now: datetime) -> datetime:
+    """When the run holding `path` started; unreadable or garbled counts as stale."""
+    try:
+        return datetime.fromisoformat(path.read_text(encoding="utf-8").splitlines()[0].strip())
+    except (OSError, ValueError, IndexError):
+        return now - timedelta(hours=LOCK_STALE_HOURS + 1)
+
+
 def begin(vault: Path, now: datetime) -> dict[str, Any]:
     lock = vault / LOCK
-    if lock.is_file():
-        try:
-            started = datetime.fromisoformat(lock.read_text(encoding="utf-8").strip())
-        except ValueError:
-            started = now - timedelta(hours=LOCK_STALE_HOURS + 1)
-        if now - started < timedelta(hours=LOCK_STALE_HOURS):
-            return {"status": "busy", "detail": f"another run holds the lock since {started.isoformat()}"}
+    token = f"{os.getpid()}-{time.time_ns()}"
+    holder = _claim(lock, now, token)
+    if holder is not None:
+        return {"status": "busy", "detail": f"another run holds the lock since {holder.isoformat()}"}
     sync = _pull(vault, now)
     if sync.get("conflict") or sync.get("secrets"):
+        _release(lock, token)
         return {"status": "skipped", "detail": sync["detail"], "sync": sync}
-    lock.parent.mkdir(parents=True, exist_ok=True)
-    lock.write_text(now.isoformat() + "\n", encoding="utf-8")
-    return {"status": "ok", "locked_at": now.isoformat(), "sync": sync}
+    # A pull that merely failed (offline, a transient auth error) does not stop the run, by design:
+    # distilling needs no network, the run's commit stays local, and the next run's pull and push
+    # reconcile it. A real conflict is the only reason to skip. `sync.pulled` says which it was.
+    # Pass `token` to `end --token` so it releases only this run's lock.
+    return {"status": "ok", "locked_at": now.isoformat(), "token": token, "sync": sync}
 
 
 def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
@@ -164,7 +232,10 @@ def scan_staged(vault: Path) -> list[dict[str, Any]]:
 
 def _commit(vault: Path, message: str, exclude: tuple[str, ...] = ()) -> dict[str, Any]:
     """Stage everything and commit, unless the diff holds a key-shaped string: then unstage and DLQ."""
-    _git(vault, "add", "-A", "--", ".", *(f":(exclude){e}" for e in exclude))
+    added = _git(vault, "add", "-A", "--", ".", *(f":(exclude){e}" for e in exclude))
+    if added.returncode != 0:
+        # An empty index after a failed add is not "nothing to commit". [earned: PR #24 review]
+        return {"commit": None, "secrets": [], "error": "git add: " + (added.stderr.strip().splitlines() or ["?"])[-1][:200]}
     if _git(vault, "diff", "--cached", "--quiet").returncode == 0:
         return {"commit": None, "secrets": []}
     hits = scan_staged(vault)
@@ -178,8 +249,10 @@ def _commit(vault: Path, message: str, exclude: tuple[str, ...] = ()) -> dict[st
                                   "or add the file to .gitignore. The next run commits once the diff is clean.",
                        confidence="high")
         return {"commit": None, "secrets": hits}
-    if _git(vault, "commit", "-q", "-m", message).returncode != 0:
-        return {"commit": None, "secrets": []}
+    done = _git(vault, "commit", "-q", "-m", message)
+    if done.returncode != 0:
+        # Not a no-op: something was staged and did not commit (a hook, identity, index error).
+        return {"commit": None, "secrets": [], "error": (done.stderr.strip().splitlines() or ["?"])[-1][:200]}
     return {"commit": _git(vault, "rev-parse", "--short", "HEAD").stdout.strip(), "secrets": []}
 
 
@@ -220,13 +293,18 @@ def _push(vault: Path, now: datetime) -> dict[str, Any]:
     sync = _pull(vault, now)
     if not sync.get("pulled"):
         return {"pushed": False, "detail": sync["detail"]}
-    push = _git(vault, "push", "-q")
+    # Push explicitly to the upstream (the remote `begin` pulled from), never where pushRemote or
+    # pushDefault would send a bare `git push`. [earned: 2026-09-23, PR #24 review]
+    upstream = _git(vault, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}").stdout.strip()
+    remote, _, branch = upstream.partition("/")
+    push = _git(vault, "push", "-q", remote, f"HEAD:{branch}")
     if push.returncode != 0:
         return {"pushed": False, "detail": "push failed: " + (push.stderr.strip().splitlines() or ["?"])[-1]}
     return {"pushed": True}
 
 
-def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "") -> dict[str, Any]:
+def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "",
+        token: str | None = None) -> dict[str, Any]:
     state = _state(vault)
     attempts: dict[str, int] = state.get("attempts", {})
     for rel in failed:
@@ -237,20 +315,75 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
 
     summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed" + (f"; {note}" if note else "")
     env = {**os.environ, "TOOLKIT_VAULT": str(vault)}
-    for script in ("index_build.py", "map_build.py", "now_build.py"):
-        subprocess.run([sys.executable, str(SCRIPTS / script)], capture_output=True, check=False, env=env)
+    # A generator that fails may have replaced some of its files and not others, so its files go
+    # back to how they were before it ran: navigation is this run's or the last one's, never a mix.
+    # The run is still committed (it is the undo for the notes it wrote); the failure is reported
+    # and gets a DLQ note. [earned: 2026-09-23, PR #20 and #24 reviews]
+    failed_builds = []
+    for script in GENERATORS:
+        before = _snapshot(vault, GENERATORS[script])
+        run = subprocess.run([sys.executable, str(SCRIPTS / script)], capture_output=True, text=True, check=False, env=env)
+        if run.returncode != 0:
+            failed_builds.append({"script": script, "error": (run.stderr.strip().splitlines() or ["?"])[-1][:200]})
+            _restore(vault, GENERATORS[script], before)
+    if failed_builds:
+        _dlq_once(vault, slug="pipeline-build-failed", title="A navigation build failed at the end of a pipeline run",
+                  what_happened="; ".join(f"{f['script']}: {f['error']}" for f in failed_builds),
+                  why_recorded="Index.md, the maps or Now.md kept their previous version and are out of date until it builds again.",
+                  resolution="Run the script by hand with TOOLKIT_VAULT set, fix what it names (often a note or "
+                             "Config/toolkit/maps.md), then mark this note resolved.",
+                  confidence="high")
+        summary += f"; build failed: {', '.join(f['script'] for f in failed_builds)}"
     subprocess.run([sys.executable, str(SCRIPTS / "log_vault.py"), "pipeline", summary], capture_output=True, check=False, env=env)
 
-    (vault / LOCK).unlink(missing_ok=True)  # released before the commit, so it is never committed
     result: dict[str, Any] = {"status": "ok", "summary": summary, "commit": None}
-    if _is_repo(vault):
-        committed = _commit(vault, f"pipeline {now.strftime('%Y-%m-%d %H:%M')}: {summary}")
-        result["commit"] = committed["commit"]
-        if committed["secrets"]:
-            result.update(status="refused", secrets=committed["secrets"])
-        else:
-            result["sync"] = _push(vault, now)
+    if failed_builds:
+        result["build_failed"] = failed_builds
+    # The lock is held through commit and push (and never staged), so no other run starts its
+    # pull while this one is still writing to git. [earned: 2026-09-23, PR #24 review]
+    try:
+        if _is_repo(vault):
+            committed = _commit(vault, f"pipeline {now.strftime('%Y-%m-%d %H:%M')}: {summary}", exclude=(LOCK.as_posix(),))
+            result["commit"] = committed["commit"]
+            if committed["secrets"]:
+                result.update(status="refused", secrets=committed["secrets"])
+            elif committed.get("error"):
+                result.update(status="commit_failed", detail=committed["error"])
+            else:
+                result["sync"] = _push(vault, now)
+    finally:
+        _release(vault / LOCK, token)
     return result
+
+
+def _owned(vault: Path, paths: tuple[str, ...]) -> list[Path]:
+    """The files a generator may touch: a named file, or every file directly in a named folder."""
+    out = []
+    for rel in paths:
+        target = vault / rel
+        out += sorted(p for p in target.iterdir() if p.is_file()) if rel.endswith("/") and target.is_dir() else [target]
+    return out
+
+
+def _snapshot(vault: Path, paths: tuple[str, ...]) -> dict[Path, bytes | None]:
+    """Exact bytes of every file a generator may touch, taken just before it runs."""
+    return {p: (p.read_bytes() if p.is_file() else None) for p in _owned(vault, paths)}
+
+
+def _restore(vault: Path, paths: tuple[str, ...], before: dict[Path, bytes | None]) -> None:
+    """Put a failed generator's files back exactly as they were before it ran: changed or deleted
+    ones get their bytes back, ones it created are removed, anything else it never saw stays.
+    Needs no git and no ownership guess. [earned: 2026-09-23, PR #24 reviews — restoring from
+    HEAD missed first-run files and deleted maps, and could hit a hand-made canvas]"""
+    for path, data in before.items():
+        if data is None:
+            path.unlink(missing_ok=True)
+        elif not path.is_file() or path.read_bytes() != data:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+    for path in _owned(vault, paths):
+        if path not in before:
+            path.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -266,6 +399,7 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--dropped", type=int, default=0, help="captures that left WITHOUT a note (a radar or newsletter discard); never a clip")
     e.add_argument("--failed", nargs="*", default=[])
     e.add_argument("--note", default="")
+    e.add_argument("--token", default=None, help="the token `begin` returned; the lock is released only if it is still this run's")
     e.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     vault, now = require_vault(), datetime.now(UTC)
@@ -274,7 +408,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "queue":
         result = queue(vault, args.batch)
     else:
-        result = end(vault, now, args.distilled, args.dropped, args.failed, args.note)
+        result = end(vault, now, args.distilled, args.dropped, args.failed, args.note, args.token)
     print(json.dumps(result, indent=2 if args.json else None))
     return 0
 

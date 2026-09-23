@@ -39,7 +39,7 @@ not a note's inbound link.
 |---|---|---|
 | `Index.md` | `index_build.py` | One line per active note, from its `description` |
 | `Now.md` | `now_build.py` | The homepage: this week's new and enriched notes, radar, stuck work, inbox |
-| `Maps/<domain>.md`, `.canvas` | `map_build.py` | One map per `domain/*` tag; `Maps/Overview` lists them |
+| `Maps/<domain>.md`, `.canvas` | `map_build.py` | One map per `domain/*` tag on three or more notes (or configured in `maps.md`); `Maps/Overview` lists them |
 | `Boards/Pipeline.md` | `now_build.py` | The same state as Now.md as a Kanban board; drags are overwritten |
 | `Log.md` | `log_vault.py` | One line per run |
 

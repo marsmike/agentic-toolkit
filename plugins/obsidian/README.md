@@ -71,7 +71,7 @@ flowchart LR
 The seam is `scripts/judge.py`: backend-neutral, stdlib only, Noul and Choice questions
 only, so a local model can replace the hosted one later. Question wording lives in
 `scripts/judgments/questions.py` under a version stamped on every block; thresholds live
-in the scripts that consume them. The `judgment-calibration` skill tunes the wording
+in the scripts that consume them. The judgment-calibration loop (`docs/MAINTAINING.md`) tunes the wording
 against `evals/golden/`. Measured results, calibration history and the reasoning are in
 the vault note [Typed-Judgments](../../vault/04_Resources/Concepts/Typed-Judgments.md).
 

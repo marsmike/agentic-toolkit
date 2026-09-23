@@ -24,11 +24,12 @@ P pipeline_run.py begin          # pulls the vault's upstream first; "busy" (ano
 #   radar skill:     radar.py scan --since 1d --promote --todoist --json
 #                    radar.py gaps --promote   (once a week: what the feeds missed; "exists" is normal)
 #                    radar.py weekly   (last week's digest, written once; "exists" is normal)
-#   readwise ingest (a script, no skill; TOOLKIT_REPO is the toolkit checkout, absent = skip):
+#   readwise ingest (a script, no skill). TOOLKIT_REPO is the toolkit checkout; when it is unset
+#   or $TOOLKIT_REPO/plugins/readwise/scripts/ingest.py does not exist, skip ingest (SKIPPED):
 #   uv run --project "$TOOLKIT_REPO/plugins/readwise/scripts" python3 "$TOOLKIT_REPO/plugins/readwise/scripts/ingest.py" --json
 P pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first
 # distill each one with the distill skill, --auto
-P pipeline_run.py end --distilled N --dropped N --failed <captures that failed distill_check>
+P pipeline_run.py end --token <begin's token> --distilled N --dropped N --failed <captures that failed distill_check>
 ```
 
 **Sources.** The radar judges the feed and promotes at most five strong items a day to Reader's
@@ -48,7 +49,8 @@ with a DLQ note for a human.
 **End, always.** Call `end` even when a step failed, with what did happen: it rebuilds the
 index, the maps (`Maps/`) and `Now.md` with its board, logs the run, commits the vault (the undo
 for everything the run wrote) and pushes it when the vault has an upstream. A staged key-shaped
-string makes `end` return `refused`: nothing is committed, a DLQ note names the file. The
+string makes `end` return `refused`: nothing is committed, a DLQ note names the file;
+`commit_failed` means git itself refused (report its `detail`). The
 counts are disjoint: `--distilled` = captures that became a note or an enrichment (every one of
 them is also archived; that is not a drop), `--dropped` = captures that left *without* a note (a
 radar or newsletter discard; never a clip), `--failed` = captures still in `01_Capture/`.
