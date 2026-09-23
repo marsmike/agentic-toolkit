@@ -47,6 +47,10 @@ scripts/cloud-vault.sh close --distilled N --note "cloud: <what>"   # rebuild, s
   which are set). Without a key, each script prints `SKIPPED` and the work goes on without it.
 - Tests and evals still run against `./vault` only, never `.vault-live/`.
 
+[earned: 2026-09-23, R12 — cloud sessions reach the vault through git, and the vault holds a live
+key in files git ignores] **Removal condition:** drop this section if cloud sessions stop
+working on a real vault, or the vault moves to a service with its own access control.
+
 ## Hard rules
 
 Plugins depend on `core`/`contract` only, never on a sibling plugin.

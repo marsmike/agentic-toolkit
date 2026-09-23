@@ -12,7 +12,8 @@ config block gives the domain a title, an intro and a "Concepts" section. After 
 5. hygiene   — no map links into 00_Memory/ or 01_Capture/; a map this generator wrote for a
                domain that no longer exists is removed
 6. idempotent — a second build changes no file
-7. untracked — a note git ignores is on no map and not in Index.md (a clone never has it)
+7. untracked — a note git ignores is on no map, not in Index.md, not scanned by lint, and its
+               old Index line is not reported as dangling (a clone never has it)
 """
 from __future__ import annotations
 
@@ -134,6 +135,13 @@ def run(vault: Path) -> dict:
         if "|Loner]]" in (maps / "evalhub.md").read_text(encoding="utf-8") or \
                 "EvalHub/Loner|" in (sandbox / "Index.md").read_text(encoding="utf-8"):
             problems.append("phase 7: a git-ignored note must be on no map and not in Index.md")
+        import vault_lint
+        notes, _, _ = vault_lint.scan_vault(sandbox)
+        index = sandbox / "Index.md"
+        index.write_text(index.read_text(encoding="utf-8") + "- [[04_Resources/EvalHub/Loner|Loner]] — stale\n", encoding="utf-8")
+        drift = vault_lint.find_index_drift(sandbox, notes)
+        if "04_Resources/EvalHub/Loner" in notes or any(d["path"].endswith("EvalHub/Loner") for d in drift["dangling"]):
+            problems.append("phase 7: lint must neither scan a git-ignored note nor report its old Index line as dangling")
         git_ignored.cache_clear()
     finally:
         if saved is None:

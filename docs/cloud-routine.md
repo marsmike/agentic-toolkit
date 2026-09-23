@@ -9,7 +9,14 @@ skill, and pushes the vault back. Everything the next run needs is committed in 
 
 ## Routine prompt
 
-Paste this as the routine's instruction.
+The routine runs in this repo, so its instruction can be one line, and this file stays the one
+place to change:
+
+```text
+Follow the "Routine prompt" in docs/cloud-routine.md exactly: run the TheVoid pipeline once, unattended.
+```
+
+The prompt it points at (paste it in full instead if you prefer the routine to be self-contained):
 
 ```text
 Run the TheVoid knowledge pipeline once, unattended, then stop. Ask no questions: if something

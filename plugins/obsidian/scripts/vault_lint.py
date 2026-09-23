@@ -125,9 +125,11 @@ def find_index_drift(vault: Path, notes: dict[str, Path]) -> dict:
             entries[m.group(1).strip()] = COG_MARK in m.group(2)
 
     active = {rel_key: p for rel_key, p in notes.items()}
+    # An old Index line for a note git now ignores is not drift to report: the next rebuild drops it.
+    ignored = {p.removesuffix(".md") for p in git_ignored(vault)}
     dangling = [
         {"name": rel.rsplit("/", 1)[-1], "path": rel, "reason": "file not found"}
-        for rel in sorted(entries) if rel not in active
+        for rel in sorted(entries) if rel not in active and rel not in ignored
     ]
     missing = [
         {"name": rel.rsplit("/", 1)[-1], "path": str(active[rel])}

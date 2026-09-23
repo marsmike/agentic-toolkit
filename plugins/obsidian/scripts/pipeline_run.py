@@ -5,11 +5,11 @@
     uv run scripts/pipeline_run.py queue [--batch N]      # after the sources ran: this run's captures
     uv run scripts/pipeline_run.py end --distilled N --dropped N [--failed CAPTURE ...]
 
-`begin` takes the run lock (`00_Memory/pipeline.lock`; a lock younger than LOCK_STALE_HOURS means
-another run is still going: status `busy`, do nothing). When the vault's git branch has an
-upstream, `begin` first commits any hand edits and pulls (`--rebase`), so work pushed from a cloud
-session arrives before the run; a conflict aborts the rebase, writes a DLQ note and returns
-`skipped` without taking the lock. Git is the sync channel and the pipeline is its one committer
+`begin` takes the run lock (`00_Memory/pipeline.lock`, created atomically; a lock younger than
+LOCK_STALE_HOURS means another run is still going: status `busy`, do nothing). The lock is local
+to one checkout, so exactly one scheduler may run the pipeline. With an upstream, `begin` then
+commits any hand edits and pulls (`--rebase`), so work pushed from a cloud session arrives before
+the run; a conflict aborts the rebase, writes a DLQ note, releases the lock and returns `skipped`. Git is the sync channel and the pipeline is its one committer
 on the Mac. [earned: 2026-09-23, R12 — cloud sessions write to the vault through GitHub]
 
 `queue` picks this run's batch from `01_Capture/`: the owner's clips first, then everything else,
@@ -80,20 +80,39 @@ def _order(vault: Path, path: Path) -> tuple[int, str]:
     return (0 if clip else 1, str(fm.get("saved_at") or fm.get("created") or fm.get("captured") or path.name))
 
 
-def begin(vault: Path, now: datetime) -> dict[str, Any]:
-    lock = vault / LOCK
-    if lock.is_file():
+def _claim(lock: Path, now: datetime) -> datetime | None:
+    """Take the lock atomically; return the holder's start time if another run has it.
+
+    Created with O_EXCL, so of two runs starting together exactly one gets past here, before the
+    slow commit-and-pull. A lock older than LOCK_STALE_HOURS is a crashed run and is taken over.
+    [earned: 2026-09-23, PR #20 review — check-then-write let two runs both sync and both run]
+    """
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
         try:
             started = datetime.fromisoformat(lock.read_text(encoding="utf-8").strip())
-        except ValueError:
+        except (OSError, ValueError):
             started = now - timedelta(hours=LOCK_STALE_HOURS + 1)
         if now - started < timedelta(hours=LOCK_STALE_HOURS):
-            return {"status": "busy", "detail": f"another run holds the lock since {started.isoformat()}"}
+            return started
+        lock.write_text(now.isoformat() + "\n", encoding="utf-8")
+        return None
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(now.isoformat() + "\n")
+    return None
+
+
+def begin(vault: Path, now: datetime) -> dict[str, Any]:
+    lock = vault / LOCK
+    holder = _claim(lock, now)
+    if holder is not None:
+        return {"status": "busy", "detail": f"another run holds the lock since {holder.isoformat()}"}
     sync = _pull(vault, now)
     if sync.get("conflict") or sync.get("secrets"):
+        lock.unlink(missing_ok=True)
         return {"status": "skipped", "detail": sync["detail"], "sync": sync}
-    lock.parent.mkdir(parents=True, exist_ok=True)
-    lock.write_text(now.isoformat() + "\n", encoding="utf-8")
     return {"status": "ok", "locked_at": now.isoformat(), "sync": sync}
 
 
@@ -237,12 +256,28 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
 
     summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed" + (f"; {note}" if note else "")
     env = {**os.environ, "TOOLKIT_VAULT": str(vault)}
+    # Each generator writes its files atomically, so one that fails leaves the previous version in
+    # place, never a half-written one. The run is still committed (it is the undo for the notes it
+    # wrote); the failure is reported and gets a DLQ note. [earned: 2026-09-23, PR #20 review]
+    failed_builds = []
     for script in ("index_build.py", "map_build.py", "now_build.py"):
-        subprocess.run([sys.executable, str(SCRIPTS / script)], capture_output=True, check=False, env=env)
+        run = subprocess.run([sys.executable, str(SCRIPTS / script)], capture_output=True, text=True, check=False, env=env)
+        if run.returncode != 0:
+            failed_builds.append({"script": script, "error": (run.stderr.strip().splitlines() or ["?"])[-1][:200]})
+    if failed_builds:
+        _dlq_once(vault, slug="pipeline-build-failed", title="A navigation build failed at the end of a pipeline run",
+                  what_happened="; ".join(f"{f['script']}: {f['error']}" for f in failed_builds),
+                  why_recorded="Index.md, the maps or Now.md kept their previous version and are out of date until it builds again.",
+                  resolution="Run the script by hand with TOOLKIT_VAULT set, fix what it names (often a note or "
+                             "Config/toolkit/maps.md), then mark this note resolved.",
+                  confidence="high")
+        summary += f"; build failed: {', '.join(f['script'] for f in failed_builds)}"
     subprocess.run([sys.executable, str(SCRIPTS / "log_vault.py"), "pipeline", summary], capture_output=True, check=False, env=env)
 
     (vault / LOCK).unlink(missing_ok=True)  # released before the commit, so it is never committed
     result: dict[str, Any] = {"status": "ok", "summary": summary, "commit": None}
+    if failed_builds:
+        result["build_failed"] = failed_builds
     if _is_repo(vault):
         committed = _commit(vault, f"pipeline {now.strftime('%Y-%m-%d %H:%M')}: {summary}")
         result["commit"] = committed["commit"]

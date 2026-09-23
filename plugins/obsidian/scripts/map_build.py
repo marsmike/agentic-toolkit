@@ -5,8 +5,10 @@
 
 One pass over the active notes (02_Projects, 03_Areas, 04_Resources) writes, under `Maps/`:
 
-    <domain>.md       one per `domain/*` tag: Start here (the 10 most-linked notes), New (last 30
-                      days), every note grouped by `kind`, Neighbouring domains (co-tag counts)
+    <domain>.md       one per `domain/*` tag on at least MIN_NOTES (3) notes or with a block in
+                      maps.md (a tag on one or two notes is usually a typo, and a map of two is
+                      noise): Start here (the 10 most-linked notes), New (last 30 days), every
+                      note grouped by `kind`, Neighbouring domains (co-tag counts)
     <domain>.canvas   the Start-here and New notes as cards, one group per kind, their links as edges
     Overview.md       every domain with its note count and newest note
     Overview.canvas   the same as cards, edges between domains that share the most notes
@@ -267,7 +269,7 @@ def _domain_canvas(d: str, start: list[Note], new: list[Note], links: dict[str, 
 
 def _overview_md(rows: list, titles: dict[str, str], untagged: int) -> str:
     out = ["---", f"generated_by: {GENERATOR}", "cssclasses:", "  - map", "---", "# Maps", "", HEADER, "",
-           "One map per `domain/*` tag. Each map lists every note in its domain; the canvas shows its hubs and newest notes.", "",
+           "One map per `domain/*` tag on at least three notes (or configured in `Config/toolkit/maps.md`). Each map lists every note in its domain; the canvas shows its hubs and newest notes.", "",
            "| Map | Notes | Newest | Neighbours |", "|---|---:|---|---|"]
     for d, count, newest, cotags in sorted(rows, key=lambda r: (-r[1], r[0])):
         near = ", ".join(f"[[{MAPS}/{o}\\|{titles[o]}]]" for o, _ in sorted(cotags.items(), key=lambda kv: (-kv[1], kv[0]))[:3])
