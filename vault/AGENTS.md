@@ -1,5 +1,5 @@
 <!--
-Maintainers: this file is installed by `toolkit vault init` as the CLAUDE.md of every new vault.
+Maintainers: this file is installed by `toolkit vault init` as the AGENTS.md of every new vault (Claude Code, Codex and others read it).
 It is always loaded, so it carries only hard requirements — rules that must hold even when no
 skill has been invoked. Procedural depth (the full distill workflow, placement heuristics, failure
 modes by name) belongs in a skill's references/, loaded only on invocation. If you're tempted to
@@ -7,7 +7,7 @@ add detail here, it probably belongs in a skill instead. See ../KNOWLEDGE_API.md
 ../VAULT_SCHEMA.md for the rules this file assumes.
 -->
 
-# CLAUDE.md — This Vault
+# AGENTS.md — This Vault
 
 An agentic knowledge base. The agent owns the structure; you source material, direct analysis, and
 review output. Depth lives in skills, loaded on demand — this file carries only what must hold

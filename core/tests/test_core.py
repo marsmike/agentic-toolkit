@@ -63,19 +63,19 @@ def test_vault_resolution_precedence(monkeypatch, tmp_path, repo_root):
     assert resolution.source == "default:./vault" and resolution.path == repo_root / "vault"
 
 
-def test_vault_init_scaffolds_and_refuses_nonempty(tmp_path, claude_md_template):
+def test_vault_init_scaffolds_and_refuses_nonempty(tmp_path, agents_md_template):
     target = tmp_path / "new-vault"
-    vault.scaffold_vault(target, claude_md_template)
+    vault.scaffold_vault(target, agents_md_template)
     for folder in vault.PARA_FOLDERS:
         assert (target / folder).is_dir(), f"missing {folder}"
     assert (target / "Config" / "toolkit").is_dir()
-    assert (target / "CLAUDE.md").read_text(encoding="utf-8") == claude_md_template.read_text(encoding="utf-8")
+    assert (target / "AGENTS.md").read_text(encoding="utf-8") == agents_md_template.read_text(encoding="utf-8")
 
     occupied = tmp_path / "occupied"
     occupied.mkdir()
     (occupied / "existing.txt").write_text("keep", encoding="utf-8")
     with pytest.raises(vault.VaultInitError):
-        vault.scaffold_vault(occupied, claude_md_template)
+        vault.scaffold_vault(occupied, agents_md_template)
     assert (occupied / "existing.txt").read_text(encoding="utf-8") == "keep"
 
 
@@ -110,13 +110,13 @@ def test_doctor_green_on_example_vault(monkeypatch, repo_root, capsys):
 
     # contract/VAULT_SCHEMA.md's root-note clause: a root-level *.md with its own
     # frontmatter status: active (the example vault's Alex-Vega.md persona note) counts as
-    # active content; Index.md/CLAUDE.md (no frontmatter) and Config/ never do.
+    # active content; Index.md/AGENTS.md (no frontmatter) and Config/ never do.
     active_rels = {
         p.relative_to(repo_root / "vault").as_posix() for p in vault.list_active_notes(repo_root / "vault")
     }
     assert "Alex-Vega.md" in active_rels
     assert "Index.md" not in active_rels
-    assert "CLAUDE.md" not in active_rels
+    assert "AGENTS.md" not in active_rels
     assert not any(rel.startswith("Config/") for rel in active_rels)
 
 

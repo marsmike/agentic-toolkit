@@ -1,6 +1,6 @@
 {
   "name": "handoff",
-  "version": "2.7.0",
+  "version": "3.0.0",
   "description": "Portable session handoff: save/resume work context across sessions, machines, and tools via chained in-repo _handoff/ markdown, with a vault discovery index and PreCompact safety net.",
   "author": {
     "name": "agentic-toolkit contributors"

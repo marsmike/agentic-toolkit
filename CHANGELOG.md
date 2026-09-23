@@ -2,6 +2,26 @@
 
 Every release entry links the change to the research or the dated failure that motivated it — this file is the public ratchet.
 
+## [Unreleased] — R12, six skills and one entry file (marketplace 3.0.0)
+
+Fifteen skills, six wrapper commands and a duplicate distill agent cost a slot in every session's
+skill list and about 2,470 lines of skill text, 666 of them generic Obsidian syntax reference.
+Six skills remain, each short enough to read and follow without the plugin installed.
+
+- **`obsidian:vault`** joins `vault-ops` and `vault-lint`; one 51-line syntax sheet replaces the
+  five Obsidian format references.
+- **`radar:radar`** absorbs `kagi` as a section; **`handoff:handoff`** absorbs `handoff-resume`
+  as a mode.
+- **readwise is scripts only**: the pipeline runs `ingest.py` by path. `daily`/`status` (Now.md
+  and Log.md say the same), `enrich` and its two modules (never run by the pipeline) and the
+  SessionStart hook (a line in every session) are gone.
+- **Maintainer loops** `judgment-calibration` and `retrieval-verification` are procedures in
+  `docs/MAINTAINING.md`; their scripts are unchanged.
+- **All six commands and `agents/knowledge-distillation-agent.md` removed.**
+- **`AGENTS.md` is the entry file** for the repo, the example vault and every vault
+  `toolkit vault init` creates (`contract/templates/VAULT_AGENTS.md`). Claude Code reads
+  `AGENTS.md` when no `CLAUDE.md` is on the path; keeping both would hide it.
+
 ## [Unreleased] — R12, generated navigation and git sync (plugins/obsidian)
 
 The vault had a flat 1,386-line Index.md and about 80 hand-made MOCs that its own rules forbid

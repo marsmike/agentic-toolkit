@@ -175,7 +175,7 @@ fn walk_dir(dir: &Path, vault: &Path, found: &mut Vec<VaultFile>) {
 /// filter, matching `Index.md`'s count) **plus** any note directly at the vault root whose own
 /// frontmatter declares `status: active`.
 ///
-/// **Deviation, documented:** `contract/VAULT_SCHEMA.md` and the vault's own `CLAUDE.md` state
+/// **Deviation, documented:** `contract/VAULT_SCHEMA.md` and the vault's own `AGENTS.md` state
 /// the active-content filter as exactly those three folders for "any generated index." Taken
 /// perfectly literally that would exclude `Alex-Vega.md` (vault root). But
 /// `vault/04_Resources/Guides/Test-Corpus-Map.md` names Alex-Vega as *the* bridge note ("root
@@ -184,7 +184,7 @@ fn walk_dir(dir: &Path, vault: &Path, found: &mut Vec<VaultFile>) {
 /// table, distinct from the folder-level filter. Excluding it would make the planted bridge
 /// structure this vault was built to test unreachable (no note titled Alex-Vega would exist in
 /// the graph at all). This crate resolves the tension narrowly: a root-level note only joins the
-/// node set if it opts in via `status: active`; nothing else at the root (`Index.md`, `CLAUDE.md`
+/// node set if it opts in via `status: active`; nothing else at the root (`Index.md`, `AGENTS.md`
 /// — neither carries frontmatter at all) is pulled in. `Config/` and `Templates/` are never
 /// scanned — they hold plugin config and templates, not vault content (schema: "Templates — Not
 /// itself vault content").

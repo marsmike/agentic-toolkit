@@ -28,7 +28,7 @@ below for the itemized cut.
 | Component | Purpose |
 |---|---|
 | `hooks/` (`SessionEnd`) | Archives a deterministic session record — project, human-turn count, a tool-usage tally, files touched, a transcript pointer — into `$VAULT/00_Memory/sessions/`. No LLM call; "zero-cost" in the literal sense of no API spend. |
-| `skills/distill-memory` | On demand, turns undistilled session records into classified (`sop`/`warning`/`fact`) notes under `$VAULT/00_Memory/notes/`, via the same analyze-then-confirm two-phase discipline `contract/templates/VAULT_CLAUDE.md` requires of every vault write. |
+| `skills/distill-memory` | On demand, turns undistilled session records into classified (`sop`/`warning`/`fact`) notes under `$VAULT/00_Memory/notes/`, via the same analyze-then-confirm two-phase discipline `contract/templates/VAULT_AGENTS.md` requires of every vault write. |
 
 ## Hook behavior and no-op conditions
 

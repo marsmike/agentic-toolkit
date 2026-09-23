@@ -24,3 +24,6 @@ vault/.gaiafield/
 
 # claude plugin eval run outputs
 plugins/*/skill-evals/results/
+
+# Claude Code worktrees of this repo (EnterWorktree, claude -w)
+.claude/worktrees/

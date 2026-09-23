@@ -20,13 +20,13 @@
    - **New vs. update** — check whether `00_Memory/notes/<slug>.md` already exists.
      If it does and this session confirms the same lesson, this is an update (new
      `source`, not a new file). If it contradicts an existing note, flag it — do not
-     silently overwrite (mirrors `contract/templates/VAULT_CLAUDE.md`'s enrichment
+     silently overwrite (mirrors `contract/templates/VAULT_AGENTS.md`'s enrichment
      rule: never a silent overwrite).
 4. Present the full candidate list (slug, kind, title, new-or-update, source) and
    **stop**. Do not write anything in this phase.
 
 Skip the stop only under an explicit `--auto`/non-interactive instruction from the
-caller — the same exception `contract/templates/VAULT_CLAUDE.md` carves out for
+caller — the same exception `contract/templates/VAULT_AGENTS.md` carves out for
 distillation generally.
 
 ## Phase 2: Write (after confirmation)

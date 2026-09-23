@@ -2,21 +2,21 @@
 
 The reference implementation of the vault contract (`contract/`): filesystem-first vault
 CRUD, a keyword-plus-optional-semantic search, the distill pipeline (captures →
-integrated knowledge), vault-lint maintenance, and a retrieval-verification maintenance
-loop for description quality.
+integrated knowledge), the unattended pipeline run, and vault health.
 
 ## What it does
 
 | Skill | Purpose |
 |---|---|
-| `vault-ops` | Read/create/edit/search notes directly on the filesystem; wikilinks, callouts, properties, `.canvas`/`.base` file formats; the Obsidian desktop CLI as an optional enhancement, never a requirement |
+| `vault` | Read/create/edit/search notes directly on the filesystem, plus vault health: orphans, stale pages, broken links, Index.md drift, metadata normalization (audit-only unless `--fix`). A 51-line Obsidian syntax sheet covers links, callouts, `.canvas`, `.base` and the optional desktop CLI |
 | `distill` | Turn `01_Capture/` into linked, sourced notes. Two tools carry the mechanics: `distill_judge.py --dossier` gathers everything known about a capture up front, `distill_check.py` is the definition of done; the agent decides in between and stops at a checkpoint. Triage the inbox, distill one capture, or file a conversation insight |
-| `vault-lint` | Vault health (orphans, stale pages, broken links, Index.md drift) and metadata normalization (frontmatter, tags, source, summaries), audit-only unless `--fix` |
-| `retrieval-verification` | Predict a note's content from title+description alone, score against the real body, flag weak descriptions for rewrite |
-| `judgment-calibration` | The loop that improves the typed-judgment questions: classify each disagreement with the golden labels by cause, change wording (never thresholds), keep a held-out slice |
+| `pipeline` | The one unattended run: radar and Readwise bring material in, distill turns it into notes, `end` rebuilds Index, maps and Now, commits and pushes |
 
-Plus `agents/knowledge-distillation-agent.md` for delegated/batch distillation runs, and
-`scripts/` (see below) that back the skills.
+Plus `scripts/` (see below) that back the skills. The two maintainer loops (judgment
+calibration, retrieval verification) are procedures in `docs/MAINTAINING.md`, not skills.
+R12 cut this plugin from six skills and an agent to three skills: `vault` joined `vault-ops`
+and `vault-lint` and replaced 666 lines of generic Obsidian syntax reference with one sheet;
+the distill agent duplicated the distill skill. [earned: 2026-09-23, R12]
 
 ## Vault resolution
 

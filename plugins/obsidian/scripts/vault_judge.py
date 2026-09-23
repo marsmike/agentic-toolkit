@@ -14,7 +14,7 @@ Two questions per active note, ten notes per request:
   where the backend is confident about a domain the note's tags do not carry.
 
 Nothing is written. `vault_normalize.py --fix` remains the only thing that edits notes;
-this script produces the reading list a human (or the vault-lint skill) works through.
+this script produces the reading list a human (or the vault skill) works through.
 """
 from __future__ import annotations
 

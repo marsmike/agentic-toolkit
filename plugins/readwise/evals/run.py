@@ -23,7 +23,6 @@ EVAL_MODULES = (
     "eval_capture_note_formatting",
     "eval_dedup_guard",
     "eval_book_capture_dedup",
-    "eval_hook_silent_noop",
     "eval_ingest",
 )
 

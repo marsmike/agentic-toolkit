@@ -33,22 +33,22 @@ def _emit(result: dict, as_json: bool, render_text: Callable[[dict], str]) -> No
 # --- vault init --------------------------------------------------------------------
 
 
-def _vault_claude_template_path(repo_root: Path | None) -> Path | None:
+def _vault_agents_template_path(repo_root: Path | None) -> Path | None:
     if repo_root is None:
         return None
-    candidate = repo_root / "contract" / "templates" / "VAULT_CLAUDE.md"
+    candidate = repo_root / "contract" / "templates" / "VAULT_AGENTS.md"
     return candidate if candidate.is_file() else None
 
 
 def cmd_vault_init(args: argparse.Namespace) -> int:
     target = Path(args.path).expanduser().resolve()
     repo_root = vault.find_repo_root(Path.cwd()) or vault.find_repo_root(Path(__file__).resolve().parent)
-    template_path = _vault_claude_template_path(repo_root)
+    template_path = _vault_agents_template_path(repo_root)
 
     if template_path is None:
         result = {
             "ok": False,
-            "error": "could not locate contract/templates/VAULT_CLAUDE.md (repo root not found)",
+            "error": "could not locate contract/templates/VAULT_AGENTS.md (repo root not found)",
         }
         _emit(result, args.json, lambda r: f"error: {r['error']}")
         return 1

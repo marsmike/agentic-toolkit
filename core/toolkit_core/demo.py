@@ -41,7 +41,7 @@ _SAMPLE_NOTES = {
     ),
 }
 
-_DEMO_CLAUDE_MD = (
+_DEMO_AGENTS_MD = (
     "# demo vault\n\n"
     "Scaffolded on the fly by `toolkit demo` (no repo checkout was found on disk). Not a "
     "real vault — this whole directory is temporary and safe to delete.\n"
@@ -61,8 +61,8 @@ def _scaffold_demo_vault() -> tuple[Path, Path]:
     `vault.scaffold_vault` a real `toolkit vault init` uses. Returns
     `(vault_path, temp_root_to_clean_up)`."""
     temp_root = Path(tempfile.mkdtemp(prefix="agentic-toolkit-demo-"))
-    template_path = temp_root / "_claude_md_template.md"
-    template_path.write_text(_DEMO_CLAUDE_MD, encoding="utf-8")
+    template_path = temp_root / "_agents_md_template.md"
+    template_path.write_text(_DEMO_AGENTS_MD, encoding="utf-8")
     target = temp_root / "vault"
     vault.scaffold_vault(target, template_path)
     for rel, content in _SAMPLE_NOTES.items():

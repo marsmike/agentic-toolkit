@@ -17,7 +17,7 @@ and Gemini pick it up automatically on startup.
 
 A `PreCompact` hook writes `_handoff/.autosnapshot.md` (git state only) right before
 context compaction, so nothing volatile is lost if you forget to save. It is **not** a
-substitute for a real handoff — it has no decisions or next step. The `handoff-resume`
+substitute for a real handoff — it has no decisions or next step. The handoff skill's resume mode
 skill surfaces it only when it is newer than the latest real handoff. Disable it via the
 profile's `autosnapshot: false` (see `../../../profile.example.md`) or the
 `TOOLKIT_HANDOFF_AUTOSNAPSHOT=false` env var.

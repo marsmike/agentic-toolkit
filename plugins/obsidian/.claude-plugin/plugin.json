@@ -1,7 +1,7 @@
 {
   "name": "obsidian",
-  "version": "2.9.0",
-  "description": "Vault interface for the agentic-toolkit contract: filesystem-first CRUD, keyword/optional-semantic search, graph-aware distill, vault-lint maintenance, and retrieval-verification description auditing.",
+  "version": "3.0.0",
+  "description": "Vault interface: filesystem-first operations and health, search, graph-aware distill, and the unattended pipeline that rebuilds Index, maps and Now.",
   "author": {
     "name": "agentic-toolkit contributors"
   },

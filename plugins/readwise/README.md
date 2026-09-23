@@ -2,21 +2,29 @@
 
 Pulls Readwise highlights (Reader v3 — tweets, articles, videos, newsletters, PDFs, EPUBs
 — plus Classic v2 for Kindle/Apple Books) into `01_Capture/` as origin-prefixed,
-schema-conformant capture notes, with optional GitHub/YouTube metadata enrichment, a
-daily digest, and pipeline status. Filesystem-first throughout
+schema-conformant capture notes. Filesystem-first throughout
 (`contract/KNOWLEDGE_API.md`) — no cross-plugin imports, no vendored environment.
 
 ## What it does
 
-| Skill | Purpose |
-|---|---|
-| `ingest` | Pull new clippings from the Readwise API (windowed sync + mandatory backlog sweep), write each as a dedup-safe capture note in `01_Capture/`, gate deletion on a coverage check |
-| `enrich` | Optional post-capture enrichment: GitHub repo metadata via `gh`, YouTube metadata + transcript via `yt-dlp` — both independent, both degrade cleanly when their CLI is absent |
-| `daily` | Digest today's new captures from `01_Capture/` to stdout, grouped by category |
-| `status` | Pipeline health: last sync, last processed, captures awaiting distillation, DLQ count |
+Scripts only, no skills, commands or hooks since R12: the obsidian `pipeline` skill runs ingest
+on every scheduled run, so an agent never needs a skill for it. [earned: 2026-09-23, R12 — 15
+skills cut to six; `daily`/`status` duplicated `Now.md` and `Log.md`, `enrich` was never run by
+the pipeline, and the SessionStart hook printed a line into every session]
 
-Plus `scripts/` (see below) that back all four skills, and a `SessionStart` hook that
-reports sync status — silently, when `READWISE_TOKEN` isn't set.
+```bash
+uv run --project scripts python3 scripts/ingest.py --json      # what the pipeline runs
+uv run --project scripts python3 scripts/ingest.py --dry-run   # counts only
+```
+
+Every Reader library item not yet in the vault becomes a capture: a windowed sync from
+`lastSyncedAt` plus a backlog sweep of new/later/shortlist, feed items only when the radar
+promoted them, each with its provenance (`via: clip`, `newsletter` or `radar`). Dedup is the
+ledger `00_Memory/readwise-ingested.jsonl` plus the vault itself. Nothing in Reader is moved or
+deleted. **Every clipping the user saved ends up in `01_Capture/`**: an item fetched but not
+captured fails the run with a DLQ note, and the watermark does not move until it is captured.
+Why each step: [references/ingest-workflow.md](references/ingest-workflow.md); the API:
+[references/api.md](references/api.md).
 
 Use `obsidian:distill` for long-term vault integration once captures land here.
 
@@ -32,7 +40,7 @@ this plugin's own eval suite.
 
 Reads `$VAULT/Config/toolkit/readwise.md` if present, per `contract/PROFILE.md`'s "fill
 from Obsidian" convention. See `profile.example.md` for the exact frontmatter shape
-(`enrichers`, `backlog_sweep`) and what each field controls. Every field also has a
+(`backlog_sweep`, `attachments_folder`) and what each field controls. Every field also has a
 `TOOLKIT_READWISE_<FIELD>` environment variable that overrides the note.
 
 ## Env vars
@@ -47,9 +55,7 @@ from Obsidian" convention. See `profile.example.md` for the exact frontmatter sh
 
 `scripts/pyproject.toml` declares one dependency: PyYAML, for frontmatter I/O. The
 Readwise API client (`readwise_api.py`) is stdlib-only (`urllib`) — no `requests`, no
-`curl` shelling. GitHub and YouTube enrichment are optional external CLIs (`gh`,
-`yt-dlp`) that `github_meta.py`/`youtube_meta.py` detect and degrade around; neither is a
-hard dependency of `ingest`. Run any script via `uv run --project scripts python3
+`curl` shelling. Run any script via `uv run --project scripts python3
 scripts/<name>.py ...` from the plugin root.
 
 ## Dead-letter queue
@@ -57,11 +63,11 @@ scripts/<name>.py ...` from the plugin root.
 `00_Memory/dlq/` via `scripts/vault_utils.write_dlq_note()` — same convention the obsidian
 plugin's scripts use (`description`/`status`/`created`/`confidence` frontmatter, a "What
 happened / Why it's here / Resolution" body). `toolkit doctor` (in `core/`) surfaces the
-count; `status.py` also reports it directly for this plugin.
+count, and `Now.md` lists the open ones.
 
 ## Dedup-before-distill
 
-`contract/templates/VAULT_CLAUDE.md`'s distill rules cite a real collision: "Check for
+`contract/templates/VAULT_AGENTS.md`'s distill rules cite a real collision: "Check for
 prior distillation before writing. Overlapping capture sources collide more often than
 expected `[earned: X-bookmark/Readwise double-distill collision, 2026-07-26]`." That rule
 is primarily `obsidian:distill`'s job at the cross-origin level (a capture reaching the
@@ -112,6 +118,7 @@ for distill to collide on. See `evals/eval_dedup_guard.py`.
 
 | Component | Reason |
 |---|---|
+| R12: `skills/ingest`, `enrich`, `daily`, `status`, `commands/`, `hooks/session-start.sh`, `github_meta.py`, `youtube_meta.py`, `daily_digest.py`, `status.py` | Ingest is run by the pipeline, not by hand; `daily` and `status` said what `Now.md` and `Log.md` now say; `enrich` and its two modules were never called by the pipeline; the hook printed a status line into every session. [earned: 2026-09-23] |
 | `build_captures.py`'s concept-cluster mode (`clusters.json`, cross-item grouping, GitHub-repo-table-per-cluster rendering) | v1's own skill already named singleton (one capture per clipping) as "the default... on every run since 2026-06-29" and the cluster path as something to reach for only on explicit request. Real, working code, but not what this plugin delivers by default — the singleton path covers the load-bearing behavior; cluster-mode's clustering heuristics (URL/keyword/semantic-similarity grouping) are a curation judgment call, not a mechanical port, and out of scope for a lean R0 port. |
 | `skills/classify` | URL/content-type detection is intrinsic to writing a capture (`build_captures.write_capture()` reads `category` straight off the Reader API item) rather than a distinct workflow step — folded into `ingest`, not a separate skill. |
 | `skills/enrich-book` (vault book-note merging into `Readwise/Books/`) | Tied to the folder convention the official Readwise-for-Obsidian community plugin creates — not a PARA folder under `contract/VAULT_SCHEMA.md`, and a second plugin's data model this one would have to reach into. Classic v2 book highlights are still captured (via `build_captures.write_book_capture()`), just as an ordinary `01_Capture/` note like everything else, not merged into a different plugin's folder. |
@@ -125,7 +132,7 @@ for distill to collide on. See `evals/eval_dedup_guard.py`.
 
 ## Evals
 
-`evals/run.py` runs four R0 capability evals against `./vault`, emitting JSON
+`evals/run.py` runs the capability evals against `./vault`, emitting JSON
 `{eval, pass, detail}` per check — no network calls, fixture-driven:
 
 | Eval | Asserts |
@@ -133,7 +140,7 @@ for distill to collide on. See `evals/eval_dedup_guard.py`.
 | `capture_note_formatting` | Given a fixture Reader-item payload (`evals/fixtures/reader_item.json`), `build_captures.write_capture()` produces an origin-prefixed (`Readwise-...`) note flat under `01_Capture/` with conformant frontmatter (`source`/`origin`/`readwise_doc_id`/`category`/`tags`) and a `## Full Text` section |
 | `dedup_guard` | Calling `write_capture()` twice with the same fixture item writes exactly one capture file, not two — the second call returns `skipped-duplicate` |
 | `book_capture_dedup` | Given a fixture Classic v2 book + highlights (`evals/fixtures/reader_book.json`), `build_captures.write_book_capture()` produces a conformant `category: book` note with the highlights rendered, and a second call over the same book dedups via the title+author slug key rather than writing a second file |
-| `hook_silent_noop` | `hooks/session-start.sh`, run with `READWISE_TOKEN` unset and a scratch `$HOME`, produces zero stdout/stderr and exits 0 |
+| `ingest` | `ingest.py` end to end against a stubbed Reader API: captures, provenance, ledger dedup, and a DLQ note with the watermark held when an item fails |
 
 Every eval that writes runs against a throwaway copy (`evals/_sandbox.py`), so `./vault`
 is never touched. If `./vault` doesn't exist yet, `run.py` exits `2` with a `corpus not

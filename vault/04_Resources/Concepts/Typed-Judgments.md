@@ -66,7 +66,7 @@ flowchart LR
 
 The cheap model answers; the reasoning model writes and debugs the questions. When an answer is
 wrong, the first suspect is the question, then the state, then the label, and only then the
-model: see the `judgment-calibration` skill, which classifies every disagreement by cause before
+model: see the judgment-calibration loop (`docs/MAINTAINING.md`), which classifies every disagreement by cause before
 proposing the smallest fix, keeps a held-out slice away from the tuning step, and never accepts
 a backend's own answer as a label.
 

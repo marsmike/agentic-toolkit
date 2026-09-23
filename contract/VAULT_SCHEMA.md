@@ -22,7 +22,7 @@ executable version of this contract: a schema change that isn't reflected there 
 always excluded from these operations.
 
 Root-level notes (directly in the vault root) join active content only when their own
-frontmatter declares `status: active` — e.g. a persona/profile note; `Index.md` and `CLAUDE.md`
+frontmatter declares `status: active` — e.g. a persona/profile note; `Index.md` and `AGENTS.md`
 never qualify (no frontmatter). Notes under `Config/` are configuration, not content: links into
 them are neither dangling nor violations, just unmodeled. [earned: gaiafield R2 node-scope
 conflict — the bridge persona note was unreachable under a literal reading, 2026-07-26]

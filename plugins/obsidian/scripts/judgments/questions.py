@@ -2,7 +2,7 @@
 
 This file is data. Thresholds, gates, and what a probability leads to live in
 `distill_judge.py` and `graph.py`; nothing here may mention a number, a threshold, or an
-action to take. The `judgment-calibration` skill edits this file (and only this file)
+action to take. The judgment-calibration loop (`docs/MAINTAINING.md`) edits this file (and only this file)
 when a disagreement traces back to wording, and bumps QUESTIONS_VERSION when it does.
 
 Rules the wording follows (TypeSafe primitive docs):

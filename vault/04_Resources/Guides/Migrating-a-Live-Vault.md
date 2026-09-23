@@ -104,7 +104,7 @@ This toolkit learned it twice ([[Calibration-Bias]], and the link-judgment cuts 
 [[Typed-Judgments]]): rankings transfer between vaults, thresholds do not.
 
 - gaiafield gates: `gaiafield calibrate --clusters <your spec>`.
-- Judgment thresholds and wording: run the `judgment-calibration` skill on ten to twenty real
+- Judgment thresholds and wording: run the judgment-calibration loop (`docs/MAINTAINING.md`) on ten to twenty real
   captures. Label blind, keep a held-out slice, let a human confirm every `must` row.
 - The description-quality cut in `vault_judge.py`: read the ranking first, then set the cut.
 
@@ -117,7 +117,7 @@ documents) and check that de-duplication by document id holds before the full sw
 
 Snapshot the real vault (sync history, a tarball, or both). Point `TOOLKIT_VAULT` at it, run
 `toolkit doctor`, distill **one** capture end to end with the Phase 1 checkpoint on, read the
-diff. Then the backlog, in batches small enough to review. Update the vault's own `CLAUDE.md`
+diff. Then the backlog, in batches small enough to review. Update the vault's own `AGENTS.md`
 last, once it describes what actually runs.
 
 Keep git on the real vault too. Obsidian Sync does not sync hidden folders, so `.git/` lives beside

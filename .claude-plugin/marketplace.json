@@ -2,7 +2,7 @@
   "name": "agentic-toolkit",
   "metadata": {
     "description": "Vault-first Claude Code toolkit: a curated set of plugins over an Obsidian knowledge base, with contracts, evals, and native engines.",
-    "version": "2.10.0"
+    "version": "3.0.0"
   },
   "owner": {
     "name": "Mike Müller",
@@ -12,14 +12,14 @@
     {
       "name": "obsidian",
       "source": "./plugins/obsidian",
-      "version": "2.9.0",
-      "description": "Vault interface: CLI operations, search, graph-aware distill, and retrieval-verification maintenance — the reference implementation of the vault contract."
+      "version": "3.0.0",
+      "description": "Vault interface: filesystem-first operations and health, search, graph-aware distill, and the unattended pipeline that rebuilds Index, maps and Now."
     },
     {
       "name": "readwise",
       "source": "./plugins/readwise",
-      "version": "2.4.0",
-      "description": "Readwise ingestion for the vault contract: pulls Reader/Classic highlights into origin-prefixed 01_Capture/ notes, with optional GitHub/YouTube enrichment, a daily digest, and pipeline status."
+      "version": "3.0.0",
+      "description": "Readwise ingestion for the vault contract, as scripts the pipeline runs: Reader/Classic highlights into origin-prefixed 01_Capture/ notes with their provenance."
     },
     {
       "name": "memory",
@@ -30,14 +30,14 @@
     {
       "name": "handoff",
       "source": "./plugins/handoff",
-      "version": "2.7.0",
+      "version": "3.0.0",
       "description": "Portable session handoff: save/resume work context across sessions, machines, and tools via chained in-repo _handoff/ markdown, with a vault discovery index and PreCompact safety net."
     },
     {
       "name": "radar",
       "source": "./plugins/radar",
-      "version": "2.10.0",
-      "description": "Active research radar: judges every Reader feed item against your interests with typed judgments, archives or promotes it in Reader, writes a daily note and a weekly capture, reports which feeds earn their place, and proposes new feeds via Kagi."
+      "version": "3.0.0",
+      "description": "Active research radar: judges every Reader feed item against your interests with typed judgments, reports which feeds earn their place, proposes new feeds, and asks Kagi (search, news, answers, summaries)."
     }
   ]
 }

@@ -14,12 +14,14 @@ tags:
 
 `.claude-plugin/marketplace.json` lists every plugin under `plugins/` as a source; installing one
 is `claude plugin marketplace add <path>` against this repo. As shipped, that file registers
-exactly four plugins — this is the current, verified reality, not a roadmap summary:
+exactly five plugins with six skills between them — this is the current, verified reality, not a
+roadmap summary:
 
-- **obsidian** — the vault-contract reference implementation: CLI operations, search, graph-aware
-  distill, retrieval-verification maintenance. See [[Obsidian-Plugin]].
-- **readwise** — Readwise ingestion into origin-prefixed `01_Capture/` notes. See
-  [[Readwise-Plugin]].
+- **obsidian** — the vault-contract reference implementation: vault operations and health,
+  search, graph-aware distill, the unattended pipeline. See [[Obsidian-Plugin]].
+- **readwise** — Readwise ingestion into origin-prefixed `01_Capture/` notes, as scripts the
+  pipeline runs. See [[Readwise-Plugin]].
+- **radar** — judges every Reader feed item against your interests, and asks Kagi.
 - **memory** — session-end capture and on-demand distillation into `00_Memory/`.
 - **handoff** — portable session continuity: chained `_handoff/` markdown in the repo, a
   discovery index in the vault, and a pre-compaction autosnapshot hook.

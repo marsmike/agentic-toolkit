@@ -9,7 +9,7 @@ REPO_ROOT = vault.find_repo_root(Path(__file__).resolve().parent)
 assert REPO_ROOT is not None, "tests must run from inside the agentic-toolkit-v2 repo"
 
 EXAMPLE_VAULT = REPO_ROOT / "vault"
-CLAUDE_MD_TEMPLATE = REPO_ROOT / "contract" / "templates" / "VAULT_CLAUDE.md"
+AGENTS_MD_TEMPLATE = REPO_ROOT / "contract" / "templates" / "VAULT_AGENTS.md"
 
 
 def example_vault_note_count() -> int:
@@ -32,5 +32,5 @@ def repo_root() -> Path:
 
 
 @pytest.fixture
-def claude_md_template() -> Path:
-    return CLAUDE_MD_TEMPLATE
+def agents_md_template() -> Path:
+    return AGENTS_MD_TEMPLATE

@@ -24,7 +24,8 @@ P pipeline_run.py begin          # pulls the vault's upstream first; "busy" (ano
 #   radar skill:     radar.py scan --since 1d --promote --todoist --json
 #                    radar.py gaps --promote   (once a week: what the feeds missed; "exists" is normal)
 #                    radar.py weekly   (last week's digest, written once; "exists" is normal)
-#   readwise:ingest: ingest.py --json
+#   readwise ingest (a script, no skill; TOOLKIT_REPO is the toolkit checkout, absent = skip):
+#   uv run --project "$TOOLKIT_REPO/plugins/readwise/scripts" python3 "$TOOLKIT_REPO/plugins/readwise/scripts/ingest.py" --json
 P pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first
 # distill each one with the distill skill, --auto
 P pipeline_run.py end --distilled N --dropped N --failed <captures that failed distill_check>

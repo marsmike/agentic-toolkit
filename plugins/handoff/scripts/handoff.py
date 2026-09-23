@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """handoff — portable, tool-agnostic session handoff.
 
-Deterministic mechanics for the `handoff` / `handoff-resume` skills. The model writes
+Deterministic mechanics for the `handoff` skill (save and resume). The model writes
 the narrative (goal / status / tried / decisions / next step); this script handles
 everything that must be exact: repo resolution, git state, chain sequencing, file
 layout, profile reads, and the vault index. Plain markdown so Claude, Codex, or Gemini

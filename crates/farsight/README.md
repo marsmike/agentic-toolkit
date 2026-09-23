@@ -22,7 +22,7 @@ farsight query "hybrid retrieval scoring" --vault ./vault --k 10 --json
 own frontmatter declares `status: active` — the active-content filter in
 `contract/VAULT_SCHEMA.md`, including its root-level-note clause (e.g. this vault's persona
 note, `Alex-Vega.md`). `00_Memory/`, `01_Capture/`, and `05_Archive/` are always excluded, and
-`Index.md`/`CLAUDE.md` never qualify since neither carries frontmatter. Frontmatter parsing is
+`Index.md`/`AGENTS.md` never qualify since neither carries frontmatter. Frontmatter parsing is
 tolerant per the same contract's floor-not-ceiling rule: unknown keys are ignored (never
 rejected), and a note with no frontmatter block at all is valid, not an error.
 
