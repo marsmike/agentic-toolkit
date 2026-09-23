@@ -166,3 +166,4 @@ flowchart LR
 - [[Calibration-Bias]]
 - [[Dead-Letter-Queues-for-Automation]]
 - [[The-Distill-Workflow]]
+- [[Active-Radar]] — the same judgments applied to every feed item, before the clip

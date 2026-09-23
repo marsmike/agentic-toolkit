@@ -66,6 +66,7 @@ Five roles: (1) `vault init` template; (2) deterministic test corpus for farsigh
 ## Curation waves
 
 - **Core wave:** obsidian → readwise → memory → research → farsight → techref → gaiafield → feinschliff
+  - *research landed in R10 as `plugins/radar`* (docs/R10-RADAR-PLAN.md): Reader is the one input channel, typed judgments filter every feed item, Kagi is for feed discovery only. The v1 launcher for third-party Kagi binaries and the prose-ranked trend-radar workflow are not ported.
 - **Second wave:** tech-radar (renders into docs/ as the public SOTA view), feinbild/feinklang/feinschnitt, imagine, elevenlabs, handoff, autoresearch (carries the eval/self-improvement loop — must survive curation)
 - **Private repo:** whatsapp, music-coach, memory identity
 - **Archive (frozen v1):** crowd, cli-recorder, social, proxmox, codescan, notebooklm, todoist, workflows, remotion — re-entry possible if they earn it against the admission bar

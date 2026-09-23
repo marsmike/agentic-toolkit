@@ -2,6 +2,51 @@
 
 Every release entry links the change to the research or the dated failure that motivated it — this file is the public ratchet.
 
+## [Unreleased] — R10, the radar (plugins/radar 2.10.0)
+
+Everything before R10 ran *after* a clip. Measured on a real Reader account: 1,716 feed items in
+30 days, none of them ever opened, and 55 clips made by hand, none from the feed. The radar reads
+the feed in full with the same typed judgments distill uses, and only what matters reaches you.
+Plan and acceptance: `docs/R10-RADAR-PLAN.md`.
+
+- **`radar.py scan`** — Reader `location=feed` items, deduped by canonical URL (GitHub repo roots
+  and arXiv abs/pdf/vN collapse, `judgments/urls.py`), by feed + title (a repost under a new
+  address) and by back catalogue (published a week before the window: a newly subscribed feed's
+  archive) [earned: 2026-09-22 smoke run, both arrived as new]. Jev answers `worth_reading` per item
+  x interest and `kind` per item, 8 items per request; rows go to `00_Memory/radar/state.jsonl`
+  and a daily note. Every item the radar has recorded then leaves the feed: archived, or with
+  `--promote` moved to Later tagged `radar/<interest>` with a dated note. A failed promotion stays
+  in the feed and is retried; nothing is ever deleted [Mike, 2026-09-23: judged items off the feed].
+- **`radar.py replay`, the acceptance run** — own clips vs. feed items, three scorers on the same
+  items. Same-day AUC: **Jev 0.70, BM25 0.57, recency 0.47**; at 20 items a day 71% of clips would
+  have been shown (BM25 50%). The first run reported pooled AUC, where recency scored 0.68 because
+  18 of 27 clips came from one bookmark import; same-day AUC is now the headline, and delivered
+  newsletters no longer count as clips [earned: 2026-09-23 replay].
+- **Blind audit** — 120 stratified items plus the top 30, labelled by a model that never saw p:
+  the strong band held at 69%, the 0.60–0.80 band at 23%. `T_WORTH` moved 0.60 → 0.70 (1,325 feed
+  items → 194 worth, 102 strong). Scoring the same items in different batches moves p by 0.02 on
+  average and flips 1% of bands.
+- **`radar.py feeds`, `trend`, `weekly`** — from state only, no model: per-feed yield with
+  "consider unsubscribing" and "serves only <interest>"; interests rising above their baseline
+  (median prior rate, flagged above lambda + 2 sqrt(lambda)); `01_Capture/Radar-Week-YYYY-Www.md`, a
+  draft digest for distill that never links `00_Memory`. The first yield report: 101 of 102
+  strong items from arXiv, three embedded feeds with none in a month.
+- **`radar.py discover`** — candidate feeds from Kagi (the interests' own queries), URL shapes
+  (GitHub releases.atom, subreddit .rss, Substack, Medium), RSS autodiscovery, one hnrss search per
+  interest and `--seed` URLs; each fetched, parsed and dropped when thin, dormant or already
+  delivered, then judged per interest; an OPML with the reason per feed, since Reader has no
+  subscription API. Kagi spend is measured from the account balance against a weekly budget.
+  Per-host spacing and a 429 retry [earned: parallel fetches to reddit.com drew 429s]; an hnrss
+  feed's title is renamed before judging because it is the search query. First run: 20 searches
+  ($0.50) found 72 candidates and 8 keepers; seeds added the rest; 14 feeds subscribed.
+- **Plumbing** — `judge.py`, `judgments/urls.py`, `judgments/state.py` are byte-identical copies
+  of obsidian's with a parity test (no cross-plugin imports); `judge.py` derives its key env name
+  from the profile name. The radar skill (daily and weekly briefing, scheduling reference),
+  `profile.example.md` with what leaves the machine, four offline evals in CI (scan 8 phases,
+  replay, discover, reports on a hand-made six-week series). `contract/KNOWLEDGE_API.md` names
+  `00_Memory/` and `01_Capture/` as the only automation sinks.
+- **Not built** — `gaps`, `--todoist`, a Kagi skill (specified in the plan).
+
 ## [Unreleased] — tools from migrating a live vault
 
 What the first real migration (a ~1,200-note vault, 2026-09-22) needed that the plugin lacked. The

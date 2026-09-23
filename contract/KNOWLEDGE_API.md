@@ -81,6 +81,13 @@ writes vault content from a judgment without explicit human confirmation in-sess
 `questions_version` that produced it, for the same reason a gate is meaningless without its
 model name (rule 3); every emitted block carries all three.
 
+## Automation sinks
+
+Scripts that run without a human in the loop write to two places only: `00_Memory/` (their own
+state, reports and dead-letter notes) and `01_Capture/` (material for distill, which reaches
+`02_`–`04_` only through the human checkpoint). The radar is the first plugin that does both on a
+schedule: `00_Memory/radar/` daily, `01_Capture/Radar-Week-*.md` weekly.
+
 ## No cross-plugin imports
 
 Plugins depend on `core` and `contract` only, never on a sibling plugin. Composition across
