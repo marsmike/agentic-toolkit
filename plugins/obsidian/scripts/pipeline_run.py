@@ -48,7 +48,7 @@ LOCK_STALE_HOURS = 6
 MAX_ATTEMPTS = 2
 DEFAULT_BATCH = 10
 SCRIPTS = Path(__file__).resolve().parent
-GENERATORS = {  # script → the files it owns (Maps/: only files carrying its `generated_by` marker)
+GENERATORS = {  # script → the files it writes (a trailing / = every file directly in that folder)
     "index_build.py": ("Index.md",),
     "map_build.py": ("Maps/",),
     "now_build.py": ("Now.md", "Boards/Pipeline.md"),
@@ -122,12 +122,13 @@ def _claim(lock: Path, now: datetime, token: str) -> datetime | None:
 
 def _release(lock: Path, token: str | None) -> None:
     """Remove the lock, but only if it is still this run's: a run that outlived LOCK_STALE_HOURS
-    must not delete the lock of the run that took over. No token (a manual `end`) removes it.
-    [earned: 2026-09-23, PR #24 review]"""
+    must not delete the lock of the run that took over. An `end` without a token removes only a
+    lock that carries none (an old one); a tokened lock waits for its run or goes stale.
+    [earned: 2026-09-23, PR #24 reviews]"""
     if not lock.exists():
         return
     with _guard(lock):
-        if token is None or _lock_token(lock) == token:
+        if _lock_token(lock) == (token or ""):
             lock.unlink(missing_ok=True)
 
 
@@ -231,7 +232,10 @@ def scan_staged(vault: Path) -> list[dict[str, Any]]:
 
 def _commit(vault: Path, message: str, exclude: tuple[str, ...] = ()) -> dict[str, Any]:
     """Stage everything and commit, unless the diff holds a key-shaped string: then unstage and DLQ."""
-    _git(vault, "add", "-A", "--", ".", *(f":(exclude){e}" for e in exclude))
+    added = _git(vault, "add", "-A", "--", ".", *(f":(exclude){e}" for e in exclude))
+    if added.returncode != 0:
+        # An empty index after a failed add is not "nothing to commit". [earned: PR #24 review]
+        return {"commit": None, "secrets": [], "error": "git add: " + (added.stderr.strip().splitlines() or ["?"])[-1][:200]}
     if _git(vault, "diff", "--cached", "--quiet").returncode == 0:
         return {"commit": None, "secrets": []}
     hits = scan_staged(vault)
@@ -311,16 +315,17 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
 
     summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed" + (f"; {note}" if note else "")
     env = {**os.environ, "TOOLKIT_VAULT": str(vault)}
-    # A generator that fails may have replaced some of its files and not others, so its outputs go
-    # back to the last commit: navigation is either this run's or the previous run's, never a mix.
+    # A generator that fails may have replaced some of its files and not others, so its files go
+    # back to how they were before it ran: navigation is this run's or the last one's, never a mix.
     # The run is still committed (it is the undo for the notes it wrote); the failure is reported
     # and gets a DLQ note. [earned: 2026-09-23, PR #20 and #24 reviews]
     failed_builds = []
     for script in GENERATORS:
+        before = _snapshot(vault, GENERATORS[script])
         run = subprocess.run([sys.executable, str(SCRIPTS / script)], capture_output=True, text=True, check=False, env=env)
         if run.returncode != 0:
             failed_builds.append({"script": script, "error": (run.stderr.strip().splitlines() or ["?"])[-1][:200]})
-            _restore(vault, GENERATORS[script])
+            _restore(vault, GENERATORS[script], before)
     if failed_builds:
         _dlq_once(vault, slug="pipeline-build-failed", title="A navigation build failed at the end of a pipeline run",
                   what_happened="; ".join(f"{f['script']}: {f['error']}" for f in failed_builds),
@@ -351,27 +356,34 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     return result
 
 
-def _restore(vault: Path, paths: tuple[str, ...]) -> None:
-    """Put a failed generator's own files back to the last commit. Only files it owns: a map it
-    added is removed only if it carries map_build's marker, so a hand-made file in Maps/ or
-    Boards/ is never touched. [earned: 2026-09-23, PR #24 review — `git clean` of the folders]"""
-    if not _is_repo(vault):
-        return
+def _owned(vault: Path, paths: tuple[str, ...]) -> list[Path]:
+    """The files a generator may touch: a named file, or every file directly in a named folder."""
+    out = []
     for rel in paths:
-        if not rel.endswith("/"):
-            if _git(vault, "cat-file", "-e", f"HEAD:{rel}").returncode == 0:
-                _git(vault, "checkout", "HEAD", "--", rel)
-            continue
-        folder = vault / rel
-        for md in sorted(folder.glob("*.md")):
-            if read_frontmatter(md)[0].get("generated_by") != "map_build.py":
-                continue
-            for path in (md, md.with_suffix(".canvas")):
-                p = path.relative_to(vault).as_posix()
-                if _git(vault, "cat-file", "-e", f"HEAD:{p}").returncode == 0:
-                    _git(vault, "checkout", "HEAD", "--", p)
-                else:
-                    path.unlink(missing_ok=True)
+        target = vault / rel
+        out += sorted(p for p in target.iterdir() if p.is_file()) if rel.endswith("/") and target.is_dir() else [target]
+    return out
+
+
+def _snapshot(vault: Path, paths: tuple[str, ...]) -> dict[Path, bytes | None]:
+    """Exact bytes of every file a generator may touch, taken just before it runs."""
+    return {p: (p.read_bytes() if p.is_file() else None) for p in _owned(vault, paths)}
+
+
+def _restore(vault: Path, paths: tuple[str, ...], before: dict[Path, bytes | None]) -> None:
+    """Put a failed generator's files back exactly as they were before it ran: changed or deleted
+    ones get their bytes back, ones it created are removed, anything else it never saw stays.
+    Needs no git and no ownership guess. [earned: 2026-09-23, PR #24 reviews — restoring from
+    HEAD missed first-run files and deleted maps, and could hit a hand-made canvas]"""
+    for path, data in before.items():
+        if data is None:
+            path.unlink(missing_ok=True)
+        elif not path.is_file() or path.read_bytes() != data:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+    for path in _owned(vault, paths):
+        if path not in before:
+            path.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:

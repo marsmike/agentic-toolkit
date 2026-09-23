@@ -10,7 +10,8 @@
 5. sync     — with a bare upstream: a second clone's commit arrives with `begin`, `end` pushes, and a
               conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
 6. build    — a generator that fails is reported in `build_failed` and gets one DLQ note across
-              runs; its outputs go back to the last commit (no half-written maps); the run commits
+              runs; its files go back exactly as before it ran (changed, added, deleted; a hand-made
+              canvas beside a map untouched); the run still commits
 """
 from __future__ import annotations
 
@@ -34,6 +35,21 @@ CAPTURES = {
 FAKE_KEY = "sk-or-v1-" + "0123456789abcdef" * 4
 
 
+_TOKEN: dict[str, str | None] = {"last": None}
+
+
+def _begin(pr, vault: Path, now: datetime) -> dict:
+    """`begin`, keeping the token it hands out for the next `_end`, as the pipeline skill does."""
+    r = pr.begin(vault, now)
+    if r.get("token"):
+        _TOKEN["last"] = r["token"]
+    return r
+
+
+def _end(pr, vault: Path, now: datetime, *args, **kwargs) -> dict:
+    return pr.end(vault, now, *args, token=_TOKEN["last"], **kwargs)
+
+
 def _git(root: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=False).stdout
 
@@ -54,10 +70,10 @@ def _sync_phase(pr, sandbox: Path) -> list[str]:
     _git(other, "commit", "-q", "-m", "cloud: one note")
     _git(other, "push", "-q")
 
-    r = pr.begin(sandbox, NOW + timedelta(hours=18))
+    r = _begin(pr, sandbox, NOW + timedelta(hours=18))
     if r.get("status") != "ok" or not (sandbox / "04_Resources" / "Eval-From-Cloud.md").is_file():
         problems.append(f"phase 5: begin must pull the cloud's commit, got {r}")
-    r = pr.end(sandbox, NOW + timedelta(hours=18), 1, 0, [])
+    r = _end(pr, sandbox, NOW + timedelta(hours=18), 1, 0, [])
     if not r.get("sync", {}).get("pushed") or _git(sandbox, "rev-parse", "HEAD") != _git(remote, "rev-parse", "HEAD"):
         problems.append(f"phase 5: end must push the run's commit, got {r.get('sync')}")
 
@@ -66,7 +82,7 @@ def _sync_phase(pr, sandbox: Path) -> list[str]:
         (root / "04_Resources" / "Eval-From-Cloud.md").write_text(text, encoding="utf-8")
     _git(other, "commit", "-q", "-am", "cloud: edit")
     _git(other, "push", "-q")
-    r = pr.begin(sandbox, NOW + timedelta(hours=21))
+    r = _begin(pr, sandbox, NOW + timedelta(hours=21))
     conflicts = list((sandbox / "00_Memory" / "dlq").glob("*pull-conflict*.md"))
     if r.get("status") != "skipped" or (sandbox / pr.LOCK).exists() or len(conflicts) != 1:
         problems.append(f"phase 5: a conflict skips the run without the lock and writes one DLQ note, got {r.get('status')}")
@@ -88,27 +104,31 @@ def _build_failure_phase(pr, sandbox: Path) -> list[str]:
             shutil.copy(saved / name, stubs / name)
         for name in ("map_build.py", "pipeline_run.py"):
             shutil.copy(saved / name, stubs / name)
-        # Still importable (now_build uses its helpers); fails only when run as the build script.
+        # Still importable (now_build uses its helpers). Run as the build script it does damage a
+        # half-finished build could do (overwrite one map, add one, delete one), then fails.
+        damage = ("import os\nfrom pathlib import Path\nm = Path(os.environ['TOOLKIT_VAULT']) / 'Maps'\n"
+                  "(m / 'Overview.md').write_text('half-written by a build that then failed')\n"
+                  "(m / 'stray.md').write_text('added by the failed build')\n"
+                  "(m / 'toolkit-meta.md').unlink()\n"
+                  "sys.exit('map_build: boom')")
         real = (saved / "map_build.py").read_text(encoding="utf-8")
-        (stubs / "map_build.py").write_text(real.replace("sys.exit(main())", "sys.exit('map_build: boom')"), encoding="utf-8")
+        (stubs / "map_build.py").write_text(real.replace("sys.exit(main())", damage.replace("\n", "\n    ")), encoding="utf-8")
         pr.SCRIPTS = stubs
         _git(sandbox, "remote", "remove", "origin")
-        overview = sandbox / "Maps" / "Overview.md"
-        mine = sandbox / "Maps" / "My-Own-Map.md"
-        mine.write_text("# made by hand\n", encoding="utf-8")
+        maps = sandbox / "Maps"
+        mine = maps / "toolkit-meta-sketch.canvas"  # hand-made, beside a generated map
+        mine.write_text('{"nodes": [], "edges": []}\n', encoding="utf-8")
         for hours in (24, 27):
+            before = {p.name: p.read_bytes() for p in maps.iterdir() if p.is_file()}
             token = pr.begin(sandbox, NOW + timedelta(hours=hours)).get("token")
             (sandbox / "04_Resources" / f"Eval-Build-Fail-{hours}.md").write_text("---\ndescription: x\n---\n", encoding="utf-8")
-            overview.write_text("---\ngenerated_by: map_build.py\n---\nhalf-written by a build that then failed\n", encoding="utf-8")
-            (sandbox / "Maps" / "stray.md").write_text("---\ngenerated_by: map_build.py\n---\nadded by the failed build\n", encoding="utf-8")
             r = pr.end(sandbox, NOW + timedelta(hours=hours), 1, 0, [], token=token)
             if [f["script"] for f in r.get("build_failed", [])] != ["map_build.py"] or not r.get("commit"):
                 problems.append(f"phase 6: a failing map_build is reported and the run still commits, got {r}")
-            if "half-written" in overview.read_text(encoding="utf-8") or (sandbox / "Maps" / "stray.md").exists() or \
-                    "Maps/stray.md" in _git(sandbox, "show", "--name-only", "--format=", "HEAD"):
-                problems.append("phase 6: a failed build's outputs go back to the last commit before committing")
-            if not mine.is_file():
-                problems.append("phase 6: rolling back a failed build must never touch a hand-made file in Maps/")
+            after = {p.name: p.read_bytes() for p in maps.iterdir() if p.is_file()}
+            if after != before:
+                problems.append(f"phase 6: a failed build's files go back exactly as before it ran; differs: "
+                                f"{sorted(k for k in before.keys() | after.keys() if before.get(k) != after.get(k))}")
             if (sandbox / pr.LOCK).exists():
                 problems.append("phase 6: end with the run's own token releases the lock")
         dlq = list((sandbox / "00_Memory" / "dlq").glob("*pipeline-build-failed*.md"))
@@ -140,12 +160,12 @@ def run(vault: Path) -> dict:
         head0 = _git(sandbox, "rev-parse", "HEAD").strip()
 
         # 1. begin
-        pr.begin(sandbox, NOW)
+        _begin(pr, sandbox, NOW)
         r = pr.queue(sandbox, batch=3)
         names = [Path(p).name for p in r.get("batch", [])]
         if names[:2] != ["Readwise-Article-clip-older.md", "Readwise-Article-clip-newer.md"] or len(names) != 3:
             problems.append(f"phase 1: clips first, oldest first, three in all; got {names}")
-        if pr.begin(sandbox, NOW + timedelta(minutes=5))["status"] != "busy":
+        if _begin(pr, sandbox, NOW + timedelta(minutes=5))["status"] != "busy":
             problems.append("phase 1: a second begin while the lock is held must be busy")
         later = NOW + timedelta(hours=pr.LOCK_STALE_HOURS + 1)
         lock = sandbox / pr.LOCK
@@ -157,11 +177,11 @@ def run(vault: Path) -> dict:
         pr._release(lock, "the-run-that-was-taken-over")
         if not lock.exists():
             problems.append("phase 1: a run must not release a lock another run took over")
-        lock.write_text(NOW.isoformat() + "\n", encoding="utf-8")
+        lock.write_text(f"{NOW.isoformat()}\n{_TOKEN['last']}\n", encoding="utf-8")  # back to the phase-1 run
 
         # 2. end
         failed = "01_Capture/Readwise-Newsletter-news.md"
-        r = pr.end(sandbox, NOW, distilled=2, dropped=1, failed=[failed])
+        r = _end(pr, sandbox, NOW, distilled=2, dropped=1, failed=[failed])
         log = _git(sandbox, "log", "--format=%s", f"{head0}..HEAD").splitlines()
         if len(log) != 1 or "2 distilled, 1 dropped, 1 failed" not in log[0]:
             problems.append(f"phase 2: expected one commit with the summary, got {log}")
@@ -172,27 +192,27 @@ def run(vault: Path) -> dict:
             problems.append("phase 2: one Log.md line for the run")
 
         # 3. parking
-        pr.begin(sandbox, NOW + timedelta(hours=3))
-        pr.end(sandbox, NOW + timedelta(hours=3), distilled=0, dropped=0, failed=[failed])
-        pr.begin(sandbox, NOW + timedelta(hours=6))
+        _begin(pr, sandbox, NOW + timedelta(hours=3))
+        _end(pr, sandbox, NOW + timedelta(hours=3), distilled=0, dropped=0, failed=[failed])
+        _begin(pr, sandbox, NOW + timedelta(hours=6))
         r = pr.queue(sandbox)
         if failed in r.get("batch", []) or r.get("parked_now") != [failed]:
             problems.append(f"phase 3: a capture failing twice must be parked, got {r}")
         dlq = list((sandbox / "00_Memory" / "dlq").glob("*pipeline-parked-*.md"))
         if len(dlq) != 1 or not (sandbox / failed).is_file():
             problems.append(f"phase 3: parking writes one DLQ note and keeps the capture, got {len(dlq)} notes")
-        pr.end(sandbox, NOW + timedelta(hours=6), 0, 0, [])
-        pr.begin(sandbox, NOW + timedelta(hours=9))
+        _end(pr, sandbox, NOW + timedelta(hours=6), 0, 0, [])
+        _begin(pr, sandbox, NOW + timedelta(hours=9))
         if pr.queue(sandbox).get("parked_now"):
             problems.append("phase 3: a parked capture gets its DLQ note once")
-        pr.end(sandbox, NOW + timedelta(hours=9), 0, 0, [])
+        _end(pr, sandbox, NOW + timedelta(hours=9), 0, 0, [])
 
         # 4. secret scan
         leak = sandbox / "04_Resources" / "Eval-Leaky-Note.md"
         leak.write_text(f"---\ndescription: leaky\n---\n\nkey: {FAKE_KEY}\n", encoding="utf-8")
         head = _git(sandbox, "rev-parse", "HEAD").strip()
-        pr.begin(sandbox, NOW + timedelta(hours=12))
-        r = pr.end(sandbox, NOW + timedelta(hours=12), 0, 0, [])
+        _begin(pr, sandbox, NOW + timedelta(hours=12))
+        r = _end(pr, sandbox, NOW + timedelta(hours=12), 0, 0, [])
         dlq = list((sandbox / "00_Memory" / "dlq").glob("*secret-refused*.md"))
         if r.get("status") != "refused" or _git(sandbox, "rev-parse", "HEAD").strip() != head:
             problems.append(f"phase 4: a key-shaped string must refuse the commit, got {r.get('status')}")
@@ -201,8 +221,8 @@ def run(vault: Path) -> dict:
         if _git(sandbox, "diff", "--cached", "--name-only").strip():
             problems.append("phase 4: a refused commit must leave nothing staged")
         leak.unlink()
-        pr.begin(sandbox, NOW + timedelta(hours=15))
-        if pr.end(sandbox, NOW + timedelta(hours=15), 0, 0, []).get("status") != "ok":
+        _begin(pr, sandbox, NOW + timedelta(hours=15))
+        if _end(pr, sandbox, NOW + timedelta(hours=15), 0, 0, []).get("status") != "ok":
             problems.append("phase 4: once the key is gone the next run commits")
 
         # 5. git sync through an upstream
