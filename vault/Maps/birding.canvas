@@ -1,0 +1,318 @@
+{
+	"nodes": [
+		{
+			"id": "9da948ee7b583ca2",
+			"type": "file",
+			"file": "Maps/birding.md",
+			"x": -720,
+			"y": 0,
+			"width": 640,
+			"height": 900
+		},
+		{
+			"id": "92a0d064a179266c",
+			"type": "group",
+			"label": "Other notes",
+			"x": 0,
+			"y": 0,
+			"width": 1120,
+			"height": 620
+		},
+		{
+			"id": "662c2db44574cc67",
+			"type": "file",
+			"file": "02_Projects/field-guide/Field-Guide-Project.md",
+			"x": 40,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "b340da8e52ae58c9",
+			"type": "file",
+			"file": "02_Projects/field-guide/Weekly-Review.md",
+			"x": 400,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "aa1ee0ab53e6e549",
+			"type": "file",
+			"file": "02_Projects/field-guide/Species-Accounts-Workflow.md",
+			"x": 760,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "2e69f23caeaf0bd8",
+			"type": "file",
+			"file": "03_Areas/Birding.md",
+			"x": 40,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "698bb55bc7730c0e",
+			"type": "file",
+			"file": "02_Projects/field-guide/Reference-Library.md",
+			"x": 400,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "49f5f09a98c7352a",
+			"type": "file",
+			"file": "02_Projects/field-guide/Illustration-Sourcing.md",
+			"x": 760,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "7f9cca431490635e",
+			"type": "file",
+			"file": "02_Projects/field-guide/Publisher-Outreach-Log.md",
+			"x": 40,
+			"y": 440,
+			"width": 320,
+			"height": 140
+		}
+	],
+	"edges": [
+		{
+			"id": "1c87e2e9bc4f46ed",
+			"fromNode": "662c2db44574cc67",
+			"fromSide": "right",
+			"toNode": "49f5f09a98c7352a",
+			"toSide": "left"
+		},
+		{
+			"id": "9a8fac6734ead16f",
+			"fromNode": "662c2db44574cc67",
+			"fromSide": "right",
+			"toNode": "7f9cca431490635e",
+			"toSide": "left"
+		},
+		{
+			"id": "0615ed2e7ce9a705",
+			"fromNode": "662c2db44574cc67",
+			"fromSide": "right",
+			"toNode": "698bb55bc7730c0e",
+			"toSide": "left"
+		},
+		{
+			"id": "c231002ecb6100d3",
+			"fromNode": "662c2db44574cc67",
+			"fromSide": "right",
+			"toNode": "aa1ee0ab53e6e549",
+			"toSide": "left"
+		},
+		{
+			"id": "1cee14f110eb6427",
+			"fromNode": "662c2db44574cc67",
+			"fromSide": "right",
+			"toNode": "b340da8e52ae58c9",
+			"toSide": "left"
+		},
+		{
+			"id": "d3e0e12d260c3ddb",
+			"fromNode": "662c2db44574cc67",
+			"fromSide": "right",
+			"toNode": "2e69f23caeaf0bd8",
+			"toSide": "left"
+		},
+		{
+			"id": "dd01f56dd6756e78",
+			"fromNode": "49f5f09a98c7352a",
+			"fromSide": "right",
+			"toNode": "662c2db44574cc67",
+			"toSide": "left"
+		},
+		{
+			"id": "0af45b85aca9d69c",
+			"fromNode": "49f5f09a98c7352a",
+			"fromSide": "right",
+			"toNode": "7f9cca431490635e",
+			"toSide": "left"
+		},
+		{
+			"id": "c0fe5ead94a14553",
+			"fromNode": "49f5f09a98c7352a",
+			"fromSide": "right",
+			"toNode": "698bb55bc7730c0e",
+			"toSide": "left"
+		},
+		{
+			"id": "a97978ee97e31d88",
+			"fromNode": "49f5f09a98c7352a",
+			"fromSide": "right",
+			"toNode": "aa1ee0ab53e6e549",
+			"toSide": "left"
+		},
+		{
+			"id": "68194933200258ef",
+			"fromNode": "49f5f09a98c7352a",
+			"fromSide": "right",
+			"toNode": "b340da8e52ae58c9",
+			"toSide": "left"
+		},
+		{
+			"id": "4a1dff7d997fb884",
+			"fromNode": "7f9cca431490635e",
+			"fromSide": "right",
+			"toNode": "662c2db44574cc67",
+			"toSide": "left"
+		},
+		{
+			"id": "a6566cbbcfde6882",
+			"fromNode": "7f9cca431490635e",
+			"fromSide": "right",
+			"toNode": "49f5f09a98c7352a",
+			"toSide": "left"
+		},
+		{
+			"id": "4fad005025721579",
+			"fromNode": "7f9cca431490635e",
+			"fromSide": "right",
+			"toNode": "aa1ee0ab53e6e549",
+			"toSide": "left"
+		},
+		{
+			"id": "92f3a54fc6a41eb5",
+			"fromNode": "7f9cca431490635e",
+			"fromSide": "right",
+			"toNode": "b340da8e52ae58c9",
+			"toSide": "left"
+		},
+		{
+			"id": "a74605e8be8a414f",
+			"fromNode": "698bb55bc7730c0e",
+			"fromSide": "right",
+			"toNode": "662c2db44574cc67",
+			"toSide": "left"
+		},
+		{
+			"id": "0ffe380188c5f510",
+			"fromNode": "698bb55bc7730c0e",
+			"fromSide": "right",
+			"toNode": "49f5f09a98c7352a",
+			"toSide": "left"
+		},
+		{
+			"id": "8730df6b6491cd27",
+			"fromNode": "698bb55bc7730c0e",
+			"fromSide": "right",
+			"toNode": "aa1ee0ab53e6e549",
+			"toSide": "left"
+		},
+		{
+			"id": "74207201bc711bb2",
+			"fromNode": "698bb55bc7730c0e",
+			"fromSide": "right",
+			"toNode": "2e69f23caeaf0bd8",
+			"toSide": "left"
+		},
+		{
+			"id": "4e7a7e076f190453",
+			"fromNode": "aa1ee0ab53e6e549",
+			"fromSide": "right",
+			"toNode": "662c2db44574cc67",
+			"toSide": "left"
+		},
+		{
+			"id": "be2fccc1e337e89c",
+			"fromNode": "aa1ee0ab53e6e549",
+			"fromSide": "right",
+			"toNode": "49f5f09a98c7352a",
+			"toSide": "left"
+		},
+		{
+			"id": "2fe3514cbc72019b",
+			"fromNode": "aa1ee0ab53e6e549",
+			"fromSide": "right",
+			"toNode": "698bb55bc7730c0e",
+			"toSide": "left"
+		},
+		{
+			"id": "b08fc36a1a1d81a8",
+			"fromNode": "aa1ee0ab53e6e549",
+			"fromSide": "right",
+			"toNode": "b340da8e52ae58c9",
+			"toSide": "left"
+		},
+		{
+			"id": "580d207febe95954",
+			"fromNode": "aa1ee0ab53e6e549",
+			"fromSide": "right",
+			"toNode": "2e69f23caeaf0bd8",
+			"toSide": "left"
+		},
+		{
+			"id": "3800083352a5b86c",
+			"fromNode": "b340da8e52ae58c9",
+			"fromSide": "right",
+			"toNode": "662c2db44574cc67",
+			"toSide": "left"
+		},
+		{
+			"id": "b346c708d4603b71",
+			"fromNode": "b340da8e52ae58c9",
+			"fromSide": "right",
+			"toNode": "49f5f09a98c7352a",
+			"toSide": "left"
+		},
+		{
+			"id": "a7ab6ec29c132956",
+			"fromNode": "b340da8e52ae58c9",
+			"fromSide": "right",
+			"toNode": "7f9cca431490635e",
+			"toSide": "left"
+		},
+		{
+			"id": "3f8f906b28982aeb",
+			"fromNode": "b340da8e52ae58c9",
+			"fromSide": "right",
+			"toNode": "698bb55bc7730c0e",
+			"toSide": "left"
+		},
+		{
+			"id": "5caf6eec433207fe",
+			"fromNode": "b340da8e52ae58c9",
+			"fromSide": "right",
+			"toNode": "aa1ee0ab53e6e549",
+			"toSide": "left"
+		},
+		{
+			"id": "78f2dc7e3c4abe29",
+			"fromNode": "b340da8e52ae58c9",
+			"fromSide": "right",
+			"toNode": "2e69f23caeaf0bd8",
+			"toSide": "left"
+		},
+		{
+			"id": "7fcd191e69dbf4e0",
+			"fromNode": "2e69f23caeaf0bd8",
+			"fromSide": "right",
+			"toNode": "662c2db44574cc67",
+			"toSide": "left"
+		},
+		{
+			"id": "8a9d2b836a02a7fd",
+			"fromNode": "2e69f23caeaf0bd8",
+			"fromSide": "right",
+			"toNode": "698bb55bc7730c0e",
+			"toSide": "left"
+		},
+		{
+			"id": "4e8968e9c6e97ed6",
+			"fromNode": "2e69f23caeaf0bd8",
+			"fromSide": "right",
+			"toNode": "aa1ee0ab53e6e549",
+			"toSide": "left"
+		}
+	]
+}

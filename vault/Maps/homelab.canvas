@@ -1,0 +1,267 @@
+{
+	"nodes": [
+		{
+			"id": "7831acb3b87051b1",
+			"type": "file",
+			"file": "Maps/homelab.md",
+			"x": -720,
+			"y": 0,
+			"width": 640,
+			"height": 900
+		},
+		{
+			"id": "569c28f1f2ab7e99",
+			"type": "group",
+			"label": "Other notes",
+			"x": 0,
+			"y": 0,
+			"width": 1120,
+			"height": 440
+		},
+		{
+			"id": "e7964a649ad2bfc7",
+			"type": "file",
+			"file": "02_Projects/home-lab-migration/Home-Lab-Migration.md",
+			"x": 40,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "4a3c126de4dcd47f",
+			"type": "file",
+			"file": "03_Areas/Home-Network-Administration.md",
+			"x": 400,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "76827d9ca5008ab3",
+			"type": "file",
+			"file": "02_Projects/home-lab-migration/Hardware-Inventory.md",
+			"x": 760,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "e4506b87fa38e49d",
+			"type": "file",
+			"file": "02_Projects/home-lab-migration/Backup-Strategy.md",
+			"x": 40,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "7a5dcd69c1e3c43b",
+			"type": "file",
+			"file": "02_Projects/home-lab-migration/Migration-Runbook.md",
+			"x": 400,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "14753f68ff564eee",
+			"type": "file",
+			"file": "02_Projects/home-lab-migration/Network-Topology.md",
+			"x": 760,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		}
+	],
+	"edges": [
+		{
+			"id": "c8184536df9c5092",
+			"fromNode": "e4506b87fa38e49d",
+			"fromSide": "right",
+			"toNode": "e7964a649ad2bfc7",
+			"toSide": "left"
+		},
+		{
+			"id": "840938c948898cb3",
+			"fromNode": "e4506b87fa38e49d",
+			"fromSide": "right",
+			"toNode": "7a5dcd69c1e3c43b",
+			"toSide": "left"
+		},
+		{
+			"id": "eb0c34b63deca0d0",
+			"fromNode": "e4506b87fa38e49d",
+			"fromSide": "right",
+			"toNode": "14753f68ff564eee",
+			"toSide": "left"
+		},
+		{
+			"id": "cd4718bfbdf5a18d",
+			"fromNode": "e4506b87fa38e49d",
+			"fromSide": "right",
+			"toNode": "4a3c126de4dcd47f",
+			"toSide": "left"
+		},
+		{
+			"id": "7d06d51af5e77a2e",
+			"fromNode": "76827d9ca5008ab3",
+			"fromSide": "right",
+			"toNode": "e4506b87fa38e49d",
+			"toSide": "left"
+		},
+		{
+			"id": "fd0fb7945dacb1fc",
+			"fromNode": "76827d9ca5008ab3",
+			"fromSide": "right",
+			"toNode": "e7964a649ad2bfc7",
+			"toSide": "left"
+		},
+		{
+			"id": "32cc800d1da316cd",
+			"fromNode": "76827d9ca5008ab3",
+			"fromSide": "right",
+			"toNode": "7a5dcd69c1e3c43b",
+			"toSide": "left"
+		},
+		{
+			"id": "2c39016807e2210e",
+			"fromNode": "76827d9ca5008ab3",
+			"fromSide": "right",
+			"toNode": "14753f68ff564eee",
+			"toSide": "left"
+		},
+		{
+			"id": "ad8dad4027d89f7e",
+			"fromNode": "e7964a649ad2bfc7",
+			"fromSide": "right",
+			"toNode": "e4506b87fa38e49d",
+			"toSide": "left"
+		},
+		{
+			"id": "ec323307c3ebe343",
+			"fromNode": "e7964a649ad2bfc7",
+			"fromSide": "right",
+			"toNode": "76827d9ca5008ab3",
+			"toSide": "left"
+		},
+		{
+			"id": "c1b7437690713997",
+			"fromNode": "e7964a649ad2bfc7",
+			"fromSide": "right",
+			"toNode": "7a5dcd69c1e3c43b",
+			"toSide": "left"
+		},
+		{
+			"id": "ecacea456ecfd21b",
+			"fromNode": "e7964a649ad2bfc7",
+			"fromSide": "right",
+			"toNode": "14753f68ff564eee",
+			"toSide": "left"
+		},
+		{
+			"id": "95655dd62caad6f8",
+			"fromNode": "e7964a649ad2bfc7",
+			"fromSide": "right",
+			"toNode": "4a3c126de4dcd47f",
+			"toSide": "left"
+		},
+		{
+			"id": "6f0d168e731ece7f",
+			"fromNode": "7a5dcd69c1e3c43b",
+			"fromSide": "right",
+			"toNode": "e4506b87fa38e49d",
+			"toSide": "left"
+		},
+		{
+			"id": "3a414a68e79f0ab3",
+			"fromNode": "7a5dcd69c1e3c43b",
+			"fromSide": "right",
+			"toNode": "76827d9ca5008ab3",
+			"toSide": "left"
+		},
+		{
+			"id": "ad75b36308a563cb",
+			"fromNode": "7a5dcd69c1e3c43b",
+			"fromSide": "right",
+			"toNode": "e7964a649ad2bfc7",
+			"toSide": "left"
+		},
+		{
+			"id": "26ba91b04b620731",
+			"fromNode": "7a5dcd69c1e3c43b",
+			"fromSide": "right",
+			"toNode": "14753f68ff564eee",
+			"toSide": "left"
+		},
+		{
+			"id": "e207b581d513cdcf",
+			"fromNode": "7a5dcd69c1e3c43b",
+			"fromSide": "right",
+			"toNode": "4a3c126de4dcd47f",
+			"toSide": "left"
+		},
+		{
+			"id": "c50f545a5fb56eed",
+			"fromNode": "14753f68ff564eee",
+			"fromSide": "right",
+			"toNode": "e4506b87fa38e49d",
+			"toSide": "left"
+		},
+		{
+			"id": "2a5ed665ee5cd9f6",
+			"fromNode": "14753f68ff564eee",
+			"fromSide": "right",
+			"toNode": "76827d9ca5008ab3",
+			"toSide": "left"
+		},
+		{
+			"id": "d7ec39da4b60d4ec",
+			"fromNode": "14753f68ff564eee",
+			"fromSide": "right",
+			"toNode": "e7964a649ad2bfc7",
+			"toSide": "left"
+		},
+		{
+			"id": "5d777b24ed0a4430",
+			"fromNode": "14753f68ff564eee",
+			"fromSide": "right",
+			"toNode": "7a5dcd69c1e3c43b",
+			"toSide": "left"
+		},
+		{
+			"id": "e903a68b1928ba87",
+			"fromNode": "14753f68ff564eee",
+			"fromSide": "right",
+			"toNode": "4a3c126de4dcd47f",
+			"toSide": "left"
+		},
+		{
+			"id": "e2f377aee620a4f2",
+			"fromNode": "4a3c126de4dcd47f",
+			"fromSide": "right",
+			"toNode": "e4506b87fa38e49d",
+			"toSide": "left"
+		},
+		{
+			"id": "0ffa5b315365f387",
+			"fromNode": "4a3c126de4dcd47f",
+			"fromSide": "right",
+			"toNode": "e7964a649ad2bfc7",
+			"toSide": "left"
+		},
+		{
+			"id": "d9d49fd769ce7946",
+			"fromNode": "4a3c126de4dcd47f",
+			"fromSide": "right",
+			"toNode": "7a5dcd69c1e3c43b",
+			"toSide": "left"
+		},
+		{
+			"id": "294b49dbc4e0e188",
+			"fromNode": "4a3c126de4dcd47f",
+			"fromSide": "right",
+			"toNode": "14753f68ff564eee",
+			"toSide": "left"
+		}
+	]
+}

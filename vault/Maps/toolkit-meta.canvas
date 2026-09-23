@@ -1,0 +1,448 @@
+{
+	"nodes": [
+		{
+			"id": "9081312f14490209",
+			"type": "file",
+			"file": "Maps/toolkit-meta.md",
+			"x": -720,
+			"y": 0,
+			"width": 640,
+			"height": 900
+		},
+		{
+			"id": "859bef5f3e64649d",
+			"type": "group",
+			"label": "Concept",
+			"x": 0,
+			"y": 0,
+			"width": 1120,
+			"height": 620
+		},
+		{
+			"id": "eb1132267034901e",
+			"type": "file",
+			"file": "04_Resources/Concepts/Dead-Letter-Queues-for-Automation.md",
+			"x": 40,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "a80a798ae3703511",
+			"type": "file",
+			"file": "04_Resources/Concepts/The-Ratchet.md",
+			"x": 400,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "19033cb50d40ea71",
+			"type": "file",
+			"file": "04_Resources/Concepts/Surprise-Scoring.md",
+			"x": 760,
+			"y": 80,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "a2aa627cdb98b37e",
+			"type": "file",
+			"file": "04_Resources/Concepts/The-Graduation-Pattern.md",
+			"x": 40,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "0110cdbb03a205f2",
+			"type": "file",
+			"file": "04_Resources/Concepts/Vault-First-Architecture.md",
+			"x": 400,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "17da586776376f5a",
+			"type": "file",
+			"file": "04_Resources/Concepts/Calibration-Bias.md",
+			"x": 760,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "a63ec8e196c554b3",
+			"type": "file",
+			"file": "04_Resources/Concepts/Active-Radar.md",
+			"x": 40,
+			"y": 440,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "4ef20ae2dfddbd39",
+			"type": "file",
+			"file": "04_Resources/Concepts/Typed-Judgments.md",
+			"x": 400,
+			"y": 440,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "2d587f79ee798bd2",
+			"type": "group",
+			"label": "Guide",
+			"x": 0,
+			"y": 660,
+			"width": 1120,
+			"height": 260
+		},
+		{
+			"id": "6f210c8a8ac83e04",
+			"type": "file",
+			"file": "04_Resources/Guides/Test-Corpus-Map.md",
+			"x": 40,
+			"y": 740,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "e7b439bf2e4acd03",
+			"type": "file",
+			"file": "04_Resources/Guides/Migrating-a-Live-Vault.md",
+			"x": 400,
+			"y": 740,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "f5a2794d1b41e286",
+			"type": "group",
+			"label": "Tool landmark",
+			"x": 0,
+			"y": 960,
+			"width": 1120,
+			"height": 260
+		},
+		{
+			"id": "f39f617fc4839681",
+			"type": "file",
+			"file": "04_Resources/Tools/Gaiafield.md",
+			"x": 40,
+			"y": 1040,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "a2e5bfeadca2f747",
+			"type": "file",
+			"file": "04_Resources/Tools/Farsight.md",
+			"x": 400,
+			"y": 1040,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "a6754212b3770f26",
+			"type": "group",
+			"label": "Other notes",
+			"x": 0,
+			"y": 1260,
+			"width": 1120,
+			"height": 260
+		},
+		{
+			"id": "68de8dcee6980161",
+			"type": "file",
+			"file": "03_Areas/Toolkit-Maintenance.md",
+			"x": 40,
+			"y": 1340,
+			"width": 320,
+			"height": 140
+		}
+	],
+	"edges": [
+		{
+			"id": "83bc38623241db49",
+			"fromNode": "68de8dcee6980161",
+			"fromSide": "right",
+			"toNode": "eb1132267034901e",
+			"toSide": "left"
+		},
+		{
+			"id": "a44b35fe8dc828d8",
+			"fromNode": "68de8dcee6980161",
+			"fromSide": "right",
+			"toNode": "a2e5bfeadca2f747",
+			"toSide": "left"
+		},
+		{
+			"id": "9951c6cb9b4e6578",
+			"fromNode": "68de8dcee6980161",
+			"fromSide": "right",
+			"toNode": "f39f617fc4839681",
+			"toSide": "left"
+		},
+		{
+			"id": "b80b02d233bb80a2",
+			"fromNode": "a63ec8e196c554b3",
+			"fromSide": "right",
+			"toNode": "17da586776376f5a",
+			"toSide": "left"
+		},
+		{
+			"id": "9af2a54898e538f4",
+			"fromNode": "a63ec8e196c554b3",
+			"fromSide": "right",
+			"toNode": "4ef20ae2dfddbd39",
+			"toSide": "left"
+		},
+		{
+			"id": "17d415e0f95ec09e",
+			"fromNode": "17da586776376f5a",
+			"fromSide": "right",
+			"toNode": "19033cb50d40ea71",
+			"toSide": "left"
+		},
+		{
+			"id": "6b88761e95b2900d",
+			"fromNode": "17da586776376f5a",
+			"fromSide": "right",
+			"toNode": "a80a798ae3703511",
+			"toSide": "left"
+		},
+		{
+			"id": "ea1426b4746df2e5",
+			"fromNode": "17da586776376f5a",
+			"fromSide": "right",
+			"toNode": "f39f617fc4839681",
+			"toSide": "left"
+		},
+		{
+			"id": "778b0f7e588ed8d6",
+			"fromNode": "eb1132267034901e",
+			"fromSide": "right",
+			"toNode": "68de8dcee6980161",
+			"toSide": "left"
+		},
+		{
+			"id": "06cfab9244313480",
+			"fromNode": "eb1132267034901e",
+			"fromSide": "right",
+			"toNode": "a2aa627cdb98b37e",
+			"toSide": "left"
+		},
+		{
+			"id": "9be9bef293988871",
+			"fromNode": "eb1132267034901e",
+			"fromSide": "right",
+			"toNode": "a80a798ae3703511",
+			"toSide": "left"
+		},
+		{
+			"id": "99df1a66131dabdf",
+			"fromNode": "19033cb50d40ea71",
+			"fromSide": "right",
+			"toNode": "17da586776376f5a",
+			"toSide": "left"
+		},
+		{
+			"id": "6f622ee9a05a4078",
+			"fromNode": "19033cb50d40ea71",
+			"fromSide": "right",
+			"toNode": "6f210c8a8ac83e04",
+			"toSide": "left"
+		},
+		{
+			"id": "c14f1a26ab1ea274",
+			"fromNode": "19033cb50d40ea71",
+			"fromSide": "right",
+			"toNode": "f39f617fc4839681",
+			"toSide": "left"
+		},
+		{
+			"id": "9678372ca1d46f21",
+			"fromNode": "a2aa627cdb98b37e",
+			"fromSide": "right",
+			"toNode": "eb1132267034901e",
+			"toSide": "left"
+		},
+		{
+			"id": "d2069caf66896a3c",
+			"fromNode": "a2aa627cdb98b37e",
+			"fromSide": "right",
+			"toNode": "a80a798ae3703511",
+			"toSide": "left"
+		},
+		{
+			"id": "612caf85dc234aad",
+			"fromNode": "a80a798ae3703511",
+			"fromSide": "right",
+			"toNode": "17da586776376f5a",
+			"toSide": "left"
+		},
+		{
+			"id": "410f2d06d3ce0a35",
+			"fromNode": "a80a798ae3703511",
+			"fromSide": "right",
+			"toNode": "eb1132267034901e",
+			"toSide": "left"
+		},
+		{
+			"id": "7c86912b08791420",
+			"fromNode": "a80a798ae3703511",
+			"fromSide": "right",
+			"toNode": "19033cb50d40ea71",
+			"toSide": "left"
+		},
+		{
+			"id": "702f679cbbd02e65",
+			"fromNode": "a80a798ae3703511",
+			"fromSide": "right",
+			"toNode": "a2aa627cdb98b37e",
+			"toSide": "left"
+		},
+		{
+			"id": "f8568a1ae35db7eb",
+			"fromNode": "4ef20ae2dfddbd39",
+			"fromSide": "right",
+			"toNode": "a63ec8e196c554b3",
+			"toSide": "left"
+		},
+		{
+			"id": "0639dd2cdc01f037",
+			"fromNode": "4ef20ae2dfddbd39",
+			"fromSide": "right",
+			"toNode": "17da586776376f5a",
+			"toSide": "left"
+		},
+		{
+			"id": "c2619033ce38c8e6",
+			"fromNode": "4ef20ae2dfddbd39",
+			"fromSide": "right",
+			"toNode": "eb1132267034901e",
+			"toSide": "left"
+		},
+		{
+			"id": "92820e00357258e9",
+			"fromNode": "4ef20ae2dfddbd39",
+			"fromSide": "right",
+			"toNode": "a2e5bfeadca2f747",
+			"toSide": "left"
+		},
+		{
+			"id": "e4648372b995a46d",
+			"fromNode": "4ef20ae2dfddbd39",
+			"fromSide": "right",
+			"toNode": "f39f617fc4839681",
+			"toSide": "left"
+		},
+		{
+			"id": "8701cef986844fa1",
+			"fromNode": "e7b439bf2e4acd03",
+			"fromSide": "right",
+			"toNode": "17da586776376f5a",
+			"toSide": "left"
+		},
+		{
+			"id": "d90768cac390721a",
+			"fromNode": "e7b439bf2e4acd03",
+			"fromSide": "right",
+			"toNode": "eb1132267034901e",
+			"toSide": "left"
+		},
+		{
+			"id": "2125d2fe21915c08",
+			"fromNode": "e7b439bf2e4acd03",
+			"fromSide": "right",
+			"toNode": "a2aa627cdb98b37e",
+			"toSide": "left"
+		},
+		{
+			"id": "b33a3de726d6a139",
+			"fromNode": "e7b439bf2e4acd03",
+			"fromSide": "right",
+			"toNode": "4ef20ae2dfddbd39",
+			"toSide": "left"
+		},
+		{
+			"id": "62cfc9b142484703",
+			"fromNode": "6f210c8a8ac83e04",
+			"fromSide": "right",
+			"toNode": "68de8dcee6980161",
+			"toSide": "left"
+		},
+		{
+			"id": "a34049b63ee424c5",
+			"fromNode": "6f210c8a8ac83e04",
+			"fromSide": "right",
+			"toNode": "19033cb50d40ea71",
+			"toSide": "left"
+		},
+		{
+			"id": "afbdaa012b799df3",
+			"fromNode": "6f210c8a8ac83e04",
+			"fromSide": "right",
+			"toNode": "a2e5bfeadca2f747",
+			"toSide": "left"
+		},
+		{
+			"id": "c0b7683855c47783",
+			"fromNode": "6f210c8a8ac83e04",
+			"fromSide": "right",
+			"toNode": "f39f617fc4839681",
+			"toSide": "left"
+		},
+		{
+			"id": "d44b667857e870dc",
+			"fromNode": "a2e5bfeadca2f747",
+			"fromSide": "right",
+			"toNode": "68de8dcee6980161",
+			"toSide": "left"
+		},
+		{
+			"id": "4a52745092b9061d",
+			"fromNode": "a2e5bfeadca2f747",
+			"fromSide": "right",
+			"toNode": "6f210c8a8ac83e04",
+			"toSide": "left"
+		},
+		{
+			"id": "3f2242e5d35a9158",
+			"fromNode": "a2e5bfeadca2f747",
+			"fromSide": "right",
+			"toNode": "f39f617fc4839681",
+			"toSide": "left"
+		},
+		{
+			"id": "d0e9e57a5122f96c",
+			"fromNode": "f39f617fc4839681",
+			"fromSide": "right",
+			"toNode": "17da586776376f5a",
+			"toSide": "left"
+		},
+		{
+			"id": "578af67579b87d33",
+			"fromNode": "f39f617fc4839681",
+			"fromSide": "right",
+			"toNode": "19033cb50d40ea71",
+			"toSide": "left"
+		},
+		{
+			"id": "1441042318b85945",
+			"fromNode": "f39f617fc4839681",
+			"fromSide": "right",
+			"toNode": "6f210c8a8ac83e04",
+			"toSide": "left"
+		},
+		{
+			"id": "15742c3c4ebaeb7c",
+			"fromNode": "f39f617fc4839681",
+			"fromSide": "right",
+			"toNode": "a2e5bfeadca2f747",
+			"toSide": "left"
+		}
+	]
+}

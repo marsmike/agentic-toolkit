@@ -1,0 +1,48 @@
+{
+	"nodes": [
+		{
+			"id": "2d3cfd82073c4bdd",
+			"type": "file",
+			"file": "Maps/toolkit-meta.md",
+			"x": 0,
+			"y": 0,
+			"width": 400,
+			"height": 260
+		},
+		{
+			"id": "dbe73cb7e27f1386",
+			"type": "file",
+			"file": "Maps/agent-systems.md",
+			"x": 480,
+			"y": 0,
+			"width": 400,
+			"height": 260
+		},
+		{
+			"id": "308484adbd0ac0dc",
+			"type": "file",
+			"file": "Maps/birding.md",
+			"x": 960,
+			"y": 0,
+			"width": 400,
+			"height": 260
+		},
+		{
+			"id": "21ba312aabde62ec",
+			"type": "file",
+			"file": "Maps/homelab.md",
+			"x": 1440,
+			"y": 0,
+			"width": 400,
+			"height": 260
+		}
+	],
+	"edges": [
+		{
+			"id": "63a2cfd8a94e82ad",
+			"fromNode": "dbe73cb7e27f1386",
+			"toNode": "2d3cfd82073c4bdd",
+			"label": "7"
+		}
+	]
+}

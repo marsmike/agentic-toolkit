@@ -8,6 +8,10 @@ Report-only, no LLM required, no embeddings store required. Run:
 Vault resolution: TOOLKIT_VAULT env var, else ./vault relative to the repo root
 (contract/PROFILE.md). Scope: 02_Projects/03_Areas/04_Resources only — 00_Memory,
 01_Capture, 05_Archive are never scanned or reported (contract/VAULT_SCHEMA.md).
+
+Links from the generated navigation (Index.md, Now.md, Maps/, Boards/) are navigation, not
+content: they never count as a note's inbound link. A map links every note in its domain, so
+counting it would hide every orphan. [earned: 2026-09-23, R12 generated maps]
 """
 from __future__ import annotations
 

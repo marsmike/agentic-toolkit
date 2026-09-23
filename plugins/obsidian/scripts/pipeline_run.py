@@ -6,19 +6,29 @@
     uv run scripts/pipeline_run.py end --distilled N --dropped N [--failed CAPTURE ...]
 
 `begin` takes the run lock (`00_Memory/pipeline.lock`; a lock younger than LOCK_STALE_HOURS means
-another run is still going: status `busy`, do nothing). `queue` picks this run's batch from
-`01_Capture/`: the owner's clips first, then everything else, oldest first, at most `--batch`
-(profile `pipeline_batch`, default 10). A capture that has failed MAX_ATTEMPTS runs is left out
-and written to the DLQ once: it needs a human, and it must not block the queue.
+another run is still going: status `busy`, do nothing). When the vault's git branch has an
+upstream, `begin` first commits any hand edits and pulls (`--rebase`), so work pushed from a cloud
+session arrives before the run; a conflict aborts the rebase, writes a DLQ note and returns
+`skipped` without taking the lock. Git is the sync channel and the pipeline is its one committer
+on the Mac. [earned: 2026-09-23, R12 — cloud sessions write to the vault through GitHub]
 
-`end` records failures, rebuilds Index.md (`index_build.py`), appends one Log.md line, commits
-the vault if it is a git repository (the undo for an unattended run), and releases the lock.
+`queue` picks this run's batch from `01_Capture/`: the owner's clips first, then everything else,
+oldest first, at most `--batch` (profile `pipeline_batch`, default 10). A capture that has failed
+MAX_ATTEMPTS runs is left out and written to the DLQ once: it needs a human, and it must not
+block the queue.
+
+`end` records failures, rebuilds Index.md, the maps and Now.md (`index_build.py`, `map_build.py`,
+`now_build.py`), appends one Log.md line, and releases the lock. If the vault is a git repository
+it commits (the undo for an unattended run), then pulls and pushes when there is an upstream.
+Before any commit the staged diff is scanned for key-shaped strings; a hit refuses the commit and
+writes a DLQ note that names the file and the kind of key, never the value (status `refused`).
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
@@ -33,6 +43,18 @@ LOCK_STALE_HOURS = 6
 MAX_ATTEMPTS = 2
 DEFAULT_BATCH = 10
 SCRIPTS = Path(__file__).resolve().parent
+SECRET_PATTERNS = {
+    "OpenRouter key": r"sk-or-v1-[0-9a-f]{32,}",
+    "Anthropic key": r"sk-ant-[A-Za-z0-9_-]{20,}",
+    "OpenAI-style key": r"\bsk-(?:proj-)?[A-Za-z0-9_-]{32,}",
+    "GitHub token": r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})",
+    "AWS access key": r"\bAKIA[0-9A-Z]{16}\b",
+    "Google API key": r"\bAIza[0-9A-Za-z_-]{35}\b",
+    "Slack token": r"\bxox[abprs]-[A-Za-z0-9-]{10,}",
+    "private key": r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----",
+    "assigned secret": r"(?i)\b(?:api[_-]?key|access[_-]?token|secret[_-]?key|auth[_-]?token)\s*[:=]\s*['\"]?(?=[A-Za-z_\-]*\d)[A-Za-z0-9_\-]{24,}",
+}
+_SECRETS = [(name, re.compile(rx)) for name, rx in SECRET_PATTERNS.items()]
 
 
 def _state(vault: Path) -> dict[str, Any]:
@@ -67,9 +89,12 @@ def begin(vault: Path, now: datetime) -> dict[str, Any]:
             started = now - timedelta(hours=LOCK_STALE_HOURS + 1)
         if now - started < timedelta(hours=LOCK_STALE_HOURS):
             return {"status": "busy", "detail": f"another run holds the lock since {started.isoformat()}"}
+    sync = _pull(vault, now)
+    if sync.get("conflict") or sync.get("secrets"):
+        return {"status": "skipped", "detail": sync["detail"], "sync": sync}
     lock.parent.mkdir(parents=True, exist_ok=True)
     lock.write_text(now.isoformat() + "\n", encoding="utf-8")
-    return {"status": "ok", "locked_at": now.isoformat()}
+    return {"status": "ok", "locked_at": now.isoformat(), "sync": sync}
 
 
 def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
@@ -103,6 +128,104 @@ def _git(vault: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, check=False)
 
 
+def _dlq_once(vault: Path, slug: str, **note: Any) -> None:
+    """One open DLQ note per recurring problem: a run every three hours must not stack them."""
+    for p in (vault / "00_Memory" / "dlq").glob(f"*-{slug}*.md"):
+        if str(read_frontmatter(p)[0].get("status", "active")) == "active":
+            return
+    write_dlq_note(vault, slug=slug, **note)
+
+
+def _is_repo(vault: Path) -> bool:
+    return _git(vault, "rev-parse", "--is-inside-work-tree").returncode == 0
+
+
+def _has_upstream(vault: Path) -> bool:
+    return _git(vault, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}").returncode == 0
+
+
+def scan_staged(vault: Path) -> list[dict[str, Any]]:
+    """Key-shaped strings on the staged diff's added lines: file, line and kind, never the value."""
+    diff = _git(vault, "diff", "--cached", "-U0", "--no-color", "--no-ext-diff").stdout
+    hits, path, line_no = [], "", 0
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            path = line[6:] if line.startswith("+++ b/") else ""
+        elif line.startswith("@@"):
+            m = re.search(r"\+(\d+)", line)
+            line_no = int(m.group(1)) if m else 0
+        elif line.startswith("+") and path:
+            kind = next((name for name, rx in _SECRETS if rx.search(line)), None)
+            if kind:
+                hits.append({"file": path, "line": line_no, "kind": kind})
+            line_no += 1
+    return hits
+
+
+def _commit(vault: Path, message: str, exclude: tuple[str, ...] = ()) -> dict[str, Any]:
+    """Stage everything and commit, unless the diff holds a key-shaped string: then unstage and DLQ."""
+    _git(vault, "add", "-A", "--", ".", *(f":(exclude){e}" for e in exclude))
+    if _git(vault, "diff", "--cached", "--quiet").returncode == 0:
+        return {"commit": None, "secrets": []}
+    hits = scan_staged(vault)
+    if hits:
+        _git(vault, "reset", "-q")
+        where = "; ".join(f"{h['file']}:{h['line']} ({h['kind']})" for h in hits[:10])
+        _dlq_once(vault, slug="pipeline-secret-refused", title="Pipeline refused to commit a key-shaped string",
+                       what_happened=f"The staged diff holds {len(hits)} key-shaped string(s): {where}. Nothing was committed or pushed.",
+                       why_recorded="A key in git is a key on GitHub; the pipeline commits and pushes unattended.",
+                       resolution="Move the key to a password manager or ~/.env and leave a placeholder in the note, "
+                                  "or add the file to .gitignore. The next run commits once the diff is clean.",
+                       confidence="high")
+        return {"commit": None, "secrets": hits}
+    if _git(vault, "commit", "-q", "-m", message).returncode != 0:
+        return {"commit": None, "secrets": []}
+    return {"commit": _git(vault, "rev-parse", "--short", "HEAD").stdout.strip(), "secrets": []}
+
+
+def _rebase_in_progress(vault: Path) -> bool:
+    return any(Path(vault, _git(vault, "rev-parse", "--git-path", d).stdout.strip()).exists()
+               for d in ("rebase-merge", "rebase-apply"))
+
+
+def _pull(vault: Path, now: datetime) -> dict[str, Any]:
+    """Bring the upstream's commits in under the vault's own; hand edits are committed first, so
+    nothing sits in a stash. A conflict is aborted and recorded, never resolved by guessing."""
+    if not _is_repo(vault) or not _has_upstream(vault):
+        return {"pulled": False, "detail": "no git upstream"}
+    local = _commit(vault, f"vault: hand edits before pipeline {now.strftime('%Y-%m-%d %H:%M')}", exclude=(LOCK.as_posix(),))
+    if local["secrets"]:
+        return {"pulled": False, "secrets": local["secrets"], "detail": "hand edits hold a key-shaped string; see the DLQ"}
+    before = _git(vault, "rev-parse", "HEAD").stdout.strip()
+    pull = _git(vault, "pull", "--rebase", "--no-edit")
+    if pull.returncode != 0:
+        if _rebase_in_progress(vault):
+            _git(vault, "rebase", "--abort")
+            _dlq_once(vault, slug="pipeline-pull-conflict", title="Pipeline could not rebase onto the vault's upstream",
+                           what_happened="git pull --rebase hit a conflict between this machine's commits and the upstream's; "
+                                         "the rebase was aborted and the run skipped. Nothing was lost.",
+                           why_recorded="Two writers changed the same note; picking a side is a human decision.",
+                           resolution="In the vault: git pull --rebase, resolve the conflict, git rebase --continue, git push.",
+                           confidence="high")
+            return {"pulled": False, "conflict": True, "detail": "pull conflict; rebase aborted, run skipped"}
+        return {"pulled": False, "detail": "pull failed: " + (pull.stderr.strip().splitlines() or ["?"])[-1]}
+    after = _git(vault, "rev-parse", "HEAD").stdout.strip()
+    count = _git(vault, "rev-list", "--count", f"{before}..{after}").stdout.strip()
+    return {"pulled": True, "hand_edits": local["commit"], "new_commits": int(count) if count.isdigit() else 0}
+
+
+def _push(vault: Path, now: datetime) -> dict[str, Any]:
+    if not _has_upstream(vault):
+        return {"pushed": False, "detail": "no git upstream"}
+    sync = _pull(vault, now)
+    if not sync.get("pulled"):
+        return {"pushed": False, "detail": sync["detail"]}
+    push = _git(vault, "push", "-q")
+    if push.returncode != 0:
+        return {"pushed": False, "detail": "push failed: " + (push.stderr.strip().splitlines() or ["?"])[-1]}
+    return {"pushed": True}
+
+
 def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "") -> dict[str, Any]:
     state = _state(vault)
     attempts: dict[str, int] = state.get("attempts", {})
@@ -114,18 +237,20 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
 
     summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed" + (f"; {note}" if note else "")
     env = {**os.environ, "TOOLKIT_VAULT": str(vault)}
-    subprocess.run([sys.executable, str(SCRIPTS / "index_build.py")], capture_output=True, check=False, env=env)
+    for script in ("index_build.py", "map_build.py", "now_build.py"):
+        subprocess.run([sys.executable, str(SCRIPTS / script)], capture_output=True, check=False, env=env)
     subprocess.run([sys.executable, str(SCRIPTS / "log_vault.py"), "pipeline", summary], capture_output=True, check=False, env=env)
 
     (vault / LOCK).unlink(missing_ok=True)  # released before the commit, so it is never committed
-    commit = None
-    if _git(vault, "rev-parse", "--is-inside-work-tree").returncode == 0:
-        _git(vault, "add", "-A")
-        if _git(vault, "diff", "--cached", "--quiet").returncode != 0:
-            msg = f"pipeline {now.strftime('%Y-%m-%d %H:%M')}: {summary}"
-            if _git(vault, "commit", "-q", "-m", msg).returncode == 0:
-                commit = _git(vault, "rev-parse", "--short", "HEAD").stdout.strip()
-    return {"status": "ok", "summary": summary, "commit": commit}
+    result: dict[str, Any] = {"status": "ok", "summary": summary, "commit": None}
+    if _is_repo(vault):
+        committed = _commit(vault, f"pipeline {now.strftime('%Y-%m-%d %H:%M')}: {summary}")
+        result["commit"] = committed["commit"]
+        if committed["secrets"]:
+            result.update(status="refused", secrets=committed["secrets"])
+        else:
+            result["sync"] = _push(vault, now)
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:

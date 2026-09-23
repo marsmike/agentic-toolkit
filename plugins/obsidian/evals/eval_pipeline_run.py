@@ -5,6 +5,10 @@
 2. end      — Index.md rebuilt, one Log.md line, one git commit carrying the run's summary; the
               lock is released and never committed
 3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted
+4. secrets  — a staged note holding a key-shaped string makes `end` refuse the commit and write one DLQ
+              note that names the file, never the key; the next clean run commits
+5. sync     — with a bare upstream: a second clone's commit arrives with `begin`, `end` pushes, and a
+              conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
 """
 from __future__ import annotations
 
@@ -25,8 +29,48 @@ CAPTURES = {
 }
 
 
+FAKE_KEY = "sk-or-v1-" + "0123456789abcdef" * 4
+
+
 def _git(root: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=False).stdout
+
+
+def _sync_phase(pr, sandbox: Path) -> list[str]:
+    """A bare upstream and a second clone (the cloud session): its commit arrives with `begin`, the
+    run's commit reaches the upstream with `end`, and a conflicting hand edit skips the run."""
+    problems = []
+    remote, other = sandbox.parent / "remote.git", sandbox.parent / "other"
+    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=False)
+    _git(sandbox, "remote", "add", "origin", str(remote))
+    _git(sandbox, "push", "-q", "-u", "origin", "HEAD")
+    subprocess.run(["git", "clone", "-q", str(remote), str(other)], check=False)
+    for args in (("config", "user.email", "cloud@example.org"), ("config", "user.name", "cloud")):
+        _git(other, *args)
+    (other / "04_Resources" / "Eval-From-Cloud.md").write_text("---\ndescription: from the cloud\n---\n", encoding="utf-8")
+    _git(other, "add", "-A")
+    _git(other, "commit", "-q", "-m", "cloud: one note")
+    _git(other, "push", "-q")
+
+    r = pr.begin(sandbox, NOW + timedelta(hours=18))
+    if r.get("status") != "ok" or not (sandbox / "04_Resources" / "Eval-From-Cloud.md").is_file():
+        problems.append(f"phase 5: begin must pull the cloud's commit, got {r}")
+    r = pr.end(sandbox, NOW + timedelta(hours=18), 1, 0, [])
+    if not r.get("sync", {}).get("pushed") or _git(sandbox, "rev-parse", "HEAD") != _git(remote, "rev-parse", "HEAD"):
+        problems.append(f"phase 5: end must push the run's commit, got {r.get('sync')}")
+
+    _git(other, "pull", "-q")
+    for root, text in ((other, "cloud version\n"), (sandbox, "mac version\n")):
+        (root / "04_Resources" / "Eval-From-Cloud.md").write_text(text, encoding="utf-8")
+    _git(other, "commit", "-q", "-am", "cloud: edit")
+    _git(other, "push", "-q")
+    r = pr.begin(sandbox, NOW + timedelta(hours=21))
+    conflicts = list((sandbox / "00_Memory" / "dlq").glob("*pull-conflict*.md"))
+    if r.get("status") != "skipped" or (sandbox / pr.LOCK).exists() or len(conflicts) != 1:
+        problems.append(f"phase 5: a conflict skips the run without the lock and writes one DLQ note, got {r.get('status')}")
+    if pr._rebase_in_progress(sandbox) or "mac version" not in (sandbox / "04_Resources" / "Eval-From-Cloud.md").read_text(encoding="utf-8"):
+        problems.append("phase 5: the aborted rebase must leave the Mac's own edit in place")
+    return problems
 
 
 def run(vault: Path) -> dict:
@@ -83,6 +127,28 @@ def run(vault: Path) -> dict:
         pr.begin(sandbox, NOW + timedelta(hours=9))
         if pr.queue(sandbox).get("parked_now"):
             problems.append("phase 3: a parked capture gets its DLQ note once")
+        pr.end(sandbox, NOW + timedelta(hours=9), 0, 0, [])
+
+        # 4. secret scan
+        leak = sandbox / "04_Resources" / "Eval-Leaky-Note.md"
+        leak.write_text(f"---\ndescription: leaky\n---\n\nkey: {FAKE_KEY}\n", encoding="utf-8")
+        head = _git(sandbox, "rev-parse", "HEAD").strip()
+        pr.begin(sandbox, NOW + timedelta(hours=12))
+        r = pr.end(sandbox, NOW + timedelta(hours=12), 0, 0, [])
+        dlq = list((sandbox / "00_Memory" / "dlq").glob("*secret-refused*.md"))
+        if r.get("status") != "refused" or _git(sandbox, "rev-parse", "HEAD").strip() != head:
+            problems.append(f"phase 4: a key-shaped string must refuse the commit, got {r.get('status')}")
+        if len(dlq) != 1 or FAKE_KEY in dlq[0].read_text(encoding="utf-8") or "Eval-Leaky-Note.md" not in dlq[0].read_text(encoding="utf-8"):
+            problems.append(f"phase 4: one DLQ note naming the file, never the key; got {len(dlq)}")
+        if _git(sandbox, "diff", "--cached", "--name-only").strip():
+            problems.append("phase 4: a refused commit must leave nothing staged")
+        leak.unlink()
+        pr.begin(sandbox, NOW + timedelta(hours=15))
+        if pr.end(sandbox, NOW + timedelta(hours=15), 0, 0, []).get("status") != "ok":
+            problems.append("phase 4: once the key is gone the next run commits")
+
+        # 5. git sync through an upstream
+        problems += _sync_phase(pr, sandbox)
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
