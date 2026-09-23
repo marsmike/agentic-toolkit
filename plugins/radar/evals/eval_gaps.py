@@ -1,7 +1,8 @@
 """Eval: `radar.py gaps` and `radar.py kagi`, offline (stubbed Kagi, judgment backend and Reader).
 
 1. no key     — without a Kagi key: SKIPPED, nothing judged, no file
-2. gaps       — results older than 7 days, already seen by the radar, or held by the vault are
+2. gaps       — an interest with neither queries nor a gloss is not searched; results older than
+                7 days, already seen by the radar, or held by the vault are
                 dropped before judging; the interest query goes to Kagi and never to the judgment
                 backend; the strong ones are listed with their sites; the week's file is written once
                 (a second run is `exists`, no call)
@@ -33,6 +34,7 @@ interests:
   - name: Agent Memory
     gloss: How software agents store and recall what they learned across sessions.
     queries: [SECRET-QUERY-memory]
+  - name: A chore with nothing to search by
 ---
 
 # Radar interests (fixture)
@@ -83,8 +85,10 @@ def run(vault: Path) -> dict:
             if qid.startswith("kind_"):
                 answers[qid] = {"type": "choice", "choice": "other", "probabilities": {"other": 1.0}}
                 continue
-            _, key, _n = qid.split("_")
-            answers[qid] = {"type": "noul", "noul": 0.9 if "STRONG" in payload["state"]["items"][key]["title"] else 0.2}
+            _, key, n = qid.split("_")
+            about_memory = list(payload["state"]["interests"])[int(n)] == "agent-memory"
+            strong = about_memory and "STRONG" in payload["state"]["items"][key]["title"]
+            answers[qid] = {"type": "noul", "noul": 0.9 if strong else 0.2}
         return {"model": "stub-1", "usage": {"input_tokens": 100}, "answers": answers}
 
     def reader_stub(method, url, data=None):
@@ -119,6 +123,8 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 2: old, seen and vault-held results must not be judged, judged {sorted(titles)}")
         if "SECRET-QUERY" in json.dumps(judged_state) or "SECRET-QUERY" not in parse_qs(urlparse(kagi_calls[0][0]).query)["q"][0]:
             problems.append("phase 2: the query must go to Kagi and never to the judgment backend")
+        if len(kagi_calls) != 1:
+            problems.append(f"phase 2: an interest with neither queries nor a gloss must not be searched, got {len(kagi_calls)} searches")
         data = gaps.load_week(out, reports.week_of(NOW.date().isoformat())) or {}
         if [g["title"] for g in data.get("rows", []) if g["strong"]] != ["Agent memory STRONG one", "Agent memory STRONG two"] \
                 or data.get("sites") != [["blog.example.org", 2]]:

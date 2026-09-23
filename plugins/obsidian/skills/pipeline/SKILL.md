@@ -26,7 +26,7 @@ P pipeline_run.py begin          # "busy": another run holds the lock; stop, say
 #   readwise:ingest: ingest.py --json
 P pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first
 # distill each one with the distill skill, --auto
-P pipeline_run.py end --distilled N --retired N --failed <captures that failed distill_check>
+P pipeline_run.py end --distilled N --dropped N --failed <captures that failed distill_check>
 ```
 
 **Sources.** The radar judges the feed and promotes at most five strong items a day to Reader's
@@ -44,8 +44,12 @@ not pass stays in `01_Capture/` and goes into `--failed`; after two failed runs 
 with a DLQ note for a human.
 
 **End, always.** Call `end` even when a step failed, with what did happen: it rebuilds the
-index, logs the run and commits the vault, which is the undo for everything the run wrote.
-Reply with one line: what came in, what was distilled or retired, what failed, the commit.
+index, logs the run and commits the vault, which is the undo for everything the run wrote. The
+counts are disjoint: `--distilled` = captures that became a note or an enrichment (every one of
+them is also archived; that is not a drop), `--dropped` = captures that left *without* a note (a
+radar or newsletter discard; never a clip), `--failed` = captures still in `01_Capture/`.
+[earned: 2026-09-23, a run logged "10 distilled, 10 retired" for ten captures]
+Reply with one line: what came in, what was distilled or dropped, what failed, the commit.
 
 ## Hard requirements
 

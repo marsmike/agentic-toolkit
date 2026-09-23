@@ -3,7 +3,7 @@
 
     uv run scripts/pipeline_run.py begin                  # take the lock (or: busy, stop)
     uv run scripts/pipeline_run.py queue [--batch N]      # after the sources ran: this run's captures
-    uv run scripts/pipeline_run.py end --distilled N --retired N [--failed CAPTURE ...]
+    uv run scripts/pipeline_run.py end --distilled N --dropped N [--failed CAPTURE ...]
 
 `begin` takes the run lock (`00_Memory/pipeline.lock`; a lock younger than LOCK_STALE_HOURS means
 another run is still going: status `busy`, do nothing). `queue` picks this run's batch from
@@ -103,16 +103,16 @@ def _git(vault: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, check=False)
 
 
-def end(vault: Path, now: datetime, distilled: int, retired: int, failed: list[str], note: str = "") -> dict[str, Any]:
+def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "") -> dict[str, Any]:
     state = _state(vault)
     attempts: dict[str, int] = state.get("attempts", {})
     for rel in failed:
         attempts[rel] = attempts.get(rel, 0) + 1
     state["attempts"] = {k: v for k, v in attempts.items() if (vault / k).is_file()}
-    state["last_run"] = {"at": now.isoformat(), "distilled": distilled, "retired": retired, "failed": len(failed)}
+    state["last_run"] = {"at": now.isoformat(), "distilled": distilled, "dropped": dropped, "failed": len(failed)}
     _save_state(vault, state)
 
-    summary = f"{distilled} distilled, {retired} retired, {len(failed)} failed" + (f"; {note}" if note else "")
+    summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed" + (f"; {note}" if note else "")
     env = {**os.environ, "TOOLKIT_VAULT": str(vault)}
     subprocess.run([sys.executable, str(SCRIPTS / "index_build.py")], capture_output=True, check=False, env=env)
     subprocess.run([sys.executable, str(SCRIPTS / "log_vault.py"), "pipeline", summary], capture_output=True, check=False, env=env)
@@ -138,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     q.add_argument("--json", action="store_true")
     e = sub.add_parser("end")
     e.add_argument("--distilled", type=int, default=0)
-    e.add_argument("--retired", type=int, default=0)
+    e.add_argument("--dropped", type=int, default=0, help="captures that left WITHOUT a note (a radar or newsletter discard); never a clip")
     e.add_argument("--failed", nargs="*", default=[])
     e.add_argument("--note", default="")
     e.add_argument("--json", action="store_true")
@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "queue":
         result = queue(vault, args.batch)
     else:
-        result = end(vault, now, args.distilled, args.retired, args.failed, args.note)
+        result = end(vault, now, args.distilled, args.dropped, args.failed, args.note)
     print(json.dumps(result, indent=2 if args.json else None))
     return 0
 

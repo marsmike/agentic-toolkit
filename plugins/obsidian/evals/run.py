@@ -36,6 +36,7 @@ EVAL_MODULES = (
     "eval_status_aliases",
     "eval_provenance",
     "eval_pipeline_run",
+    "eval_distill_check_negative",
 )
 
 
