@@ -298,22 +298,30 @@ def _apply(updates: list[dict], done_key: str) -> dict[str, Any]:
 
 
 def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], names: dict[str, str],
-           run_date: str, archive: bool, promote: bool, location: str) -> dict[str, Any]:
+           run_date: str, archive: bool, promote: bool, location: str, out: Path | None = None) -> dict[str, Any]:
     """Move every fetched feed item the radar has recorded (a repost shares a key with its
-    original) out of the feed: strong ones to `location` when promoting, the rest to the archive.
-    Promotion is read from state, so an item whose promotion failed is promoted by the next scan;
-    it is never archived instead. A Reader failure here never fails the scan."""
+    original) out of the feed. With `promote`, the strongest not yet promoted, up to
+    PROMOTE_PER_DAY a day counted in `promoted.jsonl`, go to `location`; a promoted item
+    becomes a capture and a note, so the bar is deliberate. Every other recorded item is
+    archived (the daily note still lists it). A failed promotion is neither recorded nor
+    archived: it stays in the feed and competes again next scan. A Reader failure here never
+    fails the scan."""
     strong: dict[str, dict[str, float]] = {}
+    ledger = (out / "promoted.jsonl") if out else None
+    done_before = read_jsonl(ledger) if ledger else []
     if promote:
+        promoted_keys = {r["canonical"] for r in done_before}
         for r in state_rows:
             s = reports.bands(r)[1]
-            if s:
+            if s and r["canonical"] not in promoted_keys:
                 strong[r["canonical"]] = {i: r["p"][i] for i in s}
+    budget = max(0, policy.PROMOTE_PER_DAY - sum(1 for r in done_before if r.get("date") == run_date))
+    settled = [it for it in fetched if keys_of(it) & recorded]
+    candidates = sorted((it for it in settled if item_key(it) in strong), key=lambda it: -max(strong[item_key(it)].values()))
+    chosen = {it.id for it in candidates[:budget]}
     promotions, archive_ids = [], []
-    for it in fetched:
-        if not keys_of(it) & recorded:
-            continue
-        if item_key(it) in strong:
+    for it in settled:
+        if it.id in chosen:
             p = strong[item_key(it)]
             u: dict[str, Any] = {"id": it.id, "location": location, "tags": ["radar", *(f"radar/{i}" for i in sorted(p))]}
             if not it.notes.strip():
@@ -321,7 +329,20 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
             promotions.append(u)
         elif archive:
             archive_ids.append({"id": it.id, "location": "archive"})
-    return {**_apply(promotions, "promoted"), **_apply(archive_ids, "archived")}
+    result: dict[str, Any] = {}
+    if promotions:
+        try:
+            done, failed = reader.bulk_update(promotions)
+        except reader.ReaderError as e:
+            done, failed = [], []
+            result["promote_error"] = str(e)[:200]
+        by_id = {it.id: it for it in settled}
+        if ledger and done:
+            append_jsonl(ledger, [{"canonical": item_key(by_id[i]), "id": i, "date": run_date} for i in done])
+        result["promoted"] = len(done)
+        if failed:
+            result["promote_failed"] = len(failed)
+    return {**result, **_apply(archive_ids, "archived")}
 
 
 def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | None = None,
@@ -356,7 +377,7 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
     def archived() -> dict[str, Any]:
         names = {i.id: i.name for i in interests}
         location = str(profile_value(vault, "promote_location", DEFAULT_PROMOTE_LOCATION))
-        return settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote, location)
+        return settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote, location, out)
     append_jsonl(out / "seen.jsonl", [{"canonical": item_key(it), "title_key": title_key(it),
                                         "first_seen": run_date, "backlog": True} for it in backlog])
     result: dict[str, Any] = {"since": since.isoformat(), "fetched": len(fetched), "new": len(items),

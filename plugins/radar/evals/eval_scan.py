@@ -15,7 +15,8 @@
 8. promote     — with --promote the strong item and its twin move to Later tagged radar and
                  radar/<interest> with a note naming each interest and p, the rest are archived;
                  a failed promotion leaves the item in the feed (not archived) and the next scan
-                 promotes it from state without a judgment request
+                 promotes it from state without a judgment request; at most PROMOTE_PER_DAY a
+                 day, counted across scans
 7. archive     — every recorded item (judged, repost, backlog) is archived in Reader in one
                  bulk_update and nothing else is: not with no key, not an item a failed or
                  --limit-ed run did not judge, not with --keep-in-feed; a Reader error while
@@ -279,6 +280,18 @@ def run(vault: Path) -> dict:
         if u.get("tags") != ["radar", "radar/agent-memory", "radar/firmware"] or \
                 u.get("notes") != f"[radar {NOW.date().isoformat()}] Agent Memory p=0.90; Firmware p=0.90":
             problems.append(f"phase 8: wrong tags or note on the promoted item: {u}")
+
+        # 8b. the daily cap: one promotion a day, strongest first; a second scan that day adds none
+        saved_cap, policy.PROMOTE_PER_DAY = policy.PROMOTE_PER_DAY, 1
+        try:
+            out8b = sandbox.parent / "cap"
+            promoted.clear()
+            radar.scan(sandbox, out8b, since, NOW, promote=True)
+            radar.scan(sandbox, out8b, since, NOW, promote=True)
+            if len(promoted) != 1 or promoted[0]["id"] not in ("doc1", "doc2"):
+                problems.append(f"phase 8: a cap of 1 a day must promote exactly one strong item across two scans, got {[u['id'] for u in promoted]}")
+        finally:
+            policy.PROMOTE_PER_DAY = saved_cap
 
         # 6. epics
         os.environ["TOOLKIT_RADAR_TODOIST_PROJECT_ID"] = "p1"
