@@ -100,6 +100,14 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 1: clips first, oldest first, three in all; got {names}")
         if pr.begin(sandbox, NOW + timedelta(minutes=5))["status"] != "busy":
             problems.append("phase 1: a second begin while the lock is held must be busy")
+        later = NOW + timedelta(hours=pr.LOCK_STALE_HOURS + 1)
+        if pr._claim(sandbox / pr.LOCK, later) is not None or \
+                (sandbox / pr.LOCK).read_text(encoding="utf-8").strip() != later.isoformat() or \
+                list((sandbox / pr.LOCK).parent.glob("pipeline.lock.stale-*")):
+            problems.append("phase 1: a stale lock must be taken over atomically, leaving no moved-aside copy")
+        if pr._claim(sandbox / pr.LOCK, later + timedelta(minutes=1)) != later:
+            problems.append("phase 1: right after a takeover the lock is fresh again: busy")
+        (sandbox / pr.LOCK).write_text(NOW.isoformat() + "\n", encoding="utf-8")
 
         # 2. end
         failed = "01_Capture/Readwise-Newsletter-news.md"

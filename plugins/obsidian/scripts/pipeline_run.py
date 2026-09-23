@@ -9,8 +9,9 @@
 LOCK_STALE_HOURS means another run is still going: status `busy`, do nothing). The lock is local
 to one checkout, so exactly one scheduler may run the pipeline. With an upstream, `begin` then
 commits any hand edits and pulls (`--rebase`), so work pushed from a cloud session arrives before
-the run; a conflict aborts the rebase, writes a DLQ note, releases the lock and returns `skipped`. Git is the sync channel and the pipeline is its one committer
-on the Mac. [earned: 2026-09-23, R12 — cloud sessions write to the vault through GitHub]
+the run; a conflict aborts the rebase, writes a DLQ note, releases the lock and returns `skipped`.
+Git is the sync channel and the pipeline is its one committer. [earned: 2026-09-23, R12 — cloud
+sessions write to the vault through GitHub]
 
 `queue` picks this run's batch from `01_Capture/`: the owner's clips first, then everything else,
 oldest first, at most `--batch` (profile `pipeline_batch`, default 10). A capture that has failed
@@ -31,6 +32,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -88,20 +90,44 @@ def _claim(lock: Path, now: datetime) -> datetime | None:
     [earned: 2026-09-23, PR #20 review — check-then-write let two runs both sync and both run]
     """
     lock.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-    except FileExistsError:
+    started = now
+    for _ in range(3):
         try:
-            started = datetime.fromisoformat(lock.read_text(encoding="utf-8").strip())
-        except (OSError, ValueError):
-            started = now - timedelta(hours=LOCK_STALE_HOURS + 1)
-        if now - started < timedelta(hours=LOCK_STALE_HOURS):
-            return started
-        lock.write_text(now.isoformat() + "\n", encoding="utf-8")
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            started = _lock_time(lock, now)
+            if now - started < timedelta(hours=LOCK_STALE_HOURS):
+                return started
+            # Stale: move it aside atomically (only one caller's rename succeeds), then retry the
+            # exclusive create. A caller that moved a lock another run had just taken puts it back
+            # and reports busy. [earned: 2026-09-23, PR #24 review — overwrite let two take over]
+            grave = lock.with_name(f"{lock.name}.stale-{os.getpid()}-{time.time_ns()}")
+            try:
+                os.rename(lock, grave)
+            except FileNotFoundError:
+                continue
+            moved = _lock_time(grave, now)
+            if now - moved < timedelta(hours=LOCK_STALE_HOURS):
+                try:
+                    os.link(grave, lock)
+                except FileExistsError:
+                    pass
+                grave.unlink(missing_ok=True)
+                return moved
+            grave.unlink(missing_ok=True)
+            continue
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(now.isoformat() + "\n")
         return None
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(now.isoformat() + "\n")
-    return None
+    return started
+
+
+def _lock_time(path: Path, now: datetime) -> datetime:
+    """When the run holding `path` started; unreadable or garbled counts as stale."""
+    try:
+        return datetime.fromisoformat(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return now - timedelta(hours=LOCK_STALE_HOURS + 1)
 
 
 def begin(vault: Path, now: datetime) -> dict[str, Any]:

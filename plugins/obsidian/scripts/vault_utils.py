@@ -228,8 +228,13 @@ def git_ignored(vault: Path) -> frozenset[str]:
     """
     probe = subprocess.run(["git", "-C", str(vault), "rev-parse", "--is-inside-work-tree"],
                            capture_output=True, text=True, check=False)
-    if probe.returncode != 0 or probe.stdout.strip() != "true":
-        return frozenset()  # not a git vault: nothing is ignored
+    if probe.returncode != 0:
+        if "not a git repository" in probe.stderr.lower():
+            return frozenset()  # not a git vault: nothing is ignored
+        # A broken repository or git's ownership check: fail closed, never guess "nothing ignored".
+        raise RuntimeError(f"git rev-parse failed in {vault}: {probe.stderr.strip()[:200]}")
+    if probe.stdout.strip() != "true":
+        return frozenset()
     out = subprocess.run(["git", "-C", str(vault), "ls-files", "--others", "--ignored", "--exclude-standard", "-z",
                           "--", *ACTIVE_CONTENT_FOLDERS], capture_output=True, text=True, check=False)
     if out.returncode != 0:
