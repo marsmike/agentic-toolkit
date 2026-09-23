@@ -45,7 +45,8 @@ or name it in the handoff as deliberate.
 
 1. **Two phases, one checkpoint.** Propose (what you learned, where it goes, what it links
    to and at which level, what you disagree with in the dossier and why), then stop for
-   review. Skip only on an explicit `--auto`.
+   review. Skip only on an explicit `--auto`; the `pipeline` skill runs with `--auto`, and the
+   vault's git commit per run is the undo.
 2. **Every note carries its source**, and never the string `unknown`: `(none — <context>)`
    when there is none, today's date for `processed_date`.
 3. **Advice never writes.** Dossier rows, inferred edges, adjudications: candidates for your
@@ -59,8 +60,13 @@ or name it in the handoff as deliberate.
    `05_Archive/<Origin>-Captures-<YYYY-MM>/<stem>--FULLCAPTURE.md` plus one line in that
    folder's `README.md` manifest, or deleted (`trash` if present) only for duplicates and stubs.
 7. **Ambiguity goes to the DLQ**, not a guess: `vault_utils.write_dlq_note()`, and say so.
+8. **The owner's clips never drop.** Every capture is distilled the same way whatever its
+   source; `provenance.via` decides only whether it may leave without a note. A `clip` (or a
+   capture without `via`) always becomes a note or enriches one; a `radar` or `newsletter`
+   capture may be retired when triage says discard, with the reason in the manifest line.
+   [Mike, 2026-09-23: one pipeline, different sources]
 
 Placement, enrichment levels and the DLQ convention in detail: [rules.md](references/rules.md).
 Modes: triage the inbox (run the dossier over `01_Capture/*.md`, decide distill / quick-file /
-discard per capture; a discard is always yours to make), or file a conversation insight as a
+discard per capture; a discard is always yours to make, and never a clip's), or file a conversation insight as a
 capture first and distill it like any other.

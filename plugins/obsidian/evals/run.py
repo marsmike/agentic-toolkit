@@ -34,6 +34,8 @@ EVAL_MODULES = (
     "eval_index_build",
     "eval_yaml_repair",
     "eval_status_aliases",
+    "eval_provenance",
+    "eval_pipeline_run",
 )
 
 

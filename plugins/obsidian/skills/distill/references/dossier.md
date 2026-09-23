@@ -18,7 +18,8 @@ flowchart LR
 
 | Field | What it says | How to read it |
 |---|---|---|
-| `triage.recommendation` | distill / quick-file / discard-candidate / none | a discard is only ever a candidate |
+| `triage.recommendation` | distill / quick-file / discard-candidate / none | a discard is only ever a candidate, and a clip is never one (it reads quick-file) |
+| `provenance` | `via`: clip (the owner saved it; also any capture without `via`), newsletter, radar (with `radar_interests`); `owner_chose_it` | the only thing it changes is whether the capture may leave without a note; a radar capture's interests say why it was promoted |
 | `already_distilled` | `canonical_by_url`: a note whose `source:` is this capture's own source; `covers`: notes judged to be the same original work under another address; `suggested_mode` new-note / enrich-only / hybrid | a canonical hit is provenance, decided without the model; enrich that note, do not duplicate it |
 | `related[]` | per candidate note: `p_relevant` (same subject), `p_principle` (same idea in another field; `bridge` when it alone selects the row), `relation` and `suggested_level` (L1/L2/L3), `p_covers`, `url_hit`, `via` (the search hit it was reached through) | a candidate list, not a ceiling; open what is judged relevant, read past the top of the raw search output too. When `search.note` says farsight, `judged_relevant` is the enrichment gate; otherwise the score gate stands and this is a second opinion. L2/L3 still need the sentence you can cite |
 | `placement` | folder, `ambiguous`, `alternatives` (a runner-up holding real mass) | `ambiguous` means follow rules.md and, if it stays 50/50, the DLQ |
