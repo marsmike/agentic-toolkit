@@ -11,48 +11,41 @@ allowed-tools:
 
 # Readwise Ingest
 
-Pulls new clippings from the Readwise API and writes each one as a capture note in
-`01_Capture/` — flat, origin-prefixed (`Readwise-...`), filesystem-first throughout
-(`contract/KNOWLEDGE_API.md`). No enrichment happens here; that's the `enrich` skill.
+Every Reader library item not yet in the vault becomes a capture in `01_Capture/`, in one
+scripted run with no agent steps:
+
+```bash
+uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/ingest.py" --json
+uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/ingest.py" --dry-run   # counts only
+```
+
+It fetches everything changed since `lastSyncedAt` plus a backlog sweep of new/later/shortlist,
+skips feed items (unless the radar promoted them, tag `radar`), fetches each item's full text,
+and writes one capture per item with its provenance: `via: clip` (you saved it), `newsletter`
+(delivered) or `radar` (promoted, with `radar_interests`). Dedup is a ledger,
+`00_Memory/readwise-ingested.jsonl`, plus the vault itself (a capture with the same doc id, or a
+note whose `source` is the item's address). Nothing in Reader is moved or deleted.
+
+The obsidian `pipeline` skill runs this, then distill, on a schedule; run it by hand only to
+catch up or to check a dry run. What the script does, step by step and why:
+[references/ingest-workflow.md](references/ingest-workflow.md).
 
 ## Preservation rule (non-negotiable)
 
-**Every clipping the user saved must end up in `01_Capture/`.** Never drop an item because
-it looks noisy, off-topic, or short — the user sometimes clips outside their usual
-interests on purpose. See [references/ingest-workflow.md](references/ingest-workflow.md)
-for the coverage check that enforces this before any deletion from Readwise.
-
-## Quick start
-
-```bash
-uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 -c "
-import readwise_api as rw
-items = rw.reader_list_all(updated_after='2026-06-01')
-print(len(items), 'items')
-"
-```
-
-Then follow [references/ingest-workflow.md](references/ingest-workflow.md)'s numbered steps.
-
-## Vault resolution and profile
-
-`TOOLKIT_VAULT` env var, else `./vault` relative to the repo root (`contract/PROFILE.md`).
-Profile: `$VAULT/Config/toolkit/readwise.md` — see `profile.example.md` for fields
-(`enrichers`, `backlog_sweep`). Secrets stay in `READWISE_TOKEN`, never in the vault.
+**Every clipping the user saved must end up in `01_Capture/`.** Never drop an item because it
+looks noisy, off-topic, or short. The script enforces it: an item fetched but not captured fails
+the run with a DLQ note, and the watermark does not move until it is captured. Distill may drop
+a `newsletter` or `radar` capture; it never drops a `clip`.
 
 ## Hard requirements
 
-1. **Backlog sweep, every run.** `updated_after` is a watermark, not an inventory — items
-   saved before the window and never captured stay invisible forever otherwise. See
-   references/ingest-workflow.md.
-2. **Dedup-safe writes.** `build_captures.write_capture()`/`write_book_capture()` check
-   `01_Capture/` for an existing note with the same `readwise_doc_id` before writing —
-   re-running ingest over the same clipping is a no-op, not a second file.
-3. **Coverage check gates deletion.** Never delete/archive anything in Readwise until
-   every ingested `doc_id` is confirmed present in a written capture.
+1. **Backlog sweep, every run** (the script does it): `updated_after` is a watermark, not an
+   inventory.
+2. **Dedup-safe writes**: a re-run never writes a second capture for the same doc id.
+3. **Nothing in Reader is deleted or moved by ingest.** Cleanup, if ever wanted, is a separate
+   explicit request.
 
 ## References
 
-- [ingest-workflow.md](references/ingest-workflow.md) — full procedure: fetch, backlog
-  sweep, write, coverage check, cleanup
+- [ingest-workflow.md](references/ingest-workflow.md) — what `ingest.py` does and why
 - [api.md](references/api.md) — Readwise API endpoint reference and rate limits

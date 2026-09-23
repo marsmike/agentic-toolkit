@@ -109,8 +109,12 @@ def _html_to_md_basic(html: str) -> str:
     return re.sub(r"\n\s*\n\s*\n+", "\n\n", h).strip()
 
 
-def write_capture(vault: Path, item: dict[str, Any]) -> tuple[Path | None, str]:
+def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] | None = None) -> tuple[Path | None, str]:
     """Write one Reader v3 clipping as a capture note. Returns (path, status).
+
+    `provenance` is how the item reached the library: `{"via": "clip"}` (the owner saved it),
+    `{"via": "newsletter"}` (delivered), or `{"via": "radar", "radar_interests": [...]}` (the
+    radar promoted it). It lands in frontmatter; distill may drop a non-clip capture, never a clip.
 
     `status` is one of: "written", "skipped-duplicate". `path` is None only when skipped.
     `item` is a Reader v3 list/get-response entry: id, category, title, author,
@@ -174,7 +178,8 @@ def write_capture(vault: Path, item: dict[str, Any]) -> tuple[Path | None, str]:
         "saved_at": saved_at or None,
         "created": saved_at or None,
         "attachment": attachment.as_posix() if attachment else None,
-        "tags": ["readwise", category],
+        **(provenance or {}),
+        "tags": ["readwise", category, *(["radar"] if (provenance or {}).get("via") == "radar" else [])],
     }
     fm = {k: v for k, v in fm.items() if v is not None}
 

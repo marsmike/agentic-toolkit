@@ -93,6 +93,14 @@ jobs:
             echo "::error::One or more evals reported pass: false"
             exit 1
           fi
+      - name: Run readwise plugin evals
+        run: |
+          set -o pipefail
+          uv run python plugins/readwise/evals/run.py --json | tee readwise-eval-output.json
+          if grep -q '"pass": false' readwise-eval-output.json; then
+            echo "::error::One or more readwise evals reported pass: false"
+            exit 1
+          fi
       - name: Run radar plugin evals
         run: |
           set -o pipefail
