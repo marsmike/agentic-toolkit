@@ -1,8 +1,10 @@
-"""Reader v3 client for the radar: the feed items Reader aggregates, read-only.
+"""Reader v3 client for the radar: the feed items Reader aggregates.
 
 Radar's own stdlib client, not an import of the readwise plugin's (no cross-plugin imports,
 contract/KNOWLEDGE_API.md). It reads `location=feed`, the items the readwise plugin drops by
-design, and never fetches a body: title, summary, site and category are what gets judged.
+design, and never fetches a body: title, summary, site and category are what gets judged. Its
+one write is `archive`: an item the radar has recorded leaves the feed (location=archive,
+reversible in the app); nothing is ever deleted. [Mike, 2026-09-23: judged items off the feed]
 
 A feed item carries no feed id: `source` is the constant "Reader RSS" and `url` is the Reader
 link, so the feed is `site_name` and the address is `source_url`. [verified against a live
@@ -24,7 +26,8 @@ from judgments.urls import _canonical
 
 READER_BASE = "https://readwise.io/api/v3"
 FEED_LOCATION = "feed"
-PAGE_DELAY_S = 3.0
+PAGE_DELAY_S = 3.0              # list and bulk_update are both limited to 20/minute
+BULK_MAX = 50                   # bulk_update accepts at most 50 updates per call
 MAX_429_RETRIES = 5
 HTTP_TIMEOUT = 30
 
@@ -86,16 +89,37 @@ def _request(method: str, url: str, data: dict | None = None) -> tuple[int, Any,
         raise ReaderError(f"request failed: {e}") from e
 
 
-def _get(url: str) -> Any:
+def _call(method: str, url: str, data: dict | None = None, ok: tuple[int, ...] = (200,)) -> Any:
     for _ in range(MAX_429_RETRIES):
-        status, data, retry_after = _request("GET", url)
+        status, body, retry_after = _request(method, url, data)
         if status == 429:
             time.sleep(retry_after or 60)
             continue
-        if status != 200:
-            raise ReaderError(f"GET {url.split('?')[0]} failed ({status}): {str(data)[:200]}")
-        return data
-    raise ReaderError(f"GET {url.split('?')[0]}: still rate-limited after {MAX_429_RETRIES} retries")
+        if status not in ok:
+            raise ReaderError(f"{method} {url.split('?')[0]} failed ({status}): {str(body)[:200]}")
+        return body
+    raise ReaderError(f"{method} {url.split('?')[0]}: still rate-limited after {MAX_429_RETRIES} retries")
+
+
+def _get(url: str) -> Any:
+    return _call("GET", url)
+
+
+def archive(ids: list[str]) -> tuple[list[str], list[str]]:
+    """Move documents to location=archive, 50 per call. Returns (archived, failed) ids; a 207
+    reports per-item failures, which are returned rather than raised."""
+    archived: list[str] = []
+    failed: list[str] = []
+    for start in range(0, len(ids), BULK_MAX):
+        if start:
+            time.sleep(PAGE_DELAY_S)
+        chunk = ids[start:start + BULK_MAX]
+        body = _call("PATCH", f"{READER_BASE}/bulk_update/",
+                     {"updates": [{"id": i, "location": "archive"} for i in chunk]}, ok=(200, 207)) or {}
+        done = {str(r.get("id")) for r in body.get("results") or [] if r.get("success")}
+        archived += [i for i in chunk if i in done]
+        failed += [i for i in chunk if i not in done]
+    return archived, failed
 
 
 def _published(raw: Any) -> str:

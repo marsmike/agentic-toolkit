@@ -12,6 +12,10 @@
 5. failure     — a backend answering nothing: one DLQ note, status failed, nothing but backlog marked seen
 6. epics       — Portfolio epics via `td`: wanted sections only, no subtasks, no completed tasks,
                  the `What:` sentence as gloss
+7. archive     — every recorded item (judged, repost, backlog) is archived in Reader in one
+                 bulk_update and nothing else is: not with no key, not an item a failed or
+                 --limit-ed run did not judge, not with --keep-in-feed; a Reader error while
+                 archiving leaves the scan ok; the only write to Reader is location=archive
 """
 from __future__ import annotations
 
@@ -98,13 +102,22 @@ def run(vault: Path) -> dict:
     real = (judge._post, reader._request, reader.PAGE_DELAY_S, interests_mod._run_td, policy.ITEMS_PER_REQUEST)
     calls: list[dict] = []
     reader_calls: list[str] = []
-    mode = {"too_large_above": None, "fail": False}
+    archived: list[list[str]] = []
+    mode = {"too_large_above": None, "fail": False, "archive_status": 200}
     sandbox = None
 
     def reader_stub(method, url, data=None):
+        if method == "PATCH" and url.endswith("/bulk_update/"):
+            updates = data["updates"]
+            if any(set(u) != {"id", "location"} or u["location"] != "archive" for u in updates) or len(updates) > 50:
+                problems.append(f"reader: a write other than location=archive, or over 50: {updates[:2]}")
+            if mode["archive_status"] != 200:
+                return mode["archive_status"], {"detail": "stub"}, None
+            archived.append([u["id"] for u in updates])
+            return 200, {"results": [{"id": u["id"], "success": True} for u in updates]}, None
         reader_calls.append(url)
         if method != "GET":
-            problems.append(f"reader: unexpected {method} (scan must never write to Reader)")
+            problems.append(f"reader: unexpected {method} {url}")
         if "pageCursor=p2" in url:
             return 200, {"results": PAGE_2, "nextPageCursor": None}, None
         return 200, {"results": PAGE_1, "nextPageCursor": "p2"}, None
@@ -146,7 +159,7 @@ def run(vault: Path) -> dict:
         # 1. no key
         before = snapshot(sandbox)
         r = radar.scan(sandbox, out, since, NOW)
-        if r["status"] != "SKIPPED" or calls or snapshot(sandbox) != before:
+        if r["status"] != "SKIPPED" or calls or archived or snapshot(sandbox) != before:
             problems.append(f"phase 1: expected SKIPPED with no request and no write, got {r['status']}, {len(calls)} calls")
 
         # 2. scan
@@ -157,6 +170,9 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 2: expected ok, fetched 7, judged 4, backlog 1, got {json.dumps({k: r.get(k) for k in ('status', 'fetched', 'judged', 'backlog', 'detail')})}")
         if len(reader_calls) != 2:
             problems.append(f"phase 2: expected two Reader pages, got {len(reader_calls)}")
+        want = ["doc1", "doc2", "doc3", "doc4", "doc7", "doc8", "doc9"]
+        if len(archived) != 1 or sorted(archived[0]) != want or r.get("archived") != 7:
+            problems.append(f"phase 2: expected one bulk_update archiving {want}, got {archived}")
         for payload in calls:
             wire = json.dumps(payload["state"])
             if "SECRET-QUERY" in wire or "reading_progress" in wire or "doc1" in wire:
@@ -210,11 +226,29 @@ def run(vault: Path) -> dict:
         out5 = sandbox.parent / "fail"
         dlq_before = set((sandbox / "00_Memory" / "dlq").glob("*.md"))
         mode["fail"] = True
+        archived.clear()
         r = radar.scan(sandbox, out5, since, NOW)
         mode["fail"] = False
+        if [sorted(a) for a in archived] != [["doc9"]]:
+            problems.append(f"phase 5: only the back catalogue may be archived when nothing was judged, got {archived}")
         dlq_new = set((sandbox / "00_Memory" / "dlq").glob("*.md")) - dlq_before
         if r.get("status") != "failed" or len(dlq_new) != 1 or any(not x.get("backlog") for x in radar.read_jsonl(out5 / "seen.jsonl")):
             problems.append(f"phase 5: expected failed + one DLQ note + nothing seen, got {r.get('status')}, {len(dlq_new)} DLQ")
+
+        # 7. archive: --limit, --keep-in-feed, a Reader error
+        archived.clear()
+        r = radar.scan(sandbox, sandbox.parent / "limit", since, NOW, limit=1)
+        if [sorted(a) for a in archived] != [["doc1", "doc2", "doc9"]]:
+            problems.append(f"phase 7: --limit 1 must archive only doc1, its pdf twin and the backlog, got {archived}")
+        archived.clear()
+        r = radar.scan(sandbox, sandbox.parent / "keep", since, NOW, archive=False)
+        if archived or "archived" in r:
+            problems.append("phase 7: --keep-in-feed still archived")
+        mode["archive_status"] = 500
+        r = radar.scan(sandbox, sandbox.parent / "archive-error", since, NOW)
+        mode["archive_status"] = 200
+        if r.get("status") != "ok" or "archive_error" not in r:
+            problems.append(f"phase 7: a Reader error while archiving must leave the scan ok and say so, got {r.get('status')}")
 
         # 6. epics
         os.environ["TOOLKIT_RADAR_TODOIST_PROJECT_ID"] = "p1"
@@ -232,4 +266,4 @@ def run(vault: Path) -> dict:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else f"6 offline phases ok ({len(calls)} stubbed judgment requests)"}
+            "detail": "; ".join(problems) if problems else f"7 offline phases ok ({len(calls)} stubbed judgment requests)"}
