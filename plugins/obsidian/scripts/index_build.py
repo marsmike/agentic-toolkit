@@ -3,8 +3,9 @@
 
     uv run scripts/index_build.py [--dry-run] [--json]
 
-One line per active note (02_Projects, 03_Areas, 04_Resources — the set vault_lint.py checks
-for drift), grouped `## <PARA folder>` / `### <first subfolder>`:
+One line per active note (02_Projects, 03_Areas, 04_Resources, plus root-level notes with
+`status: active` — the set vault_lint.py checks for drift), grouped `## <PARA folder>` /
+`### <first subfolder>`, root notes first under `## Vault root`:
 
     - [[path/without/extension|Name]] — <summary> <markers>
 
