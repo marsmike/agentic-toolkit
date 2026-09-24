@@ -25,6 +25,7 @@ EVAL_MODULES = (
     "eval_book_capture_dedup",
     "eval_ingest",
     "eval_pdf_convert",
+    "eval_pdf_scheme",
 )
 
 
