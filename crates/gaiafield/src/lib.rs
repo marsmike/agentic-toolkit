@@ -2007,7 +2007,8 @@ pub struct NeighborNodeV2 {
 
 /// `neighbors` with `--include-inferred`: the exact `extracted` BFS from `neighbors` above
 /// (`kind: "extracted"`, unchanged — contract rule 4, traversal defaults to deterministic) unioned
-/// with every note that has a *direct* inferred edge to `start` (`kind: "inferred"`, `depth: 1`).
+/// with every note that has a *direct* INFERRED-labeled edge to `start`
+/// (`kind: "inferred"`, `depth: 1`). AMBIGUOUS edges require a separate explicit request.
 ///
 /// Inferred edges are a similarity score, not a chain to walk hop-by-hop the way wikilinks are —
 /// so unlike the extracted side, inferred neighbors always surface at "one similarity step" from
@@ -2038,7 +2039,8 @@ pub fn neighbors_with_inferred(
         .collect();
 
     let mut stmt = conn.prepare(
-        "SELECT source, target, score, label FROM inferred_edges WHERE source = ?1 OR target = ?1",
+        "SELECT source, target, score, label FROM inferred_edges
+         WHERE (source = ?1 OR target = ?1) AND label = 'INFERRED'",
     )?;
     let rows = stmt.query_map([start], |row| {
         Ok((
@@ -2094,7 +2096,7 @@ pub struct PathReportV2 {
     pub path: Vec<PathEdge>,
 }
 
-/// `path` with `--include-inferred`: shortest path over the union of `extracted` and `inferred`
+/// `path` with `--include-inferred`: shortest path over the union of `extracted` and INFERRED-labeled
 /// edges (unlike `neighbors`, chaining through inferred hops here is unambiguous — a path is one
 /// concrete route, not an aggregated set — so both edge kinds are full BFS citizens). Each hop
 /// after the first carries the `kind` of edge that produced it (`"extracted"` or `"inferred"`,
@@ -2140,7 +2142,9 @@ pub fn shortest_path_with_inferred(
         }
     }
     {
-        let mut stmt = conn.prepare("SELECT source, target, score, label FROM inferred_edges")?;
+        let mut stmt = conn.prepare(
+            "SELECT source, target, score, label FROM inferred_edges WHERE label = 'INFERRED'",
+        )?;
         let rows = stmt.query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
