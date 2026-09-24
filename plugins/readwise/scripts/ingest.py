@@ -9,7 +9,8 @@ promoted it (tag `radar`); the radar archives every feed item it has judged, and
 clips. Each capture records its provenance (`via`):
 
   clip        the owner saved it              distill never drops it
-  newsletter  delivered by email              distill may drop it
+  newsletter  an email from a newsletter sender  distill may drop it (profile `newsletter_senders`,
+                                              default Readwise; every other email is a clip)
   radar       promoted by the radar           distill may drop it; `radar_interests` say why
 
 Dedup: `00_Memory/readwise-ingested.jsonl` (every doc id ever ingested or found in the vault),
@@ -32,7 +33,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import build_captures as bc
 import readwise_api as rw
-from vault_utils import read_frontmatter, require_vault, write_dlq_note, write_frontmatter
+from vault_utils import profile_value, read_frontmatter, require_vault, write_dlq_note, write_frontmatter
 
 STATE_NOTE = Path("00_Memory") / "readwise-state.md"
 LEDGER = Path("00_Memory") / "readwise-ingested.jsonl"
@@ -42,6 +43,7 @@ GET_DELAY_S = 3.1  # Reader's list endpoint (which reader_get uses) allows 20 re
 MAX_429_RETRIES = 4
 RETRY_429_S = 15.0
 TRACKING = re.compile(r"^(utm_|ref$|ref_src$|s$|t$|si$|fbclid$|gclid$|mc_)")
+DEFAULT_NEWSLETTER_SENDERS = ("Readwise",)  # emails from these may be dropped by distill; all others are clips
 NOT_CONTENT = {".obsidian", ".trash", ".git", ".smart-env", "00_Memory"}
 
 
@@ -62,12 +64,26 @@ def tag_names(item: dict) -> list[str]:
     return [str(t.get("name") if isinstance(t, dict) else t) for t in tags]
 
 
-def provenance(item: dict) -> dict[str, Any]:
+def newsletter_senders(vault: Path | None) -> tuple[str, ...]:
+    """Senders whose emails are newsletters (profile `newsletter_senders`, a list or a comma list)."""
+    raw = profile_value(vault, "newsletter_senders", None) if vault is not None else None
+    if isinstance(raw, str):
+        raw = [s for s in (p.strip() for p in raw.split(",")) if s]
+    return tuple(str(s) for s in raw) if raw else DEFAULT_NEWSLETTER_SENDERS
+
+
+def provenance(item: dict, senders: tuple[str, ...] = DEFAULT_NEWSLETTER_SENDERS) -> dict[str, Any]:
+    """How the item reached the library. An email is a clip unless its sender (`author`) is a
+    known newsletter: the owner forwards emails on purpose, and only a newsletter may be dropped
+    by distill. [earned: 2026-09-24 — every email was `newsletter`, so a forwarded one could be
+    discarded]"""
     names = tag_names(item)
     if "radar" in names:
         return {"via": "radar", "radar_interests": sorted(n.split("/", 1)[1] for n in names if n.startswith("radar/"))}
     if item.get("category") == "email":
-        return {"via": "newsletter"}
+        sender = str(item.get("author") or "").casefold()
+        if sender and any(s.casefold() in sender for s in senders):
+            return {"via": "newsletter"}
     return {"via": "clip"}
 
 
@@ -173,6 +189,7 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
         if eligible(it):
             unique.setdefault(str(it["id"]), it)
     ledger = read_ledger(vault)
+    senders = newsletter_senders(vault)
     ids, sources = vault_index(vault)
     new_items, known_rows = [], []
     # One page saved twice in Reader is one capture: the first save of an address is the item, the
@@ -201,7 +218,7 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
     if dry_run:
         by_via: dict[str, int] = {}
         for it in new_items:
-            v = provenance(it)["via"]
+            v = provenance(it, senders)["via"]
             by_via[v] = by_via.get(v, 0) + 1
         return {**result, "status": "dry-run", "by_via": by_via}
 
@@ -212,7 +229,7 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
             time.sleep(GET_DELAY_S)
         saves = [it, *copies[str(it["id"])]]
         for cand in saves:
-            prov = provenance(cand)
+            prov = provenance(cand, senders)
             try:
                 full = fetch_full(str(cand["id"]))
                 item = {**cand, **{k: v for k, v in full.items() if v not in (None, "")}}

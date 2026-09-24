@@ -4,6 +4,8 @@ kind: profile
 status: active
 plugin: readwise
 backlog_sweep: true
+newsletter_senders:
+  - Readwise
 attachments_folder: 04_Resources/Attachments
 tags:
   - domain/toolkit-meta
@@ -19,6 +21,10 @@ resolution order (env var → this note → shipped default).
 
 ## Fields
 
+- **`newsletter_senders`** — senders (the email's `author`, matched case-insensitively as a substring)
+  whose emails are newsletters: distill may drop those without a note. Every other email is a
+  clip and always ends as a note or an enrichment, so forward mail to Reader without worry.
+  Default `[Readwise]`; add a sender only for mail you are happy to lose.
 - **`backlog_sweep`** — whether `ingest` runs the mandatory reconciliation pass over
   `location=new`/`later` in addition to the windowed `updatedAfter` sync. Defaults to `true`;
   set `false` only if you have an external reason to trust the watermark alone (not

@@ -41,7 +41,9 @@ def _doc(i: str, title: str, location: str, category: str = "article", tags: dic
 
 DOCS = [
     _doc("clip1", "A clipped article", "new"),
-    _doc("news1", "Weekly newsletter", "new", category="email"),
+    _doc("news1", "Weekly newsletter", "new", category="email", author="Readwise"),
+    _doc("fwd1", "An email the owner forwarded", "new", category="email", author="Jane Colleague",
+         url="mailto:reader-forwarded-email/fwd1"),
     _doc("radar1", "Claude Code v2", "later", category="rss",
          tags={"radar": {}, "radar/claude-code": {}, "radar/dev-tooling": {}}, notes="[radar 2026-09-23] Claude Code p=0.95"),
     _doc("feed1", "Still in the feed", "feed", category="rss"),
@@ -105,10 +107,11 @@ def run(vault: Path) -> dict:
             fm, _ = read_frontmatter(p)
             if fm.get("readwise_doc_id") in {d["id"] for d in DOCS}:
                 caps[str(fm["readwise_doc_id"])] = fm
-        if sorted(caps) != ["clip1", "news1", "radar1", "tw1"]:
-            problems.append(f"phase 2: expected captures for clip1, news1, radar1, tw1 (tw2 is the same tweet), got {sorted(caps)}")
-        if caps.get("clip1", {}).get("via") != "clip" or caps.get("news1", {}).get("via") != "newsletter":
-            problems.append("phase 2: a clip and a newsletter must say so in `via`")
+        if sorted(caps) != ["clip1", "fwd1", "news1", "radar1", "tw1"]:
+            problems.append(f"phase 2: expected captures for clip1, fwd1, news1, radar1, tw1 (tw2 is the same tweet), got {sorted(caps)}")
+        if caps.get("clip1", {}).get("via") != "clip" or caps.get("news1", {}).get("via") != "newsletter" \
+                or caps.get("fwd1", {}).get("via") != "clip":
+            problems.append("phase 2: a clip, a Readwise newsletter (newsletter) and a forwarded email (clip) must say so in `via`")
         if caps.get("radar1", {}).get("via") != "radar" or caps.get("radar1", {}).get("radar_interests") != ["claude-code", "dev-tooling"]:
             problems.append(f"phase 2: the radar item needs via: radar and its interests, got {caps.get('radar1')}")
         if r.get("already_in_vault") != 1 or r.get("duplicates") != 1:
