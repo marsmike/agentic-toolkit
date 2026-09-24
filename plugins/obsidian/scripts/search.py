@@ -151,6 +151,18 @@ def semantic_available() -> bool:
     return True
 
 
+MODEL_NAME = "TaylorAI/bge-micro-v2"
+MODEL_REVISION = "3edf6d7de0faa426b09780416fe61009f26ae589"  # pinned: a moved repo head must not change what runs
+
+
+def stale_docs(corpus: list[Doc], cache: dict[str, Any]) -> list[Doc]:
+    """Docs whose cached vector is missing, older than the note, or from another model revision
+    (an entry written before the pin has none) — re-embedded before any query is scored."""
+    return [d for d in corpus
+            if (entry := cache.get(d.rel, {})).get("mtime") != d.path.stat().st_mtime
+            or entry.get("revision") != MODEL_REVISION]
+
+
 def semantic_scores(query: str, corpus: list[Doc], vault: Path, rebuild: bool = False) -> dict[str, float] | None:
     """Cosine similarity between the query and each doc's cached embedding.
 
@@ -171,18 +183,16 @@ def semantic_scores(query: str, corpus: list[Doc], vault: Path, rebuild: bool = 
         except (json.JSONDecodeError, OSError):
             cache = {}
 
-    model_name = "TaylorAI/bge-micro-v2"
-    revision = "3edf6d7de0faa426b09780416fe61009f26ae589"  # pinned: a moved repo head must not change what runs
-    stale = [d for d in corpus if cache.get(d.rel, {}).get("mtime") != d.path.stat().st_mtime]
+    stale = stale_docs(corpus, cache)
     if stale:
-        model = SentenceTransformer(model_name, revision=revision)
+        model = SentenceTransformer(MODEL_NAME, revision=MODEL_REVISION)
         vectors = model.encode([d.text[:1000] for d in stale], show_progress_bar=False)
         for d, vec in zip(stale, vectors, strict=False):
-            cache[d.rel] = {"mtime": d.path.stat().st_mtime, "vector": vec.tolist()}
+            cache[d.rel] = {"mtime": d.path.stat().st_mtime, "revision": MODEL_REVISION, "vector": vec.tolist()}
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         cache_file.write_text(json.dumps(cache), encoding="utf-8")
 
-    model = SentenceTransformer(model_name, revision=revision)
+    model = SentenceTransformer(MODEL_NAME, revision=MODEL_REVISION)
     q_vec = np.array(model.encode([query], show_progress_bar=False)[0])
     q_norm = q_vec / (np.linalg.norm(q_vec) or 1.0)
 

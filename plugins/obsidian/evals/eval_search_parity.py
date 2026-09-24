@@ -14,6 +14,9 @@ semantic-unavailable-anyway) blended search() output.
 Always, with a stub binary: a farsight row's raw BM25 score is not on the 0-1 scale
 `search_score_gate` was calibrated on, so its `above_enrichment_gate` is null, never a
 boolean from comparing the two (2026-09-24 review GLM-10).
+
+Always: a cached embedding counts as stale unless it has the note's mtime and the pinned
+model revision, so moving the pin re-embeds the corpus (2026-09-24 review IMPL-GLM-3).
 """
 from __future__ import annotations
 
@@ -63,6 +66,22 @@ def _gate_is_null_for_farsight(search_mod, vault: Path) -> str | None:
     return None
 
 
+def _cache_staleness_problem(search_mod, vault: Path) -> str | None:
+    docs = search_mod.build_corpus(vault)[:4]
+    fresh, old_rev, no_rev, old_mtime = docs
+    rev = search_mod.MODEL_REVISION
+    cache = {
+        fresh.rel: {"mtime": fresh.path.stat().st_mtime, "revision": rev},
+        old_rev.rel: {"mtime": old_rev.path.stat().st_mtime, "revision": "0" * 40},
+        no_rev.rel: {"mtime": no_rev.path.stat().st_mtime},
+        old_mtime.rel: {"mtime": old_mtime.path.stat().st_mtime - 1, "revision": rev},
+    }
+    stale = [d.rel for d in search_mod.stale_docs(docs, cache)]
+    if stale != [old_rev.rel, no_rev.rel, old_mtime.rel]:
+        return f"embedding cache: only the current-mtime, current-revision entry is fresh; stale={stale}"
+    return None
+
+
 def run(vault: Path) -> dict:
     import sys
     scripts_dir = Path(__file__).resolve().parent.parent / "scripts"
@@ -70,7 +89,7 @@ def run(vault: Path) -> dict:
         sys.path.insert(0, str(scripts_dir))
     import search as search_mod
 
-    gate_problem = _gate_is_null_for_farsight(search_mod, vault)
+    gate_problem = _gate_is_null_for_farsight(search_mod, vault) or _cache_staleness_problem(search_mod, vault)
     if gate_problem:
         return {"eval": "search_parity", "pass": False, "detail": gate_problem}
 
