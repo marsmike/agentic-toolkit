@@ -17,8 +17,8 @@ The field-guide project and the birding area it feeds: species accounts, sourcin
 ## Start here
 
 - [[02_Projects/field-guide/Field-Guide-Project|Field-Guide-Project]] — Project overview for Alex's regional birding field guide — a closable writing project with a defined manuscript deadline.
-- [[02_Projects/field-guide/Species-Accounts-Workflow|Species-Accounts-Workflow]] — The repeatable per-species drafting workflow used for every account in the field guide.
 - [[03_Areas/Birding|Birding]] — Ongoing birding practice and local patch records — the area the field-guide project draws expertise from.
+- [[02_Projects/field-guide/Species-Accounts-Workflow|Species-Accounts-Workflow]] — The repeatable per-species drafting workflow used for every account in the field guide.
 - [[02_Projects/field-guide/Reference-Library|Reference-Library]] — Source material — field guides, range-data sources, and museum collection notes — used across every species account.
 - [[02_Projects/field-guide/Illustration-Sourcing|Illustration-Sourcing]] — Tracking original illustrations vs. licensed photos across the field guide's 180 accounts.
 - [[02_Projects/field-guide/Weekly-Review|Weekly-Review]] — Weekly review for the field-guide project, week of 2026-07-20.

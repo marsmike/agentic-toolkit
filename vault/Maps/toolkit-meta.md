@@ -13,20 +13,20 @@ aliases:
 How the agentic toolkit itself works: the retrieval, graph and pipeline ideas behind it, the tools
 it wraps, and the guides for running and maintaining it.
 
-*67 notes · [[Maps/toolkit-meta.canvas|Canvas]] · [[Maps/Overview|All maps]]*
+*68 notes · [[Maps/toolkit-meta.canvas|Canvas]] · [[Maps/Overview|All maps]]*
 
 ## Start here
 
 - [[04_Resources/Tools/Gaiafield|Gaiafield]] — The knowledge-graph engine — deterministic wikilink/frontmatter/tag extraction (v1, shipped) plus a report-only statistical inference layer (v2, shipped) — nev…
 - [[04_Resources/Guides/Test-Corpus-Map|Test-Corpus-Map]] — Where every deliberately-planted test case in this vault lives, and the three link clusters plus bridge notes this vault's density was built to demonstrate.
 - [[04_Resources/Concepts/Dead-Letter-Queues-for-Automation|Dead-Letter-Queues-for-Automation]] — An automation that can't confidently resolve something writes a record of the failure instead of guessing — borrowed from message-queue dead-letter patterns.
+- [[Alex-Vega|Alex-Vega]] — Profile note for this example vault's fictional persona — resolution target for the "fill from Obsidian" convention.
 - [[04_Resources/Tools/Farsight|Farsight]] — The vault's search engine — stateless BM25, Rust, CLI-in/JSON-out, one per-query scan over active-content notes with no persisted index to go stale.
 - [[04_Resources/Concepts/The-Ratchet|The-Ratchet]] — Every standing rule in a config or contract cites the dated incident that earned it, so the rule set only ever tightens in response to a real failure, never on…
 - [[03_Areas/Toolkit-Maintenance|Toolkit-Maintenance]] — Alex's ongoing responsibility for keeping this vault and its toolkit plugins healthy — the area that dogfoods the toolkit against Alex's own projects.
 - [[04_Resources/Concepts/Surprise-Scoring|Surprise-Scoring]] — Scoring a graph edge by how unexpected it is given the deterministic graph's own structure, so a genuinely novel cross-domain connection ranks above a thousand…
 - [[04_Resources/Concepts/The-Graduation-Pattern|The-Graduation-Pattern]] — Shipping a capability behind a low-bar eval on day one, then raising the bar over time until it graduates into the regression suite that gates merges.
 - [[04_Resources/Concepts/Vault-First-Architecture|Vault-First-Architecture]] — Designing a system so identity, configuration, and knowledge live in a plain-file vault the agent can read and write directly, rather than in the application's…
-- [[04_Resources/Concepts/Calibration-Bias|Calibration-Bias]] — Pooling similarity statistics across clusters of very different sizes lets the biggest cluster's internal noise masquerade as the whole vault's separation sign…
 
 ## New (last 30 days)
 
@@ -109,6 +109,10 @@ it wraps, and the guides for running and maintaining it.
 - [[04_Resources/Tools/Readwise-Plugin|Readwise-Plugin]] — Pulls Readwise highlights into 01_Capture/ with origin-prefixed filenames — the second core-wave plugin, feeding the same distill pipeline the obsidian plugin…
 - [[04_Resources/Tools/Tech-Radar|Tech-Radar]] — Renders the toolkit's own state-of-the-art positioning into docs/ as a public radar view — second-wave plugin, and the carrier of this vault's unknown-frontmat…
 - [[04_Resources/Tools/Toolkit-CLI|Toolkit-CLI]] — The core Python CLI — vault init, doctor, and profile resolution — the surface every plugin and every new user touches first.
+
+### Profile
+
+- [[Alex-Vega|Alex-Vega]] — Profile note for this example vault's fictional persona — resolution target for the "fill from Obsidian" convention.
 
 ### Other notes
 

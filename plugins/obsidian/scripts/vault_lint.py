@@ -24,7 +24,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from vault_utils import ACTIVE_CONTENT_FOLDERS, EXCLUDE_DIRS, git_ignored, require_vault
+from vault_utils import ACTIVE_CONTENT_FOLDERS, EXCLUDE_DIRS, git_ignored, require_vault, root_active_notes
 
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
 INDEX_ENTRY_RE = re.compile(r"^\s*-\s*\[\[([^\]|]+)(?:\|[^\]]+)?\]\]\s*—\s*(.*?)\s*$")
@@ -41,22 +41,20 @@ def scan_vault(vault: Path) -> tuple[dict[str, Path], dict[str, set[str]], dict[
     inbound: dict[str, set[str]] = defaultdict(set)
 
     ignored = git_ignored(vault)
-    for folder in ACTIVE_CONTENT_FOLDERS:
-        folder_path = vault / folder
-        if not folder_path.exists():
+    files = [md for folder in ACTIVE_CONTENT_FOLDERS if (vault / folder).exists()
+             for md in (vault / folder).rglob("*.md")]
+    for md_file in files + root_active_notes(vault):
+        if any(part in EXCLUDE_DIRS for part in md_file.relative_to(vault).parts[:-1]):
             continue
-        for md_file in folder_path.rglob("*.md"):
-            if any(part in EXCLUDE_DIRS for part in md_file.relative_to(vault).parts[:-1]):
-                continue
-            if md_file.relative_to(vault).as_posix() in ignored:
-                continue
-            rel_key = md_file.relative_to(vault).with_suffix("").as_posix()
-            notes[rel_key] = md_file
-            content = md_file.read_text(encoding="utf-8", errors="replace")
-            for match in WIKILINK_RE.finditer(content):
-                target_basename = match.group(1).strip().rsplit("/", 1)[-1]
-                outbound[rel_key].add(target_basename)
-                inbound[target_basename].add(rel_key)
+        if md_file.relative_to(vault).as_posix() in ignored:
+            continue
+        rel_key = md_file.relative_to(vault).with_suffix("").as_posix()
+        notes[rel_key] = md_file
+        content = md_file.read_text(encoding="utf-8", errors="replace")
+        for match in WIKILINK_RE.finditer(content):
+            target_basename = match.group(1).strip().rsplit("/", 1)[-1]
+            outbound[rel_key].add(target_basename)
+            inbound[target_basename].add(rel_key)
     return notes, outbound, inbound
 
 
