@@ -1,7 +1,8 @@
 """Eval: given a fixture Readwise Reader item (no network), build_captures.write_capture()
 produces a schema-conformant capture note — origin-prefixed filename, flat under
 01_Capture/, frontmatter carrying the fields the dedup guard and coverage check depend on.
-Writes, so this runs against a sandbox copy of the vault.
+A wall instead of content (a sign-up page, a 404) is marked `content: stub`; a short tweet and a
+real article are not. Writes, so this runs against a sandbox copy of the vault.
 """
 from __future__ import annotations
 
@@ -51,6 +52,17 @@ def run(vault: Path) -> dict:
             problems.append("capture body does not contain the fixture's title")
         if "## Full Text" not in body:
             problems.append("capture body is missing the '## Full Text' section")
+
+        walls = {"wall1": ("article", "<p>Explore the Resource Hub.</p><p><a href='/sign-up'>Create a free account</a></p>"),
+                 "gone1": ("article", "<p>DeveloPassion</p><p>Not found</p><p>This page does not exist</p>" + "<p>menu</p>" * 40),
+                 "twt1": ("tweet", "<p>This is actually insane.</p>"),
+                 "real1": ("article", "<p>" + "A paragraph with a claim and a number, 42 percent. " * 12 + "</p>")}
+        for doc_id, (category, html) in walls.items():
+            wp, _ = bc.write_capture(sandbox_vault, {**fixture, "id": doc_id, "title": f"Wall test {doc_id}",
+                                                     "category": category, "html_content": html})
+            got = read_frontmatter(wp)[0].get("content") == "stub" if wp else None
+            if got != doc_id.startswith(("wall", "gone")):
+                problems.append(f"{doc_id} ({category}): stub={got}")
 
         if problems:
             return {"eval": "capture_note_formatting", "pass": False, "detail": "; ".join(problems)}

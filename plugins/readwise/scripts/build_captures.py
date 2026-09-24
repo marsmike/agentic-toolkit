@@ -75,6 +75,23 @@ def store_attachment(vault: Path, item: dict[str, Any], slug: str) -> Path | Non
     dest.write_bytes(data)
     return dest.relative_to(vault)
 
+STUB_CHARS = 200        # less real text than this is not the article (a short X post via RSS has ~270)
+STUB_CEILING = 1500     # a known wall phrase in a text shorter than this marks a stub
+STUB_PHRASES = re.compile(
+    r"(?i)(page (does not|doesn't) exist|\bnot found\b|\b404\b|create a (free )?account|sign up to|"
+    r"log ?in to (continue|read)|enable javascript|subscribe to (continue|read)|access denied|just a moment)")
+
+
+def is_stub(text: str, category: str) -> bool:
+    """Reader saved a wall, not the content: a sign-up page, a 404, a bot check. A tweet is short
+    by nature and never a stub. [earned: 2026-09-24 — two clips held "Create a free account" and
+    "This page does not exist"; the dossier rated both discard-candidate ~1.0]"""
+    if category == "tweet":
+        return False
+    body = text.strip()
+    return len(body) < STUB_CHARS or (len(body) < STUB_CEILING and bool(STUB_PHRASES.search(body)))
+
+
 CATEGORY_LABEL = {
     "tweet": "Tweet",
     "article": "Article",
@@ -169,6 +186,8 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
     dest = unique_path(capture_dir, f"Readwise-{label}-{slug}-{saved_at or 'undated'}")
 
     attachment = store_attachment(vault, item, slug)
+    text = _html_to_md_basic(html)
+    stub = not attachment and is_stub(text, category)
     fm = {
         "source": source_url,
         "origin": "readwise",
@@ -178,6 +197,7 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
         "saved_at": saved_at or None,
         "created": saved_at or None,
         "attachment": attachment.as_posix() if attachment else None,
+        "content": "stub" if stub else None,
         **(provenance or {}),
         "tags": ["readwise", category, *(["radar"] if (provenance or {}).get("via") == "radar" else [])],
     }
@@ -193,7 +213,9 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
         body_lines += ["## Readwise summary", "", summary, ""]
     body_lines.append("## Full Text")
     body_lines.append("")
-    text = _html_to_md_basic(html)
+    if stub:
+        body_lines += ["> [!warning] Stub: Reader saved no real content (a wall, a 404 or an empty page). "
+                       "Fetch the source before distilling.", ""]
     body_lines.append(text if text else "_(no body content returned by the API for this item)_")
     body_lines.append("")
     if notes:
