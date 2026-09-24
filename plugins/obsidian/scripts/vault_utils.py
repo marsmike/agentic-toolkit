@@ -121,7 +121,15 @@ def inside(path: Path, root: Path) -> bool:
 def contained(paths, vault: Path) -> list[Path]:
     """Keep only paths that resolve inside the vault: a `.md` symlink to a file elsewhere must not
     be read, indexed or sent on by an unattended run. [earned: 2026-09-24, Copilot review of #26]"""
-    return [p for p in paths if inside(p, vault)]
+    root = vault.resolve()
+    kept = []
+    for p in paths:
+        try:  # strict: a symlink loop or a dangling link is not a note (and must not crash the run)
+            if p.resolve(strict=True).is_relative_to(root):
+                kept.append(p)
+        except (OSError, RuntimeError):
+            continue
+    return kept
 
 
 # ---------------------------------------------------------------------------

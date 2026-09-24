@@ -63,6 +63,16 @@ def test_core_listing_skips_symlinks_out_of_the_vault(vault):
     assert not names & {"Planted.md", "Root-Planted.md"}, names
 
 
+def test_a_symlink_loop_is_skipped_not_fatal(vault):
+    # Codex cross-review of the fix: resolve() can raise on a loop and abort the whole run.
+    loop = vault / "03_Areas" / "Loop.md"
+    loop.symlink_to(loop)
+    found = {p.name for p in _module("obsidian", "vault_utils").discover_notes(vault)}
+    assert "Real-Note.md" in found and "Loop.md" not in found
+    from toolkit_core.vault import list_active_notes
+    assert "Loop.md" not in {p.name for p in list_active_notes(vault)}
+
+
 def test_a_symlink_inside_the_vault_still_counts(vault):
     # Containment, not a blanket symlink ban: an alias to another vault note stays a note.
     (vault / "04_Resources" / "Alias.md").symlink_to(vault / "03_Areas" / "Real-Note.md")

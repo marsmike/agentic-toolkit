@@ -20,8 +20,8 @@ export TOOLKIT_VAULT="$VAULT"
 #   (vault_utils.secret: TOOLKIT_KEYS_FILE, default ~/.env); the agent may neither read nor edit it.
 # - Bash: exactly the scripts the pipeline and distill skills run, each through `uv run --locked`,
 #   written relative to the repo; a shell function, a variable, `cd` or `python3 -c` is refused.
-# - Files: read the repo and the vault, write the vault only; never read or write either .git (history,
-#   hooks, remote) and never write
+# - Files: read the repo and the vault, write the vault only; the agent's own file tools never read or
+#   write either .git (history, hooks, remote; the granted scripts' git calls still work) and never write
 #   Config/toolkit (a profile names the host a key is sent to).
 # - WebFetch: only the domains in TOOLKIT_PIPELINE_FETCH_DOMAINS, for a stub's own source; a
 #   stub elsewhere ends as a short note with its link (distill "A stub is not the content").
@@ -54,8 +54,9 @@ ALLOWED+="$(script radar radar.py scan)$(script radar radar.py gaps)$(script rad
 ALLOWED+="$(script readwise ingest.py)"
 ALLOWED+="Read(/$REPO/**),Read(/$VAULT/**),Edit(/$VAULT/**),Glob,Grep,Skill"
 for domain in $(printf '%s' "$FETCH_DOMAINS" | tr ',' ' '); do ALLOWED+=",WebFetch(domain:$domain)"; done
-# .git is denied for reads too: history can hold old secrets, and hooks/remotes are not the agent's
-# business. [earned: 2026-09-24, Copilot review of #26]
+# .git is denied to the agent's file tools for reads too: history can hold old secrets, and hooks and
+# remotes are not the agent's business. (A granted script that runs git still reads it; that is the
+# script's job, and the scripts are the reviewed surface.) [earned: 2026-09-24, Copilot review of #26]
 DENIED="Read(/$KEYS_FILE),Edit(/$KEYS_FILE),Read(/$VAULT/.git),Read(/$VAULT/.git/**),Read(/$REPO/.git),Read(/$REPO/.git/**)"
 DENIED+=",Edit(/$VAULT/.git/**),Edit(/$VAULT/Config/toolkit/**),Edit(/$REPO/**)"
 

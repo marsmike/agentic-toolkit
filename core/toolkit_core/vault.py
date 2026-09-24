@@ -142,7 +142,10 @@ def _inside_vault(note_path: Path, vault_path: Path) -> bool:
     """A `.md` symlink resolving outside the vault is not a vault note: skipping it keeps
     external files out of search, the engines and anything a run sends on.
     [earned: 2026-09-24, Copilot review of #26]"""
-    return note_path.resolve().is_relative_to(vault_path.resolve())
+    try:  # strict: a symlink loop or a dangling link is not a note (and must not crash the run)
+        return note_path.resolve(strict=True).is_relative_to(vault_path.resolve())
+    except (OSError, RuntimeError):
+        return False
 
 
 def _root_active_notes(vault_path: Path) -> list[Path]:
