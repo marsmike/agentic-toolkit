@@ -29,19 +29,24 @@ jobs:
         with:
           filters: |
             python:
+              - '.github/workflows/ci.yml'
               - 'core/**'
               - 'plugins/**'
               - 'pyproject.toml'
             contract:
+              - '.github/workflows/ci.yml'
               - 'contract/**'
               - 'vault/**'
               - 'core/**'
             evals:
+              - '.github/workflows/ci.yml'
               - 'plugins/**'
               - 'vault/**'
             rust:
+              - '.github/workflows/ci.yml'
               - 'crates/**'
               - 'Cargo.toml'
+              - 'Cargo.lock'
 
   python:
     needs: changes
@@ -109,6 +114,10 @@ jobs:
             echo "::error::One or more radar evals reported pass: false"
             exit 1
           fi
+      - name: Run memory plugin evals
+        run: uv run python plugins/memory/evals/run.py --json
+      - name: Run handoff plugin evals
+        run: uv run python plugins/handoff/evals/run.py --json
 
   # cargo fails on a memberless virtual workspace, so the job skips cleanly
   # until R1 adds the first crate [earned: adversarial R0 review 2026-07-26 —
