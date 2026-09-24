@@ -64,14 +64,18 @@ def main() -> int:
     theirs = table(storyboard)
     if len(theirs) != len(ours["scenes"]):
         problems.append(f"scene count: storyboard {len(theirs)}, video {len(ours['scenes'])}")
-    for want, got in zip(theirs, ours["scenes"]):
+    # Scenes are compared pairwise only when the counts agree, so nothing is silently truncated.
+    pairs = list(enumerate(theirs)) if len(theirs) == len(ours["scenes"]) else []
+    for i, want in pairs:
+        got = ours["scenes"][i]
         for key in ("n", "start", "end", "text", "source"):
             if want[key] != got[key]:
                 problems.append(f"scene {want['n']} {key}:\n  storyboard: {want[key]!r}\n  video:      {got[key]!r}")
         if want["end"] - want["start"] != want["dur"]:
             problems.append(f"scene {want['n']}: storyboard duration {want['dur']} != end - start")
     scenes = ours["scenes"]
-    for a, b in zip(scenes, scenes[1:]):
+    for i in range(1, len(scenes)):
+        a, b = scenes[i - 1], scenes[i]
         if a["end"] != b["start"]:
             problems.append(f"gap or overlap between scenes {a['n']} and {b['n']}")
     total = scenes[-1]["end"] - scenes[0]["start"]
@@ -87,7 +91,10 @@ def main() -> int:
         got = shown_lines(session, terminal)
         if expected.get(name) != got:
             problems.append(f"scene {scene['n']} {name}: terminal lines differ from the storyboard block")
-            for i, (w, g) in enumerate(zip(expected.get(name, []), got)):
+            want = expected.get(name, [])
+            for i in range(max(len(want), len(got))):  # extra or missing lines are differences too
+                w = want[i] if i < len(want) else None
+                g = got[i] if i < len(got) else None
                 if w != g:
                     problems.append(f"  line {i + 1}:\n    storyboard: {w!r}\n    capture:    {g!r}")
 

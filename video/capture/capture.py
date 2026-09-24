@@ -17,7 +17,6 @@ changes, change them here and re-capture.
 Only the `claude` binary is taken from this machine: PREREQ_BIN holds a
 symlink to it and nothing else, so no installed toolkit leaks onto PATH.
 """
-import os
 import platform
 import shutil
 import subprocess

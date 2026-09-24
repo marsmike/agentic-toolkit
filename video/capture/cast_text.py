@@ -101,7 +101,7 @@ def screen_text(raw: str, width: int) -> str:
             logical[-1] += text
         else:
             logical.append(text)
-    return "\n".join(l.rstrip() for l in logical).strip("\n")
+    return "\n".join(line.rstrip() for line in logical).strip("\n")
 
 
 def convert(cast: Path) -> Path:
