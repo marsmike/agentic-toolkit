@@ -154,6 +154,78 @@ def test_plugin_vault_utils_profile_and_write_agree(tmp_path):
         assert len(dlq) == 1 and dlq[0].endswith(f"{plugin_name}-profile-unreadable.md"), f"{plugin_name}: {dlq}"
 
 
+def test_each_script_reads_its_own_key_env_first_then_the_key_file(tmp_path, monkeypatch):
+    """contract/PROFILE.md "Secrets": a key comes from the environment, else the owner's key file
+    (`TOOLKIT_KEYS_FILE`), and is returned to the caller, never exported, so the unattended agent
+    that starts the scripts holds none [earned: 2026-09-24, review-01 SEC-1]. All three copies."""
+    import os
+    import sys
+
+    keys = tmp_path / "keys.env"
+    keys.write_text("# comment\nexport READWISE_TOKEN='rw from file'\nKAGI_API_KEY=\"kagi\"\n"
+                    "OPENROUTER_API_KEY=or=with=equals\nEMPTY_KEY=\n", encoding="utf-8")
+    for plugin_name in ("obsidian", "readwise", "radar"):
+        scripts_dir = EXAMPLE_VAULT.parent / "plugins" / plugin_name / "scripts"
+        sys.path.insert(0, str(scripts_dir))
+        sys.modules.pop("vault_utils", None)
+        try:
+            import vault_utils
+
+            monkeypatch.setenv("TOOLKIT_KEYS_FILE", str(keys))
+            for name in ("READWISE_TOKEN", "KAGI_API_KEY", "OPENROUTER_API_KEY", "EMPTY_KEY"):
+                monkeypatch.delenv(name, raising=False)
+            got = {n: vault_utils.secret(n) for n in ("READWISE_TOKEN", "KAGI_API_KEY", "OPENROUTER_API_KEY",
+                                                      "EMPTY_KEY", "ABSENT_KEY")}
+            assert got == {"READWISE_TOKEN": "rw from file", "KAGI_API_KEY": "kagi",
+                           "OPENROUTER_API_KEY": "or=with=equals", "EMPTY_KEY": None, "ABSENT_KEY": None}, plugin_name
+            assert "READWISE_TOKEN" not in os.environ, f"{plugin_name}: secret() exported the key"
+            monkeypatch.setenv("KAGI_API_KEY", "from env")
+            assert vault_utils.secret("KAGI_API_KEY") == "from env", f"{plugin_name}: the environment wins"
+            monkeypatch.setenv("TOOLKIT_KEYS_FILE", str(tmp_path / "missing.env"))
+            assert vault_utils.secret("READWISE_TOKEN") is None, plugin_name
+        finally:
+            sys.path.remove(str(scripts_dir))
+            sys.modules.pop("vault_utils", None)
+
+
+def test_no_plugin_script_reads_a_key_past_secret():
+    """A key read straight from os.environ would bypass the key file, and the unattended run's
+    agent has no key in its environment: that script would silently print SKIPPED. Every
+    `*_KEY`/`*_TOKEN` read goes through `vault_utils.secret` instead."""
+    import re
+
+    direct = re.compile(r"os\.environ(?:\.get\(|\[)\s*[\"']([A-Z0-9_]*(?:_KEY|_TOKEN))[\"']")
+    offenders = [f"{p.relative_to(EXAMPLE_VAULT.parent)}: {m}"
+                 for p in (EXAMPLE_VAULT.parent / "plugins").glob("*/scripts/**/*.py")
+                 for m in direct.findall(p.read_text(encoding="utf-8"))]
+    assert not offenders, offenders
+
+
+def test_example_vault_index_has_no_drift():
+    """vault/Index.md is generated (contract/VAULT_SCHEMA.md): it must be exactly what
+    `index_build.py` builds from the example vault, less the rebuild date. A hand-written intro
+    and aliases once made lint report the root note missing [earned: 2026-09-24, review-01 GLM-1 /
+    IMPL-GLM-2, operator decision (a)]. After changing a note, rebuild with `index_build.py`."""
+    import re
+    import sys
+
+    skip_if_example_vault_empty()
+    scripts_dir = EXAMPLE_VAULT.parent / "plugins" / "obsidian" / "scripts"
+    sys.path.insert(0, str(scripts_dir))
+    for mod in ("vault_utils", "index_build"):
+        sys.modules.pop(mod, None)
+    try:
+        import index_build
+
+        built, _ = index_build.build(EXAMPLE_VAULT)
+    finally:
+        sys.path.remove(str(scripts_dir))
+    undated = re.compile(r"^\*Last rebuild: \d{4}-\d{2}-\d{2} ", re.M)
+    committed = (EXAMPLE_VAULT / "Index.md").read_text(encoding="utf-8")
+    assert undated.sub("*Last rebuild: ", committed) == undated.sub("*Last rebuild: ", built), (
+        "vault/Index.md drifted from index_build.py: rebuild it")
+
+
 def test_shared_judgment_modules_are_byte_identical():
     """The judgment client and its helpers exist twice, in obsidian and radar, because a plugin
     never imports a sibling (contract/KNOWLEDGE_API.md). The copies are only safe while they are

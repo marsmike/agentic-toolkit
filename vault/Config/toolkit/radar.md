@@ -23,5 +23,5 @@ default) and the plugin's own `profile.example.md` for every key and what leaves
 - `promote_location` — where `scan --promote` moves strong items in Reader.
 - `kagi_weekly_budget_usd` — the ceiling `discover` enforces from its spend ledger.
 
-Keys are environment variables only: `READWISE_TOKEN`, `KAGI_API_KEY`,
-`TOOLKIT_RADAR_JUDGMENT_API_KEY` (or `OPENROUTER_API_KEY`).
+Keys come from the environment or the owner's key file (`~/.env`), each read by the script that
+needs it: `READWISE_TOKEN`, `KAGI_API_KEY`, `TOOLKIT_RADAR_JUDGMENT_API_KEY` (or `OPENROUTER_API_KEY`).

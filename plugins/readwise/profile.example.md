@@ -33,7 +33,8 @@ resolution order (env var → this note → shipped default).
 ## Secrets
 
 No credential belongs in this file, ever — see `contract/PROFILE.md`'s Secrets section. The
-Readwise API token is the `READWISE_TOKEN` environment variable, referenced here only by name.
+Readwise API token is `READWISE_TOKEN`, from the environment or the key file (`~/.env`, read by
+the script itself), referenced here only by name.
 Get a token at https://readwise.io/access_token.
 
 ## Env var overrides

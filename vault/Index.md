@@ -1,129 +1,106 @@
 # Vault Index
 
-**Start here if you're new.** This is the example vault for
-[agentic-toolkit](https://github.com/marsmike/agentic-toolkit): a vault-first Claude Code toolkit
-where identity and knowledge live in a plain Obsidian-compatible vault, not in application code.
-Everything below this line is that vault's own content — the toolkit's documentation, written as
-the vault notes it describes, plus a fictional persona ([[Alex-Vega]]) and two demo projects that
-exercise the whole pipeline end to end.
+*Last rebuild: 2026-09-24 · 83 entries · 1 without a description (⚙)*
 
-**The pipeline, if you want the shape before the detail:** a `contract/` (the rules) governs a
-`core` CLI (`toolkit vault init`/`doctor`/`profile`, see [[Toolkit-CLI]]) and a set of curated
-plugins (see [[Obsidian-Plugin]]) that read and write this vault directly. Two native engines sit
-underneath: [[Farsight]] (search) and [[Gaiafield]] (the knowledge graph, deterministic first,
-statistical inference layered on top under strict rules — see
-[[Inference-Write-Policy|Report-Only Inference]]). Everything ships behind capability evals (see
-[[Running-Evals]]) and cites the dated failure that earned it (see [[The-Ratchet]]).
+## Vault root
 
-**Where to go next:** [[Quick-Start]] for the shortest path to a working install,
-[[Test-Corpus-Map]] for how this vault is deliberately structured as both documentation and a test
-corpus, [[Alex-Vega]] for the fictional persona the demo projects below belong to.
-
-One line per active note in `02_Projects`, `03_Areas`, `04_Resources` — schema in
-`contract/VAULT_SCHEMA.md`. Excludes `00_Memory`, `01_Capture`, and `05_Archive` by
-convention (see [[Test-Corpus-Map]]). 81 entries.
+- [[Alex-Vega|Alex-Vega]] — Profile note for this example vault's fictional persona — resolution target for the "fill from Obsidian" convention.
 
 ## 02_Projects
 
 ### field-guide
-
-- [[02_Projects/field-guide/Field-Guide-Project|Field Guide Project]] — Project overview for Alex's regional birding field guide — a closable writing project with a defined manuscript deadline.
-- [[02_Projects/field-guide/Illustration-Sourcing|Illustration Sourcing]] — Tracking original illustrations vs. licensed photos across the field guide's 180 accounts.
-- [[02_Projects/field-guide/Publisher-Outreach-Log|Publisher Outreach Log]] — Running log of contact with the regional publisher under discussion for the field guide.
-- [[02_Projects/field-guide/Reference-Library|Reference Library]] — Source material — field guides, range-data sources, and museum collection notes — used across every species account.
-- [[02_Projects/field-guide/Species-Accounts-Workflow|Species Accounts Workflow]] — The repeatable per-species drafting workflow used for every account in the field guide.
-- [[02_Projects/field-guide/Weekly-Review|Weekly Review]] — Weekly review for the field-guide project, week of 2026-07-20.
+- [[02_Projects/field-guide/Field-Guide-Project|Field-Guide-Project]] — Project overview for Alex's regional birding field guide — a closable writing project with a defined manuscript deadline.
+- [[02_Projects/field-guide/Illustration-Sourcing|Illustration-Sourcing]] — Tracking original illustrations vs. licensed photos across the field guide's 180 accounts.
+- [[02_Projects/field-guide/Publisher-Outreach-Log|Publisher-Outreach-Log]] — Running log of contact with the regional publisher under discussion for the field guide.
+- [[02_Projects/field-guide/Reference-Library|Reference-Library]] — Source material — field guides, range-data sources, and museum collection notes — used across every species account.
+- [[02_Projects/field-guide/Species-Accounts-Workflow|Species-Accounts-Workflow]] — The repeatable per-species drafting workflow used for every account in the field guide.
+- [[02_Projects/field-guide/Weekly-Review|Weekly-Review]] — Weekly review for the field-guide project, week of 2026-07-20.
 
 ### home-lab-migration
-
-- [[02_Projects/home-lab-migration/Backup-Strategy|Backup Strategy]] — Backup and restore-verification approach used during the home-lab migration, including the restore-drill discipline.
-- [[02_Projects/home-lab-migration/Hardware-Inventory|Hardware Inventory]] — Inventory of old and new home-lab hardware, and per-service migration status.
-- [[02_Projects/home-lab-migration/Home-Lab-Migration|Home Lab Migration]] — Project overview for migrating Alex's self-hosted services off an aging mini-PC onto new hardware.
-- [[02_Projects/home-lab-migration/Migration-Runbook|Migration Runbook]] — The repeatable per-service migration procedure used for each of the five home-lab services.
-- [[02_Projects/home-lab-migration/Network-Topology|Network Topology]] — Current and target network layout for the home-lab migration — VLANs, static addresses, and the old-vs-new box path.
-- [[02_Projects/home-lab-migration/Weekly-Review|Weekly Review]] — Weekly review for the home-lab migration project, week of 2026-07-20.
+- [[02_Projects/home-lab-migration/Backup-Strategy|Backup-Strategy]] — Backup and restore-verification approach used during the home-lab migration, including the restore-drill discipline.
+- [[02_Projects/home-lab-migration/Hardware-Inventory|Hardware-Inventory]] — Inventory of old and new home-lab hardware, and per-service migration status.
+- [[02_Projects/home-lab-migration/Home-Lab-Migration|Home-Lab-Migration]] — Project overview for migrating Alex's self-hosted services off an aging mini-PC onto new hardware.
+- [[02_Projects/home-lab-migration/Migration-Runbook|Migration-Runbook]] — The repeatable per-service migration procedure used for each of the five home-lab services.
+- [[02_Projects/home-lab-migration/Network-Topology|Network-Topology]] — Current and target network layout for the home-lab migration — VLANs, static addresses, and the old-vs-new box path.
+- [[02_Projects/home-lab-migration/Weekly-Review|Weekly-Review]] — Weekly review for the home-lab migration project, week of 2026-07-20.
 
 ## 03_Areas
 
 - [[03_Areas/Birding|Birding]] — Ongoing birding practice and local patch records — the area the field-guide project draws expertise from.
-- [[03_Areas/Home-Network-Administration|Home Network Administration]] — Ongoing responsibility for the home network and self-hosted services, independent of the current migration project.
-- [[03_Areas/Open-Source-Maintenance|Open Source Maintenance]] — Alex's ongoing maintenance of a small open-source CLI tool, run on the same graduation-pattern and ratchet discipline this toolkit documents.
-- [[03_Areas/Toolkit-Maintenance|Toolkit Maintenance]] — Alex's ongoing responsibility for keeping this vault and its toolkit plugins healthy — the area that dogfoods the toolkit against…
+- [[03_Areas/Home-Network-Administration|Home-Network-Administration]] — Ongoing responsibility for the home network and self-hosted services, independent of the current migration project.
+- [[03_Areas/Open-Source-Maintenance|Open-Source-Maintenance]] — Alex's ongoing maintenance of a small open-source CLI tool, run on the same graduation-pattern and ratchet discipline this toolkit documents.
+- [[03_Areas/Toolkit-Maintenance|Toolkit-Maintenance]] — Alex's ongoing responsibility for keeping this vault and its toolkit plugins healthy — the area that dogfoods the toolkit against Alex's own projects.
 
 ## 04_Resources
 
 ### Concepts
-
-- [[04_Resources/Concepts/Active-Radar|Active Radar]] — Judging every item a reader aggregates before anyone clips it, so the feed is read in full and only what matters reaches you.
-- [[04_Resources/Concepts/Ambient-vs-On-Demand-Context|Ambient vs. On-Demand Context]] — Distinguishing what must be true even when no skill is running from what only needs to be known while a…
-- [[04_Resources/Concepts/Anonymized-Failure-Repros|Anonymized Failure Repros]] — Turning a real, dated failure into a minimal, anonymized regression case — the public half of the ratchet, shareable without…
-- [[04_Resources/Concepts/Atomic-Notes|Atomic Notes]] — One note, one idea — the sizing discipline that makes wikilinks meaningful instead of pointing at an undifferentiated wall of…
-- [[04_Resources/Concepts/BM25-Dilution|BM25 Dilution]] — A long, verbose description field dilutes the keyword weight of the terms that actually matter, hurting BM25-side retrieval even when…
-- [[04_Resources/Concepts/Calibration-Bias|Calibration Bias]] — Pooling similarity statistics across clusters of very different sizes lets the biggest cluster's internal noise masquerade as the whole…
-- [[04_Resources/Concepts/Capability-Probing|Capability Probing]] — Detecting what a binary can actually do at runtime via a side-effect-free check, rather than parsing a version number or…
-- [[04_Resources/Concepts/CLI-in-JSON-out-Contracts|CLI-in / JSON-out Contracts]] — Every engine and plugin surface is a CLI that takes flags in and returns JSON out — a stable, language-agnostic…
-- [[04_Resources/Concepts/Community-Detection-and-Bridge-Notes|Community Detection and Bridge Notes]] — Finding densely-connected clusters in a wikilink graph, and the sparse cross-cluster notes — bridges — that make the clusters discoverable…
-- [[04_Resources/Concepts/Confidence-Labeling-for-Inferred-Edges|Confidence Labeling for Inferred Edges]] — Labeling a graph edge EXTRACTED, INFERRED, or AMBIGUOUS so a consumer knows how much to trust it, instead of presenting…
-- [[04_Resources/Concepts/Dead-Letter-Queues-for-Automation|Dead-Letter Queues for Automation]] — An automation that can't confidently resolve something writes a record of the failure instead of guessing — borrowed from message-queue…
-- [[04_Resources/Concepts/Delete-Over-Add-for-Stronger-Models|Delete-Over-Add for Stronger Models]] — A stronger model needs fewer standing constraints, not more — config rules written to compensate for a weaker model's judgment…
-- [[04_Resources/Concepts/Deterministic-vs-Inferred-Graph-Edges|Deterministic vs. Inferred Graph Edges]] — Building a knowledge graph's first version from wikilinks, frontmatter, and tags alone — no model call, no hallucinated edges —…
-- [[04_Resources/Concepts/Enrichment-Levels|Enrichment Levels]] — Three graded responses to a related note found above the search-score gate — backlink, inline merge, or contradiction flag —…
-- [[04_Resources/Concepts/Filesystem-vs-MCP-for-Agent-Tool-Access|Filesystem vs. MCP for Agent Tool Access]] — Direct filesystem and CLI access to vault content beats routing every read and write through an MCP server, by a…
-- [[04_Resources/Concepts/Fill-From-Obsidian-Profiles|Fill-From-Obsidian Profiles]] — Plugins get identity and configuration from a note in the vault, never hard-coded in the repo — the repo ships…
-- [[04_Resources/Concepts/Frontmatter-as-Floor-Not-Ceiling|Frontmatter as Floor, Not Ceiling]] — The documented frontmatter field table is a guaranteed minimum, not an exhaustive schema — parsers must tolerate and preserve fields…
-- [[04_Resources/Concepts/Hybrid-Retrieval|Hybrid Retrieval]] — Fusing keyword (BM25) and dense-vector search at query time rather than picking one, because each covers the other's blind spot.
-- [[04_Resources/Concepts/Inference-Write-Policy|Report-Only Inference]] — No automation writes vault content from an inferred edge without explicit human confirmation in that session — the contract…
-- [[04_Resources/Concepts/Judgment-Calls-vs-Deterministic-Failures|Judgment Calls vs. Deterministic Failures]] — Two hook classes — one auto-enforces a deterministic, unambiguous failure, the other stops and asks because the right answer depends…
-- [[04_Resources/Concepts/Knowledge-Graphs-from-Wikilinks|Knowledge Graphs from Wikilinks]] — Treating the wikilinks that already exist in a note-taking vault as a knowledge graph, rather than building a separate graph…
-- [[04_Resources/Concepts/Model-Tiering-for-Agent-Fleets|Model Tiering for Agent Fleets]] — Routing mechanical, high-volume work to cheap models and judgment calls to frontier models, with fan-out restricted to the frontier tier…
-- [[04_Resources/Concepts/PARA-Method|PARA Method]] — The Projects/Areas/Resources/Archive folder structure this vault and the toolkit's own schema are built on.
-- [[04_Resources/Concepts/Progressive-Disclosure|Progressive Disclosure]] — Loading only what the current step needs — an always-loaded core plus depth that surfaces on demand — applied to…
-- [[04_Resources/Concepts/Retrieval-Verification-Loop-Condensed-Description-Specimen|Retrieval-Verification Loop — Condensed-Description Specimen]] — Retrieval-verification loop, condensed-description specimen, BM25 test pair.
-- [[04_Resources/Concepts/Retrieval-Verification-Loop-Long-Description-Specimen|Retrieval-Verification Loop — Long-Description Specimen]] — This description is deliberately long and discursive on purpose, walking through the full background of the retrieval-verification loop, its motivation,…
-- [[04_Resources/Concepts/Retrieval-Verification-Loop|Retrieval-Verification Loop]] — Predicting a note's content from its description alone, scoring the prediction against the real content, and flagging low scores —…
-- [[04_Resources/Concepts/Scope-Discipline-for-Curated-Systems|Scope Discipline for Curated Systems]] — A component earns its place in a curated system only if someone can name the specific behavior it delivers —…
-- [[04_Resources/Concepts/Semantic-Search-Score-Calibration|Semantic Search Score Calibration]] — A similarity score's meaning is specific to the embedding model that produced it — 0.70 on one model is not…
-- [[04_Resources/Concepts/Surprise-Scoring|Surprise Scoring]] — Scoring a graph edge by how unexpected it is given the deterministic graph's own structure, so a genuinely novel…
-- [[04_Resources/Concepts/The-Cold-Boot-Ritual|The Cold-Boot Ritual]] — Verifying the stranger experience end-to-end before every release — a clean clone, released binaries, and an isolated headless…
-- [[04_Resources/Concepts/The-Graduation-Pattern|The Graduation Pattern]] — Shipping a capability behind a low-bar eval on day one, then raising the bar over time until it graduates into…
-- [[04_Resources/Concepts/The-Instruction-Budget|The Instruction Budget]] — Every always-loaded config file competes for the same shared pool of instruction slots — the budget is per-agent-context, not per-file,…
-- [[04_Resources/Concepts/The-Observer-Pattern|The Observer Pattern]] — Separating the agent that builds a release from the agent that adversarially reviews it before commit — an independent…
-- [[04_Resources/Concepts/The-Ratchet|The Ratchet]] — Every standing rule in a config or contract cites the dated incident that earned it, so the rule set only…
-- [[04_Resources/Concepts/Two-Phase-Distillation|Two-Phase Distillation]] — Splitting capture processing into an analyze-only phase with a human checkpoint, then a write phase — so an agent never…
-- [[04_Resources/Concepts/Typed-Judgments|Typed Judgments]] — Many narrow yes/no and pick-one questions answered as probabilities, with every threshold and consequence kept in code.
-- [[04_Resources/Concepts/Vault-First-Architecture|Vault-First Architecture]] — Designing a system so identity, configuration, and knowledge live in a plain-file vault the agent can read and write directly,…
-- [[04_Resources/Concepts/Vault-Größe-und-Skalierungsschwellen|Vault-Größe und Skalierungsschwellen]] — Wie groß ein Vault werden darf, bevor flache Notizstrukturen anfangen zu brechen — der Schwellenwert, ab dem Ordner, Communities oder…
-- [[04_Resources/Concepts/Versioned-Inter-Plugin-Contracts|Versioned Inter-Plugin Contracts]] — When plugins compose through vault notes instead of direct calls, the note shape one plugin writes and another reads needs…
+- [[04_Resources/Concepts/Active-Radar|Active-Radar]] — Judging every item a reader aggregates before anyone clips it, so the feed is read in full and only what matters reaches you — typed judgments moved to the front of the pipeline.
+- [[04_Resources/Concepts/Ambient-vs-On-Demand-Context|Ambient-vs-On-Demand-Context]] — Distinguishing what must be true even when no skill is running from what only needs to be known while a specific workflow executes — the sharper, file-placement version of progressive disclosure.
+- [[04_Resources/Concepts/Anonymized-Failure-Repros|Anonymized-Failure-Repros]] — Turning a real, dated failure into a minimal, anonymized regression case — the public half of the ratchet, shareable without exposing what actually broke or for whom.
+- [[04_Resources/Concepts/Atomic-Notes|Atomic-Notes]] — One note, one idea — the sizing discipline that makes wikilinks meaningful instead of pointing at an undifferentiated wall of text.
+- [[04_Resources/Concepts/BM25-Dilution|BM25-Dilution]] — A long, verbose description field dilutes the keyword weight of the terms that actually matter, hurting BM25-side retrieval even when the content itself is good.
+- [[04_Resources/Concepts/Calibration-Bias|Calibration-Bias]] — Pooling similarity statistics across clusters of very different sizes lets the biggest cluster's internal noise masquerade as the whole vault's separation signal — a lesson learned calibrating gaiafield's inference gates.
+- [[04_Resources/Concepts/Capability-Probing|Capability-Probing]] — Detecting what a binary can actually do at runtime via a side-effect-free check, rather than parsing a version number or letting a real call fail and crash.
+- [[04_Resources/Concepts/CLI-in-JSON-out-Contracts|CLI-in-JSON-out-Contracts]] — Every engine and plugin surface is a CLI that takes flags in and returns JSON out — a stable, language-agnostic seam between components that never share process memory.
+- [[04_Resources/Concepts/Community-Detection-and-Bridge-Notes|Community-Detection-and-Bridge-Notes]] — Finding densely-connected clusters in a wikilink graph, and the sparse cross-cluster notes — bridges — that make the clusters discoverable from each other.
+- [[04_Resources/Concepts/Confidence-Labeling-for-Inferred-Edges|Confidence-Labeling-for-Inferred-Edges]] — Labeling a graph edge EXTRACTED, INFERRED, or AMBIGUOUS so a consumer knows how much to trust it, instead of presenting every edge with equal certainty.
+- [[04_Resources/Concepts/Dead-Letter-Queues-for-Automation|Dead-Letter-Queues-for-Automation]] — An automation that can't confidently resolve something writes a record of the failure instead of guessing — borrowed from message-queue dead-letter patterns.
+- [[04_Resources/Concepts/Delete-Over-Add-for-Stronger-Models|Delete-Over-Add-for-Stronger-Models]] — A stronger model needs fewer standing constraints, not more — config rules written to compensate for a weaker model's judgment become conflicting noise once the model improves.
+- [[04_Resources/Concepts/Deterministic-vs-Inferred-Graph-Edges|Deterministic-vs-Inferred-Graph-Edges]] — Building a knowledge graph's first version from wikilinks, frontmatter, and tags alone — no model call, no hallucinated edges — before ever adding inferred similarity edges.
+- [[04_Resources/Concepts/Enrichment-Levels|Enrichment-Levels]] — Three graded responses to a related note found above the search-score gate — backlink, inline merge, or contradiction flag — matched to how specific the relationship actually is.
+- [[04_Resources/Concepts/Filesystem-vs-MCP-for-Agent-Tool-Access|Filesystem-vs-MCP-for-Agent-Tool-Access]] — Direct filesystem and CLI access to vault content beats routing every read and write through an MCP server, by a wide token-overhead margin.
+- [[04_Resources/Concepts/Fill-From-Obsidian-Profiles|Fill-From-Obsidian-Profiles]] — Plugins get identity and configuration from a note in the vault, never hard-coded in the repo — the repo ships behavior, the vault carries specifics.
+- [[04_Resources/Concepts/Frontmatter-as-Floor-Not-Ceiling|Frontmatter-as-Floor-Not-Ceiling]] — The documented frontmatter field table is a guaranteed minimum, not an exhaustive schema — parsers must tolerate and preserve fields they don't recognize.
+- [[04_Resources/Concepts/Hybrid-Retrieval|Hybrid-Retrieval]] — Fusing keyword (BM25) and dense-vector search at query time rather than picking one, because each covers the other's blind spot.
+- [[04_Resources/Concepts/Inference-Write-Policy|Inference-Write-Policy]] — No automation writes vault content from an inferred edge without explicit human confirmation in that session — the contract rule that keeps a wrong statistical guess from silently corrupting the vault while reporting success.
+- [[04_Resources/Concepts/Judgment-Calls-vs-Deterministic-Failures|Judgment-Calls-vs-Deterministic-Failures]] — Two hook classes — one auto-enforces a deterministic, unambiguous failure, the other stops and asks because the right answer depends on judgment a hook can't encode.
+- [[04_Resources/Concepts/Knowledge-Graphs-from-Wikilinks|Knowledge-Graphs-from-Wikilinks]] — Treating the wikilinks that already exist in a note-taking vault as a knowledge graph, rather than building a separate graph layer that requires its own maintenance.
+- [[04_Resources/Concepts/Model-Tiering-for-Agent-Fleets|Model-Tiering-for-Agent-Fleets]] — Routing mechanical, high-volume work to cheap models and judgment calls to frontier models, with fan-out restricted to the frontier tier so spawn depth stays bounded.
+- [[04_Resources/Concepts/PARA-Method|PARA-Method]] — The Projects/Areas/Resources/Archive folder structure this vault and the toolkit's own schema are built on.
+- [[04_Resources/Concepts/Progressive-Disclosure|Progressive-Disclosure]] — Loading only what the current step needs — an always-loaded core plus depth that surfaces on demand — applied to agent context the way UI design applies it to interfaces.
+- [[04_Resources/Concepts/Retrieval-Verification-Loop|Retrieval-Verification-Loop]] — Predicting a note's content from its description alone, scoring the prediction against the real content, and flagging low scores — a maintenance loop that catches descriptions that mislead search.
+- [[04_Resources/Concepts/Retrieval-Verification-Loop-Condensed-Description-Specimen|Retrieval-Verification-Loop-Condensed-Description-Specimen]] — Retrieval-verification loop, condensed-description specimen, BM25 test pair.
+- [[04_Resources/Concepts/Retrieval-Verification-Loop-Long-Description-Specimen|Retrieval-Verification-Loop-Long-Description-Specimen]] — This description is deliberately long and discursive on purpose, walking through the full background of the retrieval-verification loop, its motivation, its history in this toolkit's design process, and several tangential asides about sear…
+- [[04_Resources/Concepts/Scope-Discipline-for-Curated-Systems|Scope-Discipline-for-Curated-Systems]] — A component earns its place in a curated system only if someone can name the specific behavior it delivers — a scope test that caps the listing budget at what stays nameable.
+- [[04_Resources/Concepts/Semantic-Search-Score-Calibration|Semantic-Search-Score-Calibration]] — A similarity score's meaning is specific to the embedding model that produced it — 0.70 on one model is not 0.70 on another, so the enrichment gate must be recalibrated per model.
+- [[04_Resources/Concepts/Surprise-Scoring|Surprise-Scoring]] — Scoring a graph edge by how unexpected it is given the deterministic graph's own structure, so a genuinely novel cross-domain connection ranks above a thousand predictable within-cluster ones.
+- [[04_Resources/Concepts/The-Cold-Boot-Ritual|The-Cold-Boot-Ritual]] — Verifying the stranger experience end-to-end before every release — a clean clone, released binaries, and an isolated headless session — never assumed from a developer's own configured machine.
+- [[04_Resources/Concepts/The-Graduation-Pattern|The-Graduation-Pattern]] — Shipping a capability behind a low-bar eval on day one, then raising the bar over time until it graduates into the regression suite that gates merges.
+- [[04_Resources/Concepts/The-Instruction-Budget|The-Instruction-Budget]] — Every always-loaded config file competes for the same shared pool of instruction slots — the budget is per-agent-context, not per-file, so adding to one file taxes all the others.
+- [[04_Resources/Concepts/The-Observer-Pattern|The-Observer-Pattern]] — Separating the agent that builds a release from the agent that adversarially reviews it before commit — an independent pass incentivized to find what's wrong, not to confirm the build works.
+- [[04_Resources/Concepts/The-Ratchet|The-Ratchet]] — Every standing rule in a config or contract cites the dated incident that earned it, so the rule set only ever tightens in response to a real failure, never on speculation.
+- [[04_Resources/Concepts/Two-Phase-Distillation|Two-Phase-Distillation]] — Splitting capture processing into an analyze-only phase with a human checkpoint, then a write phase — so an agent never files or enriches a note without a review step.
+- [[04_Resources/Concepts/Typed-Judgments|Typed-Judgments]] — Asking a model many narrow yes/no and pick-one questions that come back as probabilities, and keeping every threshold and consequence in code — the division of labor behind the distill run's advisory judgments.
+- [[04_Resources/Concepts/Vault-First-Architecture|Vault-First-Architecture]] — Designing a system so identity, configuration, and knowledge live in a plain-file vault the agent can read and write directly, rather than in the application's own database.
+- [[04_Resources/Concepts/Vault-Größe-und-Skalierungsschwellen|Vault-Größe-und-Skalierungsschwellen]] — Wie groß ein Vault werden darf, bevor flache Notizstrukturen anfangen zu brechen — der Schwellenwert, ab dem Ordner, Communities oder ein Graph-Layer nötig werden.
+- [[04_Resources/Concepts/Versioned-Inter-Plugin-Contracts|Versioned-Inter-Plugin-Contracts]] — When plugins compose through vault notes instead of direct calls, the note shape one plugin writes and another reads needs its own versioned, documented contract.
 
 ### Guides
-
-- [[04_Resources/Guides/Capture-Conventions|Capture Conventions]] — Naming, flatness, and provenance rules for 01_Capture/ — why a directory listing alone should show where every capture came from.
-- [[04_Resources/Guides/Docs-Site|Docs Site]] — How the public docs site is built from this vault — pinned Quartz 4, the vault rendered directly with no separate docs source, and what's excluded from…
-- [[04_Resources/Guides/Migrating-a-Live-Vault|Migrating a Live Vault]] — Moving a long-lived vault onto the toolkit's plugins: rehearse on a copy, profile, parity checks, recalibrate, cut over.
-- [[04_Resources/Guides/Migrating-Notes-From-Plain-Markdown|Migrating-Notes-From-Plain-Markdown]] — No frontmatter — parser-tolerance test specimen; see Test-Corpus-Map.
-- [[04_Resources/Guides/Naming-Conventions-for-Notes-and-Files|Naming Conventions for Notes and Files]] — Filename conventions across captures, distilled notes, and projects — origin prefixes, author/year disambiguation, and when a plain title is fine.
-- [[04_Resources/Guides/Profiles-and-Config|Profiles and Config]] — How a plugin's identity and settings resolve — env var, vault profile note, shipped default — and where to look…
-- [[04_Resources/Guides/Quick-Start|Quick Start]] — Clone the repo, install a plugin, run one skill against the example vault — the shortest path from zero to…
-- [[04_Resources/Guides/Running-Evals|Running Evals]] — How to run a plugin's capability evals against this example vault, and what a passing regression suite actually certifies.
-- [[04_Resources/Guides/Scripting-the-Toolkit-Headless|Scripting the Toolkit Headless]] — Running the toolkit's skills in a non-interactive claude -p session — the --allowedTools shape that actually works, and…
-- [[04_Resources/Guides/Test-Corpus-Map|Test Corpus Map]] — Where every deliberately-planted test case in this vault lives, and the three link clusters plus bridge notes this vault's density…
-- [[04_Resources/Guides/The-Distill-Workflow|The Distill Workflow]] — Dossier, proposal, checkpoint, write, check, retire: how a capture becomes a findable, linked note.
-- [[04_Resources/Guides/Troubleshooting-Toolkit-Doctor|Troubleshooting toolkit doctor]] — Reading toolkit doctor output — active vault, profile completeness, the graph/inference section, and DLQ surfacing — to debug config that isn't…
-- [[04_Resources/Guides/Using-Your-Own-Vault|Using Your Own Vault]] — Pointing the toolkit at a real personal vault via TOOLKIT_VAULT, and how tests stay isolated from it regardless.
-- [[04_Resources/Guides/Vault-Maintenance-and-Linting|Vault Maintenance and Linting]] — Vault health checks — metadata normalization, orphaned notes, stale pages, and broken wikilinks — and what a lint pass should…
-- [[04_Resources/Guides/Writing-Good-Descriptions|Writing Good Descriptions]] — Writing a description field that serves both a human skimming and BM25 scoring it — condensed, high-IDF terms over grammatical…
-- [[04_Resources/Guides/Writing-a-Plugin|Writing a Plugin]] — The shape a new plugin must follow to be curated onto the platform — depends only on core/contract, reads profiles…
+- [[04_Resources/Guides/Capture-Conventions|Capture-Conventions]] — Naming, flatness, and provenance rules for 01_Capture/ — why a directory listing alone should show where every capture came from.
+- [[04_Resources/Guides/Docs-Site|Docs-Site]] — How the public docs site is built from this vault — pinned Quartz 4, the vault rendered directly with no separate docs source, and what's excluded from the publish.
+- [[04_Resources/Guides/Migrating-a-Live-Vault|Migrating-a-Live-Vault]] — Moving a long-lived personal vault onto this toolkit's plugins without touching it until a copy has passed every step — dry run, profile, parity checks, recalibration, cutover.
+- [[04_Resources/Guides/Migrating-Notes-From-Plain-Markdown|Migrating-Notes-From-Plain-Markdown]] — No frontmatter — parser-tolerance test specimen; see Test-Corpus-Map. ⚙
+- [[04_Resources/Guides/Naming-Conventions-for-Notes-and-Files|Naming-Conventions-for-Notes-and-Files]] — Filename conventions across captures, distilled notes, and projects — origin prefixes, author/year disambiguation, and when a plain title is fine.
+- [[04_Resources/Guides/Profiles-and-Config|Profiles-and-Config]] — How a plugin's identity and settings resolve — env var, vault profile note, shipped default — and where to look when a setting isn't behaving as expected.
+- [[04_Resources/Guides/Quick-Start|Quick-Start]] — Clone the repo, install a plugin, run one skill against the example vault — the shortest path from zero to a working toolkit.
+- [[04_Resources/Guides/Running-Evals|Running-Evals]] — How to run a plugin's capability evals against this example vault, and what a passing regression suite actually certifies.
+- [[04_Resources/Guides/Scripting-the-Toolkit-Headless|Scripting-the-Toolkit-Headless]] — Running the toolkit's skills in a non-interactive claude -p session — the --allowedTools shape that actually works, and the gotchas that each cost a debugging round.
+- [[04_Resources/Guides/Test-Corpus-Map|Test-Corpus-Map]] — Where every deliberately-planted test case in this vault lives, and the three link clusters plus bridge notes this vault's density was built to demonstrate.
+- [[04_Resources/Guides/The-Distill-Workflow|The-Distill-Workflow]] — The end-to-end procedure for turning a raw capture into an integrated vault note — analyze, checkpoint, write, enrich.
+- [[04_Resources/Guides/Troubleshooting-Toolkit-Doctor|Troubleshooting-Toolkit-Doctor]] — Reading toolkit doctor output — active vault, profile completeness, the graph/inference section, and DLQ surfacing — to debug config that isn't behaving as expected.
+- [[04_Resources/Guides/Using-Your-Own-Vault|Using-Your-Own-Vault]] — Pointing the toolkit at a real personal vault via TOOLKIT_VAULT, and how tests stay isolated from it regardless.
+- [[04_Resources/Guides/Vault-Maintenance-and-Linting|Vault-Maintenance-and-Linting]] — Vault health checks — metadata normalization, orphaned notes, stale pages, and broken wikilinks — and what a lint pass should and shouldn't auto-fix.
+- [[04_Resources/Guides/Writing-a-Plugin|Writing-a-Plugin]] — The shape a new plugin must follow to be curated onto the platform — depends only on core/contract, reads profiles the standard way, ships evals.
+- [[04_Resources/Guides/Writing-Good-Descriptions|Writing-Good-Descriptions]] — Writing a description field that serves both a human skimming and BM25 scoring it — condensed, high-IDF terms over grammatical completeness.
 
 ### Tools
-
-- [[04_Resources/Tools/Autoresearch-Eval-Loop|Autoresearch Eval Loop]] — Carries the self-improvement loop — research findings feed evals, evals feed the graduation pattern — the one second-wave plugin explicitly…
-- [[04_Resources/Tools/Farsight|Farsight]] — The vault's search engine — stateless BM25, Rust, CLI-in/JSON-out, one per-query scan over active-content notes with no…
-- [[04_Resources/Tools/Feinschliff-Deck-Pipeline|Feinschliff Deck Pipeline]] — The fein-* brand-pack pipeline for decks, diagrams, and data viz — feinschmiede's media plugins absorbed into the platform with brand…
-- [[04_Resources/Tools/Gaiafield|Gaiafield]] — The knowledge-graph engine — deterministic wikilink/frontmatter/tag extraction (v1, shipped) plus a report-only statistical inference layer (v2,…
-- [[04_Resources/Tools/Handoff-Skill|Handoff Skill]] — Saves a portable snapshot of in-progress work so another session or tool can resume it — a second-wave plugin built…
-- [[04_Resources/Tools/Marketplace-and-Plugin-Curation|Marketplace and Plugin Curation]] — How plugins are added to the marketplace.json and the curation waves that stage them in — core wave, second wave,…
-- [[04_Resources/Tools/Obsidian-Plugin|Obsidian Plugin]] — The core-wave plugin — distill workflow, capture handling, and the retrieval-verification maintenance skill, ported from the v1 monorepo.
-- [[04_Resources/Tools/Readwise-Plugin|Readwise Plugin]] — Pulls Readwise highlights into 01_Capture/ with origin-prefixed filenames — the second core-wave plugin, feeding the same distill pipeline the obsidian…
-- [[04_Resources/Tools/Tech-Radar|Tech Radar]] — Renders the toolkit's own state-of-the-art positioning into docs/ as a public radar view — second-wave plugin, and the carrier of…
-- [[04_Resources/Tools/Toolkit-CLI|Toolkit CLI]] — The core Python CLI — vault init, doctor, and profile resolution — the surface every plugin and every new user…
-
+- [[04_Resources/Tools/Autoresearch-Eval-Loop|Autoresearch-Eval-Loop]] — Carries the self-improvement loop — research findings feed evals, evals feed the graduation pattern — the one second-wave plugin explicitly required to survive curation.
+- [[04_Resources/Tools/Farsight|Farsight]] — The vault's search engine — stateless BM25, Rust, CLI-in/JSON-out, one per-query scan over active-content notes with no persisted index to go stale.
+- [[04_Resources/Tools/Feinschliff-Deck-Pipeline|Feinschliff-Deck-Pipeline]] — The fein-* brand-pack pipeline for decks, diagrams, and data viz — feinschmiede's media plugins absorbed into the platform with brand packs as data, not code.
+- [[04_Resources/Tools/Gaiafield|Gaiafield]] — The knowledge-graph engine — deterministic wikilink/frontmatter/tag extraction (v1, shipped) plus a report-only statistical inference layer (v2, shipped) — never conflated.
+- [[04_Resources/Tools/Handoff-Skill|Handoff-Skill]] — Saves a portable snapshot of in-progress work so another session or tool can resume it — a second-wave plugin built directly on vault-first architecture.
+- [[04_Resources/Tools/Marketplace-and-Plugin-Curation|Marketplace-and-Plugin-Curation]] — How plugins are added to the marketplace.json and the curation waves that stage them in — core wave, second wave, private repo, archive.
+- [[04_Resources/Tools/Obsidian-Plugin|Obsidian-Plugin]] — The core-wave plugin — distill workflow, capture handling, and the retrieval-verification maintenance skill, ported from the v1 monorepo.
+- [[04_Resources/Tools/Readwise-Plugin|Readwise-Plugin]] — Pulls Readwise highlights into 01_Capture/ with origin-prefixed filenames — the second core-wave plugin, feeding the same distill pipeline the obsidian plugin owns.
+- [[04_Resources/Tools/Tech-Radar|Tech-Radar]] — Renders the toolkit's own state-of-the-art positioning into docs/ as a public radar view — second-wave plugin, and the carrier of this vault's unknown-frontmatter-keys test case.
+- [[04_Resources/Tools/Toolkit-CLI|Toolkit-CLI]] — The core Python CLI — vault init, doctor, and profile resolution — the surface every plugin and every new user touches first.

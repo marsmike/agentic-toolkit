@@ -71,6 +71,9 @@ def _stdout_to_stderr():
 
 def main() -> int:
     as_json = "--json" in sys.argv
+    # Keys come from the environment only, as before: the key-file fallback (vault_utils.secret)
+    # would hand a "no key" case the developer's real ~/.env.
+    os.environ["TOOLKIT_KEYS_FILE"] = os.devnull
     evals_dir = Path(__file__).resolve().parent
     if str(evals_dir) not in sys.path:
         sys.path.insert(0, str(evals_dir))

@@ -592,6 +592,10 @@ def main(argv: list[str] | None = None) -> int:
 
     vault = require_vault()
     now = datetime.now(UTC)
+    # The unattended pipeline may run these three: their state stays in the vault, never where an
+    # agent points it. [earned: 2026-09-24, impl-02 review IMPL02-CODE-1]
+    if args.cmd in ("scan", "gaps", "weekly") and args.out and not args.out.resolve().is_relative_to(vault.resolve()):
+        raise SystemExit(f"--out must be inside the vault for {args.cmd}: {args.out}")
     if args.cmd == "kagi":
         result = kagi_cmd(vault, args.out or vault / RADAR_DIR, args.mode, args.text)
     elif args.cmd == "gaps":

@@ -102,6 +102,22 @@ def require_vault() -> Path:
     return res.path
 
 
+def vault_file(vault: Path, arg: str) -> Path:
+    """A note or capture named on the command line (vault-relative or absolute), refused unless it
+    resolves inside the vault: the unattended run may call these scripts but not read the key
+    file, and `01_Capture/../../.env` or a symlink would have printed it as a capture's passages.
+    [earned: 2026-09-24, review-01 SEC-1]"""
+    path = vault / arg  # an absolute `arg` replaces the vault prefix
+    if not inside(path, vault):
+        raise SystemExit(f"not inside the vault: {arg}")
+    return path
+
+
+def inside(path: Path, root: Path) -> bool:
+    """`path` resolves (symlinks, `..`) to `root` or below it."""
+    return path.resolve().is_relative_to(root.resolve())
+
+
 # ---------------------------------------------------------------------------
 # Profile (contract/PROFILE.md resolution order: env -> vault note -> default)
 # ---------------------------------------------------------------------------
@@ -158,6 +174,33 @@ def profile_value(vault: Path, key: str, default: Any = None) -> Any:
     if key in note and note[key] not in (None, ""):
         return note[key]
     return default
+
+
+KEYS_FILE_ENV = "TOOLKIT_KEYS_FILE"
+_KEY_LINE_RE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
+
+
+def secret(name: str) -> str | None:
+    """One key, read by the script that needs it (contract/PROFILE.md "Secrets"): the environment
+    first, then the owner's key file (`TOOLKIT_KEYS_FILE`, default `~/.env`), `NAME=value` lines
+    only. The value is returned, never put into os.environ, so nothing this script starts inherits
+    it. The unattended run no longer sources the key file into the agent's environment, so the
+    agent that reads other people's text holds no key. [earned: 2026-09-24, review-01 SEC-1]"""
+    if os.environ.get(name):
+        return os.environ[name]
+    path = Path(os.environ.get(KEYS_FILE_ENV) or Path.home() / ".env")
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    for line in lines:
+        m = _KEY_LINE_RE.match(line)
+        if m and m.group(1) == name:
+            value = m.group(2)
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            return value or None
+    return None
 
 
 def load_inference_config(vault: Path) -> dict[str, Any]:
@@ -345,7 +388,7 @@ def discover_notes(
     candidates: list[Path] = []
     for folder in folders:
         root = vault / folder
-        if not root.is_dir():
+        if not root.is_dir() or not inside(root, vault):  # a `scope` is a vault folder, never beyond
             continue
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
@@ -509,7 +552,7 @@ def llm_chat(
             "json_schema": {"name": "response", "schema": response_schema, "strict": True},
         }
     headers = {"Content-Type": "application/json"}
-    api_key = os.environ.get("TOOLKIT_OBSIDIAN_INFERENCE_API_KEY")
+    api_key = secret("TOOLKIT_OBSIDIAN_INFERENCE_API_KEY")
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     return _http_llm_request(url, payload, extract_ollama=False, headers=headers)

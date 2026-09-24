@@ -124,6 +124,33 @@ def profile_value(vault: Path, key: str, default: Any = None) -> Any:
     return default
 
 
+KEYS_FILE_ENV = "TOOLKIT_KEYS_FILE"
+_KEY_LINE_RE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
+
+
+def secret(name: str) -> str | None:
+    """One key, read by the script that needs it (contract/PROFILE.md "Secrets"): the environment
+    first, then the owner's key file (`TOOLKIT_KEYS_FILE`, default `~/.env`), `NAME=value` lines
+    only. The value is returned, never put into os.environ, so nothing this script starts inherits
+    it. The unattended run no longer sources the key file into the agent's environment, so the
+    agent that reads other people's text holds no key. [earned: 2026-09-24, review-01 SEC-1]"""
+    if os.environ.get(name):
+        return os.environ[name]
+    path = Path(os.environ.get(KEYS_FILE_ENV) or Path.home() / ".env")
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    for line in lines:
+        m = _KEY_LINE_RE.match(line)
+        if m and m.group(1) == name:
+            value = m.group(2)
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            return value or None
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Frontmatter I/O — tolerant per contract/VAULT_SCHEMA.md's "floor, not ceiling" rule
 # ---------------------------------------------------------------------------

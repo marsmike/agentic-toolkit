@@ -17,7 +17,7 @@ is linked to what it draws on, and can be found from a vague question a year lat
 decide how; two tools do the mechanical parts and check the result.
 
 ```bash
-S() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/$1" "${@:2}"; }  # a function, not a string: zsh does not word-split [earned: 2026-09-23 first pipeline run]
+S() { uv run --locked --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/$1" "${@:2}"; }  # a function, not a string: zsh does not word-split [earned: 2026-09-23 first pipeline run]
 S distill_judge.py 01_Capture/<capture>.md --dossier --json   # everything known about it, before you read it
 S distill_check.py <note> 01_Capture/<capture>.md --ask "<a question a reader would type>" --ask "…"
 S retire_capture.py 01_Capture/<capture>.md --note <note> --line "<what became of it>"   # invariant 6, one call
@@ -57,7 +57,8 @@ long wrong page passes ingest's length check — a treg.to docs link once captur
 unrelated LinkedIn feed), is distilled from its source: fetch the page (WebFetch, or search for
 it), write from that, and say so in the note ("*Text: fetched from the source on <date>; Reader
 saved only a sign-up page*"). The dossier's triage judged that wrong text, not the article;
-ignore its discard score. If nothing can be retrieved, a clip still ends as a short note or an
+ignore its discard score. If nothing can be retrieved (the unattended run fetches only from the
+domains it is allowed; a refused fetch counts), a clip still ends as a short note or an
 L1 enrichment (what it is, who published it, the link), never dropped.
 [earned: 2026-09-24, two clips held "Create a free account" and "This page does not exist"; a
 third, longer than ingest's wall check, held someone else's LinkedIn feed]
