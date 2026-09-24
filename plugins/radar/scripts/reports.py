@@ -191,7 +191,7 @@ def _bigrams(tokens: list[tuple[str, bool]]) -> list[tuple[str, bool]]:
     name split into two tokens ("system one"). A bigram looks like a name if either of its words
     does (`_tokens`), so "Vector Loom launches" still gets the entity bonus as a phrase, not just
     on its own two words."""
-    return [(f"{a} {b}", ea or eb) for (a, ea), (b, eb) in zip(tokens, tokens[1:])]
+    return [(f"{a} {b}", ea or eb) for (a, ea), (b, eb) in zip(tokens, tokens[1:], strict=False)]
 
 
 def _auto_stopwords(rows: list[dict], min_week_frac: float = DF_STOP_FRAC,
