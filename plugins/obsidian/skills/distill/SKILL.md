@@ -51,12 +51,15 @@ bloated the git repo, and the vault's own `.gitignore` excludes `*.pdf` anyway, 
 copy vanished from every cloud run while the note kept linking a file that existed nowhere]
 
 **A stub is not the content.** A capture marked `content: stub` (ingest saw a sign-up wall, a
-404 or an empty page), or whose full text plainly is one, is distilled from its source: fetch
-the page (WebFetch, or search for it), write from that, and say so in the note ("*Text: fetched
-from the source on <date>; Reader saved only a sign-up page*"). The dossier's triage judged the
-wall, not the article; ignore its discard score. If nothing can be retrieved, a clip still ends
-as a short note or an L1 enrichment (what it is, who published it, the link), never dropped.
-[earned: 2026-09-24, two clips held "Create a free account" and "This page does not exist"]
+404 or an empty page), or one the dossier's `content` field judges `stub` or `wrong-page` (a
+long wrong page passes ingest's length check — a treg.to docs link once captured 16 KB of an
+unrelated LinkedIn feed), is distilled from its source: fetch the page (WebFetch, or search for
+it), write from that, and say so in the note ("*Text: fetched from the source on <date>; Reader
+saved only a sign-up page*"). The dossier's triage judged that wrong text, not the article;
+ignore its discard score. If nothing can be retrieved, a clip still ends as a short note or an
+L1 enrichment (what it is, who published it, the link), never dropped.
+[earned: 2026-09-24, two clips held "Create a free account" and "This page does not exist"; a
+third, longer than ingest's wall check, held someone else's LinkedIn feed]
 
 ## Invariants
 

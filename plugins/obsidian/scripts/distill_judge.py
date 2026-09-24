@@ -34,6 +34,7 @@ from judge import Answer, JudgmentFailed, JudgmentUnavailable, Question
 from judgments import questions as Q
 from judgments.batch import judge_batch  # noqa: F401  (re-exported for the skill docs and evals)
 from judgments.capture import CAPTURE_CHARS, URL_RE, WIKILINK_RE, query_text, read_capture  # noqa: F401
+from judgments.content import judge_content
 from judgments.passages import check_note, judge_passages, split_passages  # noqa: F401
 from judgments.policy import LEVEL_BY_RELATION, THRESHOLDS, thresholds  # noqa: F401
 from judgments.state import domain_glosses, in_chunks, note_payload
@@ -347,6 +348,19 @@ def judge_capture(path: Path, vault: Path, top: int, exclude: list[str], force: 
     block.update(apply_policy(notes, answers, thresholds(usage.backend)))
     block["provenance"] = capture_provenance(path)
     block["triage"] = apply_provenance(block["triage"], block["provenance"])
+    content, content_usage = judge_content(path, vault)
+    if content_usage is not None:
+        usage.requests += content_usage.requests
+        usage.input_tokens += content_usage.input_tokens
+        usage.usd += content_usage.usd
+        usage.splits += content_usage.splits
+        usage.skipped.extend(content_usage.skipped)
+    block["content"] = content
+    if content["verdict"] not in (None, "ok"):
+        # The triage recommendation above was computed from this same wrong text; say so right
+        # where a reader would see the score, not only in the new `content` block.
+        block["triage"]["note"] = (block["triage"]["note"] + " " if block["triage"].get("note") else "") + (
+            f"content judged {content['verdict']}: its triage score judged that text, not the article — see `content`.")
     block["judgment"] = {**usage.as_dict(), "views": views}
     block["answers"] = {stable[qid]: (round(a.p, 4) if a.kind == "noul" else _probs(a)) for qid, a in answers.items()}
     return block
@@ -503,6 +517,9 @@ def _print_text(result: dict) -> None:
         if "skipped" in b:
             print(f"SKIPPED — judgment backend unavailable ({b['skipped']})")
             continue
+        c = b.get("content") or {}
+        flag = "" if c.get("verdict") in (None, "ok") else f"  ** CONTENT {c['verdict'].upper()} (p={c['p']}) — {c.get('note', '')}"
+        print(f"content: {c.get('verdict')}{flag}")
         print(f"triage: {b['triage']['recommendation'] or 'no recommendation'}  {b['triage']['probs']}")
         print(f"mode:   {b['already_distilled']['suggested_mode']}  {b['already_distilled']}")
         print(f"place:  {b['placement']['folder'] or 'AMBIGUOUS'}  {b['placement']['probs']}")

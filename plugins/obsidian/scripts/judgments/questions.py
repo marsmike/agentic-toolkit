@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from judge import Question
 
-QUESTIONS_VERSION = "2026-09-22.4"
+QUESTIONS_VERSION = "2026-09-24.1"
 
 # One-line meaning of each placement target, sent as `vault_map` so `para` can point at it.
 VAULT_MAP = {
@@ -101,15 +101,26 @@ def relation(nid: str) -> Question:
 
 
 def covers(nid: str) -> Question:
+    """[earned: 2026-09-24, a tool's tweet announcement and its own docs page scored 0.55 here
+    (a "same original work" reading is technically right: a tweet and a docs page are different
+    works) although `related.relation` already called them contradicts-claim at p=0.91 — the note
+    plainly needed the second source, not a new one. Broadened to the entity a reader actually
+    asks "is this already in the vault?" about: a named tool/project/paper/product survives being
+    written up twice from different primary sources. Re-asked on the same pair: 0.94.]"""
     return Question(
         kind="noul",
         instructions=(
-            f"Is `notes.{nid}` already a write-up of the same original work that `capture` was taken from, "
-            f"even if the addresses in `notes.{nid}.source` and `capture.source_urls` differ?"
+            f"Is `notes.{nid}` already a write-up of the same original work `capture` was taken from, or of the "
+            f"same named tool, project, product or paper that `capture` documents from a different primary source, "
+            f"even if the addresses in `notes.{nid}.source` and `capture.own_source` differ?"
         ),
         criteria={
-            "true": "the same article, talk, paper or thread: same author and title, or a mirror, repost or newsletter copy of it",
-            "false": "a different work, even one on the same topic or by the same author",
+            "true": (
+                f"the same article, talk, paper or thread (a mirror, repost or newsletter copy of it), or the same "
+                f"named tool, project, product or paper that `notes.{nid}` already covers from a different write-up "
+                "of it (its own docs vs an announcement tweet, a repo vs a blog post about it)"
+            ),
+            "false": "a different work about a different tool, project or subject, even one on a similar topic",
         },
     )
 
@@ -227,6 +238,29 @@ def answers_query(nid: str) -> Question:
         criteria={
             "true": "the note addresses the thing asked about directly: it states, explains or records it",
             "false": "the note only shares words or a subject area with the question, or mentions the thing in passing on the way to something else",
+        },
+    )
+
+
+# --- capture content (distill_judge, every capture) ---
+
+def content_match() -> Question:
+    """Reader sometimes saves something other than the article: a sign-up wall, a 404, or (2026-09-24)
+    16 KB of an unrelated LinkedIn feed behind a treg.to docs link. A short wall is caught before this
+    ever runs (ingest marks it `content: stub`); this catches a *long* wrong page, and any capture from
+    before that fix existed. Three labels, not a noul: "is this a wall" and "is this the wrong page" are
+    different failures with different fixes (retry the fetch vs. find the real address), and neither
+    reads as a degree of the other."""
+    return Question(
+        kind="choice",
+        instructions=(
+            "Does `capture.full_text` actually deliver the content promised by `capture.title` and "
+            "`capture.own_source`, or is it something else that happened to load at that address?"
+        ),
+        criteria={
+            "ok": "a substantive rendering of the promised subject, at any length — a short tweet that says its own thing counts",
+            "stub": "a sign-up wall, paywall notice, cookie/bot-check screen, empty shell, or too little real text to be the promised content",
+            "wrong-page": "substantial real text, but about a different subject than the title/source promise: an unrelated feed, a different article, a navigation or index page",
         },
     )
 

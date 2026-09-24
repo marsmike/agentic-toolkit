@@ -45,3 +45,20 @@ def read_capture(path: Path) -> dict[str, Any]:
     }
 
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)")
+
+FULL_TEXT_HEADING_RE = re.compile(r"^#{1,6}\s*Full Text\s*$", re.I | re.M)
+
+
+def full_text_section(body: str) -> str:
+    """What Reader actually saved: the capture pipeline's own `## Full Text` section, without
+    the pipeline's Source line or Readwise-summary framing above it (both can be long enough to
+    outweigh a short wall in a naive length check). Falls back to the whole body for a capture
+    the pipeline didn't shape this way (a hand-written clip, a research session log).
+    [earned: 2026-09-24, content_match — judging the summary section as content would score a
+    wall's Readwise-generated summary instead of what was actually captured]"""
+    m = FULL_TEXT_HEADING_RE.search(body)
+    if not m:
+        return body.strip()
+    rest = body[m.end():]
+    end = re.search(r"^#{1,6}\s+\S", rest, re.M)
+    return rest[: end.start() if end else None].strip()
