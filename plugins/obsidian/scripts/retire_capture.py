@@ -21,6 +21,7 @@ Refuses, and moves nothing:
     capture (imported, not reimplemented — the same definition of done as the skill)
   - `--dropped` on a clip (`via: clip`, or no `via` at all): invariant 8, the owner's own
     clips never leave without a note
+  - `--line` with no `--note`: a capture archived as distilled must name the note it became
   - neither, or both, of `--line` / `--dropped`
 
 Prints one JSON object: the result on success, `{"error": ...}` on refusal (exit 1).
@@ -102,6 +103,8 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
     if dropped and via in OWNER_SOURCES:
         raise RetireRefused(
             f"refusing --dropped: via={via!r} is the owner's own clip (invariant 8) — it must become a note, not be dropped")
+    if line and not notes:
+        raise RetireRefused("--line needs at least one --note: a distilled capture names the note it became")
 
     resolved_notes = _validate_notes(notes, capture, vault)
 
