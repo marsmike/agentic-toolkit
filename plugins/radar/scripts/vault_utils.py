@@ -76,13 +76,39 @@ def _profile_note_path(vault: Path) -> Path:
 
 
 def read_profile(vault: Path) -> dict:
-    """This plugin's profile frontmatter, or {} if no profile note exists."""
+    """This plugin's profile frontmatter, or {} if no profile note exists.
+
+    Uses `strict=True` so a profile note whose frontmatter fails to parse raises rather than
+    silently reading as "no config" — that ambiguity (a note the user believes is active,
+    quietly ignored) is exactly the unreadable-profile case README's DLQ convention calls
+    out, so it's recorded via `write_dlq_note()` before falling back to defaults: once a day,
+    since every `profile_value()` call reads the profile again. The obsidian, radar and
+    readwise copies of this function are identical but for `PROFILE_PLUGIN_NAME`
+    (core/tests/test_contract.py).
+    """
     path = _profile_note_path(vault)
     if not path.is_file():
         return {}
     try:
-        fm, _ = read_frontmatter(path)
-    except UnparseableFrontmatter:
+        fm, _ = read_frontmatter(path, strict=True)
+    except UnparseableFrontmatter as exc:
+        slug = f"{PROFILE_PLUGIN_NAME}-profile-unreadable"
+        if not (vault / "00_Memory" / "dlq" / f"{time.strftime('%Y-%m-%d')}-{slug}.md").exists():
+            write_dlq_note(
+                vault,
+                slug=slug,
+                title=f"{PROFILE_PLUGIN_NAME.capitalize()} profile note has unparseable frontmatter",
+                what_happened=(
+                    f"{path} exists but its frontmatter did not parse as YAML ({exc}); every "
+                    "profile field fell back to its shipped default for this run."
+                ),
+                why_recorded=(
+                    "Silently defaulting the whole profile from a config note the user believes "
+                    "is active would hide a misconfiguration instead of surfacing it for repair."
+                ),
+                resolution="Fix the YAML frontmatter in the profile note, then re-run.",
+                confidence="medium",
+            )
         return {}
     return fm
 

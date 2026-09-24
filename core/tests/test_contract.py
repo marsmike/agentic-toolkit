@@ -123,6 +123,37 @@ def test_core_and_plugin_frontmatter_implementations_agree(tmp_path):
         assert plugin_fm["unknown_field"] == "keep-me"
 
 
+def test_plugin_vault_utils_profile_and_write_agree(tmp_path):
+    """The three plugin copies of vault_utils once disagreed on two contracts: `atomic_write` into
+    a missing folder (radar created it, obsidian and readwise raised) and an unparseable profile
+    note (readwise wrote a DLQ note, obsidian and radar silently read `{}` through a dead
+    `except`) [earned: 2026-09-24 review GLM-3]. Each copy must now create the folder, and read a
+    broken profile as defaults plus one DLQ note a day, however often it is read."""
+    import sys
+
+    for plugin_name in ("obsidian", "readwise", "radar"):
+        vault = tmp_path / plugin_name
+        scripts_dir = EXAMPLE_VAULT.parent / "plugins" / plugin_name / "scripts"
+        sys.path.insert(0, str(scripts_dir))
+        sys.modules.pop("vault_utils", None)
+        try:
+            import vault_utils
+
+            vault_utils.atomic_write(vault / "new" / "folder" / "note.md", "written\n")
+            profile = vault / "Config" / "toolkit" / f"{plugin_name}.md"
+            profile.parent.mkdir(parents=True)
+            profile.write_text("---\nbatch: [25\n---\n", encoding="utf-8")
+            reads = [vault_utils.read_profile(vault), vault_utils.read_profile(vault)]
+        finally:
+            sys.path.remove(str(scripts_dir))
+            sys.modules.pop("vault_utils", None)
+
+        assert (vault / "new" / "folder" / "note.md").read_text(encoding="utf-8") == "written\n", plugin_name
+        assert reads == [{}, {}], f"{plugin_name}: an unparseable profile must read as defaults"
+        dlq = sorted(p.name for p in (vault / "00_Memory" / "dlq").glob("*.md"))
+        assert len(dlq) == 1 and dlq[0].endswith(f"{plugin_name}-profile-unreadable.md"), f"{plugin_name}: {dlq}"
+
+
 def test_shared_judgment_modules_are_byte_identical():
     """The judgment client and its helpers exist twice, in obsidian and radar, because a plugin
     never imports a sibling (contract/KNOWLEDGE_API.md). The copies are only safe while they are
