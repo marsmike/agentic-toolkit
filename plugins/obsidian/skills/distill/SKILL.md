@@ -34,7 +34,7 @@ attached; you read the notes it points at and decide. Without a judgment backend
 
 **The check** is the definition of done. Hard gates: frontmatter (`source`, `status:
 distilled`, `processed_date`, `description`), a `*Source: …*` line naming the capture's own
-source, a stored document linked when the capture has one, no wikilink into `01_Capture/`
+source (one line, never wrapped; an enrichment adds the capture's line beside the note's own), a stored document linked when the capture has one, no wikilink into `01_Capture/`
 or `05_Archive/`, no dangling wikilink, an Index.md line. Soft, reported: which of the
 capture's other URLs the note dropped, whether your `--ask` questions find the note in the
 top three, and which of the capture's kept passages the note does not carry. A capture is

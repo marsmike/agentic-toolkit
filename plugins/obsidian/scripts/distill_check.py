@@ -52,12 +52,16 @@ def check(note: Path, capture: Path, vault: Path, asks: list[str]) -> dict:
     missing = [k for k in ("source", "status", "processed_date", "description") if not fm.get(k) or str(fm.get(k)).strip().lower() == "unknown"]
     hard["frontmatter"] = (not missing and fm.get("status") == "distilled",
                            f"missing or 'unknown': {missing}" if missing else ("status must be distilled" if fm.get("status") != "distilled" else "ok"))
-    src_line = re.search(r"^\*Source:.*\*", body, re.M)
+    src_lines = re.findall(r"^\*Source:.*\*", body, re.M)
+    src_line = bool(src_lines)
     own = cap.get("own_source") or ""
-    line_urls = {_canonical(u) for u in URL_RE.findall(src_line.group(0))} if src_line else set()
+    line_urls = {_canonical(u) for line in src_lines for u in URL_RE.findall(line)}
     # A Source line that names addresses must name the capture's own; the frontmatter only stands in
     # for a line with no address at all (a title, "(none — …)"). [earned: 2026-09-23, negative eval —
     # a line naming another address passed because the frontmatter was right]
+    # Any Source line counts: a note enriched by a later capture carries that capture's line beside
+    # its own. [earned: 2026-09-24 — only the first line was read, so enriching failed the gate and
+    # pushed distill toward a new note]
     names_own = not own or _canonical(own) in line_urls or (
         not line_urls and _canonical(own) == _canonical(str(fm.get("source") or "")))
     hard["source-line"] = (bool(src_line) and names_own,

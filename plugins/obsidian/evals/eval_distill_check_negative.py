@@ -56,6 +56,9 @@ def _note(fm: dict, body: str) -> str:
 VARIANTS: dict[str, tuple[str, dict, str]] = {
     # name: (the gate that must fail, frontmatter, body)
     "good": ("", GOOD_FM, GOOD_BODY),
+    # an existing note enriched by the capture: its own Source line first, the capture's beside it
+    "enriched": ("", {**GOOD_FM, "source": "https://earlier.example.org/first"},
+                 "*Source: [The note's first source](https://earlier.example.org/first)*\n\n" + GOOD_BODY),
     "no-source": ("frontmatter", {k: v for k, v in GOOD_FM.items() if k != "source"}, GOOD_BODY),
     "unknown-source": ("frontmatter", {**GOOD_FM, "source": "unknown"}, GOOD_BODY),
     "draft": ("frontmatter", {**GOOD_FM, "status": "draft"}, GOOD_BODY),
@@ -111,4 +114,4 @@ def run(vault: Path) -> dict:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else f"{len(VARIANTS) - 1} broken notes each fail exactly their gate; the good note passes"}
+            "detail": "; ".join(problems) if problems else f"{len(VARIANTS) - 2} broken notes each fail exactly their gate; the good and the enriched note pass"}
