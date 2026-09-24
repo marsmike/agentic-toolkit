@@ -30,6 +30,7 @@ jobs:
           filters: |
             python:
               - '.github/workflows/ci.yml'
+              - '.github/workflows/release-binaries.yml'
               - 'core/**'
               - 'plugins/**'
               - 'pyproject.toml'

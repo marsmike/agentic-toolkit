@@ -24,6 +24,7 @@ def test_ci_routes_lock_and_workflow_changes_to_required_checks():
     assert selected("Cargo.lock") == {"rust"}
     assert "python" in selected("uv.lock")
     assert selected(".github/workflows/ci.yml") == set(filters)
+    assert "python" in selected(".github/workflows/release-binaries.yml")
 
 
 def test_ci_runs_every_plugin_eval_suite():
