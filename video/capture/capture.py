@@ -154,7 +154,7 @@ def capture(name: str) -> int:
     # A capture directory is committed evidence: never overwrite it. A new revision is recorded
     # into a new directory (and a new RECORDED entry). [earned: 2026-09-24, Copilot review of #27]
     if out.is_dir() and any(out.iterdir()):
-        raise SystemExit(f"{out} already holds a capture; record a new revision into a new directory")
+        raise NotOurs(f"{out} already holds a capture; record a new revision into a new directory")
     out.mkdir(parents=True, exist_ok=True)
     env_lines = [
         f"path: {name}",

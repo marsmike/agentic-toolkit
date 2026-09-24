@@ -67,14 +67,18 @@ test("refuses to overwrite a capture directory that already holds evidence", () 
     "import sys; from pathlib import Path; import capture",
     "capture.HERE = Path(sys.argv[1]) / 'out'; capture.HOME = Path(sys.argv[1]) / 'home'",
     "capture.fresh_home.__defaults__ = (capture.HOME,)",
-    "capture.capture('headline')",
+    "try:\n    capture.capture('headline')\nexcept capture.NotOurs as e:\n    print(e, file=sys.stderr); sys.exit(3)",
   ].join("\n");
   let err = "";
+  let code = 0;
   try {
     execFileSync("python3", ["-c", script, base], { cwd: capture, stdio: "pipe" });
   } catch (e) {
     err = String((e as { stderr: Buffer }).stderr);
+    code = (e as { status: number }).status;
   }
+  // a handled refusal (NotOurs), which main() turns into the documented exit status 2
+  assert.equal(code, 3);
   assert.match(err, /already holds a capture/);
   assert.equal(readFileSync(join(base, "out", "headline", "01-install.cast"), "utf8"), "committed capture");
 });
