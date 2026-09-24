@@ -218,8 +218,9 @@ def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
                        resolution="Distill it by hand (the dossier says why it is hard), or delete it from pipeline-state.json to retry.",
                        confidence="high")
     state["parked"] = parked
-    _save_state(vault, state)
     size = int(batch or profile_value(vault, "pipeline_batch", DEFAULT_BATCH))
+    state["batch"] = queue[:size]
+    _save_state(vault, state)
     return {"status": "ok", "batch": queue[:size], "backlog": len(queue), "parked_now": newly_parked, "parked_total": len(parked)}
 
 
@@ -348,12 +349,18 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     state["attempts"] = {k: v for k, v in attempts.items() if (vault / k).is_file()}
     state["last_run"] = {"at": now.isoformat(), "distilled": distilled, "dropped": dropped, "failed": len(failed)}
     marks = state.pop("marks", None)
+    # A capture of this run's batch still in the inbox and not reported failed was never attempted:
+    # say so, a smaller batch must not pass for a clean run. [earned: 2026-09-24 — a cloud run was
+    # handed 25, distilled 10 and reported "10 of 10"]
+    untouched = [c for c in state.pop("batch", []) if (vault / c).is_file() and c not in failed]
     _save_state(vault, state)
 
     summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed"
     if marks is not None:
         summary += f"; in: {came_in(vault, marks)}"
     left = sum(1 for p in (vault / "01_Capture").glob("*.md") if p.is_file())
+    if untouched:
+        summary += f"; {len(untouched)} of the batch not attempted"
     summary += f"; {left} in the inbox" + (f"; {note}" if note else "")
     env = {**os.environ, "TOOLKIT_VAULT": str(vault)}
     # A generator that fails may have replaced some of its files and not others, so its files go
@@ -378,7 +385,8 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     subprocess.run([sys.executable, str(SCRIPTS / "log_vault.py"), "pipeline", summary], capture_output=True, check=False, env=env)
 
     result: dict[str, Any] = {"status": "ok", "summary": summary, "commit": None,
-                               **({"failed_not_found": not_found} if not_found else {})}
+                               **({"failed_not_found": not_found} if not_found else {}),
+                               **({"not_attempted": untouched} if untouched else {})}
     if failed_builds:
         result["build_failed"] = failed_builds
     # The lock is held through commit and push (and never staged), so no other run starts its

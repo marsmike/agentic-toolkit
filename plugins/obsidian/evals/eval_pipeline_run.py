@@ -4,7 +4,8 @@
               at the batch size; a second begin while the lock is held is `busy`
 2. end      — Index.md rebuilt, one Log.md line, one git commit carrying the run's summary; the
               lock is released and never committed; what came in is counted from the rows the
-              radar and Readwise ledgers gained since begin, never from rows that were there
+              radar and Readwise ledgers gained since begin, never from rows that were there; batch
+              captures left in the inbox and not reported failed are named as not attempted
 3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted;
               `--failed ""` or a path no longer in 01_Capture/ counts no failure
 4. secrets  — a staged note holding a key-shaped string makes `end` refuse the commit and write one DLQ
@@ -199,6 +200,9 @@ def run(vault: Path) -> dict:
         log = _git(sandbox, "log", "--format=%s", f"{head0}..HEAD").splitlines()
         if len(log) != 1 or "2 distilled, 1 dropped, 1 failed" not in log[0]:
             problems.append(f"phase 2: expected one commit with the summary, got {log}")
+        # the batch was three (the failed newsletter is not among them), all still in the inbox
+        if "; 3 of the batch not attempted" not in r.get("summary", "") or len(r.get("not_attempted", [])) != 3:
+            problems.append(f"phase 2: batch captures left in the inbox and not failed must be reported, got {r.get('summary')}")
         if "in: radar 2 judged, 1 promoted; readwise 2 new (1 clip, 1 radar)" not in r.get("summary", ""):
             problems.append(f"phase 2: what came in must be counted from the ledgers' new rows, got {r.get('summary')}")
         committed = _git(sandbox, "show", "--name-only", "--format=", "HEAD").split()

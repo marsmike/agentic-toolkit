@@ -53,7 +53,8 @@ RUN, in the skill's order
   setup script) and TODOIST_API_TOKEN set, --todoist comments the strong items on each epic
   task itself. Once a week (Saturday): gaps --promote and weekly ("exists" is normal).
 - Readwise ingest.
-- pipeline_run.py queue --json, then distill every capture in the batch (--auto). Rebuild the
+- pipeline_run.py queue --json exactly so (no --batch), then distill every capture in the batch
+  (--auto); end reports any the run left untouched. Rebuild the
   index after each note and before distill_check.
 - Todoist fallback, only if `td` is not on PATH: for each interest in
   $TOOLKIT_VAULT/Config/toolkit/radar.md that has a todoist_task_id and got strong items today,
@@ -91,8 +92,7 @@ ledgers), the commit, and whether it was pushed. No number the scripts did not p
   environment, so keep it yours alone): `TOOLKIT_VAULT_REMOTE=https://github.com/marsmike/TheVoid.git`
   (used only by the `cloud-vault.sh` fallback), `OPENROUTER_API_KEY`, `READWISE_TOKEN`,
   `KAGI_API_KEY`, `TODOIST_API_TOKEN` (read by `td`); optional
-  `TOOLKIT_OBSIDIAN_PIPELINE_BATCH` (leave it unset for the default of 25; a leftover `=10`
-  overrides it, as it did on 2026-09-24). `GH_TOKEN` is not needed once TheVoid is attached. Never
+  `TOOLKIT_OBSIDIAN_PIPELINE_BATCH` (leave it unset for the default of 25). `GH_TOKEN` is not needed once TheVoid is attached. Never
   in a file in a repo.
 - **Setup script** (below): tools and the git credential; it assumes no repository exists yet.
 - **Network access:** the run calls `openrouter.ai`, `readwise.io`, `kagi.com`, `api.todoist.com`,
