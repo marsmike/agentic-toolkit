@@ -26,6 +26,7 @@ import http.client
 import re
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
@@ -41,15 +42,27 @@ HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$", re.M)
 PAGE_ANCHOR_RE = re.compile(r"^<!-- page (\d+) -->$", re.M)
 
 
+def _is_web_url(url: str) -> bool:
+    return urllib.parse.urlsplit(url).scheme.lower() in ("http", "https")
+
+
 def _download(url: str) -> bytes | None:
     """Fetch the PDF into memory. Same failure contract the old `store_attachment()` used: a
     bad scheme, a non-PDF response, a truncated or oversized body all return None rather than
     raise — a malformed `source_url` (seen from real API payloads: a stray space, a broken
     IPv6-literal host) makes urlopen() raise a bare ValueError instead of URLError, so that's
-    caught here too."""
+    caught here too.
+
+    Only http(s), before and after redirects: urllib also opens `file://` (and follows a
+    redirect to `ftp://`), which would turn a local file into a capture the pipeline commits
+    and pushes. [earned: 2026-09-24, review-01 SEC-4]"""
+    if not _is_web_url(url):
+        return None
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "agentic-toolkit-readwise/1.0"})
         with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
+            if not _is_web_url(resp.geturl()):
+                return None
             if "pdf" not in (resp.headers.get("Content-Type") or "").lower() and not url.lower().endswith(".pdf"):
                 return None
             data = resp.read(DOWNLOAD_MAX_BYTES + 1)

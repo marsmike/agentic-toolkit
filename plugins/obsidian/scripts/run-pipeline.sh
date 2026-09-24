@@ -12,9 +12,13 @@ cd "$REPO"
 # The prompt goes first: --allowedTools takes several values and would swallow it. User settings
 # only: the repo's .claude/settings.json enables its plugins for interactive and cloud sessions, and
 # a headless run cannot answer its trust prompt; --plugin-dir loads them here instead.
+# No env, bare python3 or git grants: the skills run every script through `uv run --project`,
+# and `end` is the vault's only committer. The run distills text other people wrote with the
+# keys above in its environment, so it gets no tool the skills do not use.
+# [earned: 2026-09-24, review-01 SEC-1]
 exec claude -p "Run the obsidian:pipeline skill against the vault in TOOLKIT_VAULT ($TOOLKIT_VAULT). Reply with the one-line run summary." \
   --setting-sources user --plugin-dir plugins/obsidian --plugin-dir plugins/radar \
   --add-dir "$TOOLKIT_VAULT" \
   --permission-mode acceptEdits \
-  --allowedTools "Bash(uv run:*),Bash(uv:*),Bash(env:*),Bash(python3:*),Bash(git -C:*),Bash(trash:*),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Read,Write,Edit,Glob,Grep,Skill,WebFetch" \
+  --allowedTools "Bash(uv run:*),Bash(uv:*),Bash(trash:*),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Read,Write,Edit,Glob,Grep,Skill,WebFetch" \
   < /dev/null

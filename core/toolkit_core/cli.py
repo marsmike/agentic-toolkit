@@ -181,6 +181,8 @@ def _render_engines_action_result(result: dict) -> str:
             if action == "up-to-date"
             else f"  {r['engine']:<10} {action} {r['tag']} -> {r['path']}"
         )
+        if r.get("warning"):
+            lines.append(f"    warning: {r['warning']}")
     triple = engines.target_triple()
     if triple and engines.is_windows_triple(triple):
         lines.append("note: Windows support is unverified by this toolkit's own CI/tests.")
