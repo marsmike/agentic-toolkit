@@ -40,7 +40,7 @@ import subprocess
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -88,6 +88,15 @@ def title_key(item: Item) -> str:
     """feed + normalised title: a repost under a different URL. Empty for an untitled item."""
     words = re.sub(r"[^\w]+", " ", item.title.casefold()).split()
     return f"{item.feed.casefold()}|{' '.join(words)}" if words else ""
+
+
+_RELEASE = re.compile(r"^(github\.com/[^/]+/[^/]+/releases)(/|$)")
+
+
+def release_stream(canonical: str) -> str | None:
+    """`github.com/<owner>/<repo>/releases` for a release page, else None."""
+    m = _RELEASE.match(canonical)
+    return m.group(1) if m else None
 
 
 def is_backlog(item: Item, since: datetime) -> bool:
@@ -325,7 +334,18 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
     budget = max(0, policy.PROMOTE_PER_DAY - sum(1 for r in done_before if r.get("date") == run_date))
     settled = [it for it in fetched if keys_of(it) & recorded]
     candidates = sorted((it for it in settled if item_key(it) in strong), key=lambda it: -max(strong[item_key(it)].values()))
-    chosen = {it.id for it in candidates[:budget]}
+    since = (date.fromisoformat(run_date) - timedelta(days=policy.RELEASE_STREAM_DAYS)).isoformat()
+    streams = {release_stream(r["canonical"]) for r in done_before if str(r.get("date", "")) > since} - {None}
+    chosen: set[str] = set()
+    for it in candidates:
+        if len(chosen) >= budget:
+            break
+        stream = release_stream(item_key(it))
+        if stream in streams:
+            continue  # this repo's release already came in this week; the daily note still lists it
+        if stream:
+            streams.add(stream)
+        chosen.add(it.id)
     promotions, archive_ids = [], []
     for it in settled:
         if it.id in chosen:

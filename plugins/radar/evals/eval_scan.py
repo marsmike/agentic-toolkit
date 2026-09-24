@@ -16,7 +16,8 @@
                  radar/<interest> with a note naming each interest and p, the rest are archived;
                  a failed promotion leaves the item in the feed (not archived) and the next scan
                  promotes it from state without a judgment request; at most PROMOTE_PER_DAY a
-                 day, counted across scans
+                 day, counted across scans; one GitHub release stream at most once in
+                 RELEASE_STREAM_DAYS (the strongest release that day; a later day skips the stream)
 9. todoist     — with --todoist and Portfolio epics as interests, one comment per epic with strong
                  items, dated, with links and p; a second scan the same day adds none; without
                  `td` nothing happens and nothing fails
@@ -297,6 +298,33 @@ def run(vault: Path) -> dict:
                 problems.append(f"phase 8: a cap of 1 a day must promote exactly one strong item across two scans, got {[u['id'] for u in promoted]}")
         finally:
             policy.PROMOTE_PER_DAY = saved_cap
+
+        # 8c. release streams: three releases of one repo and one of another -> one per repo
+        from reader import Item
+        rel = [Item(id=f"rel{i}", url="", canonical=c, title=c.rsplit("/", 1)[-1], summary="", site="github.com",
+                    feed="releases", published="", category="rss", saved_at="")
+               for i, c in enumerate(["github.com/anthropics/claude-code/releases/tag/v2.1.275",
+                                      "github.com/anthropics/claude-code/releases/tag/v2.1.278",
+                                      "github.com/anthropics/claude-code/releases/tag/v2.1.280",
+                                      "github.com/ggml-org/llama.cpp/releases/tag/v0.5.0",
+                                      "example.com/a-post"])]
+        rows = [{"canonical": it.canonical, "backend": "jev", "p": {"x": 0.81 + i / 100}} for i, it in enumerate(rel)]
+        out8c = sandbox.parent / "streams"
+        out8c.mkdir(exist_ok=True)
+        day = NOW.date().isoformat()
+        promoted.clear()
+        radar.settle(rel, {it.canonical for it in rel}, rows, {}, day, False, True, "later", out8c)
+        got = sorted(u["id"] for u in promoted)
+        if got != ["rel2", "rel3", "rel4"]:
+            problems.append(f"phase 8: one promotion per release stream (the strongest), got {got}")
+        nxt = [Item(id="rel9", url="", canonical="github.com/anthropics/claude-code/releases/tag/v2.1.281", title="v2.1.281",
+                    summary="", site="github.com", feed="releases", published="", category="rss", saved_at="")]
+        promoted.clear()
+        tomorrow = (NOW + timedelta(days=1)).date().isoformat()
+        radar.settle(nxt, {"github.com/anthropics/claude-code/releases/tag/v2.1.281"},
+                     [{"canonical": nxt[0].canonical, "backend": "jev", "p": {"x": 0.95}}], {}, tomorrow, False, True, "later", out8c)
+        if promoted:
+            problems.append("phase 8: a release stream promoted yesterday must not be promoted again within the week")
 
         # 6. epics
         os.environ["TOOLKIT_RADAR_TODOIST_PROJECT_ID"] = "p1"

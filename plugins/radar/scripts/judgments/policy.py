@@ -22,6 +22,10 @@ MAX_REQUESTS_PER_RUN = 300      # a daily scan needs ~10; the 30-day replay ~220
 # strongest first. [Mike, 2026-09-23: one pipeline for clips and radar; the 8-day backlog held
 # 52 strong items, 36 of them arXiv]
 PROMOTE_PER_DAY = 5
+# One release stream (github.com/<owner>/<repo>/releases) is promoted at most once in this many
+# days: each patch release is its own feed item, and four Claude Code patch releases in a day
+# became four captures titled only "v2.1.27x". [earned: 2026-09-24 pipeline run]
+RELEASE_STREAM_DAYS = 7
 # An item published this long before --since is a newly subscribed feed's back catalogue, not
 # news: recorded as seen, never judged. [earned: 2026-09-22 smoke run, a new feed's archive
 # arrived as that day's items]
