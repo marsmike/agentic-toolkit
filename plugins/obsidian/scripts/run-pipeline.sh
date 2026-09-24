@@ -20,7 +20,8 @@ export TOOLKIT_VAULT="$VAULT"
 #   (vault_utils.secret: TOOLKIT_KEYS_FILE, default ~/.env); the agent may neither read nor edit it.
 # - Bash: exactly the scripts the pipeline and distill skills run, each through `uv run --locked`,
 #   written relative to the repo; a shell function, a variable, `cd` or `python3 -c` is refused.
-# - Files: read the repo and the vault, write the vault only; never its .git (hooks, remote) or
+# - Files: read the repo and the vault, write the vault only; never read or write either .git (history,
+#   hooks, remote) and never write
 #   Config/toolkit (a profile names the host a key is sent to).
 # - WebFetch: only the domains in TOOLKIT_PIPELINE_FETCH_DOMAINS, for a stub's own source; a
 #   stub elsewhere ends as a short note with its link (distill "A stub is not the content").
@@ -35,6 +36,10 @@ for name in HOME PATH USER LOGNAME SHELL TMPDIR LANG LC_ALL LC_CTYPE TERM \
   case "$name" in TOOLKIT_*KEY|TOOLKIT_*TOKEN) continue ;; esac
   if value="$(printenv "$name")"; then AGENT_ENV+=("$name=$value"); fi
 done
+# claude itself needs its own auth (above), but nothing it starts may inherit it: the scrub strips
+# Anthropic credentials from every Bash command, hook and MCP server the run spawns, so a granted
+# script or a steered prompt cannot print or forward them. [earned: 2026-09-24, Copilot review of #26]
+AGENT_ENV+=("CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1")
 FETCH_DOMAINS="${TOOLKIT_PIPELINE_FETCH_DOMAINS:-github.com raw.githubusercontent.com}"
 
 script() {  # plugin, script, [fixed leading args]: the command, with and without further args
@@ -49,7 +54,10 @@ ALLOWED+="$(script radar radar.py scan)$(script radar radar.py gaps)$(script rad
 ALLOWED+="$(script readwise ingest.py)"
 ALLOWED+="Read(/$REPO/**),Read(/$VAULT/**),Edit(/$VAULT/**),Glob,Grep,Skill"
 for domain in $(printf '%s' "$FETCH_DOMAINS" | tr ',' ' '); do ALLOWED+=",WebFetch(domain:$domain)"; done
-DENIED="Read(/$KEYS_FILE),Edit(/$KEYS_FILE),Edit(/$VAULT/.git/**),Edit(/$VAULT/Config/toolkit/**),Edit(/$REPO/**)"
+# .git is denied for reads too: history can hold old secrets, and hooks/remotes are not the agent's
+# business. [earned: 2026-09-24, Copilot review of #26]
+DENIED="Read(/$KEYS_FILE),Edit(/$KEYS_FILE),Read(/$VAULT/.git),Read(/$VAULT/.git/**),Read(/$REPO/.git),Read(/$REPO/.git/**)"
+DENIED+=",Edit(/$VAULT/.git/**),Edit(/$VAULT/Config/toolkit/**),Edit(/$REPO/**)"
 
 PROMPT="Run the obsidian:pipeline skill against the vault in TOOLKIT_VAULT ($VAULT). \
 Run every script from the working directory exactly as \

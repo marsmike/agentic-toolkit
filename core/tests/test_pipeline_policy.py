@@ -90,6 +90,20 @@ def test_the_agent_reads_repo_and_vault_writes_vault_fetches_listed_domains(laun
                                      f"Edit(/{vault}/Config/toolkit/**)", f"Edit(/{repo}/**)"}
 
 
+def test_claude_auth_never_reaches_what_the_run_spawns(launch):
+    # Fails on main after #26: claude needs its own login, but every Bash command, hook and MCP server
+    # it starts inherited it. The scrub strips Anthropic credentials from those subprocesses.
+    # [Copilot review of #26]
+    assert launch["env"].get("CLAUDE_CODE_SUBPROCESS_ENV_SCRUB") == "1"
+
+
+def test_neither_git_tree_is_readable(launch):
+    # Fails on main after #26: the read grants covered both .git trees (history, hooks, remotes).
+    repo, vault = REPO_ROOT.resolve(), launch["vault"]
+    assert set(launch["denied"]) >= {f"Read(/{vault}/.git)", f"Read(/{vault}/.git/**)",
+                                     f"Read(/{repo}/.git)", f"Read(/{repo}/.git/**)"}
+
+
 def _obsidian_module(name: str):
     scripts = REPO_ROOT / "plugins" / "obsidian" / "scripts"
     sys.path.insert(0, str(scripts))
