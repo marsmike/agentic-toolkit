@@ -6,7 +6,7 @@
 [![CI](https://github.com/marsmike/agentic-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/marsmike/agentic-toolkit/actions/workflows/ci.yml)
 [![Docs](https://github.com/marsmike/agentic-toolkit/actions/workflows/docs.yml/badge.svg)](https://marsmike.github.io/agentic-toolkit/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Marketplace](https://img.shields.io/badge/claude--code_marketplace-2.9.0-8A2BE2)](.claude-plugin/marketplace.json)
+[![Marketplace](https://img.shields.io/badge/claude--code_marketplace-3.0.0-8A2BE2)](.claude-plugin/marketplace.json)
 
 **Your notes become an operating system for AI agents.** This toolkit turns an
 Obsidian-style markdown vault into the shared memory, knowledge graph, and
@@ -48,7 +48,7 @@ claude plugin marketplace add marsmike/agentic-toolkit                          
 toolkit demo                                                                        # see it work, for real
 ```
 
-**From source**: `git clone https://github.com/marsmike/agentic-toolkit && cd agentic-toolkit && uv run toolkit demo` — then `claude plugin marketplace add .` in place of the line above.
+**From source**: `git clone https://github.com/marsmike/agentic-toolkit && cd agentic-toolkit && uv run toolkit engines install && uv run toolkit demo` — then `claude plugin marketplace add ./` in place of the line above.
 
 Then read the [Quick Start](https://marsmike.github.io/agentic-toolkit/04_Resources/Guides/Quick-Start)
 and scaffold your own vault with `uv run toolkit vault init ~/my-vault`
@@ -154,6 +154,9 @@ claude -p --allowedTools "Bash(uv run:*),Bash(uv:*),Bash(env:*),Bash(python3:*)"
 
 Note: `--allowedTools` takes **one comma-separated argument**, and `Bash(env:*)`
 is required because skills compose `env VAR=... uv run ...` command lines.
+An unattended run needs narrower grants than this: `plugins/obsidian/scripts/run-pipeline.sh` grants
+each pipeline script by name and starts the agent with no key in its environment (each script
+reads its own).
 Full guide: [Scripting the Toolkit](https://marsmike.github.io/agentic-toolkit/04_Resources/Guides/Scripting-the-Toolkit-Headless).
 
 ## Principles

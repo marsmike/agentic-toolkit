@@ -52,7 +52,7 @@ The R10 acceptance run on a real Reader account (30 days, 1,325 feed items plus 
 ## Configuration
 
 `profile.example.md` documents every profile key and exactly what leaves the machine. Keys come
-from the environment only (`READWISE_TOKEN`, `KAGI_API_KEY`, `TOOLKIT_RADAR_JUDGMENT_API_KEY` or
+from the environment or the key file `~/.env`, read by each script itself (`READWISE_TOKEN`, `KAGI_API_KEY`, `TOOLKIT_RADAR_JUDGMENT_API_KEY` or
 `OPENROUTER_API_KEY`); without one, the command that needs it prints `SKIPPED` and sends nothing.
 
 ## Boundaries

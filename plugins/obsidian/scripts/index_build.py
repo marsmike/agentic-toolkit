@@ -3,8 +3,9 @@
 
     uv run scripts/index_build.py [--dry-run] [--json]
 
-One line per active note (02_Projects, 03_Areas, 04_Resources — the set vault_lint.py checks
-for drift), grouped `## <PARA folder>` / `### <first subfolder>`:
+One line per active note (02_Projects, 03_Areas, 04_Resources, plus root-level notes with
+`status: active` — the set vault_lint.py checks for drift), grouped `## <PARA folder>` /
+`### <first subfolder>`, root notes first under `## Vault root`:
 
     - [[path/without/extension|Name]] — <summary> <markers>
 
@@ -40,9 +41,11 @@ from vault_utils import (
     parse_existing_index,
     read_frontmatter,
     require_vault,
+    root_active_notes,
 )
 
 MAX_SUMMARY = 240
+ROOT = "Vault root"  # heading for root-level `status: active` notes (contract/VAULT_SCHEMA.md)
 SKIP_LINE = re.compile(r"^\s*(#|>|\||!\[|```|---|\*Source:|\*\*Source|<)")
 
 
@@ -71,6 +74,9 @@ def collect(vault: Path) -> dict[str, Path]:
             if md.relative_to(vault).as_posix() in ignored:
                 continue
             notes[md.relative_to(vault).with_suffix("").as_posix()] = md
+    for md in root_active_notes(vault):
+        if md.name not in ignored:
+            notes[md.stem] = md
     return notes
 
 
@@ -107,13 +113,13 @@ def build(vault: Path) -> tuple[str, dict]:
         parts = rel.split("/")
         section = parts[1] if len(parts) > 2 else ""
         suffix = f" {markers}" if markers else ""
-        groups[parts[0]][section].append(f"- [[{rel}|{path.stem}]] — {summary}{suffix}")
+        groups[parts[0] if len(parts) > 1 else ROOT][section].append(f"- [[{rel}|{path.stem}]] — {summary}{suffix}")
         stats["entries"] += 1
 
     needs = stats["entries"] - stats["from_description"]
     out = ["# Vault Index", "",
            f"*Last rebuild: {date.today().isoformat()} · {stats['entries']} entries · {needs} without a description ({COG})*", ""]
-    for folder in ACTIVE_CONTENT_FOLDERS:
+    for folder in (ROOT, *ACTIVE_CONTENT_FOLDERS):
         if folder not in groups:
             continue
         out += [f"## {folder}", ""]

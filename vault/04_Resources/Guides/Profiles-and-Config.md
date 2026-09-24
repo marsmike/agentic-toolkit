@@ -35,8 +35,9 @@ environment and the profile note directly rather than expecting doctor to point 
 
 ## What never belongs in a profile note
 
-Credentials. An API token, a password, anything secret lives in an environment variable or a
-keychain, never in vault content — see the Secrets section of `contract/PROFILE.md`. A profile
+Credentials. An API token, a password, anything secret lives in an environment variable, the
+owner's key file (`~/.env`, read by each script for the one key it needs) or a keychain, never in
+vault content — see the Secrets section of `contract/PROFILE.md`. A profile
 note may say a credential exists and name where to configure it; it never carries the value.
 
 ## Related

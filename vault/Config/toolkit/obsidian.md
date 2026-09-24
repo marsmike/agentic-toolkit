@@ -46,8 +46,9 @@ The canonical field reference is the plugin's own `profile.example.md` — this 
 must stay in sync (CI does not yet enforce this; keep the shapes identical by hand).
 
 No credential of any kind belongs in this file — see `contract/PROFILE.md`'s Secrets section.
-Anything the plugin needs to authenticate with (a Readwise token, an API key) is an environment
-variable, referenced here only by name if at all.
+Anything the plugin needs to authenticate with (a Readwise token, an API key) comes from the
+environment or the owner's key file (`TOOLKIT_KEYS_FILE`, default `~/.env`), read by the script that needs it, and is referenced here only by
+name if at all.
 
 ## Related
 

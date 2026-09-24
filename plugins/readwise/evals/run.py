@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -25,6 +26,7 @@ EVAL_MODULES = (
     "eval_book_capture_dedup",
     "eval_ingest",
     "eval_pdf_convert",
+    "eval_pdf_scheme",
 )
 
 
@@ -36,6 +38,9 @@ def resolve_repo_vault() -> Path:
 
 def main() -> int:
     as_json = "--json" in sys.argv
+    # Keys come from the environment only, as before: the key-file fallback (vault_utils.secret)
+    # would hand a "no key" case the developer's real ~/.env.
+    os.environ["TOOLKIT_KEYS_FILE"] = os.devnull
     evals_dir = Path(__file__).resolve().parent
     if str(evals_dir) not in sys.path:
         sys.path.insert(0, str(evals_dir))

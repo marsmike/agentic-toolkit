@@ -23,6 +23,7 @@ EVAL_MODULES = (
     "eval_session_capture",
     "eval_distill_idempotent",
     "eval_codec_parity",
+    "eval_slug_containment",
 )
 
 

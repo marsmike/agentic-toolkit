@@ -13,6 +13,15 @@
 set -euo pipefail
 
 REPO="marsmike/agentic-toolkit"
+
+# Stage 4 copies the keychain's Claude OAuth credential into the work dir; the EXIT trap below
+# removes it, but a SIGKILL or a crash does not run traps. Remove this user's work dirs left by
+# such a run (older than two hours, so a run in progress keeps its own) before starting.
+# `--sweep-only` does just that and exits. [earned: 2026-09-24, review-01 SEC-7]
+find "${TMPDIR:-/tmp}" -maxdepth 1 -type d -name 'toolkit-coldboot.*' -user "$(id -u)" -mmin +120 \
+  -exec rm -rf {} + 2>/dev/null || true
+[ "${1:-}" = "--sweep-only" ] && exit 0
+
 WORK="$(mktemp -d -t toolkit-coldboot)"
 trap 'rm -rf "$WORK"' EXIT
 echo "workdir: $WORK"

@@ -47,6 +47,10 @@ three:
    headless run is supposed to be exercising an engine binary, check for explicit evidence it did
    (e.g. the cold-boot ritual's own `"ENGINES: ok"` sentinel), not just a clean exit.
 
+These grants suit a session you watch. An unattended run (the scheduled pipeline) needs narrower grants than this: `plugins/obsidian/scripts/run-pipeline.sh` grants
+each pipeline script by name and starts the agent with no key in its environment (each script
+reads its own).
+
 ## Isolating a headless run entirely
 
 A headless session driven for testing (rather than real personal use) should run against an

@@ -88,6 +88,30 @@ state, reports and dead-letter notes) and `01_Capture/` (material for distill, w
 `02_`–`04_` only through the human checkpoint). The radar is the first plugin that does both on a
 schedule: `00_Memory/radar/` daily, `01_Capture/Radar-Week-*.md` weekly.
 
+## Cross-plugin ledgers (v1)
+
+Three append-only JSONL files in `00_Memory/` are read by a plugin that did not write them. They
+are data, not code, so the no-import rule below holds, but a reader depends on their row shape:
+the pipeline counts what came in from them, and `Now.md` lists the radar's strong items. That
+shape is this contract, not either plugin's private detail. [earned: 2026-09-24 review GLM-2 —
+a renamed field would have scored every radar item 0 and reported "0 new" with no failing test]
+
+| Ledger | Path | Written by | Read by | Fields a reader may rely on |
+|---|---|---|---|---|
+| judged | `00_Memory/radar/state.jsonl` | radar `radar.py`, one row per judged feed item | obsidian `pipeline_run.py` (row count), `now_build.py` (Radar) | `run`, `canonical`, `url`, `title`, `p`, `strong`, `in_vault` |
+| promoted | `00_Memory/radar/promoted.jsonl` | radar `radar.py`, one row per item promoted to Readwise | obsidian `pipeline_run.py` (row count) | `canonical`, `id`, `date` |
+| ingested | `00_Memory/readwise-ingested.jsonl` | readwise `ingest.py`, one row per Readwise document seen | obsidian `pipeline_run.py` (captures by `via`) | `doc_id`, `capture`, `via`, `date` |
+
+- One JSON object per line, appended, never rewritten. A reader skips blank or unparseable lines
+  and ignores fields it does not know.
+- A writer may add fields. Renaming or removing a listed field, or moving a ledger, bumps the
+  version above and updates every reader in the same change.
+- A reader relies on the listed fields only. `core/tests/test_contract.py` checks the paths
+  and fields in this table against both sides.
+
+**Removal condition:** drop this section if the pipeline stops reading other plugins' ledgers
+(e.g. each source reports its own run summary instead).
+
 ## No cross-plugin imports
 
 Plugins depend on `core` and `contract` only, never on a sibling plugin. Composition across

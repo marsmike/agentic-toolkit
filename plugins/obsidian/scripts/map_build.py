@@ -135,20 +135,37 @@ def collect(vault: Path) -> list[Note]:
     return notes
 
 
-def resolve_links(notes: list[Note]) -> dict[str, set[str]]:
-    """Each note's outgoing links as note paths; a link resolves by path, then by file name."""
+def _resolver(notes: list[Note]):
+    """A link resolves by path, then by file name. A name several notes share goes to the one in
+    the linking note's own folder; any other ambiguity stays unresolved rather than guessed."""
     by_path = {n.rel.casefold(): n.rel for n in notes}
-    by_name: dict[str, str] = {}
+    by_name: dict[str, list[str]] = defaultdict(list)
     for n in notes:
-        by_name.setdefault(n.name.casefold(), n.rel)
+        by_name[n.name.casefold()].append(n.rel)
+
+    def resolve(raw: str, source: str | None = None) -> str | None:
+        key = raw.removesuffix(".md").strip("/").casefold()
+        if key in by_path:
+            return by_path[key]
+        candidates = by_name.get(key.rsplit("/", 1)[-1], [])
+        if len(candidates) == 1:
+            return candidates[0]
+        if source is not None:
+            folder = source.rpartition("/")[0]
+            local = [c for c in candidates if c.rpartition("/")[0] == folder]
+            if len(local) == 1:
+                return local[0]
+        return None
+
+    return resolve
+
+
+def resolve_links(notes: list[Note]) -> dict[str, set[str]]:
+    """Each note's outgoing links as note paths (see `_resolver`)."""
+    resolve = _resolver(notes)
     out: dict[str, set[str]] = {}
     for n in notes:
-        targets = set()
-        for raw in n.links:
-            key = raw.removesuffix(".md").strip("/").casefold()
-            target = by_path.get(key) or by_name.get(key.rsplit("/", 1)[-1])
-            if target and target != n.rel:
-                targets.add(target)
+        targets = {t for raw in n.links if (t := resolve(raw, n.rel)) and t != n.rel}
         out[n.rel] = targets
     return out
 
@@ -180,6 +197,7 @@ def group_notes(members: list[Note], cfg: MapConfig) -> list[tuple[str, list[Not
 def build(vault: Path, today: date) -> tuple[dict[str, str], dict]:
     notes = collect(vault)
     links = resolve_links(notes)
+    resolve = _resolver(notes)
     inbound = Counter(t for targets in links.values() for t in targets)
     by_rel = {n.rel: n for n in notes}
     configs = read_config(vault)
@@ -196,7 +214,7 @@ def build(vault: Path, today: date) -> tuple[dict[str, str], dict]:
     for d in domains:
         cfg = configs.get(d) or MapConfig()
         group = sorted(members[d], key=lambda n: n.name.casefold())
-        pinned = [by_rel[r] for r in (_resolve_one(t, by_rel) for t in cfg.start) if r and d in by_rel[r].domains]
+        pinned = [by_rel[r] for r in (resolve(t) for t in cfg.start) if r and d in by_rel[r].domains]
         hubs = [n for n in sorted(group, key=lambda n: (-inbound[n.rel], n.name.casefold())) if inbound[n.rel] and n.rel not in {p.rel for p in pinned}]
         start = (pinned + hubs)[:START_HERE]
         new = sorted((n for n in group if n.when >= new_since), key=lambda n: (n.when, n.name.casefold()), reverse=True)
@@ -227,14 +245,6 @@ def build(vault: Path, today: date) -> tuple[dict[str, str], dict]:
     stats = {"notes": len(notes), "domains": len(domains), "untagged": sum(1 for n in notes if not n.domains),
              "maps": {d: len(members[d]) for d in domains}}
     return files, stats
-
-
-def _resolve_one(target: str, by_rel: dict[str, Note]) -> str | None:
-    key = target.removesuffix(".md").strip("/").casefold()
-    for rel, n in by_rel.items():
-        if rel.casefold() == key or n.name.casefold() == key.rsplit("/", 1)[-1]:
-            return rel
-    return None
 
 
 def _canvas(nodes: list[dict], edges: list[dict]) -> str:

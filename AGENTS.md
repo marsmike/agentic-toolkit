@@ -43,8 +43,10 @@ scripts/cloud-vault.sh close --distilled N --note "cloud: <what>"   # rebuild, s
 ```
 
 - `.vault-live/` is git-ignored here: never commit the vault into the toolkit.
-- Keys come from the environment, never from a file; check them by name only (`open` prints
-  which are set). Without a key, each script prints `SKIPPED` and the work goes on without it.
+- Keys come from the environment or the owner's key file (`~/.env`, never a file in a repo or the
+  vault); each script reads its own (`contract/PROFILE.md` "Secrets"). Check them by name only
+  (`open` prints which are set in the environment). Without a key, each script prints `SKIPPED`
+  and the work goes on without it.
 - Tests and evals still run against `./vault` only, never `.vault-live/`.
 
 [earned: 2026-09-23, R12 — cloud sessions reach the vault through git, and the vault holds a live

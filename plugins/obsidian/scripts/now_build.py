@@ -27,7 +27,7 @@ from pathlib import Path
 
 from map_build import _date, _one_line
 from pipeline_run import STATE, _order
-from vault_utils import atomic_write, discover_notes, read_frontmatter, require_vault
+from vault_utils import atomic_write, discover_notes, read_frontmatter, require_vault, root_active_notes
 
 NOW = "Now.md"
 BOARD = "Boards/Pipeline.md"
@@ -55,13 +55,18 @@ def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
     """(new, enriched, source): note paths from the pipeline's commits since `since`."""
     folders = ("02_Projects", "03_Areas", "04_Resources")
     git = subprocess.run(["git", "-C", str(vault), "log", f"--since={since.isoformat()}", "--grep=^pipeline",
-                          "--name-status", "--format=tformat:@@", "--", *folders],
+                          "--name-status", "--format=tformat:@@", "--", *folders, ":(glob)*.md"],
                          capture_output=True, text=True, check=False)
     if git.returncode == 0 and (vault / ".git").exists():
+        # Of the root files a run commits (Index.md, Now.md, Log.md …) only a root `status: active`
+        # note is content (contract/VAULT_SCHEMA.md).
+        root_notes = {p.name for p in root_active_notes(vault)}
         new, changed = set(), set()
         for line in git.stdout.splitlines():
             status, _, path = line.partition("\t")
             if not path.endswith(".md") or not (vault / path).is_file():
+                continue
+            if "/" not in path and path not in root_notes:
                 continue
             (new if status.startswith("A") else changed).add(path)
         return sorted(new), sorted(changed - new), "git"

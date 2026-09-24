@@ -14,7 +14,7 @@ the thresholds, and the result lands where you already look. You run the command
 human; you never clip, and you never write active content.
 
 ```bash
-R() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/radar.py" "$@"; }
+R() { uv run --locked --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/radar.py" "$@"; }
 R scan --since 1d [--promote] --json   # daily: judge, write 00_Memory/radar/, settle items in Reader
 R weekly                              # Saturday: 01_Capture/Radar-Week-YYYY-Www.md for distill
 R feeds --json                        # which feeds earn their place

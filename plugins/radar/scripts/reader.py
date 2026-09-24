@@ -14,7 +14,6 @@ item 2026-09-22]
 from __future__ import annotations
 
 import json
-import os
 import time
 import urllib.error
 import urllib.parse
@@ -24,6 +23,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from judgments.urls import _canonical
+from vault_utils import secret
 
 READER_BASE = "https://readwise.io/api/v3"
 FEED_LOCATION = "feed"
@@ -61,7 +61,7 @@ class Item:
 
 
 def _token() -> str:
-    tok = os.environ.get("READWISE_TOKEN")
+    tok = secret("READWISE_TOKEN")
     if not tok:
         raise NoToken("READWISE_TOKEN is not set")
     return tok

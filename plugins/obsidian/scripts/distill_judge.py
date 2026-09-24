@@ -41,7 +41,17 @@ from judgments.state import domain_glosses, in_chunks, note_payload
 from judgments.urls import _canonical
 from search import search
 from search_judge import expand
-from vault_utils import discover_notes, profile_value, read_frontmatter, require_vault, write_dlq_note
+from vault_utils import (
+    discover_notes,
+    inside,
+    profile_value,
+    read_frontmatter,
+    require_vault,
+    vault_file,
+    write_dlq_note,
+)
+
+GOLDEN_DIR = Path(__file__).resolve().parent.parent / "evals" / "golden"
 
 MAX_LISTED_FOLDERS = 60
 
@@ -126,7 +136,7 @@ def candidates(capture: dict, vault: Path, top: int, exclude: list[str], force: 
     out = []
     for rel, extra in rows.items():
         path = vault / rel
-        if _excluded(rel, exclude) or not path.is_file():
+        if _excluded(rel, exclude) or not inside(path, vault) or not path.is_file():
             continue
         out.append({**note_payload(path, vault), **extra, "url_hit": hits.get(rel)})
     meta = {"score_gate": found.get("score_gate"), "note": found.get("note", "")}
@@ -261,7 +271,8 @@ def enrichment_targets(vault: Path, exclude: list[str]) -> list[str]:
     raw = profile_value(vault, "enrichment_targets", []) or []
     if isinstance(raw, str):
         raw = [t for t in re.split(r"[,\n]", raw) if t.strip()]
-    # A profile note usually sits at the vault root, outside the PARA folders search walks.
+    # A profile note usually sits at the vault root; discover_notes returns it only when it
+    # declares `status: active`, so every root note is looked up here.
     by_stem = {p.stem: p.relative_to(vault).as_posix() for p in discover_notes(vault, exclude=exclude)}
     by_stem.update({p.stem: p.name for p in vault.glob("*.md")})
     out = []
@@ -377,9 +388,11 @@ def _decide(key: str, value: Any, t: dict[str, float]) -> Any:
 
 def _resolve_capture(ref: str, vault: Path, base: Path | None) -> Path:
     """A golden row names a capture in the vault (`01_Capture/X.md`, or a bare file name
-    under 01_Capture) or a fixture next to the golden file (`fixtures/captures/X.md`)."""
-    for candidate in (vault / ref, vault / "01_Capture" / ref, *([base / ref] if base else [])):
-        if candidate.is_file():
+    under 01_Capture) or a fixture next to the golden file (`fixtures/captures/X.md`), and
+    never a file outside both: its text goes to the judgment backend."""
+    for root, candidate in ((vault, vault / ref), (vault, vault / "01_Capture" / ref),
+                            *([(base, base / ref)] if base else [])):
+        if inside(candidate, root) and candidate.is_file():
             return candidate
     raise SystemExit(f"golden file names a capture that does not exist: {ref}")
 
@@ -564,6 +577,11 @@ def main() -> int:
     try:
         if args.calibrate:
             golden_path = Path(args.calibrate).resolve()
+            # Only the repo's own golden files: one the caller writes could name any file for the
+            # backend to read, and the unattended run may write the vault, never the repo.
+            # [earned: 2026-09-24, impl-02 review IMPL02-CODE-1]
+            if not inside(golden_path, GOLDEN_DIR):
+                raise SystemExit(f"--calibrate reads only golden files under {GOLDEN_DIR}: {args.calibrate}")
             golden = json.loads(golden_path.read_text(encoding="utf-8"))
             golden["rows"] = [r for r in golden["rows"] if r.get("expect") is not None]
             run = run_golden(golden, vault, args.top, args.exclude, base=golden_path.parent.parent)
@@ -577,8 +595,8 @@ def main() -> int:
         if args.check_note:
             if len(args.captures) != 1:
                 ap.error("--check-note takes exactly one capture")
-            note = Path(args.check_note) if Path(args.check_note).is_absolute() else vault / args.check_note
-            cap = Path(args.captures[0]) if Path(args.captures[0]).is_absolute() else vault / args.captures[0]
+            note = vault_file(vault, args.check_note)
+            cap = vault_file(vault, args.captures[0])
             report = check_note(note, cap, vault)
             if args.json:
                 print(json.dumps(report, indent=2))
@@ -589,7 +607,7 @@ def main() -> int:
             return 0
         if not args.captures:
             ap.error("name at least one capture, or use --calibrate")
-        paths = [p if p.is_absolute() else vault / p for p in map(Path, args.captures)]
+        paths = [vault_file(vault, c) for c in args.captures]
         missing = [str(p) for p in paths if not p.is_file()]
         if missing:
             ap.error(f"not a file: {', '.join(missing)}")

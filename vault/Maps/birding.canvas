@@ -28,9 +28,9 @@
 			"height": 140
 		},
 		{
-			"id": "b340da8e52ae58c9",
+			"id": "2e69f23caeaf0bd8",
 			"type": "file",
-			"file": "02_Projects/field-guide/Weekly-Review.md",
+			"file": "03_Areas/Birding.md",
 			"x": 400,
 			"y": 80,
 			"width": 320,
@@ -46,19 +46,10 @@
 			"height": 140
 		},
 		{
-			"id": "2e69f23caeaf0bd8",
-			"type": "file",
-			"file": "03_Areas/Birding.md",
-			"x": 40,
-			"y": 260,
-			"width": 320,
-			"height": 140
-		},
-		{
 			"id": "698bb55bc7730c0e",
 			"type": "file",
 			"file": "02_Projects/field-guide/Reference-Library.md",
-			"x": 400,
+			"x": 40,
 			"y": 260,
 			"width": 320,
 			"height": 140
@@ -67,6 +58,15 @@
 			"id": "49f5f09a98c7352a",
 			"type": "file",
 			"file": "02_Projects/field-guide/Illustration-Sourcing.md",
+			"x": 400,
+			"y": 260,
+			"width": 320,
+			"height": 140
+		},
+		{
+			"id": "b340da8e52ae58c9",
+			"type": "file",
+			"file": "02_Projects/field-guide/Weekly-Review.md",
 			"x": 760,
 			"y": 260,
 			"width": 320,

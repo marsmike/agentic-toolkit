@@ -40,13 +40,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from vault_utils import profile_value, read_frontmatter, require_vault, write_dlq_note
+from vault_utils import inside, profile_value, read_frontmatter, require_vault, write_dlq_note
 
 LOCK = Path("00_Memory") / "pipeline.lock"
 STATE = Path("00_Memory") / "pipeline-state.json"
 # What came in is counted from the sources' own ledgers (rows appended between begin and end), so
 # the run's summary is a record, not a recollection. [earned: 2026-09-24 — a cloud run reported
-# "3 promoted as strong" where its radar had promoted none]
+# "3 promoted as strong" where its radar had promoted none] Paths and the row fields read here are
+# contract/KNOWLEDGE_API.md's "Cross-plugin ledgers".
 LEDGERS = {"judged": Path("00_Memory/radar/state.jsonl"), "promoted": Path("00_Memory/radar/promoted.jsonl"),
            "ingested": Path("00_Memory/readwise-ingested.jsonl")}
 LOCK_STALE_HOURS = 6
@@ -340,7 +341,7 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     # A failed capture is one still in 01_Capture/; a blank or a path that is not there is no
     # failure. [earned: 2026-09-24 — `--failed ""` logged "1 failed" for a clean run]
     named = [f.strip() for f in failed if f.strip()]
-    failed = [f for f in named if (vault / f).is_file()]
+    failed = [f for f in named if inside(vault / f, vault / "01_Capture") and (vault / f).is_file()]
     not_found = [f for f in named if f not in failed]
     state = _state(vault)
     attempts: dict[str, int] = state.get("attempts", {})

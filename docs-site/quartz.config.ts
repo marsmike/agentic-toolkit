@@ -26,7 +26,7 @@ const config: QuartzConfig = {
     // the content copy itself in docs.yml, not just ignored here — this list
     // only needs to cover things that DO land in content/ but shouldn't be
     // built as pages (Obsidian's own config folder, if ever present).
-    ignorePatterns: ["private", "templates", ".obsidian"],
+    ignorePatterns: ["private", "Templates", ".obsidian"],
     defaultDateType: "modified",
     theme: {
       fontOrigin: "googleFonts",

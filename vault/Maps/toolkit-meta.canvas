@@ -64,20 +64,11 @@
 			"height": 140
 		},
 		{
-			"id": "17da586776376f5a",
-			"type": "file",
-			"file": "04_Resources/Concepts/Calibration-Bias.md",
-			"x": 760,
-			"y": 260,
-			"width": 320,
-			"height": 140
-		},
-		{
 			"id": "a63ec8e196c554b3",
 			"type": "file",
 			"file": "04_Resources/Concepts/Active-Radar.md",
-			"x": 40,
-			"y": 440,
+			"x": 760,
+			"y": 260,
 			"width": 320,
 			"height": 140
 		},
@@ -85,7 +76,7 @@
 			"id": "4ef20ae2dfddbd39",
 			"type": "file",
 			"file": "04_Resources/Concepts/Typed-Judgments.md",
-			"x": 400,
+			"x": 40,
 			"y": 440,
 			"width": 320,
 			"height": 140
@@ -145,11 +136,29 @@
 			"height": 140
 		},
 		{
+			"id": "f2cafb9ac5df31c6",
+			"type": "group",
+			"label": "Profile",
+			"x": 0,
+			"y": 1260,
+			"width": 1120,
+			"height": 260
+		},
+		{
+			"id": "81d08a02317a03ab",
+			"type": "file",
+			"file": "Alex-Vega.md",
+			"x": 40,
+			"y": 1340,
+			"width": 320,
+			"height": 140
+		},
+		{
 			"id": "a6754212b3770f26",
 			"type": "group",
 			"label": "Other notes",
 			"x": 0,
-			"y": 1260,
+			"y": 1560,
 			"width": 1120,
 			"height": 260
 		},
@@ -158,7 +167,7 @@
 			"type": "file",
 			"file": "03_Areas/Toolkit-Maintenance.md",
 			"x": 40,
-			"y": 1340,
+			"y": 1640,
 			"width": 320,
 			"height": 140
 		}
@@ -186,10 +195,10 @@
 			"toSide": "left"
 		},
 		{
-			"id": "b80b02d233bb80a2",
-			"fromNode": "a63ec8e196c554b3",
+			"id": "e0987b86601d135b",
+			"fromNode": "68de8dcee6980161",
 			"fromSide": "right",
-			"toNode": "17da586776376f5a",
+			"toNode": "81d08a02317a03ab",
 			"toSide": "left"
 		},
 		{
@@ -197,27 +206,6 @@
 			"fromNode": "a63ec8e196c554b3",
 			"fromSide": "right",
 			"toNode": "4ef20ae2dfddbd39",
-			"toSide": "left"
-		},
-		{
-			"id": "17d415e0f95ec09e",
-			"fromNode": "17da586776376f5a",
-			"fromSide": "right",
-			"toNode": "19033cb50d40ea71",
-			"toSide": "left"
-		},
-		{
-			"id": "6b88761e95b2900d",
-			"fromNode": "17da586776376f5a",
-			"fromSide": "right",
-			"toNode": "a80a798ae3703511",
-			"toSide": "left"
-		},
-		{
-			"id": "ea1426b4746df2e5",
-			"fromNode": "17da586776376f5a",
-			"fromSide": "right",
-			"toNode": "f39f617fc4839681",
 			"toSide": "left"
 		},
 		{
@@ -239,13 +227,6 @@
 			"fromNode": "eb1132267034901e",
 			"fromSide": "right",
 			"toNode": "a80a798ae3703511",
-			"toSide": "left"
-		},
-		{
-			"id": "99df1a66131dabdf",
-			"fromNode": "19033cb50d40ea71",
-			"fromSide": "right",
-			"toNode": "17da586776376f5a",
 			"toSide": "left"
 		},
 		{
@@ -277,13 +258,6 @@
 			"toSide": "left"
 		},
 		{
-			"id": "612caf85dc234aad",
-			"fromNode": "a80a798ae3703511",
-			"fromSide": "right",
-			"toNode": "17da586776376f5a",
-			"toSide": "left"
-		},
-		{
 			"id": "410f2d06d3ce0a35",
 			"fromNode": "a80a798ae3703511",
 			"fromSide": "right",
@@ -312,13 +286,6 @@
 			"toSide": "left"
 		},
 		{
-			"id": "0639dd2cdc01f037",
-			"fromNode": "4ef20ae2dfddbd39",
-			"fromSide": "right",
-			"toNode": "17da586776376f5a",
-			"toSide": "left"
-		},
-		{
 			"id": "c2619033ce38c8e6",
 			"fromNode": "4ef20ae2dfddbd39",
 			"fromSide": "right",
@@ -340,10 +307,10 @@
 			"toSide": "left"
 		},
 		{
-			"id": "8701cef986844fa1",
-			"fromNode": "e7b439bf2e4acd03",
+			"id": "b57fd689eb881699",
+			"fromNode": "0110cdbb03a205f2",
 			"fromSide": "right",
-			"toNode": "17da586776376f5a",
+			"toNode": "81d08a02317a03ab",
 			"toSide": "left"
 		},
 		{
@@ -396,6 +363,13 @@
 			"toSide": "left"
 		},
 		{
+			"id": "595114755164be8e",
+			"fromNode": "6f210c8a8ac83e04",
+			"fromSide": "right",
+			"toNode": "81d08a02317a03ab",
+			"toSide": "left"
+		},
+		{
 			"id": "d44b667857e870dc",
 			"fromNode": "a2e5bfeadca2f747",
 			"fromSide": "right",
@@ -417,10 +391,10 @@
 			"toSide": "left"
 		},
 		{
-			"id": "d0e9e57a5122f96c",
-			"fromNode": "f39f617fc4839681",
+			"id": "e15cf6cf9f9c3284",
+			"fromNode": "a2e5bfeadca2f747",
 			"fromSide": "right",
-			"toNode": "17da586776376f5a",
+			"toNode": "81d08a02317a03ab",
 			"toSide": "left"
 		},
 		{
@@ -442,6 +416,20 @@
 			"fromNode": "f39f617fc4839681",
 			"fromSide": "right",
 			"toNode": "a2e5bfeadca2f747",
+			"toSide": "left"
+		},
+		{
+			"id": "003c1d45da30254c",
+			"fromNode": "81d08a02317a03ab",
+			"fromSide": "right",
+			"toNode": "68de8dcee6980161",
+			"toSide": "left"
+		},
+		{
+			"id": "12e6583362d2ae19",
+			"fromNode": "81d08a02317a03ab",
+			"fromSide": "right",
+			"toNode": "0110cdbb03a205f2",
 			"toSide": "left"
 		}
 	]

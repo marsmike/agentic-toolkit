@@ -66,6 +66,31 @@ else
   echo "ok: no backtick-in-wikilink-alias found vault-wide"
 fi
 
+# --- (d) numbers the docs state that drift silently: the badge version and the eval count ---
+# [earned: 2026-09-24 review GLM-5 — the badge said 2.9.0 against marketplace.json's 3.0.0, and
+# the obsidian README said "eleven" evals when run.py ran 21]
+echo "== docscheck: README badge version and obsidian eval count =="
+if ! numbers="$(cd "$REPO_ROOT" && python3 -c "
+import json, re, sys
+sys.path.insert(0, 'plugins/obsidian/evals')
+import run
+version = json.load(open('.claude-plugin/marketplace.json', encoding='utf-8'))['metadata']['version']
+badge = re.search(r'claude--code_marketplace-([0-9.]+)-', open('README.md', encoding='utf-8').read())
+evals = re.search(r'evals/run.py\` runs (\d+) capability evals', open('plugins/obsidian/README.md', encoding='utf-8').read())
+problems = []
+if not badge or badge.group(1) != version:
+    problems.append(f'README.md badge says {badge.group(1) if badge else None}, marketplace.json says {version}')
+if not evals or int(evals.group(1)) != len(run.EVAL_MODULES):
+    problems.append(f'plugins/obsidian/README.md says {evals.group(1) if evals else None} evals, run.py runs {len(run.EVAL_MODULES)}')
+print('; '.join(problems))
+sys.exit(1 if problems else 0)
+")"; then
+  echo "FAIL: $numbers"
+  fail=1
+else
+  echo "ok: badge matches marketplace.json and the eval count matches run.py"
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo "docscheck: FAILED"
   exit 1

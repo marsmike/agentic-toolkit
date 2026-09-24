@@ -24,7 +24,6 @@ imports, contract/KNOWLEDGE_API.md); core/tests/test_contract.py fails if the co
 from __future__ import annotations
 
 import json
-import os
 import time
 import urllib.error
 import urllib.request
@@ -33,7 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from vault_utils import PROFILE_PLUGIN_NAME, profile_value
+from vault_utils import PROFILE_PLUGIN_NAME, profile_value, secret
 
 DEFAULT_BACKEND = "jev"
 DEFAULT_BASE_URL = "https://openrouter.ai/api"
@@ -134,10 +133,10 @@ def load_config(vault: Path) -> dict[str, str]:
 
 
 def _api_key() -> str | None:
-    """Secrets come from the environment only (contract/PROFILE.md), never the profile note."""
+    """Secrets come from the environment or the key file (contract/PROFILE.md), never the profile note."""
     for name in API_KEY_ENV:
-        if os.environ.get(name):
-            return os.environ[name]
+        if key := secret(name):
+            return key
     return None
 
 

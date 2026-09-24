@@ -16,7 +16,7 @@
 			"x": 0,
 			"y": 0,
 			"width": 1120,
-			"height": 440
+			"height": 620
 		},
 		{
 			"id": "e7964a649ad2bfc7",
@@ -71,6 +71,15 @@
 			"y": 260,
 			"width": 320,
 			"height": 140
+		},
+		{
+			"id": "36f5e699171e1f22",
+			"type": "file",
+			"file": "02_Projects/home-lab-migration/Weekly-Review.md",
+			"x": 40,
+			"y": 440,
+			"width": 320,
+			"height": 140
 		}
 	],
 	"edges": [
@@ -93,6 +102,13 @@
 			"fromNode": "e4506b87fa38e49d",
 			"fromSide": "right",
 			"toNode": "14753f68ff564eee",
+			"toSide": "left"
+		},
+		{
+			"id": "a11b7af31cd1e758",
+			"fromNode": "e4506b87fa38e49d",
+			"fromSide": "right",
+			"toNode": "36f5e699171e1f22",
 			"toSide": "left"
 		},
 		{
@@ -131,6 +147,13 @@
 			"toSide": "left"
 		},
 		{
+			"id": "8e4018d7ac153f20",
+			"fromNode": "76827d9ca5008ab3",
+			"fromSide": "right",
+			"toNode": "36f5e699171e1f22",
+			"toSide": "left"
+		},
+		{
 			"id": "ad8dad4027d89f7e",
 			"fromNode": "e7964a649ad2bfc7",
 			"fromSide": "right",
@@ -156,6 +179,13 @@
 			"fromNode": "e7964a649ad2bfc7",
 			"fromSide": "right",
 			"toNode": "14753f68ff564eee",
+			"toSide": "left"
+		},
+		{
+			"id": "045e103193c2b05c",
+			"fromNode": "e7964a649ad2bfc7",
+			"fromSide": "right",
+			"toNode": "36f5e699171e1f22",
 			"toSide": "left"
 		},
 		{
@@ -191,6 +221,13 @@
 			"fromNode": "7a5dcd69c1e3c43b",
 			"fromSide": "right",
 			"toNode": "14753f68ff564eee",
+			"toSide": "left"
+		},
+		{
+			"id": "b9ee7957cd83dbee",
+			"fromNode": "7a5dcd69c1e3c43b",
+			"fromSide": "right",
+			"toNode": "36f5e699171e1f22",
 			"toSide": "left"
 		},
 		{
@@ -231,6 +268,48 @@
 		{
 			"id": "e903a68b1928ba87",
 			"fromNode": "14753f68ff564eee",
+			"fromSide": "right",
+			"toNode": "4a3c126de4dcd47f",
+			"toSide": "left"
+		},
+		{
+			"id": "20c46f7f550dabf0",
+			"fromNode": "36f5e699171e1f22",
+			"fromSide": "right",
+			"toNode": "e4506b87fa38e49d",
+			"toSide": "left"
+		},
+		{
+			"id": "e9e0be807e97491b",
+			"fromNode": "36f5e699171e1f22",
+			"fromSide": "right",
+			"toNode": "76827d9ca5008ab3",
+			"toSide": "left"
+		},
+		{
+			"id": "9d691b4ff5780ac0",
+			"fromNode": "36f5e699171e1f22",
+			"fromSide": "right",
+			"toNode": "e7964a649ad2bfc7",
+			"toSide": "left"
+		},
+		{
+			"id": "02a35d124db1d59b",
+			"fromNode": "36f5e699171e1f22",
+			"fromSide": "right",
+			"toNode": "7a5dcd69c1e3c43b",
+			"toSide": "left"
+		},
+		{
+			"id": "733224e65decb567",
+			"fromNode": "36f5e699171e1f22",
+			"fromSide": "right",
+			"toNode": "14753f68ff564eee",
+			"toSide": "left"
+		},
+		{
+			"id": "1f41074dae03f30e",
+			"fromNode": "36f5e699171e1f22",
 			"fromSide": "right",
 			"toNode": "4a3c126de4dcd47f",
 			"toSide": "left"
