@@ -14,7 +14,7 @@ inference_base_url: http://localhost:11434
 inference_model: null
 judgment_backend: jev
 judgment_base_url: https://openrouter.ai/api
-judgment_model: jev-latest
+judgment_model: jev-1.13-20260917
 enrichment_targets:
   - "[[Alex-Vega]]"
 tags:

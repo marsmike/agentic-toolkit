@@ -1,5 +1,5 @@
 formulas:
-  domain: 'tags.filter(value.startsWith("domain/")).map(value.replace("domain/", "")).join(", ")'
+  domain: tags.filter(value.startsWith("domain/")).map(value.replace("domain/", "")).join(", ")
 properties:
   file.name:
     displayName: Title
@@ -103,7 +103,7 @@ views:
         - file.inFolder("01_Capture")
         - file.ext == "md"
     groupBy:
-      property: note.via
+      property: via
       direction: ASC
     order:
       - file.name

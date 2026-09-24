@@ -10,7 +10,7 @@ promote_location: later
 kagi_weekly_budget_usd: 1.00
 judgment_backend: jev
 judgment_base_url: https://openrouter.ai/api
-judgment_model: jev-latest
+judgment_model: jev-1.13-20260917
 tags:
   - domain/toolkit-meta
   - profile

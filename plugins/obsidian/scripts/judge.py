@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -36,12 +37,16 @@ from vault_utils import PROFILE_PLUGIN_NAME, profile_value
 
 DEFAULT_BACKEND = "jev"
 DEFAULT_BASE_URL = "https://openrouter.ai/api"
-DEFAULT_MODEL = "jev-latest"
+# Pinned, not the moving alias `jev-latest`: every threshold in policy.py and the judge scripts was
+# calibrated on this version, and an alias moves when TypeSafe ships a new one. Re-calibrate
+# (docs/MAINTAINING.md) before changing it. [earned: 2026-09-24, Jev usage review]
+DEFAULT_MODEL = "jev-1.13-20260917"
 SYSTEM_ONE_PATH = "/v1/systemone"
 API_KEY_ENV = (f"TOOLKIT_{PROFILE_PLUGIN_NAME.upper()}_JUDGMENT_API_KEY", "OPENROUTER_API_KEY")
 USD_PER_M_INPUT = 0.042  # jev list price; output is free. Used only when the API reports no cost.
 MAX_CHOICE_OPTIONS = 255
 HTTP_TIMEOUT = 60
+RATE_LIMIT_WAIT_S = 10.0  # when a 429 carries no Retry-After
 
 
 @dataclass(frozen=True)
@@ -109,9 +114,10 @@ class StateTooLarge(JudgmentFailed):
 
 
 class _CallError(RuntimeError):
-    def __init__(self, detail: str, retryable_by_split: bool):
+    def __init__(self, detail: str, retryable_by_split: bool, retry_after: float | None = None):
         super().__init__(detail)
         self.retryable_by_split = retryable_by_split
+        self.retry_after = retry_after  # set for a rate limit (429): wait, then ask the same again
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +184,12 @@ def _post(url: str, payload: dict, headers: dict[str, str]) -> dict:
         detail = e.read().decode("utf-8", errors="replace")[:300]
         if "max_tokens_exceeded" in detail:
             raise StateTooLarge(f"HTTP {e.code}: {detail}") from e
+        if e.code == 429:
+            try:
+                wait = float(e.headers.get("Retry-After") or RATE_LIMIT_WAIT_S)
+            except (TypeError, ValueError):
+                wait = RATE_LIMIT_WAIT_S
+            raise _CallError(f"HTTP 429: {detail}", retryable_by_split=True, retry_after=min(wait, 60.0)) from e
         # 401/403 will not improve by asking less; everything else might (one bad question, a blip).
         raise _CallError(f"HTTP {e.code}: {detail}", retryable_by_split=e.code not in (401, 403)) from e
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
@@ -243,10 +255,19 @@ _BACKENDS: dict[str, Callable[[dict[str, str], Any, dict[str, Question], Usage],
 
 def _ask(call, cfg, state, questions: dict[str, Question], usage: Usage) -> dict[str, Answer]:
     """One request; on a failure that asking less might fix, halve the questions (same
-    state) and retry each half, down to a single question, which is then skipped."""
+    state) and retry each half, down to a single question, which is then skipped. A rate limit
+    (429) is a timing problem, not a size one: wait (Retry-After) and send the same request once
+    more before splitting. [earned: 2026-09-24, Jev usage review — halving on 429 sent more
+    requests sooner; TypeSafe's API docs recommend backing off]"""
     try:
         return call(cfg, state, questions, usage)
     except _CallError as e:
+        if e.retry_after is not None:
+            time.sleep(e.retry_after)
+            try:
+                return call(cfg, state, questions, usage)
+            except _CallError as again:
+                e = again
         if not e.retryable_by_split or len(questions) == 1:
             usage.skipped.extend(questions)
             usage.last_error = str(e)
