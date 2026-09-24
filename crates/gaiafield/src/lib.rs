@@ -504,7 +504,9 @@ fn file_stat(path: &Path) -> (i64, u64) {
                 .modified()
                 .ok()
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs() as i64)
+                // Old databases store whole seconds and naturally refresh once.
+                // Preserve subsecond edits for both indexing and embedding reuse.
+                .map(|d| d.as_nanos() as i64)
                 .unwrap_or(0);
             (mtime, meta.len())
         }

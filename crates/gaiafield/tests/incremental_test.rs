@@ -77,3 +77,67 @@ fn incremental_target_changes_match_full_resolution() {
         assert_eq!(incremental, edges(&conn), "incremental differs from full after {change}");
     }
 }
+
+fn set_mtime(path: &Path, millis: u64) {
+    let time = std::time::UNIX_EPOCH + std::time::Duration::from_millis(millis);
+    std::fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_times(std::fs::FileTimes::new().set_modified(time))
+        .unwrap();
+}
+
+fn same_second_edit(infer: bool) {
+    let vault = Fixture::new();
+    let source = "04_Resources/Regression-Source.md";
+    let original = "---\ndescription: birds\n---\n[[Foo]] birds birds birds";
+    let changed = "---\ndescription: notes\n---\n[[Bar]] notes notes notes";
+    assert_eq!(original.len(), changed.len());
+    vault.write(source, original);
+    set_mtime(&vault.0.join(source), 1_700_000_000_100);
+    let conn = gaiafield::open_db(&vault.0.join(".gaiafield/test.db")).unwrap();
+    gaiafield::index(&vault.0, &conn, true).unwrap();
+    let model = std::env::temp_dir().join("gaiafield-v2-test-model-cache");
+    let before: Option<Vec<u8>> = if infer {
+        gaiafield::infer(&vault.0, &conn, &model, true, false).unwrap();
+        Some(conn.query_row("SELECT vector FROM embeddings WHERE path = ?1", [source], |r| r.get(0)).unwrap())
+    } else {
+        None
+    };
+
+    // Same integer second and byte count, with no sleep or wall-clock race.
+    vault.write(source, changed);
+    set_mtime(&vault.0.join(source), 1_700_000_000_200);
+    let report = gaiafield::index(&vault.0, &conn, false).unwrap();
+    assert_eq!(report.updated, 1);
+    assert_eq!(conn.query_row("SELECT description FROM nodes WHERE path = ?1", [source], |r| r.get::<_, String>(0)).unwrap(), "notes");
+    assert_eq!(conn.query_row("SELECT raw_target FROM edges WHERE source = ?1", [source], |r| r.get::<_, String>(0)).unwrap(), "Bar");
+    if let Some(before) = before {
+        let report = gaiafield::infer(&vault.0, &conn, &model, false, false).unwrap();
+        assert_eq!(report.embedded, 1);
+        let after: Vec<u8> = conn.query_row("SELECT vector FROM embeddings WHERE path = ?1", [source], |r| r.get(0)).unwrap();
+        assert_ne!(before, after, "the changed content must produce a fresh embedding");
+        assert_eq!(gaiafield::infer(&vault.0, &conn, &model, false, false).unwrap().embedded, 0);
+    }
+    assert_eq!(gaiafield::index(&vault.0, &conn, false).unwrap().updated, 0);
+
+    // A database written by an older version used seconds; it must refresh once.
+    conn.execute("UPDATE nodes SET mtime = mtime / 1000000000", []).unwrap();
+    let report = gaiafield::index(&vault.0, &conn, false).unwrap();
+    assert_eq!(report.updated, report.total_nodes);
+    if infer {
+        conn.execute("UPDATE embeddings SET mtime = mtime / 1000000000", []).unwrap();
+        assert_eq!(gaiafield::infer(&vault.0, &conn, &model, false, false).unwrap().embedded, report.total_nodes);
+    }
+}
+
+#[test]
+fn incremental_same_second_equal_size_edit_refreshes_metadata_and_links() {
+    same_second_edit(false);
+}
+
+#[test]
+fn incremental_same_second_equal_size_edit_refreshes_embedding() {
+    same_second_edit(true);
+}
