@@ -14,10 +14,13 @@ platform named `<engine>-<target-triple>` (`.exe` suffix on Windows). There is n
 single repo-wide "latest release" — "latest" is scoped per engine, so this module lists
 all releases and takes the newest tag matching each engine's own prefix.
 
-Nothing here touches a checksum published by the release process (none is): a
-downloaded file is instead verified for `size > 0` and its own sha256 is recorded in
-`manifest.json` — enough to detect a corrupt re-download or advertise what shipped,
-without inventing a checksum authority that doesn't exist yet.
+Checksums: a release may carry `<asset>.sha256` beside each binary (`sha256sum` format:
+the hex digest first). When it does, the download is checked against it before it replaces
+the installed binary, and a mismatch installs nothing. When it does not (every release made
+before the convention), the binary is installed as before, recorded `"verified": false` in
+`manifest.json`, and the result carries a warning. A checksum published in the same release
+catches a tampered or corrupted asset, not a compromised release itself; that needs a signature.
+[earned: 2026-09-24, review-01 SEC-2 — binaries were made executable with no check at all]
 
 Every network/platform failure raises `EngineError` with a message meant to be printed
 as-is (no traceback) — see `cli.py`'s `cmd_engines_*` handlers.
@@ -208,6 +211,30 @@ def _find_asset(release: dict, filename: str) -> dict | None:
     return None
 
 
+CHECKSUM_SUFFIX = ".sha256"
+CHECKSUM_MAX_BYTES = 4096
+
+
+def _fetch_checksum(release: dict, filename: str, timeout: int = HTTP_TIMEOUT) -> str | None:
+    """The sha256 the release publishes for `filename`, or None when it publishes none. A
+    checksum asset that exists but cannot be fetched or read raises `EngineError`: an
+    unreadable checksum is not the same as no checksum."""
+    asset = _find_asset(release, filename + CHECKSUM_SUFFIX)
+    if asset is None:
+        return None
+    url = asset["browser_download_url"]
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            text = resp.read(CHECKSUM_MAX_BYTES).decode("utf-8", errors="replace")
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise EngineError(f"checksum download failed ({url}): {exc}") from exc
+    digest = (text.split() or [""])[0].lower()
+    if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+        raise EngineError(f"checksum asset is not a sha256 digest: {url}")
+    return digest
+
+
 def _download(url: str, dest: Path, timeout: int = DOWNLOAD_TIMEOUT) -> tuple[int, str]:
     """Stream `url` to `dest`, returning `(size_bytes, sha256_hex)`. Any failure removes
     the partial file and raises `EngineError`; a zero-byte download is treated as a
@@ -276,25 +303,39 @@ def install_engine(engine: str, releases: list[dict] | None = None, *, force: bo
         return {"ok": False, "engine": engine, "error": f"release {tag} has no asset named {filename}"}
 
     dest.parent.mkdir(parents=True, exist_ok=True)
+    # Downloaded beside the binary and checked there: the installed one is replaced only by a
+    # download that matches its published checksum.
+    staged = dest.with_name(dest.name + ".new")
     try:
-        size, sha256 = _download(asset["browser_download_url"], dest)
+        expected = _fetch_checksum(release, filename)
+        size, sha256 = _download(asset["browser_download_url"], staged)
     except EngineError as exc:
         return {"ok": False, "engine": engine, "error": str(exc)}
+    if expected is not None and sha256 != expected:
+        staged.unlink(missing_ok=True)
+        return {"ok": False, "engine": engine,
+                "error": f"checksum mismatch for {filename} in {tag}: expected {expected}, got {sha256}; nothing installed"}
 
     if not is_windows_triple(triple):
-        dest.chmod(dest.stat().st_mode | 0o111)
+        staged.chmod(staged.stat().st_mode | 0o111)
+    staged.replace(dest)
 
     manifest[engine] = {
         "tag": tag,
         "version": tag.split("-v", 1)[-1],
         "target": triple,
         "sha256": sha256,
+        "verified": expected is not None,
         "size": size,
         "installed_at": _now_iso(),
     }
     write_manifest(manifest)
     action = "updated" if current else "installed"
-    return {"ok": True, "engine": engine, "action": action, "tag": tag, "path": str(dest), "sha256": sha256}
+    result = {"ok": True, "engine": engine, "action": action, "tag": tag, "path": str(dest), "sha256": sha256,
+              "verified": expected is not None}
+    if expected is None:
+        result["warning"] = f"release {tag} publishes no {filename}{CHECKSUM_SUFFIX}; installed unverified"
+    return result
 
 
 def install_all(force: bool = False) -> list[dict]:
