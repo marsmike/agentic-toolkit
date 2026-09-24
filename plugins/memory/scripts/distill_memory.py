@@ -13,7 +13,7 @@ the candidate.
 from __future__ import annotations
 
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import memory_vault as mv
 
@@ -39,6 +39,13 @@ def mark_session_distilled(session_path: Path) -> None:
     mv.write_note(session_path, fm, body)
 
 
+def _is_plain_name(slug: str) -> bool:
+    """One file name under both POSIX and Windows rules: no separator, drive (`C:x`) or anchor."""
+    if not slug or slug in (".", "..") or "\0" in slug:
+        return False
+    return all(not p.anchor and not p.drive and p.name == slug for p in (PurePosixPath(slug), PureWindowsPath(slug)))
+
+
 def write_memory_note(
     vault: Path,
     kind: str,
@@ -60,7 +67,7 @@ def write_memory_note(
         raise ValueError(f"kind must be one of {VALID_KINDS}, got {kind!r}")
     # The slug is proposed by a model: it names one file in 00_Memory/notes/, never a path.
     # [earned: 2026-09-24, review-01 SEC-5 — "/x" or "../x" wrote outside notes/]
-    if not slug or slug in (".", "..") or "/" in slug or "\\" in slug or "\0" in slug:
+    if not _is_plain_name(slug):
         raise ValueError(f"slug must be a plain file name, got {slug!r}")
     today = today or time.strftime("%Y-%m-%d")
     notes_dir = Path(vault) / "00_Memory" / "notes"

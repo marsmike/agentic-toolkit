@@ -111,3 +111,10 @@ def test_a_failed_install_step_leaves_no_staged_file(monkeypatch, fake_net):
     dest = engines.binary_path("farsight")
     assert not result["ok"] and "could not install" in result["error"]
     assert not dest.with_name(dest.name + ".new").exists() and not dest.exists()
+
+
+def test_install_repairs_a_modified_binary_without_force(monkeypatch, fake_net):
+    _installed(monkeypatch, fake_net).write_bytes(b"tampered")
+    result = engines.install_engine("farsight", [_release(checksum=b"")])
+    assert result["ok"] and result["action"] == "updated" and result["verified"]
+    assert engines.binary_path("farsight").read_bytes() == BINARY

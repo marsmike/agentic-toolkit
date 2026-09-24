@@ -10,7 +10,7 @@ from pathlib import Path
 
 from _sandbox import make_sandbox, teardown_sandbox
 
-BAD_SLUGS = ("../escaped", "../../escaped", "/tmp/escaped", "sub/escaped", "..", ".", "", "a\\b")
+BAD_SLUGS = ("../escaped", "../../escaped", "/tmp/escaped", "sub/escaped", "..", ".", "", "a\\b", "C:escaped", "C:\\escaped")
 
 
 def run(vault: Path) -> dict:

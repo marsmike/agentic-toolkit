@@ -294,7 +294,8 @@ def install_engine(engine: str, releases: list[dict] | None = None, *, force: bo
     manifest = read_manifest()
     current = manifest.get(engine)
     dest = binary_path(engine)
-    if current and current.get("tag") == tag and not force and dest.is_file():
+    # "Up to date" means the recorded tag's binary is there and unchanged; anything else reinstalls.
+    if current and current.get("tag") == tag and not force and _installed_binary_problem(current, dest) is None:
         return {"ok": True, "engine": engine, "action": "up-to-date", "tag": tag, "path": str(dest)}
 
     filename = _asset_filename(engine, triple)
