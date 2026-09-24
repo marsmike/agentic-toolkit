@@ -6,7 +6,8 @@
                  the radar archived without promoting, and a highlight child are not ingested; a
                  clip whose address a vault note already has is recorded, not captured; one tweet
                  saved twice (twitter.com and x.com?s=12) in the same run is one capture; only
-                 01_Capture/ and 00_Memory/ change; nothing in Reader is written
+                 01_Capture/ and 00_Memory/ change; nothing in Reader is written; an item saved
+                 before the four-week window is neither captured nor recorded, even in Later
 3. gap         — an item whose full text fails: status failed, one DLQ note, the watermark stays
 4. rerun       — the next run captures the missing item and nothing twice; the watermark moves
 5. copies      — when the first save of a page can never be fetched, its copy is captured instead
@@ -53,6 +54,7 @@ DOCS = [
     _doc("flaky1", "Full text fails once", "later"),
     _doc("tw1", "A tweet", "new", category="tweet", url="https://twitter.com/someone/status/42"),
     _doc("tw2", "The same tweet saved again", "new", category="tweet", url="https://x.com/someone/status/42?s=12"),
+    _doc("old1", "Saved before the window", "later", saved_at="2026-08-20T10:00:00Z"),
 ]
 
 
@@ -117,6 +119,8 @@ def run(vault: Path) -> dict:
         if r.get("already_in_vault") != 1 or r.get("duplicates") != 1:
             problems.append(f"phase 2: one clip a note already has, one same-run duplicate; got {r.get('already_in_vault')}, {r.get('duplicates')}")
         ledger = {row["doc_id"]: row for row in ingest.read_ledger(sandbox).values()}
+        if "old1" in caps or "old1" in ledger:
+            problems.append("phase 2: an item saved before the four-week window must be neither captured nor recorded")
         if ledger.get("tw2", {}).get("duplicate_of") != "tw1" or "tw1" not in ledger:
             problems.append(f"phase 2: the ledger must record tw2 as duplicate_of tw1, got {ledger.get('tw2')}")
         changed = {p for p, m in snap(sandbox).items() if before.get(p) != m} - {"04_Resources/Known-Post.md"}

@@ -6,8 +6,8 @@
 ## 1. Read state
 
 `lastSyncedAt` in `00_Memory/readwise-state.md` is the watermark for step 2. If the state
-note doesn't exist, this is a first sync — default to 30 days ago and rely on the backlog
-sweep (step 3) to catch anything older.
+note doesn't exist, this is a first sync — default to 28 days ago (the window: nothing saved earlier is ingested, sweep included). The backlog
+sweep (step 3) catches what the watermark missed within the same window.
 
 ## 2. Windowed fetch
 

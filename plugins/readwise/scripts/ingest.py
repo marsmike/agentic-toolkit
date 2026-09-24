@@ -4,7 +4,8 @@
     uv run --project plugins/readwise/scripts python3 plugins/readwise/scripts/ingest.py [--dry-run] [--json]
 
 One run, no agent: windowed fetch since `lastSyncedAt` plus the backlog sweep of new/later/
-shortlist, every location but `feed`. An `rss` item (a feed item) is ingested only when the radar
+shortlist, every location but `feed`. Both look back WINDOW_DAYS (four weeks) at most: an item saved
+earlier is out of scope, however long it has waited in Later. An `rss` item (a feed item) is ingested only when the radar
 promoted it (tag `radar`); the radar archives every feed item it has judged, and those are not
 clips. Each capture records its provenance (`via`):
 
@@ -38,7 +39,7 @@ from vault_utils import profile_value, read_frontmatter, require_vault, write_dl
 STATE_NOTE = Path("00_Memory") / "readwise-state.md"
 LEDGER = Path("00_Memory") / "readwise-ingested.jsonl"
 SWEEP_LOCATIONS = ("new", "later", "shortlist")
-FIRST_SYNC_DAYS = 30
+WINDOW_DAYS = 28  # the owner's scope: the last four weeks [earned: 2026-09-24, owner's request]
 GET_DELAY_S = 3.1  # Reader's list endpoint (which reader_get uses) allows 20 requests a minute
 MAX_429_RETRIES = 4
 RETRY_429_S = 15.0
@@ -143,8 +144,23 @@ def last_synced(vault: Path, now: datetime) -> str:
     if path.is_file():
         fm, _ = read_frontmatter(path)
         if fm.get("lastSyncedAt"):
-            return str(fm["lastSyncedAt"])
-    return (now - timedelta(days=FIRST_SYNC_DAYS)).isoformat()
+            return max(str(fm["lastSyncedAt"]), window_start(now), key=_utc)
+    return window_start(now)
+
+
+def window_start(now: datetime) -> str:
+    return (now - timedelta(days=WINDOW_DAYS)).isoformat()
+
+
+def in_window(item: dict, start: str) -> bool:
+    """Saved within the window; an item without a date is kept (it cannot be judged old)."""
+    saved = str(item.get("saved_at") or item.get("created_at") or "")
+    return not saved or _utc(saved) >= _utc(start)
+
+
+def _utc(stamp: str) -> datetime:
+    t = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    return t if t.tzinfo else t.replace(tzinfo=UTC)
 
 
 def set_last_synced(vault: Path, stamp: str) -> None:
@@ -185,8 +201,9 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
         return {"status": "failed", "detail": f"Reader: {e}"}
 
     unique = {}
+    start = window_start(now)
     for it in items:
-        if eligible(it):
+        if eligible(it) and in_window(it, start):
             unique.setdefault(str(it["id"]), it)
     ledger = read_ledger(vault)
     senders = newsletter_senders(vault)

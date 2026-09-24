@@ -14,7 +14,7 @@ Git is the sync channel and the pipeline is its one committer. [earned: 2026-09-
 sessions write to the vault through GitHub]
 
 `queue` picks this run's batch from `01_Capture/`: the owner's clips first, then everything else,
-oldest first, at most `--batch` (profile `pipeline_batch`, default 10). A capture that has failed
+oldest first, at most `--batch` (profile `pipeline_batch`, default 25). A capture that has failed
 MAX_ATTEMPTS runs is left out and written to the DLQ once: it needs a human, and it must not
 block the queue.
 
@@ -46,7 +46,7 @@ LOCK = Path("00_Memory") / "pipeline.lock"
 STATE = Path("00_Memory") / "pipeline-state.json"
 LOCK_STALE_HOURS = 6
 MAX_ATTEMPTS = 2
-DEFAULT_BATCH = 10
+DEFAULT_BATCH = 25
 SCRIPTS = Path(__file__).resolve().parent
 GENERATORS = {  # script → the files it writes (a trailing / = every file directly in that folder)
     "index_build.py": ("Index.md",),

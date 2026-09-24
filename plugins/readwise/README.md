@@ -18,7 +18,7 @@ uv run --project scripts python3 scripts/ingest.py --dry-run   # counts only
 ```
 
 Every Reader library item not yet in the vault becomes a capture: a windowed sync from
-`lastSyncedAt` plus a backlog sweep of new/later/shortlist, feed items only when the radar
+`lastSyncedAt` plus a backlog sweep of new/later/shortlist, both limited to the last four weeks, feed items only when the radar
 promoted them, each with its provenance (`via: clip`, `newsletter` or `radar`). Dedup is the
 ledger `00_Memory/readwise-ingested.jsonl` plus the vault itself. Nothing in Reader is moved or
 deleted. **Every clipping the user saved ends up in `01_Capture/`**: an item fetched but not
