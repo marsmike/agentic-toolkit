@@ -66,3 +66,37 @@ def test_release_without_checksum_installs_unverified_with_a_warning(fake_net):
     assert result["ok"] and result["verified"] is False
     assert "installed unverified" in result["warning"]
     assert engines.read_manifest()["farsight"]["verified"] is False
+
+
+# --- status (review-01 CODE-7): the manifest says what was installed, the file whether it still is ---
+
+
+def _installed(monkeypatch, fake_net):
+    fake_net["https://example.invalid/sum"] = f"{hashlib.sha256(BINARY).hexdigest()}  {FILENAME}\n".encode()
+    release = _release(checksum=b"")
+    assert engines.install_engine("farsight", [release])["ok"]
+    monkeypatch.setattr(engines, "_fetch_releases", lambda *a, **k: [release])
+    return engines.binary_path("farsight")
+
+
+def _farsight_status() -> dict:
+    return next(r for r in engines.status_all() if r["engine"] == "farsight")
+
+
+def test_status_of_an_intact_install_is_up_to_date(monkeypatch, fake_net):
+    _installed(monkeypatch, fake_net)
+    row = _farsight_status()
+    assert row["up_to_date"] and row["installed_tag"] == "farsight-v0.1.2" and "note" not in row
+
+
+def test_status_of_a_deleted_binary_is_not_installed(monkeypatch, fake_net):
+    _installed(monkeypatch, fake_net).unlink()
+    row = _farsight_status()
+    assert row["up_to_date"] is False and row["installed_tag"] is None and row["installed_path"] is None
+    assert "is missing" in row["note"] and "--force" in row["note"]
+
+
+def test_status_of_a_modified_binary_is_not_up_to_date(monkeypatch, fake_net):
+    _installed(monkeypatch, fake_net).write_bytes(b"something else entirely")
+    row = _farsight_status()
+    assert row["up_to_date"] is False and "does not match the sha256" in row["note"]

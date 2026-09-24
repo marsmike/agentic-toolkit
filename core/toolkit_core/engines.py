@@ -349,6 +349,21 @@ def install_all(force: bool = False) -> list[dict]:
     return [install_engine(engine, releases, force=force) for engine in ENGINES]
 
 
+def _installed_binary_problem(entry: dict, path: Path) -> str | None:
+    """Why the binary the manifest records is not usable as installed, or None if it is."""
+    if not path.is_file():
+        return f"manifest records {entry.get('tag')} but {path} is missing"
+    recorded = entry.get("sha256")
+    if recorded:
+        digest = hashlib.sha256()
+        with open(path, "rb") as fh:
+            while chunk := fh.read(DOWNLOAD_CHUNK):
+                digest.update(chunk)
+        if digest.hexdigest() != recorded:
+            return f"{path} does not match the sha256 recorded when {entry.get('tag')} was installed"
+    return None
+
+
 def status_all() -> list[dict]:
     """Installed vs. latest for every known engine — read-only, never downloads."""
     manifest = read_manifest()
@@ -365,15 +380,25 @@ def status_all() -> list[dict]:
         entry = manifest.get(engine)
         latest = _latest_for_engine(engine, releases) if releases else None
         latest_tag = latest.get("tag_name") if latest else None
+        # The manifest says what was installed; the file says whether it still is.
+        # [earned: 2026-09-24, review-01 CODE-7 — a deleted binary reported up_to_date: true]
+        path = binary_path(engine)
+        problem = _installed_binary_problem(entry, path) if entry else None
+        intact = entry is not None and problem is None
         row = {
             "engine": engine,
-            "installed_tag": entry.get("tag") if entry else None,
-            "installed_path": str(binary_path(engine)) if entry else None,
+            "installed_tag": entry.get("tag") if intact else None,
+            "installed_path": str(path) if intact else None,
             "latest_tag": latest_tag,
-            "up_to_date": bool(entry and latest_tag and entry.get("tag") == latest_tag),
+            "up_to_date": bool(intact and latest_tag and entry.get("tag") == latest_tag),
             "target": triple,
         }
+        notes = []
+        if problem:
+            notes.append(f"{problem}: run `toolkit engines install --force`")
         if fetch_error and latest_tag is None:
-            row["note"] = f"could not check latest release: {fetch_error}"
+            notes.append(f"could not check latest release: {fetch_error}")
+        if notes:
+            row["note"] = "; ".join(notes)
         rows.append(row)
     return rows
