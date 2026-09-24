@@ -34,12 +34,21 @@ attached; you read the notes it points at and decide. Without a judgment backend
 
 **The check** is the definition of done. Hard gates: frontmatter (`source`, `status:
 distilled`, `processed_date`, `description`), a `*Source: …*` line naming the capture's own
-source (one line, never wrapped; an enrichment adds the capture's line beside the note's own), a stored document linked when the capture has one, no wikilink into `01_Capture/`
+source (one line, never wrapped; an enrichment adds the capture's line beside the note's own), a stored document linked when the capture has one (legacy captures only — a PDF captured
+since 2026-09-24 has no file in the vault to link; its Source line already names the PDF URL,
+so the note cites page ranges against that instead), no wikilink into `01_Capture/`
 or `05_Archive/`, no dangling wikilink, an Index.md line. Soft, reported: which of the
 capture's other URLs the note dropped, whether your `--ask` questions find the note in the
 top three, and which of the capture's kept passages the note does not carry. A capture is
 retired only after the check passes and you have answered every soft finding: put it in,
 or name it in the handoff as deliberate.
+
+**A PDF capture has no stored file.** Its Full Text is a LiteParse conversion with
+`<!-- page N -->` anchors (or, on a failed conversion, Reader's own extraction — see
+`extractor` in the capture's frontmatter); cite page ranges for the claims the note keeps,
+the same way a book note cites a location. [earned: 2026-09-24, owner's request — PDFs
+bloated the git repo, and the vault's own `.gitignore` excludes `*.pdf` anyway, so a stored
+copy vanished from every cloud run while the note kept linking a file that existed nowhere]
 
 **A stub is not the content.** A capture marked `content: stub` (ingest saw a sign-up wall, a
 404 or an empty page), or whose full text plainly is one, is distilled from its source: fetch

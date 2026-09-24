@@ -48,6 +48,41 @@ The document: [[04_Resources/Attachments/eval-doc.pdf]]. Related: [[Typed-Judgme
 """
 
 
+# A capture with no `attachment` field at all — a PDF captured since 2026-09-24 (pdf_extract.py):
+# the file is never stored in the vault, so the note has nothing to link but its Source URL.
+# [earned: 2026-09-24, owner's request — PDFs bloated the git repo; the attachment gate must
+# pass a capture that was never given a file to link, not just one whose note forgot to link it]
+PDF_SOURCE = "https://example.org/eval-report.pdf"
+PDF_CAPTURE = f"""---
+source: {PDF_SOURCE}
+origin: readwise
+via: clip
+category: pdf
+pdf_pages: 3
+pdf_sha256: deadbeefcafef00d
+extractor: liteparse 9.9.9
+---
+
+# A PDF report
+
+*Source: [{PDF_SOURCE}]({PDF_SOURCE})*
+
+## Full Text
+
+<!-- page 1 -->
+A claim with a number: gates catch 100% of what they are shown to catch.
+"""
+PDF_NOTE_FM = {"description": "A note distilled from a PDF; no stored file to link.",
+               "status": "distilled", "source": PDF_SOURCE, "processed_date": "2026-09-23"}
+PDF_NOTE_BODY = f"""# Eval PDF note
+
+*Source: [A PDF report]({PDF_SOURCE})*
+
+The key claim (p.1): gates catch 100% of what they are shown to catch. This capture has no
+`attachment` field, so nothing needs linking here beyond the Source URL above.
+"""
+
+
 def _note(fm: dict, body: str) -> str:
     lines = ["---", *(f"{k}: {v}" for k, v in fm.items()), "---", ""]
     return "\n".join(lines) + body
@@ -106,6 +141,21 @@ def run(vault: Path) -> dict:
             if failed != expected:
                 why = {g: report["hard"][g][1] for g in failed}
                 problems.append(f"{name}: expected {expected or 'a pass'}, failed {failed} {why}")
+
+        # A capture with no `attachment` field at all (a PDF, since 2026-09-24) must pass the
+        # attachment gate on a note that links nothing — there is no stored file to require.
+        pdf_capture = sandbox / "01_Capture" / "Eval-Check-PDF-Capture.md"
+        pdf_capture.write_text(PDF_CAPTURE, encoding="utf-8")
+        pdf_note = sandbox / "04_Resources" / "Eval-Check-pdf-no-attachment.md"
+        pdf_note.write_text(_note(PDF_NOTE_FM, PDF_NOTE_BODY), encoding="utf-8")
+        index.write_text(index.read_text(encoding="utf-8") +
+                          "\n- [[04_Resources/Eval-Check-pdf-no-attachment|Eval pdf-no-attachment]] — fixture\n",
+                          encoding="utf-8")
+        report = distill_check.check(pdf_note, pdf_capture, sandbox, asks=[])
+        failed = sorted(g for g, (ok, _) in report["hard"].items() if not ok)
+        if failed:
+            why = {g: report["hard"][g][1] for g in failed}
+            problems.append(f"pdf-no-attachment: expected a pass (no attachment field to gate on), failed {failed} {why}")
     finally:
         for k, v in saved.items():
             if v is not None:
@@ -114,4 +164,6 @@ def run(vault: Path) -> dict:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else f"{len(VARIANTS) - 2} broken notes each fail exactly their gate; the good and the enriched note pass"}
+            "detail": "; ".join(problems) if problems else
+            f"{len(VARIANTS) - 2} broken notes each fail exactly their gate; the good, the enriched "
+            "and the pdf-no-attachment note pass"}
