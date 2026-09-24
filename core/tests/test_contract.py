@@ -288,3 +288,40 @@ def test_cross_plugin_ledgers_match_the_contract():
     for name, keys in readers.items():
         assert keys, f"{name}: found no field reads — the reader moved; update this test"
         assert keys <= table[name][1], f"{name}: reader relies on undocumented fields {sorted(keys - table[name][1])}"
+
+
+def test_core_and_plugin_engine_install_paths_agree(tmp_path, monkeypatch):
+    """search.py's farsight discovery mirrors engines.py the way graph.py's gaiafield discovery
+    does, but only graph.py had a parity test: moving the install dir in engines.py and graph.py
+    alone would leave search silently on pure-Python BM25 [earned: 2026-09-24 review GLM-4].
+    Both plugin mirrors must compute `engines.binary_path()` and fall back to it after the env
+    var and PATH, in that order."""
+    import sys
+
+    from toolkit_core import engines
+
+    scripts_dir = EXAMPLE_VAULT.parent / "plugins" / "obsidian" / "scripts"
+    sys.path.insert(0, str(scripts_dir))
+    try:
+        import graph as graph_mod
+        import search as search_mod
+    finally:
+        sys.path.remove(str(scripts_dir))
+
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    assert search_mod._engines_install_dir() == engines.binary_path("farsight")
+    assert graph_mod._engines_install_dir() == engines.binary_path("gaiafield")
+
+    for name, env, find in (("farsight", "TOOLKIT_FARSIGHT_BIN", search_mod.farsight_binary),
+                            ("gaiafield", knowledge.GAIAFIELD_BIN_ENV, graph_mod.gaiafield_binary)):
+        monkeypatch.delenv(env, raising=False)
+        monkeypatch.setattr(search_mod.shutil, "which", lambda _: None)
+        assert find() is None, f"{name}: nothing installed must find nothing"
+        installed = engines.binary_path(name)
+        installed.parent.mkdir(parents=True, exist_ok=True)
+        installed.write_text("", encoding="utf-8")
+        assert find() == str(installed), f"{name}: the engines install dir must be the last fallback"
+        monkeypatch.setattr(search_mod.shutil, "which", lambda n, name=name: f"/usr/bin/{n}" if n == name else None)
+        assert find() == f"/usr/bin/{name}", f"{name}: PATH must win over the install dir"
+        monkeypatch.setenv(env, f"/custom/{name}-bin")
+        assert find() == f"/custom/{name}-bin", f"{name}: the env var must win"
