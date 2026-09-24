@@ -172,16 +172,17 @@ def semantic_scores(query: str, corpus: list[Doc], vault: Path, rebuild: bool = 
             cache = {}
 
     model_name = "TaylorAI/bge-micro-v2"
+    revision = "3edf6d7de0faa426b09780416fe61009f26ae589"  # pinned: a moved repo head must not change what runs
     stale = [d for d in corpus if cache.get(d.rel, {}).get("mtime") != d.path.stat().st_mtime]
     if stale:
-        model = SentenceTransformer(model_name)
+        model = SentenceTransformer(model_name, revision=revision)
         vectors = model.encode([d.text[:1000] for d in stale], show_progress_bar=False)
         for d, vec in zip(stale, vectors, strict=False):
             cache[d.rel] = {"mtime": d.path.stat().st_mtime, "vector": vec.tolist()}
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         cache_file.write_text(json.dumps(cache), encoding="utf-8")
 
-    model = SentenceTransformer(model_name)
+    model = SentenceTransformer(model_name, revision=revision)
     q_vec = np.array(model.encode([query], show_progress_bar=False)[0])
     q_norm = q_vec / (np.linalg.norm(q_vec) or 1.0)
 
