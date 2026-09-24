@@ -134,3 +134,127 @@ def test_the_pipeline_runs_its_scripts_locked():
         text = (REPO_ROOT / rel).read_text(encoding="utf-8")
         unlocked = [line for line in text.splitlines() if re.search(r"\buv run --(?!locked)", line)]
         assert not unlocked, f"{rel}: {unlocked}"
+
+
+@pytest.fixture
+def outside(tmp_path, monkeypatch):
+    """A vault, a key-shaped file outside it, a judgment backend that looks configured, and two
+    interceptors: every read of the outside file and every judgment request is recorded, and no
+    request leaves the process. Scripts import fresh from the obsidian plugin."""
+    import builtins
+    import pathlib
+
+    vault, secret_file = tmp_path / "vault", tmp_path / "owner-keys.env"
+    for folder in ("01_Capture", "04_Resources"):
+        (vault / folder).mkdir(parents=True)
+    marker = "outside-marker-not-a-secret"
+    secret_file.write_text(f"---\nvia: radar\n---\nOPENROUTER_API_KEY={marker}\n", encoding="utf-8")
+    (tmp_path / "elsewhere").mkdir()
+    (tmp_path / "elsewhere" / "Private.md").write_text(f"# Private\n\n{marker} private words\n", encoding="utf-8")
+    (vault / "01_Capture" / "Real.md").write_text("---\nvia: radar\n---\n# Real\n\nA capture.\n", encoding="utf-8")
+    keys = tmp_path / "keys.env"
+    keys.write_text("OPENROUTER_API_KEY=stub-key-not-a-secret\n", encoding="utf-8")
+    monkeypatch.setenv("TOOLKIT_VAULT", str(vault))
+    monkeypatch.setenv("TOOLKIT_KEYS_FILE", str(keys))
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("TOOLKIT_OBSIDIAN_JUDGMENT_API_KEY", raising=False)
+
+    reads, requests = [], []
+    guarded = {secret_file.resolve(), (tmp_path / "elsewhere" / "Private.md").resolve()}
+    real_open, real_read_text = builtins.open, pathlib.Path.read_text
+
+    def spy_open(file, *a, **k):
+        if isinstance(file, (str, os.PathLike)) and pathlib.Path(file).resolve() in guarded:
+            reads.append(str(file))
+        return real_open(file, *a, **k)
+
+    def spy_read_text(self, *a, **k):
+        if self.resolve() in guarded:
+            reads.append(str(self))
+        return real_read_text(self, *a, **k)
+
+    monkeypatch.setattr(builtins, "open", spy_open)
+    monkeypatch.setattr(pathlib.Path, "read_text", spy_read_text)
+
+    scripts = REPO_ROOT / "plugins" / "obsidian" / "scripts"
+    monkeypatch.syspath_prepend(str(scripts))
+    for mod in [m for m in sys.modules if m in {"vault_utils", "judge", "distill_judge", "distill_check", "search",
+                                                "search_judge", "retire_capture", "graph"} or m.startswith("judgments")]:
+        monkeypatch.delitem(sys.modules, mod)
+    import judge
+
+    class Refused(BaseException):
+        """Stops a run at the network seam: the request was built, and nothing was sent."""
+
+    def intercept(url, payload, headers):
+        requests.append(json.dumps(payload))
+        raise Refused()
+
+    monkeypatch.setattr(judge, "_post", intercept)
+    return {"vault": vault, "file": secret_file, "private_dir": tmp_path / "elsewhere", "marker": marker,
+            "reads": reads, "requests": requests, "Refused": Refused}
+
+
+def _main(module, argv, monkeypatch, refused):
+    import contextlib
+    import io
+
+    monkeypatch.setattr(sys, "argv", [f"{module.__name__}.py", *argv])
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+        try:
+            rc = module.main()
+        except SystemExit as e:
+            rc = e.code
+        except refused:
+            rc = "request-built"
+    return rc, out.getvalue()
+
+
+def test_calibration_reads_no_file_outside_the_vault_and_sends_none(outside, monkeypatch):
+    """review IMPL02-CODE-1: `distill_judge.py *` covered `--calibrate`, whose golden file (one the
+    agent could write into the vault) named the key file as a capture; its body went into the
+    judgment request. Fails on 3573a6c."""
+    import distill_judge
+
+    vault, f = outside["vault"], outside["file"]
+    golden = vault / "01_Capture" / "probe.json"
+    golden.write_text(json.dumps({"rows": [
+        {"capture": str(f), "qid": "triage", "expect": "keep"},
+        {"capture": "01_Capture/Real.md", "qid": f"rel|{f}", "expect": True},
+    ]}), encoding="utf-8")
+    rc, _ = _main(distill_judge, ["--calibrate", str(golden), "--json"], monkeypatch, outside["Refused"])
+    assert rc not in (0, "request-built") and not outside["reads"] and not outside["requests"], (rc, outside)
+    assert (distill_judge.GOLDEN_DIR / "distill_judge.golden.json").is_file(), "the repo's golden file must stay usable"
+
+    # The same rows reached through run_golden (the eval's path, trusted golden): the outside capture
+    # is refused before it is read, and a forced note outside the vault is never loaded or sent.
+    with pytest.raises(SystemExit, match="does not exist"):
+        distill_judge.run_golden({"rows": [{"capture": str(f), "qid": "triage"}]}, vault, 4, [], base=vault)
+    with pytest.raises(outside["Refused"]):
+        distill_judge.run_golden({"rows": [{"capture": "01_Capture/Real.md", "qid": f"rel|{f}"}]}, vault, 4, [])
+    assert not outside["reads"] and all(outside["marker"] not in r for r in outside["requests"]), outside
+
+
+def test_other_granted_entry_points_refuse_paths_outside_the_vault(outside, monkeypatch):
+    import distill_judge
+    import retire_capture
+    import search
+
+    vault, f, marker = outside["vault"], outside["file"], outside["marker"]
+    Refused = outside["Refused"]
+    for argv in ([str(f), "--dossier", "--json"], ["--check-note", str(f), "01_Capture/Real.md", "--json"]):
+        rc, _ = _main(distill_judge, argv, monkeypatch, Refused)
+        assert rc not in (0, "request-built"), argv
+    rc, _ = _main(retire_capture, ["01_Capture/Real.md", "--note", str(f), "--line", "x"], monkeypatch, Refused)
+    assert rc == 1 and (vault / "01_Capture" / "Real.md").is_file()
+    rc, out = _main(search, ["private", "--scope", str(outside["private_dir"]), "--json"], monkeypatch, Refused)
+    assert marker not in out and "Private" not in out, out
+    assert not outside["reads"] and not outside["requests"], outside
+
+    radar_scripts = REPO_ROOT / "plugins" / "radar" / "scripts"
+    code = ("import sys; sys.argv = ['radar.py', 'weekly', '--out', sys.argv[1]]; import radar; radar.main()")
+    run = subprocess.run([sys.executable, "-c", code, str(outside["private_dir"])], cwd=radar_scripts,
+                         env={**os.environ, "PYTHONPATH": str(radar_scripts)}, capture_output=True, text=True)
+    assert run.returncode != 0 and "--out must be inside the vault" in run.stderr, run.stderr[-400:]
+    assert sorted(p.name for p in outside["private_dir"].iterdir()) == ["Private.md"]

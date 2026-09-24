@@ -107,10 +107,15 @@ def vault_file(vault: Path, arg: str) -> Path:
     resolves inside the vault: the unattended run may call these scripts but not read the key
     file, and `01_Capture/../../.env` or a symlink would have printed it as a capture's passages.
     [earned: 2026-09-24, review-01 SEC-1]"""
-    path = Path(arg) if Path(arg).is_absolute() else vault / arg
-    if not path.resolve().is_relative_to(vault.resolve()):
+    path = vault / arg  # an absolute `arg` replaces the vault prefix
+    if not inside(path, vault):
         raise SystemExit(f"not inside the vault: {arg}")
     return path
+
+
+def inside(path: Path, root: Path) -> bool:
+    """`path` resolves (symlinks, `..`) to `root` or below it."""
+    return path.resolve().is_relative_to(root.resolve())
 
 
 # ---------------------------------------------------------------------------
@@ -383,7 +388,7 @@ def discover_notes(
     candidates: list[Path] = []
     for folder in folders:
         root = vault / folder
-        if not root.is_dir():
+        if not root.is_dir() or not inside(root, vault):  # a `scope` is a vault folder, never beyond
             continue
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
