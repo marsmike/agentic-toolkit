@@ -29,6 +29,11 @@ To run it as a Claude cloud routine instead (no Mac needed), see `docs/cloud-rou
 </dict></plist>
 ```
 
+The run's agent holds no key and reaches only what the pipeline needs (`run-pipeline.sh` says
+exactly what): each script reads its own key from `~/.env` (or `TOOLKIT_KEYS_FILE`), and a stub's
+source is fetched only from `TOOLKIT_PIPELINE_FETCH_DOMAINS` (default `github.com
+raw.githubusercontent.com`; add either variable to `EnvironmentVariables` to change it).
+
 ```bash
 launchctl load ~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist     # start
 launchctl start io.agentic-toolkit.pipeline                                  # one run now

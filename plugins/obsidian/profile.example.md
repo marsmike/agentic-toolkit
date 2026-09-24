@@ -61,8 +61,8 @@ order (env var → this note → shipped default).
 ## Secrets
 
 No credential belongs in this file, ever — see `contract/PROFILE.md`'s Secrets section. An
-OpenAI-compatible API key is an environment variable (`TOOLKIT_OBSIDIAN_INFERENCE_API_KEY`),
-referenced here only by name if at all. The judgment backend reads
+OpenAI-compatible API key is `TOOLKIT_OBSIDIAN_INFERENCE_API_KEY`, from the environment or the
+key file (`~/.env`, read by the script itself), referenced here only by name if at all. The judgment backend reads
 `TOOLKIT_OBSIDIAN_JUDGMENT_API_KEY`, falling back to `OPENROUTER_API_KEY`.
 
 ## Env var overrides

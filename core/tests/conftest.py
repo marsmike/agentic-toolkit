@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,9 @@ assert REPO_ROOT is not None, "tests must run from inside the agentic-toolkit re
 
 EXAMPLE_VAULT = REPO_ROOT / "vault"
 AGENTS_MD_TEMPLATE = REPO_ROOT / "contract" / "templates" / "VAULT_AGENTS.md"
+
+# No test reads the developer's key file (vault_utils.secret falls back to ~/.env).
+os.environ["TOOLKIT_KEYS_FILE"] = os.devnull
 
 
 def example_vault_note_count() -> int:

@@ -41,7 +41,7 @@ from judgments.state import domain_glosses, in_chunks, note_payload
 from judgments.urls import _canonical
 from search import search
 from search_judge import expand
-from vault_utils import discover_notes, profile_value, read_frontmatter, require_vault, write_dlq_note
+from vault_utils import discover_notes, profile_value, read_frontmatter, require_vault, vault_file, write_dlq_note
 
 MAX_LISTED_FOLDERS = 60
 
@@ -578,8 +578,8 @@ def main() -> int:
         if args.check_note:
             if len(args.captures) != 1:
                 ap.error("--check-note takes exactly one capture")
-            note = Path(args.check_note) if Path(args.check_note).is_absolute() else vault / args.check_note
-            cap = Path(args.captures[0]) if Path(args.captures[0]).is_absolute() else vault / args.captures[0]
+            note = vault_file(vault, args.check_note)
+            cap = vault_file(vault, args.captures[0])
             report = check_note(note, cap, vault)
             if args.json:
                 print(json.dumps(report, indent=2))
@@ -590,7 +590,7 @@ def main() -> int:
             return 0
         if not args.captures:
             ap.error("name at least one capture, or use --calibrate")
-        paths = [p if p.is_absolute() else vault / p for p in map(Path, args.captures)]
+        paths = [vault_file(vault, c) for c in args.captures]
         missing = [str(p) for p in paths if not p.is_file()]
         if missing:
             ap.error(f"not a file: {', '.join(missing)}")

@@ -43,9 +43,9 @@ SETUP
    the pipeline skill exactly (use the obsidian:pipeline skill if it is loaded; otherwise follow
    the file). Distill each capture per plugins/obsidian/skills/distill/SKILL.md in --auto mode.
    The radar commands are
-     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py <args>
+     uv run --locked --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py <args>
    and ingest is
-     uv run --project plugins/readwise/scripts python3 plugins/readwise/scripts/ingest.py --json
+     uv run --locked --project plugins/readwise/scripts python3 plugins/readwise/scripts/ingest.py --json
 
 RUN, in the skill's order
 - pipeline_run.py begin. "busy" or "skipped": stop and report why. Keep the "token" it returns.

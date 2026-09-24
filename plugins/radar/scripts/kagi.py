@@ -14,12 +14,13 @@ and for summarize the address of the page to summarise.
 from __future__ import annotations
 
 import json
-import os
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+from vault_utils import secret
 
 BASE = "https://kagi.com/api/v0"
 DEFAULT_WEEKLY_BUDGET_USD = 1.00
@@ -45,7 +46,7 @@ class OverBudget(KagiError):
 
 def _request(url: str, body: dict | None = None) -> dict:
     """The one network call in this module (POST when `body` is given). Evals replace it with a stub."""
-    key = os.environ.get("KAGI_API_KEY")
+    key = secret("KAGI_API_KEY")
     if not key:
         raise NoKey("KAGI_API_KEY is not set")
     data = json.dumps(body).encode("utf-8") if body is not None else None

@@ -31,7 +31,7 @@ from judgments.capture import URL_RE, read_capture
 from judgments.passages import check_note
 from judgments.urls import _canonical
 from search import search
-from vault_utils import discover_notes, read_frontmatter, require_vault
+from vault_utils import discover_notes, read_frontmatter, require_vault, vault_file
 
 NEVER_LINK = ("01_Capture/", "05_Archive/")
 IMAGE_HOSTS = ("readwise-assets", "substackcdn", "pbs.twimg.com", "images.unsplash", "cdn-images", "gravatar")
@@ -114,8 +114,8 @@ def main() -> int:
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
     vault = require_vault()
-    note = Path(args.note) if Path(args.note).is_absolute() else vault / args.note
-    capture = Path(args.capture) if Path(args.capture).is_absolute() else vault / args.capture
+    note = vault_file(vault, args.note)
+    capture = vault_file(vault, args.capture)
     t0 = time.time()
     report = check(note, capture, vault, args.ask)
     report["seconds"] = round(time.time() - t0, 1)

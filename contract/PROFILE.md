@@ -22,9 +22,14 @@ the answer.
 
 ## Secrets
 
-Secrets never live in the vault or in the repo — only in environment variables or a keychain. A
-profile note may reference that a credential exists and where to configure it; it never carries
-the credential's value. A plugin that calls a hosted service says so next to the profile key that
+Secrets never live in the vault or in the repo — only in environment variables, the owner's key
+file, or a keychain. The key file is `TOOLKIT_KEYS_FILE`, default `~/.env`, `NAME=value` lines.
+Each script reads the one key it needs itself (`vault_utils.secret(name)`: the environment first,
+then the key file) and keeps it in the process that makes the call: it never exports it, so
+nothing the script starts, and no agent that started the script, holds it. The unattended
+pipeline relies on this: its agent runs without any key in its environment and may not read
+the key file. [earned: 2026-09-24, review-01 SEC-1] A profile note may reference that a
+credential exists and where to configure it; it never carries the credential's value. A plugin that calls a hosted service says so next to the profile key that
 enables it, names what leaves the machine, and does nothing over the network while the
 credential is absent.
 

@@ -2,8 +2,8 @@
 """Readwise API client — Reader v3 (primary) + Classic v2 (supplementary, Kindle/Apple Books).
 
 Python port of v1's `readwise-api.sh`, stdlib-only (urllib) to keep scripts/pyproject.toml's
-dependency list minimal. The token is read from the `READWISE_TOKEN` environment variable —
-never from the vault, never from a profile note, never hard-coded (contract/PROFILE.md's
+dependency list minimal. The token is `READWISE_TOKEN`, from the environment or the key file
+(`vault_utils.secret`) — never from the vault, never from a profile note, never hard-coded (contract/PROFILE.md's
 Secrets rule). Get a token at https://readwise.io/access_token.
 
 CLI usage (mostly for debugging — the ingest skill drives this as a library):
@@ -22,6 +22,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
+
+from vault_utils import secret
 
 READER_BASE = "https://readwise.io/api/v3"
 CLASSIC_BASE = "https://readwise.io/api/v2"
@@ -42,12 +44,10 @@ class ReadwiseAPIError(RuntimeError):
 
 
 def _token(token: str | None = None) -> str:
-    import os
-
-    tok = token or os.environ.get("READWISE_TOKEN")
+    tok = token or secret("READWISE_TOKEN")
     if not tok:
         raise NoTokenConfigured(
-            "READWISE_TOKEN is not set. Add it to your environment (see profile.example.md's "
+            "READWISE_TOKEN is not set. Add it to your environment or ~/.env (see profile.example.md's "
             "Secrets section) — never write the value into the vault or the repo."
         )
     return tok

@@ -1,24 +1,70 @@
 #!/bin/zsh
 # One unattended pipeline run: Claude Code headless with the pipeline skill.
 # Scheduled every 3 hours by launchd; see skills/pipeline/references/scheduling.md.
+# Plain bash syntax as well (core/tests/test_pipeline_policy.py runs it under either shell).
 set -euo pipefail
 export TOOLKIT_REPO="${TOOLKIT_REPO:-$HOME/Developer/agentic-toolkit}"
-REPO="$TOOLKIT_REPO"
 : "${TOOLKIT_VAULT:?set TOOLKIT_VAULT to the vault this run keeps current}"
-# Keys (READWISE_TOKEN, OPENROUTER_API_KEY, KAGI_API_KEY) come from ~/.env, never from the repo.
-[[ -f "$HOME/.env" ]] && { set -a; source "$HOME/.env"; set +a; }
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-cd "$REPO"
+cd "$TOOLKIT_REPO"
+REPO="$(pwd -P)"
+VAULT="$(cd "$TOOLKIT_VAULT" && pwd -P)"
+export TOOLKIT_VAULT="$VAULT"
+
+# The run distills text other people wrote, so the agent holds no key and reaches only what the
+# skills name. [earned: 2026-09-24, review-01 SEC-1: `Bash(uv run:*)` ran any code, the agent's
+# environment held every key in ~/.env, and WebFetch reached any host]
+# - Keys: never sourced here. The agent starts from an empty environment plus the names below
+#   (Claude Code's own login, locale, TOOLKIT_* settings that are not a key or token), so nothing
+#   the caller exported reaches it. Each script reads the one key it needs from the key file itself
+#   (vault_utils.secret: TOOLKIT_KEYS_FILE, default ~/.env); the agent may neither read nor edit it.
+# - Bash: exactly the scripts the pipeline and distill skills run, each through `uv run --locked`,
+#   written relative to the repo; a shell function, a variable, `cd` or `python3 -c` is refused.
+# - Files: read the repo and the vault, write the vault only; never its .git (hooks, remote) or
+#   Config/toolkit (a profile names the host a key is sent to).
+# - WebFetch: only the domains in TOOLKIT_PIPELINE_FETCH_DOMAINS, for a stub's own source; a
+#   stub elsewhere ends as a short note with its link (distill "A stub is not the content").
+KEYS_FILE="${TOOLKIT_KEYS_FILE:-$HOME/.env}"
+[[ "$KEYS_FILE" = /* ]] || KEYS_FILE="$PWD/$KEYS_FILE"
+export TOOLKIT_KEYS_FILE="$KEYS_FILE"
+AGENT_ENV=()
+for name in HOME PATH USER LOGNAME SHELL TMPDIR LANG LC_ALL LC_CTYPE TERM \
+    XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME CLAUDE_CONFIG_DIR \
+    ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CODE_OAUTH_TOKEN \
+    $(env | sed -n 's/^\(TOOLKIT_[A-Z0-9_]*\)=.*/\1/p'); do
+  case "$name" in TOOLKIT_*KEY|TOOLKIT_*TOKEN) continue ;; esac
+  if value="$(printenv "$name")"; then AGENT_ENV+=("$name=$value"); fi
+done
+FETCH_DOMAINS="${TOOLKIT_PIPELINE_FETCH_DOMAINS:-github.com raw.githubusercontent.com}"
+
+script() {  # plugin, script, [fixed leading args]: the command, with and without further args
+  local cmd="uv run --locked --project plugins/$1/scripts python3 plugins/$1/scripts/$2${3:+ $3}"
+  printf 'Bash(%s),Bash(%s *),' "$cmd" "$cmd"
+}
+ALLOWED="$(script obsidian pipeline_run.py begin)$(script obsidian pipeline_run.py queue)"
+ALLOWED+="$(script obsidian pipeline_run.py end)$(script obsidian index_build.py)"
+ALLOWED+="$(script obsidian distill_judge.py)$(script obsidian distill_check.py)"
+ALLOWED+="$(script obsidian retire_capture.py)$(script obsidian search.py)"
+ALLOWED+="$(script radar radar.py scan)$(script radar radar.py gaps)$(script radar radar.py weekly)"
+ALLOWED+="$(script readwise ingest.py)"
+ALLOWED+="Read(/$REPO/**),Read(/$VAULT/**),Edit(/$VAULT/**),Glob,Grep,Skill"
+for domain in $(printf '%s' "$FETCH_DOMAINS" | tr ',' ' '); do ALLOWED+=",WebFetch(domain:$domain)"; done
+DENIED="Read(/$KEYS_FILE),Edit(/$KEYS_FILE),Edit(/$VAULT/.git/**),Edit(/$VAULT/Config/toolkit/**),Edit(/$REPO/**)"
+
+PROMPT="Run the obsidian:pipeline skill against the vault in TOOLKIT_VAULT ($VAULT). \
+Run every script from the working directory exactly as \
+'uv run --locked --project plugins/<plugin>/scripts python3 plugins/<plugin>/scripts/<script> <args>' \
+(plugin obsidian, radar or readwise); no shell function, variable, cd or other command is permitted. \
+Reply with the one-line run summary."
+
 # The prompt goes first: --allowedTools takes several values and would swallow it. User settings
 # only: the repo's .claude/settings.json enables its plugins for interactive and cloud sessions, and
-# a headless run cannot answer its trust prompt; --plugin-dir loads them here instead.
-# No env, bare python3 or git grants: the skills run every script through `uv run --project`,
-# and `end` is the vault's only committer. The run distills text other people wrote with the
-# keys above in its environment, so it gets no tool the skills do not use.
-# [earned: 2026-09-24, review-01 SEC-1]
-exec claude -p "Run the obsidian:pipeline skill against the vault in TOOLKIT_VAULT ($TOOLKIT_VAULT). Reply with the one-line run summary." \
+# a headless run cannot answer its trust prompt; --plugin-dir loads them here instead. dontAsk:
+# anything not allowed above is refused, not prompted.
+exec env -i "${AGENT_ENV[@]}" claude -p "$PROMPT" \
   --setting-sources user --plugin-dir plugins/obsidian --plugin-dir plugins/radar \
-  --add-dir "$TOOLKIT_VAULT" \
-  --permission-mode acceptEdits \
-  --allowedTools "Bash(uv run:*),Bash(uv:*),Bash(trash:*),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Read,Write,Edit,Glob,Grep,Skill,WebFetch" \
+  --add-dir "$VAULT" \
+  --permission-mode dontAsk \
+  --allowedTools "$ALLOWED" \
+  --disallowedTools "$DENIED" \
   < /dev/null

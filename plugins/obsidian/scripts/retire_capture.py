@@ -94,8 +94,11 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         raise RetireRefused("give exactly one of --line or --dropped")
     if not capture.is_file():
         raise RetireRefused(f"no such capture: {capture}")
+    # Resolved, not as written: `01_Capture/../../.env` or a symlink would move a file from outside
+    # the inbox into the vault, where the agent may read it. [earned: 2026-09-24, review-01 SEC-1]
+    inbox = (vault / "01_Capture").resolve()
     rel = capture.relative_to(vault).as_posix() if capture.is_relative_to(vault) else str(capture)
-    if not rel.startswith("01_Capture/"):
+    if not rel.startswith("01_Capture/") or not capture.resolve().is_relative_to(inbox):
         raise RetireRefused(f"not a capture under 01_Capture/: {rel}")
 
     fm, _ = read_frontmatter(capture)
