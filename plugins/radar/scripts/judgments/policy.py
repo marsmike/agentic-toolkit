@@ -50,3 +50,10 @@ SCOUT_MAX_JUDGED = 20           # candidates judged per run, ranked by mention c
                                  # value + actionable, 3 questions each — the cap on cost, not a
                                  # mention-count floor, since one clip can be evidence enough
 SCOUT_TOP_N = 8                 # candidates kept in the week's capture
+# A news hit names the outlet that reported a launch, not the thing launched; a web search returns
+# the product page or repo itself. The owner's strongest interests (most strong items in the window)
+# get one web search each ($0.025), and half the judged slots go to candidates only the web found:
+# ranked by mentions alone, what the owner already reads always won. [earned: 2026-09-24 dry run —
+# 20 judged, all mined from his own clips and feeds; the one proposal was a site he clips from daily]
+SCOUT_SEARCH_INTERESTS = 5
+SCOUT_EXTERNAL_SHARE = 0.5

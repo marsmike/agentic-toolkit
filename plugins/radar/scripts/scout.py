@@ -166,7 +166,7 @@ def _from_clips(cands: dict[str, Candidate], the_clips: list[clips_mod.Clip]) ->
 
 
 def _from_kagi(cands: dict[str, Candidate], now: datetime, interests: list[Interest],
-              ledger: kagi.Ledger) -> tuple[int, list[str]]:
+              ledger: kagi.Ledger, search_ids: set[str] = frozenset()) -> tuple[int, list[str]]:
     """One `kagi.news` query per interest with queries or a gloss, angled at a launch; the angle
     rotates by ISO week so the same interest is not asked the same way every time."""
     week = reports.week_of(now.date().isoformat())
@@ -178,6 +178,8 @@ def _from_kagi(cands: dict[str, Candidate], now: datetime, interests: list[Inter
         q = f"{it.queries[0] if it.queries else it.name} {angle}"
         try:
             found = kagi.news(q, ledger, now)
+            if it.id in search_ids:
+                found = found + kagi.search(q, ledger, now=now)
         except kagi.NoKey:
             notes.append("KAGI_API_KEY is not set; nothing searched")
             return searched, notes
@@ -194,10 +196,10 @@ def _from_kagi(cands: dict[str, Candidate], now: datetime, interests: list[Inter
 
 
 def _novel(cands: dict[str, Candidate], known_urls: dict[str, str], index_text: str,
-          subscribed: set[str]) -> dict[str, Candidate]:
-    """Drop what the vault already knows: an exact source URL, a subscribed feed's host, or a
-    name already in `Index.md`."""
-    known_hosts = {u.split("/", 1)[0] for u in known_urls}
+          subscribed: set[str], visited: set[str] = frozenset()) -> dict[str, Candidate]:
+    """Drop what the vault already knows: an exact source URL, a subscribed feed's host, a name
+    already in `Index.md`, or a site the owner clipped from himself (`visited`): he has been there."""
+    known_hosts = {u.split("/", 1)[0] for u in known_urls} | set(visited)
     out = {}
     for key, c in cands.items():
         if any(_canonical(u) in known_urls for u in c.urls):
@@ -209,6 +211,31 @@ def _novel(cands: dict[str, Candidate], known_urls: dict[str, str], index_text: 
             continue
         out[key] = c
     return out
+
+
+def feed_homes(rows: list[dict]) -> set[str]:
+    """Sites the owner already subscribes to: a feed whose items (two or more) all live on one site
+    is that site's feed. An aggregator (Hacker News, a subreddit) points at many sites, and those
+    stay discoveries. [earned: 2026-09-24 dry run — the top pick was a repo whose release feed he
+    already reads]"""
+    by_feed: dict[str, list[str | None]] = {}
+    for r in rows:
+        if r.get("url") and r.get("feed"):
+            by_feed.setdefault(r["feed"], []).append(candidate_key(r["url"]))
+    homes = {keys[0] for keys in by_feed.values() if len(keys) >= 2 and keys[0] and len(set(keys)) == 1}
+    # A repo whose release pages reach him is one he follows, whatever feed carries them.
+    return homes | {k for r in rows if "/releases" in str(r.get("url")) and (k := candidate_key(r["url"]))}
+
+
+def rank_for_judging(cands: list[Candidate]) -> list[Candidate]:
+    """SCOUT_MAX_JUDGED candidates: up to SCOUT_EXTERNAL_SHARE of them found only by the web
+    search (most hits first), the rest by mentions; unused external slots go to the rest."""
+    external = sorted((c for c in cands if c.kagi_hits and not c.feed_hits and not c.clip_hits),
+                      key=lambda c: -c.kagi_hits)
+    mined = sorted((c for c in cands if c not in external), key=lambda c: -c.mentions())
+    ext = external[:int(policy.SCOUT_MAX_JUDGED * policy.SCOUT_EXTERNAL_SHARE)]
+    rest = [c for c in mined + external if c not in ext]
+    return ext + rest[:policy.SCOUT_MAX_JUDGED - len(ext)]
 
 
 def _judge_candidates(vault: Path, cands: list[Candidate], interests: list[Interest],
@@ -323,7 +350,15 @@ def scout(vault: Path, out: Path, now: datetime, week: str | None = None, force:
     ledger = kagi.Ledger(out / "kagi-ledger.jsonl",
                          float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
     spent_before = ledger.spent_this_week(now)
-    searched, notes = _from_kagi(cands, now, interests, ledger)
+    strong_count: dict[str, int] = {}
+    for r in rows:
+        if reports.arrived(r) >= since:
+            for iid in reports.bands(r)[1]:
+                strong_count[iid] = strong_count.get(iid, 0) + 1
+    search_ids = set(sorted((it.id for it in interests), key=lambda i: -strong_count.get(i, 0))[:policy.SCOUT_SEARCH_INTERESTS])
+    searched, notes = _from_kagi(cands, now, interests, ledger, search_ids)
+    visited = {k for c in the_clips if c.source and (k := candidate_key(c.source))}
+    visited |= feed_homes(rows)
 
     # Never 01_Capture: an un-distilled clip's own `source:` is exactly the raw material scout
     # mines for candidates, not something the vault already knows — a clip in this week's own
@@ -341,8 +376,8 @@ def scout(vault: Path, out: Path, now: datetime, week: str | None = None, force:
         subscribed = set()
         notes.append(f"reader: {e}")
 
-    survivors = _novel(cands, known_urls, index_text, subscribed)
-    ranked = sorted(survivors.values(), key=lambda c: -c.mentions())[:policy.SCOUT_MAX_JUDGED]
+    survivors = _novel(cands, known_urls, index_text, subscribed, visited)
+    ranked = rank_for_judging(list(survivors.values()))
 
     usage: dict[str, Any] = {"requests": 0, "usd": 0.0, "errors": []}
     judged = _judge_candidates(vault, ranked, interests, usage) if ranked else {}

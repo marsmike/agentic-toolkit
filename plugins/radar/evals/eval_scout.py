@@ -77,7 +77,7 @@ def _rows() -> list[dict]:
 
     return [
         row("https://github.com/newco/newtool", "NewTool ships fast", "FeedA", "2026-09-20"),
-        row("https://github.com/newco/newtool/releases/tag/v1", "NewTool v1 release", "FeedB", "2026-09-21"),
+        row("https://github.com/newco/newtool/blob/main/README.md", "NewTool v1 release", "FeedB", "2026-09-21"),
         row("https://known.example.org/repo", "Known thing again", "FeedA", "2026-09-20"),
         row("https://x.com/someone/status/1", "tweet about stuff", "FeedA", "2026-09-20"),
         row("https://subscribed.example.org/post", "Subscribed blog post", "FeedA", "2026-09-20"),
@@ -156,6 +156,25 @@ def run(vault: Path) -> dict:
                              {"subscribed.example.org"})
     if set(survivors) != {"novel.example.org"}:
         problems.append(f"phase 2: expected only the untouched candidate to survive, got {sorted(survivors)}")
+    if "novel.example.org" in scout._novel(cands, known_urls, "", set(), visited={"novel.example.org"}):
+        problems.append("phase 2: a site the owner clipped from himself is not new to him")
+    homes = scout.feed_homes([{"feed": "SDK releases", "url": f"https://github.com/acme/sdk/releases/tag/v{i}"} for i in range(3)]
+                             + [{"feed": "HN", "url": "https://github.com/acme/sdk"}, {"feed": "HN", "url": "https://other.example.org/x"}])
+    homes |= scout.feed_homes([{"feed": "Mixed releases", "url": "https://github.com/acme/cli/releases/tag/v1"},
+                               {"feed": "Mixed releases", "url": "https://github.com/other/lib/releases/tag/v2"}])
+    if homes != {"github.com/acme/sdk", "github.com/acme/cli", "github.com/other/lib"}:
+        problems.append(f"phase 2: a feed whose items all live on one site is a subscription; an aggregator is not, got {homes}")
+    # half the judged slots go to what only the web search found, even against many-mention mined ones
+    from judgments import policy as scout_policy
+    mined = [scout.Candidate(key=f"mined{i}.example.org", clip_hits=3) for i in range(30)]
+    web = [scout.Candidate(key=f"web{i}.example.org", kagi_hits=1) for i in range(30)]
+    picked = scout.rank_for_judging(mined + web)
+    n_web = sum(1 for c in picked if c.key.startswith("web"))
+    want = int(scout_policy.SCOUT_MAX_JUDGED * scout_policy.SCOUT_EXTERNAL_SHARE)
+    if len(picked) != scout_policy.SCOUT_MAX_JUDGED or n_web != want:
+        problems.append(f"phase 2: {want} of {scout_policy.SCOUT_MAX_JUDGED} judged slots go to web-only finds, got {n_web} of {len(picked)}")
+    if len(scout.rank_for_judging(mined[:5] + web)) != scout_policy.SCOUT_MAX_JUDGED:
+        problems.append("phase 2: slots the mined candidates cannot fill go to web finds")
 
     # 3. no key (judgment backend unavailable — Kagi may still have a key, it must not matter)
     try:
