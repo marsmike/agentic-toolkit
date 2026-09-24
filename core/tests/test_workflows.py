@@ -41,3 +41,29 @@ def test_ci_sync_rejects_stale_dependency_locks():
         commands = [step["run"] for step in jobs[job_name]["steps"] if "run" in step]
         sync = next(command for command in commands if command.startswith("uv sync "))
         assert "--locked" in sync.split()
+
+
+def test_ci_routes_video_changes_and_checks_committed_sources():
+    jobs = workflow("ci.yml")["jobs"]
+    filter_step = next(step for step in jobs["changes"]["steps"] if step.get("id") == "filter")
+    filters = yaml.safe_load(filter_step["with"]["filters"])
+
+    # Representative paths only: fnmatch does not implement every paths-filter glob rule.
+    assert "video" in filters
+    assert "python" in filters
+    assert any(fnmatch.fnmatchcase("video/capture/capture.py", p) for p in filters["python"])
+    assert any(fnmatch.fnmatchcase("video/src/Explainer.tsx", p) for p in filters["video"])
+    assert not any(fnmatch.fnmatchcase("README.md", p) for p in filters["video"])
+
+    video = jobs["video"]
+    assert video["needs"] == "changes"
+    assert video["if"] == "needs.changes.outputs.video == 'true'"
+    assert video["permissions"] == {"contents": "read"}
+    assert video["defaults"]["run"]["working-directory"] == "video"
+    node = next(step for step in video["steps"] if step.get("uses") == "actions/setup-node@v7")
+    python = next(step for step in video["steps"] if step.get("uses") == "actions/setup-python@v6")
+    assert node["with"]["node-version"] == "24"
+    assert python["with"]["python-version"] == "3.11"
+    assert [step["run"] for step in video["steps"] if "run" in step] == [
+        "npm ci --ignore-scripts", "npm test", "npm run typecheck"
+    ]
