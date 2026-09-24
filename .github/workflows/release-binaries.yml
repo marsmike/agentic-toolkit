@@ -32,7 +32,13 @@ jobs:
       - name: Derive crate name from tag
         id: crate
         shell: bash
-        run: echo "name=${GITHUB_REF_NAME%-v*}" >> "$GITHUB_OUTPUT"
+        run: |
+          name="${GITHUB_REF_NAME%-v*}"
+          if [[ ! "$name" =~ ^[a-z0-9]+$ ]]; then
+            echo "::error::Invalid crate name in release tag"
+            exit 1
+          fi
+          printf 'name=%s\n' "$name" >> "$GITHUB_OUTPUT"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -55,20 +61,37 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }} -p ${{ steps.crate.outputs.name }}
+        shell: bash
+        env:
+          CRATE_NAME: ${{ steps.crate.outputs.name }}
+          TARGET: ${{ matrix.target }}
+        run: cargo build --release --target "$TARGET" -p "$CRATE_NAME"
 
       - name: Package binary
         shell: bash
+        env:
+          CRATE_NAME: ${{ steps.crate.outputs.name }}
+          TARGET: ${{ matrix.target }}
+          TARGET_OS: ${{ matrix.os }}
         run: |
           set -euo pipefail
-          bin="${{ steps.crate.outputs.name }}"
-          target="${{ matrix.target }}"
+          bin="$CRATE_NAME"
+          target="$TARGET"
           mkdir -p dist
-          if [[ "${{ matrix.os }}" == windows-latest ]]; then
+          if [[ "$TARGET_OS" == windows-latest ]]; then
             cp "target/${target}/release/${bin}.exe" "dist/${bin}-${target}.exe"
           else
             cp "target/${target}/release/${bin}" "dist/${bin}-${target}"
           fi
+          cd dist
+          for asset in *; do
+            if command -v sha256sum >/dev/null 2>&1; then
+              checksum=$(sha256sum -b "$asset")
+            else
+              checksum=$(shasum -a 256 -b "$asset")
+            fi
+            printf '%s  %s\n' "${checksum%% *}" "$asset" > "$asset.sha256"
+          done
 
       - name: Attach to release
         uses: softprops/action-gh-release@v3

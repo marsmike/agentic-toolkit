@@ -15,7 +15,7 @@
 //! engines behave consistently for a caller that uses both.
 
 use model2vec_rs::model::StaticModel;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Read;
@@ -504,7 +504,9 @@ fn file_stat(path: &Path) -> (i64, u64) {
                 .modified()
                 .ok()
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs() as i64)
+                // Old databases store whole seconds and naturally refresh once.
+                // Preserve subsecond edits for both indexing and embedding reuse.
+                .map(|d| d.as_nanos() as i64)
                 .unwrap_or(0);
             (mtime, meta.len())
         }
@@ -602,6 +604,7 @@ pub struct IndexReport {
 /// Extract the graph into `conn`. `full` forces re-extraction of every node even if its
 /// mtime+size are unchanged; otherwise only new/changed notes are re-extracted and removed
 /// notes' rows (and their outgoing edges) are deleted — the default incremental path.
+/// When the resolution scope changes, unchanged sources' links are also re-extracted.
 pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<IndexReport> {
     if full {
         conn.execute_batch("DELETE FROM nodes; DELETE FROM edges;")?;
@@ -610,6 +613,22 @@ pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<In
     let all_files = discover_all_files(vault);
     let node_files = discover_nodes(vault);
     let node_paths: HashSet<String> = node_files.iter().map(|f| f.rel.clone()).collect();
+
+    // Include every resolvable file, not only nodes: an out-of-scope link has no
+    // stored edge, and must be extracted again if its target enters graph scope.
+    let resolution_scope = serde_json::to_string(&(
+        all_files.iter().map(|f| &f.rel).collect::<Vec<_>>(),
+        node_files.iter().map(|f| &f.rel).collect::<Vec<_>>(),
+    ))
+    .expect("paths serialize");
+    let previous_scope: Option<String> = conn
+        .query_row(
+            "SELECT value FROM gaiafield_meta WHERE key = 'resolution_scope'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let scope_changed = previous_scope.as_deref() != Some(&resolution_scope);
 
     let by_path: HashMap<String, usize> = all_files
         .iter()
@@ -653,30 +672,34 @@ pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<In
                 .unwrap_or(false);
         if unchanged {
             report.unchanged += 1;
-            continue;
+            if !scope_changed {
+                continue;
+            }
         }
         let is_new = !existing.contains_key(&file.rel);
         let meta = read_note(file);
 
-        conn.execute(
-            "INSERT INTO nodes (path, title, description, status, kind, tags, mtime, size, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-             ON CONFLICT(path) DO UPDATE SET
-                title=excluded.title, description=excluded.description, status=excluded.status,
-                kind=excluded.kind, tags=excluded.tags, mtime=excluded.mtime, size=excluded.size,
-                updated_at=excluded.updated_at",
-            rusqlite::params![
-                file.rel,
-                meta.title,
-                meta.description,
-                meta.status,
-                meta.kind,
-                serde_json::to_string(&meta.tags).unwrap_or_else(|_| "[]".to_string()),
-                mtime,
-                size as i64,
-                now,
-            ],
-        )?;
+        if !unchanged {
+            conn.execute(
+                "INSERT INTO nodes (path, title, description, status, kind, tags, mtime, size, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                 ON CONFLICT(path) DO UPDATE SET
+                    title=excluded.title, description=excluded.description, status=excluded.status,
+                    kind=excluded.kind, tags=excluded.tags, mtime=excluded.mtime, size=excluded.size,
+                    updated_at=excluded.updated_at",
+                rusqlite::params![
+                    file.rel,
+                    meta.title,
+                    meta.description,
+                    meta.status,
+                    meta.kind,
+                    serde_json::to_string(&meta.tags).unwrap_or_else(|_| "[]".to_string()),
+                    mtime,
+                    size as i64,
+                    now,
+                ],
+            )?;
+        }
 
         conn.execute("DELETE FROM edges WHERE source = ?1", [&file.rel])?;
         for link in extract_links(&meta.body) {
@@ -720,7 +743,7 @@ pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<In
 
         if is_new {
             report.added += 1;
-        } else {
+        } else if !unchanged {
             report.updated += 1;
         }
     }
@@ -728,21 +751,17 @@ pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<In
     for old_path in existing.keys() {
         if !node_paths.contains(old_path) {
             conn.execute("DELETE FROM nodes WHERE path = ?1", [old_path])?;
-            // The removed note's own outgoing links are meaningless now — it no longer exists to
-            // author them. But other notes' *incoming* edges into it are not deleted: those
-            // wikilinks are still real text sitting in other notes' bodies ("dangling links are
-            // data" — see the module doc). Re-flag them dangling rather than dropping the row, so
-            // `stats` still counts them and `neighbors`/`path` exclude them exactly like any
-            // scan-time dangling edge, instead of silently traversing into a node that no longer
-            // has a row in `nodes` (the crash/misroute this fixes).
+            // Surviving sources were re-resolved above against the current scope.
             conn.execute("DELETE FROM edges WHERE source = ?1", [old_path])?;
-            conn.execute(
-                "UPDATE edges SET target = NULL, dangling = 1 WHERE target = ?1",
-                [old_path],
-            )?;
             report.removed += 1;
         }
     }
+
+    conn.execute(
+        "INSERT INTO gaiafield_meta (key, value) VALUES ('resolution_scope', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [&resolution_scope],
+    )?;
 
     report.edges =
         conn.query_row("SELECT COUNT(*) FROM edges", [], |r| r.get::<_, i64>(0))? as usize;
@@ -1988,7 +2007,10 @@ pub struct NeighborNodeV2 {
 
 /// `neighbors` with `--include-inferred`: the exact `extracted` BFS from `neighbors` above
 /// (`kind: "extracted"`, unchanged — contract rule 4, traversal defaults to deterministic) unioned
-/// with every note that has a *direct* inferred edge to `start` (`kind: "inferred"`, `depth: 1`).
+/// with every note that has a *direct* INFERRED-labeled edge to `start`
+/// (`kind: "inferred"`, `depth: 1`). Traversal excludes AMBIGUOUS edges entirely;
+/// inspect that band with `candidates --include-ambiguous` or
+/// `surprise --include-ambiguous` instead.
 ///
 /// Inferred edges are a similarity score, not a chain to walk hop-by-hop the way wikilinks are —
 /// so unlike the extracted side, inferred neighbors always surface at "one similarity step" from
@@ -2019,7 +2041,8 @@ pub fn neighbors_with_inferred(
         .collect();
 
     let mut stmt = conn.prepare(
-        "SELECT source, target, score, label FROM inferred_edges WHERE source = ?1 OR target = ?1",
+        "SELECT source, target, score, label FROM inferred_edges
+         WHERE (source = ?1 OR target = ?1) AND label = 'INFERRED'",
     )?;
     let rows = stmt.query_map([start], |row| {
         Ok((
@@ -2075,7 +2098,7 @@ pub struct PathReportV2 {
     pub path: Vec<PathEdge>,
 }
 
-/// `path` with `--include-inferred`: shortest path over the union of `extracted` and `inferred`
+/// `path` with `--include-inferred`: shortest path over the union of `extracted` and INFERRED-labeled
 /// edges (unlike `neighbors`, chaining through inferred hops here is unambiguous — a path is one
 /// concrete route, not an aggregated set — so both edge kinds are full BFS citizens). Each hop
 /// after the first carries the `kind` of edge that produced it (`"extracted"` or `"inferred"`,
@@ -2121,7 +2144,9 @@ pub fn shortest_path_with_inferred(
         }
     }
     {
-        let mut stmt = conn.prepare("SELECT source, target, score, label FROM inferred_edges")?;
+        let mut stmt = conn.prepare(
+            "SELECT source, target, score, label FROM inferred_edges WHERE label = 'INFERRED'",
+        )?;
         let rows = stmt.query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
