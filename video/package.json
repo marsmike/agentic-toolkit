@@ -1,0 +1,23 @@
+{
+  "name": "agentic-toolkit-explainer",
+  "private": true,
+  "type": "module",
+  "description": "The agentic-toolkit explainer video, rendered with Remotion from real captured CLI output.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:capture": "remotion render src/index.ts Capture out/capture.mp4",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.528",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.528"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.2",
+    "@types/react": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}

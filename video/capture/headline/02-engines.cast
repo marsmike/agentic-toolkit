@@ -1,0 +1,2 @@
+{"version": 2, "width": 120, "height": 32, "timestamp": 1790271932, "command": "toolkit engines install"}
+[1.376741, "o", "  farsight   installed farsight-v0.1.2 -> /private/tmp/newcomer/.local/share/agentic-toolkit/bin/farsight\r\n  gaiafield  installed gaiafield-v0.2.0 -> /private/tmp/newcomer/.local/share/agentic-toolkit/bin/gaiafield\r\n"]

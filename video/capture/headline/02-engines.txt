@@ -1,0 +1,3 @@
+$ toolkit engines install
+  farsight   installed farsight-v0.1.2 -> /private/tmp/newcomer/.local/share/agentic-toolkit/bin/farsight
+  gaiafield  installed gaiafield-v0.2.0 -> /private/tmp/newcomer/.local/share/agentic-toolkit/bin/gaiafield
