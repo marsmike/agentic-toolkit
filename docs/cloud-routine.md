@@ -99,6 +99,7 @@ and whether it was pushed.
   use full access; otherwise each source just prints `SKIPPED`.
 - **Connectors:** Todoist, only as the fallback when `td` is missing.
 - **Schedule:** every 3 hours (`58 */3 * * *` UTC).
+- **Model:** Opus 5.5 (`claude-opus-5-5`), set in the routine's `session_context.model`.
 
 ## Environment setup script
 
