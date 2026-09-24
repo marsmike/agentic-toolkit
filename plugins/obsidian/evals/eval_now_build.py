@@ -4,7 +4,9 @@ Fixture: after a base commit, a `pipeline …` commit adds one note and changes 
 hand commit adds a third; the radar state holds a strong item from this week, one from a month
 ago and a weak one; one capture is parked, one DLQ note is open and one resolved.
 
-1. week      — New holds the pipeline's new note (not the hand-committed one), Enriched the changed one
+1. week      — New holds the pipeline's new note (not the hand-committed one), Enriched the changed one;
+               a root `status: active` note the run added is new, the Index.md it rewrote is not
+               (2026-09-24 review IMPL-GLM-4)
 2. radar     — only this week's strong item
 3. stuck     — the parked capture and the open DLQ note, not the resolved one; the inbox leaves the
                parked capture out
@@ -56,6 +58,8 @@ def run(vault: Path) -> dict:
         (res / "Eval-Pipeline-New.md").write_text(NOTE.format(d="new", p=today.isoformat()), encoding="utf-8")
         enriched = next(p for p in sorted((res / "Concepts").glob("*.md")))
         enriched.write_text(enriched.read_text(encoding="utf-8") + "\nEnriched.\n", encoding="utf-8")
+        (sandbox / "Eval-Root-Profile.md").write_text("---\ndescription: root\nstatus: active\n---\n\n# R\n", encoding="utf-8")
+        (sandbox / "Index.md").write_text((sandbox / "Index.md").read_text(encoding="utf-8") + "\n", encoding="utf-8")
         _git(sandbox, "add", "-A")
         _git(sandbox, "commit", "-q", "-m", "pipeline 2026-09-23 12:00: 1 distilled, 0 dropped, 0 failed")
         (res / "Eval-Hand-Note.md").write_text(NOTE.format(d="hand", p="2020-01-01"), encoding="utf-8")
@@ -89,6 +93,8 @@ def run(vault: Path) -> dict:
         new, enr = _callout(now, "New this week"), _callout(now, "Enriched this week")
         if "Eval-Pipeline-New" not in new or "Eval-Hand-Note" in new or enriched.stem not in enr:
             problems.append(f"phase 1: new/enriched from the pipeline commit only; new={new!r} enriched={enr!r}")
+        if "Eval-Root-Profile" not in new or "[[Index" in new + enr:
+            problems.append(f"phase 1: a root active note counts as new, Index.md never; new={new!r} enriched={enr!r}")
         # 2. radar
         rad = _callout(now, "Radar")
         if "Strong this week" not in rad or "last month" in rad or "Weak" in rad:
