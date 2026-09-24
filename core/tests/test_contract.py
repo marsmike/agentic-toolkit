@@ -201,6 +201,31 @@ def test_no_plugin_script_reads_a_key_past_secret():
     assert not offenders, offenders
 
 
+def test_example_vault_index_has_no_drift():
+    """vault/Index.md is generated (contract/VAULT_SCHEMA.md): it must be exactly what
+    `index_build.py` builds from the example vault, less the rebuild date. A hand-written intro
+    and aliases once made lint report the root note missing [earned: 2026-09-24, review-01 GLM-1 /
+    IMPL-GLM-2, operator decision (a)]. After changing a note, rebuild with `index_build.py`."""
+    import re
+    import sys
+
+    skip_if_example_vault_empty()
+    scripts_dir = EXAMPLE_VAULT.parent / "plugins" / "obsidian" / "scripts"
+    sys.path.insert(0, str(scripts_dir))
+    for mod in ("vault_utils", "index_build"):
+        sys.modules.pop(mod, None)
+    try:
+        import index_build
+
+        built, _ = index_build.build(EXAMPLE_VAULT)
+    finally:
+        sys.path.remove(str(scripts_dir))
+    undated = re.compile(r"^\*Last rebuild: \d{4}-\d{2}-\d{2} ", re.M)
+    committed = (EXAMPLE_VAULT / "Index.md").read_text(encoding="utf-8")
+    assert undated.sub("*Last rebuild: ", committed) == undated.sub("*Last rebuild: ", built), (
+        "vault/Index.md drifted from index_build.py: rebuild it")
+
+
 def test_shared_judgment_modules_are_byte_identical():
     """The judgment client and its helpers exist twice, in obsidian and radar, because a plugin
     never imports a sibling (contract/KNOWLEDGE_API.md). The copies are only safe while they are
