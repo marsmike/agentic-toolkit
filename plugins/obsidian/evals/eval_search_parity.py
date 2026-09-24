@@ -10,6 +10,10 @@ binaries exist (docs/PLAN.md) — it reports pass with a detail saying so.
 Both sides are compared on BM25 alone (no semantic blend): farsight is BM25-only in R1,
 so the fair comparison is search.py's bm25_scores() ranking directly, not its (usually
 semantic-unavailable-anyway) blended search() output.
+
+Always, with a stub binary: a farsight row's raw BM25 score is not on the 0-1 scale
+`search_score_gate` was calibrated on, so its `above_enrichment_gate` is null, never a
+boolean from comparing the two (2026-09-24 review GLM-10).
 """
 from __future__ import annotations
 
@@ -38,6 +42,27 @@ def _farsight_top(search_mod, vault: Path, query: str, n: int, binary: str) -> l
     return [r["path"] for r in result["results"]]
 
 
+def _gate_is_null_for_farsight(search_mod, vault: Path) -> str | None:
+    import json
+    import stat
+    import sys
+    import tempfile
+
+    rows = [{"path": "04_Resources/High.md", "title": "High", "score": 14.2},
+            {"path": "04_Resources/Low.md", "title": "Low", "score": 0.3}]
+    with tempfile.TemporaryDirectory() as tmp:
+        stub = Path(tmp) / "farsight"
+        stub.write_text(f"#!{sys.executable}\nprint({json.dumps(json.dumps(rows))})\n", encoding="utf-8")
+        stub.chmod(stub.stat().st_mode | stat.S_IXUSR)
+        result = search_mod.farsight_search("anything", vault, 2, str(stub))
+    if result is None:
+        return "stub farsight: farsight_search returned None"
+    flags = [r["above_enrichment_gate"] for r in result["results"]]
+    if flags != [None, None]:
+        return f"farsight rows must carry above_enrichment_gate=null (raw BM25 vs a 0-1 gate), got {flags}"
+    return None
+
+
 def run(vault: Path) -> dict:
     import sys
     scripts_dir = Path(__file__).resolve().parent.parent / "scripts"
@@ -45,11 +70,15 @@ def run(vault: Path) -> dict:
         sys.path.insert(0, str(scripts_dir))
     import search as search_mod
 
+    gate_problem = _gate_is_null_for_farsight(search_mod, vault)
+    if gate_problem:
+        return {"eval": "search_parity", "pass": False, "detail": gate_problem}
+
     binary = search_mod.farsight_binary()
     if not binary:
         return {
             "eval": "search_parity", "pass": True,
-            "detail": "farsight not present — python fallback only",
+            "detail": "farsight not present — python fallback only; farsight rows carry no gate flag (stub)",
         }
 
     per_query = []
@@ -68,4 +97,4 @@ def run(vault: Path) -> dict:
     if problems:
         return {"eval": "search_parity", "pass": False, "detail": "; ".join(problems)}
     detail = "; ".join(f"{r['query']!r} overlap={r['overlap']}/{TOP_N}" for r in per_query)
-    return {"eval": "search_parity", "pass": True, "detail": f"farsight ({binary}): {detail}"}
+    return {"eval": "search_parity", "pass": True, "detail": f"farsight ({binary}): {detail}; farsight rows carry no gate flag"}

@@ -247,15 +247,15 @@ def farsight_search(query: str, vault: Path, top: int, binary: str) -> dict | No
     results = [
         {
             "path": r["path"], "title": r["title"], "folder": r["path"].split("/", 1)[0],
-            "score": r["score"], "above_enrichment_gate": r["score"] >= gate,
+            "score": r["score"], "above_enrichment_gate": None,  # raw BM25: no 0-1 gate applies
             "channels": ["keyword"],
         }
         for r in rows
     ]
     note = (
         f"farsight ({binary}) — Rust BM25 engine, R1. Raw scores are not on the "
-        "normalized 0-1 scale score_gate was calibrated against; above_enrichment_gate "
-        "is informational only for farsight-sourced results."
+        "normalized 0-1 scale score_gate was calibrated against, so above_enrichment_gate "
+        "is null for farsight-sourced results."
     )
     return {"query": query, "semantic_available": False, "note": note, "score_gate": gate, "results": results}
 
