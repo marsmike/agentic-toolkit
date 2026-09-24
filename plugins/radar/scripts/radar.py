@@ -497,7 +497,7 @@ def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, fo
         wk = week or reports.week_of(now.date().isoformat())
         return {"status": "ok", "week": wk, "interests": reports.trend(rows, wk), "terms": reports.emerging_terms(rows, wk)}
     wk = week or reports.last_complete_week(now.date())
-    if not any(reports.week_of(r["run"]) == wk for r in rows):
+    if not any(reports.week_of(reports.arrived(r)) == wk for r in rows):
         # A week the radar did not scan has no digest; writing one would hand distill an empty
         # capture. [earned: 2026-09-23, first live week: the last complete week predates the radar]
         return {"status": "empty", "week": wk, "detail": f"no scans in {wk}; nothing to digest"}

@@ -2,7 +2,9 @@
 
 1. trend    — interest a jumps from 5 to 20 strong in about 100 (limit ~11): rising;
               b goes 5 -> 8: not rising; c exists only this week: "no baseline"; a week with
-              fewer than two earlier weeks has no baseline for anyone
+              fewer than two earlier weeks has no baseline for anyone; six loud weeks more than
+              four weeks back do not mask a's rise (the baseline is the last four weeks); an item
+              counts in the week it arrived in the feed (`saved_at`), not the week it was scanned
 2. feeds    — 50 items over five weeks and nothing strong: "consider unsubscribing"; a feed whose
               strong items all serve a: "serves only a"; a productive feed gets no advice
 3. weekly   — 01_Capture/Radar-Week-YYYY-Www.md with parseable frontmatter, the rising interest
@@ -65,6 +67,16 @@ def run(vault: Path) -> dict:
     early = reports.trend(rows, reports.week_of((START + timedelta(days=7)).isoformat()))
     if any(e.get("baseline") is not None for e in early.values()):
         problems.append("phase 1: the second week has one earlier week, which is no baseline")
+    old = [{"run": (START - timedelta(days=7 * j + 5)).isoformat(), "feed": "Main", "title": f"old {j}-{n}",
+            "url": f"https://example.org/old/{j}/{n}", "kind": "news", "backend": "jev",
+            "p": {"a": 0.9 if n < 60 else 0.1, "b": 0.1}} for j in range(6) for n in range(100)]
+    if not reports.trend(rows + old, week)["a"]["rising"]:
+        problems.append("phase 1: weeks more than four weeks back must not enter the baseline")
+    late = [{**r, "run": (START + timedelta(days=37)).isoformat(), "saved_at": (START + timedelta(days=30)).isoformat() + "T09:00:00+00:00",
+             "url": r["url"] + "/late"} for r in rows[:50]]
+    prev = reports.week_of((START + timedelta(days=28)).isoformat())
+    if reports.trend(rows + late, prev)["a"]["scanned"] != reports.trend(rows, prev)["a"]["scanned"] + 50:
+        problems.append("phase 1: an item belongs to the week it arrived in the feed, not the week of the scan")
 
     # 2. feeds
     f = {x["feed"]: x for x in reports.feeds(rows, NOW)}

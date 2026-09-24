@@ -7,11 +7,13 @@
 Everything reads `00_Memory/radar/state.jsonl`. Bands are recomputed from each row's p with the
 current thresholds for the row's backend, so a threshold change applies to history too.
 
-Trend: per interest and ISO week, rate = strong / scanned. The baseline is the median rate of
-the prior weeks and needs at least TREND_MIN_WEEKS of them ("no baseline" otherwise). With
+Trend: per interest and ISO week of arrival (the item's `saved_at` in the feed, else its scan
+date), rate = strong / scanned. The baseline is the median rate of the TREND_BASELINE_WEEKS weeks
+before and needs at least TREND_MIN_WEEKS of them ("no baseline" otherwise). With
 lambda = baseline x this week's scanned, an interest is rising when strong > lambda + 2 sqrt(lambda)
 and strong >= TREND_MIN_STRONG. Emerging terms (experimental): title words of this week's worth
-items, seen at least 3 times from at least 2 feeds, ranked by smoothed log-ratio against prior weeks.
+items, seen at least 3 times from at least 2 feeds, ranked by smoothed log-ratio against the same
+four weeks before.
 """
 from __future__ import annotations
 
@@ -32,6 +34,9 @@ FEED_UNSUBSCRIBE_WEEKS = 4
 FEED_UNSUBSCRIBE_MIN_ITEMS = 40
 FEED_ONE_INTEREST_SHARE = 0.80
 TREND_MIN_WEEKS = 2
+# The baseline looks back four weeks, no further: interests drift, and a topic that was loud in
+# spring must not mask one rising now. [earned: 2026-09-24, owner: "the last four weeks only"]
+TREND_BASELINE_WEEKS = 4
 TREND_MIN_STRONG = 3
 TERM_MIN_COUNT = 3
 TERM_MIN_FEEDS = 2
@@ -45,6 +50,20 @@ their them they has have had more most less least all any each other such only a
 def week_of(day: str) -> str:
     y, w, _ = date.fromisoformat(day[:10]).isocalendar()
     return f"{y}-W{w:02d}"
+
+
+def arrived(row: dict) -> str:
+    """The day an item reached the feed; a first scan covers several days, and a missed run must
+    not move its items into the next week. [earned: 2026-09-24 — the first scan's 391 items,
+    saved over eight days, all counted in the week of the scan]"""
+    return str(row.get("saved_at") or row["run"])[:10]
+
+
+def baseline_weeks(week: str) -> set[str]:
+    """The TREND_BASELINE_WEEKS ISO weeks before `week`."""
+    y, w = week.split("-W")
+    monday = date.fromisocalendar(int(y), int(w), 1)
+    return {week_of((monday - timedelta(weeks=k)).isoformat()) for k in range(1, TREND_BASELINE_WEEKS + 1)}
 
 
 def bands(row: dict) -> tuple[set[str], set[str]]:
@@ -101,15 +120,16 @@ def trend(rows: list[dict], week: str) -> dict[str, dict[str, Any]]:
     """Per interest: this week's scanned/strong, the baseline and whether it is rising."""
     weekly: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(lambda: [0, 0]))
     for r in rows:
-        wk = week_of(r["run"])
+        wk = week_of(arrived(r))
         _, s = bands(r)
         for iid in r.get("p") or {}:
             weekly[iid][wk][0] += 1
             weekly[iid][wk][1] += iid in s
     out = {}
+    before = baseline_weeks(week)
     for iid, weeks in weekly.items():
         scanned, strong = weeks.get(week, [0, 0])
-        prior = [st / sc for wk, (sc, st) in weeks.items() if wk < week and sc]
+        prior = [st / sc for wk, (sc, st) in weeks.items() if wk in before and sc]
         entry: dict[str, Any] = {"scanned": scanned, "strong": strong, "prior_weeks": len(prior)}
         if len(prior) < TREND_MIN_WEEKS:
             entry.update(baseline=None, rising=False, note="no baseline")
@@ -131,16 +151,18 @@ def emerging_terms(rows: list[dict], week: str, limit: int = 10) -> list[dict[st
     now_c: Counter[str] = Counter()
     now_feeds: dict[str, set[str]] = defaultdict(set)
     prior_c: Counter[str] = Counter()
+    before = baseline_weeks(week)
     for r in rows:
         w, _ = bands(r)
         if not w:
             continue
         terms = _terms(r.get("title") or "")
-        if week_of(r["run"]) == week:
+        wk = week_of(arrived(r))
+        if wk == week:
             now_c.update(terms)
             for t in terms:
                 now_feeds[t].add(r.get("feed") or "?")
-        elif week_of(r["run"]) < week:
+        elif wk in before:
             prior_c.update(terms)
     n_now, n_prior = sum(now_c.values()) or 1, sum(prior_c.values()) or 1
     scored = [{"term": t, "count": c, "feeds": len(now_feeds[t]),
@@ -173,7 +195,7 @@ def _vault_ref(path: str | None) -> str:
 def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: datetime, per_interest: int = 3,
                   gaps: dict | None = None) -> str:
     names = {i.id: i.name for i in interests}
-    wk_rows = [r for r in rows if week_of(r["run"]) == week]
+    wk_rows = [r for r in rows if week_of(arrived(r)) == week]
     strong_rows = {iid: [] for iid in names}
     worth_n = strong_n = 0
     for r in wk_rows:
