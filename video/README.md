@@ -12,9 +12,12 @@ output**. Terminal scenes replay the recorded bytes in `capture/`; nothing is re
 | `capture/capture.py` | Runs the README newcomer commands in a clean, empty HOME and records each one. |
 | `capture/cast_text.py` | Writes each capture's final screen as `.txt`: the verbatim text the storyboard quotes. |
 | `capture/<path>/` | One folder per install path: `env.txt` (starting state, tool versions, source revision), then `NN-<step>.cast` + `.txt` per command, or for a session `commands.txt` (typed lines) + `session.cast` + `session.txt`. |
-| `src/cast.ts` | Replays a `.cast` into screen text (same rules as `cast_text.py`). |
-| `src/Terminal.tsx`, `src/Root.tsx` | Remotion scenes. |
-| `test/cast.test.ts` | Holds the replay and the `.txt` transcripts equal, capture by capture. |
+| `src/storyboard.json` | The locked storyboard's scene table, copied verbatim (times, composed text, source), plus the `session.txt` lines each terminal scene shows. |
+| `src/Explainer.tsx`, `src/Root.tsx` | The `Explainer` composition: one sequence per storyboard scene. It decides pacing and highlights only; terminal text comes from the capture, composed text from `storyboard.json`. |
+| `src/cast.ts`, `src/scene-text.ts` | Replay of a `.cast` into screen text (same rules as `cast_text.py`); parser for the storyboard's text markup. |
+| `scripts/check_storyboard.py` | Compares `storyboard.json` and the capture with the locked `STORYBOARD.md`: scenes, times, every caption byte for byte, every terminal block. |
+| `music.json`, `MUSIC.md`, `scripts/fetch-music.mjs` | The music track (not committed): URL, sha256, licence; the verified download. |
+| `test/` | Replay vs transcripts, text parsing, storyboard and music consistency. |
 
 ## The captures
 
@@ -53,12 +56,17 @@ whatever `main` is at capture time; re-capture if `main` changes before publishi
 
 ```bash
 npm ci --ignore-scripts                     # no install scripts are needed
+npm run fetch-music                         # public/music/gymnopedie-1.ogg, sha256-checked
 npm test && npm run typecheck
-npm run render:capture                      # out/capture.mp4: the D6 path replayed, a pipeline check
+python3 scripts/check_storyboard.py <path>/STORYBOARD.md   # the locked slice 01 storyboard
+npm run render                              # out/explainer.mp4: 1920x1080 H.264 + AAC, 118 s
 ```
 
-The first render downloads Chrome Headless Shell into `node_modules/.remotion/`. The explainer composition
-(one scene per storyboard scene, with music) is added once the storyboard is locked.
+The first render downloads Chrome Headless Shell into `node_modules/.remotion/`. Terminal text is set in Menlo
+(macOS); on another system the fallback monospace font may wrap long lines slightly differently.
+
+Changing what the video says means amending the locked storyboard first, then copying the changed cells into
+`storyboard.json`; `check_storyboard.py` fails until the two agree.
 
 **Licence:** Remotion is free for individuals and companies of up to three people; larger companies need a
 [company licence](https://www.remotion.dev/license).
