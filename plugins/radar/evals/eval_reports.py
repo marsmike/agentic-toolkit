@@ -11,6 +11,12 @@
               first and marked, a vault link for an item the vault has, no link into 00_Memory;
               a second write is refused, --force rewrites; nothing else in the vault changes; a
               week the radar never scanned gets no digest at all
+4. terms    — a term generic to this feed set every week ("claude"/"agent") is auto-stoplisted once
+              there is enough history, and not before; a name-like bigram ("Vector Loom") this week
+              only outranks an equally-frequent generic one ("gadget update") with no capitalisation;
+              a term the owner clipped several times ("jev") surfaces with zero feed corroboration,
+              and only because the clips were passed in — without them it does not appear at all;
+              the weekly digest's "Topics rising" section carries the same evidence
 """
 from __future__ import annotations
 
@@ -23,6 +29,9 @@ from _sandbox import make_sandbox, snapshot, teardown_sandbox
 NAME = "reports"
 START = date(2026, 7, 20)  # a Monday, ISO week 30
 NOW = datetime(2026, 8, 30, 12, 0, tzinfo=UTC)  # Sunday of week 35
+
+TERM_START = date(2026, 8, 3)  # a Monday, ISO week 32
+TERM_WEEKS = 5
 
 
 def _rows() -> list[dict]:
@@ -45,6 +54,38 @@ def _rows() -> list[dict]:
         rows.append({"run": run, "feed": "Mono", "title": f"mono {k}", "url": f"https://github.com/acme/mono{k}",
                      "kind": "release-or-tool", "p": {"a": 0.95, "b": 0.1}, "backend": "jev"})
     return rows
+
+
+def _term_rows() -> list[dict]:
+    """Every week: two generic feed items ("Claude Agent Update") from two feeds — this feed set's
+    own always-there vocabulary. The last week only, also adds a name-like bigram ("Vector Loom",
+    capitalised) and an equally-frequent plain one ("gadget update") from the same two feeds, to
+    tell entity/bigram preference apart from raw frequency."""
+    rows = []
+    for k in range(TERM_WEEKS):
+        run = (TERM_START + timedelta(weeks=k, days=2)).isoformat()
+        for i in range(3):  # >= TERM_MIN_COUNT on its own, so a single week already qualifies
+            feed = "FeedA" if i % 2 == 0 else "FeedB"
+            rows.append({"run": run, "feed": feed, "title": f"Claude Agent Update {k}-{i}",
+                        "url": f"https://example.org/update/{k}/{i}", "kind": "news", "p": {"a": 0.9}, "backend": "jev",
+                        "saved_at": run})
+        if k == TERM_WEEKS - 1:
+            for i, angle in enumerate(("launches", "pricing", "docs", "demo")):
+                feed = "FeedA" if i % 2 == 0 else "FeedC"
+                rows.append({"run": run, "feed": feed, "title": f"Vector Loom {angle}",
+                            "url": f"https://example.org/vl/{i}", "kind": "news", "p": {"a": 0.9}, "backend": "jev",
+                            "saved_at": run})
+                rows.append({"run": run, "feed": feed, "title": f"gadget update {i}",
+                            "url": f"https://example.org/gadget/{i}", "kind": "news", "p": {"a": 0.9}, "backend": "jev",
+                            "saved_at": run})
+    return rows
+
+
+def _term_clips(n: int = 5):
+    from clips import Clip
+    day = (TERM_START + timedelta(weeks=TERM_WEEKS - 1, days=3)).isoformat()
+    return [Clip(path=f"01_Capture/jev-clip-{i}.md", title="Jev is trending", source="",
+                saved_at=day, body="") for i in range(n)]
 
 
 def run(vault: Path) -> dict:
@@ -139,5 +180,35 @@ def run(vault: Path) -> dict:
         if sandbox is not None:
             teardown_sandbox(sandbox)
 
+    # 4. terms
+    term_rows = _term_rows()
+    term_week = reports.week_of(term_rows[-1]["run"])
+    term_clips = _term_clips()
+    with_clips = {t["term"]: t for t in reports.emerging_terms(term_rows, term_week, term_clips, limit=20)}
+    without_clips = {t["term"]: t for t in reports.emerging_terms(term_rows, term_week, (), limit=20)}
+    one_week_only = {t["term"]: t for t in reports.emerging_terms(term_rows[-11:], term_week, term_clips, limit=20)}
+
+    if "claude" in with_clips or "agent" in with_clips:
+        problems.append(f"phase 4: a term generic to every week must be auto-stoplisted, got {sorted(with_clips)}")
+    if "claude" not in one_week_only and "agent" not in one_week_only:
+        problems.append("phase 4: the auto-stoplist must not fire before there is enough history to call a term generic")
+    if "vector loom" not in with_clips:
+        problems.append(f"phase 4: a name-like bigram this week only should surface, got {sorted(with_clips)}")
+    elif "gadget update" in with_clips and with_clips["vector loom"]["score"] <= with_clips["gadget update"]["score"]:
+        problems.append("phase 4: a capitalised bigram should outrank an equally-frequent plain one")
+    jev = with_clips.get("jev") or {}
+    if jev.get("clip_count", 0) < 5 or jev.get("feed_count"):
+        problems.append(f"phase 4: a term seen only in clips should surface with its clip count and no feed count, got {jev or 'nothing'}")
+    elif not jev["examples"] or "Jev" not in jev["examples"][0]:
+        problems.append(f"phase 4: a clip-only term's evidence should include a clip title, got {jev}")
+    if "jev" in without_clips:
+        problems.append("phase 4: without clips passed in, a clip-only term must not appear at all")
+
+    digest = reports.render_weekly(term_week, term_rows, [Interest("a", "Agents")], NOW, clips=term_clips)
+    if "## Topics rising" not in digest or "jev" not in digest.casefold() or "your own clips" not in digest:
+        problems.append("phase 4: the weekly digest must show Topics rising with clip evidence")
+    if "claude" in digest.casefold().split("## topics rising", 1)[1].split("## next actions")[0]:
+        problems.append("phase 4: the digest's Topics rising must not list the auto-stoplisted term")
+
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "trend, feed advice and weekly capture ok on a six-week series"}
+            "detail": "; ".join(problems) if problems else "trend, feed advice, weekly capture and topic detection ok"}

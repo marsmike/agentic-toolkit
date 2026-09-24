@@ -73,3 +73,48 @@ def feed_worth(key: str, iid: str) -> Question:
 
 def feed_kind(key: str) -> Question:
     return Question(kind="choice", instructions=f"What does `feeds.{key}` mostly carry?", criteria=dict(FEED_KINDS))
+
+
+SCOUT_KINDS = {
+    "feed": "a blog, newsletter, changelog or other subscribable feed of posts",
+    "api": "a programmable API or SDK meant to be integrated into other software",
+    "service": "a hosted product or service someone would sign up for and use directly",
+    "tool": "a downloadable tool, library or app run or installed directly, not called as an API",
+    "dataset": "a dataset or corpus for training, evaluation or reference",
+    "community": "a forum, Discord, subreddit or other place people gather to discuss it",
+    "other": "none of the other descriptions fits, or there is too little to tell",
+}
+
+
+def scout_kind(key: str) -> Question:
+    return Question(kind="choice", instructions=f"What is `candidates.{key}`?", criteria=dict(SCOUT_KINDS))
+
+
+def scout_value(key: str) -> Question:
+    return Question(
+        kind="noul",
+        instructions=(
+            f"Judging `candidates.{key}` against everything in `interests`, would it have real value for "
+            "someone actively working on those interests — something worth knowing exists?"
+        ),
+        criteria={
+            "true": f"`candidates.{key}` does something none of the owner's existing tools or sources "
+                    "already cover, for at least one interest",
+            "false": f"`candidates.{key}` only restates what is already common knowledge for these "
+                     "interests, or serves something unrelated to all of them",
+        },
+    )
+
+
+def scout_actionable(key: str) -> Question:
+    return Question(
+        kind="noul",
+        instructions=(
+            f"Could the owner act on `candidates.{key}` directly this week — sign up, subscribe, call it, "
+            "or install it — without more research first?"
+        ),
+        criteria={
+            "true": "signing up, subscribing or installing needs no more than an account or a URL",
+            "false": "it needs approval, a waitlist, missing documentation, or is not usable yet",
+        },
+    )

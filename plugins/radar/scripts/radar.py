@@ -5,6 +5,7 @@
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py replay --since 30d --out DIR
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py discover [--interest ID ...]
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py feeds|trend|weekly
+    uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py scout [--dry-run]
 
 `scan` fetches feed items saved since `--since`, drops those already seen (canonical URL, or the
 same title from the same feed: a repost under a new address) and a new feed's back catalogue
@@ -23,9 +24,14 @@ answers nothing at all is recorded once in the dead-letter queue.
 
 `replay` is the acceptance run (replay.py): own clips vs. feed items, Jev vs. BM25 vs. recency.
 `discover` (discover.py) finds feeds for the interests via Kagi and writes an OPML to import.
-`feeds`, `trend` and `weekly` (reports.py) read state.jsonl only: feed yield, rising interests,
-and the weekly capture `01_Capture/Radar-Week-YYYY-WW.md`. `gaps` (gaps.py) is the weekly search
-for what the feeds missed; `kagi search|news|answer|summarize` is the kagi skill's entry point.
+`feeds`, `trend` and `weekly` (reports.py) read state.jsonl only, plus the owner's own clips
+(`clips.py`, read straight from the vault's files, never the readwise plugin) as a second signal
+`trend`'s emerging terms and the weekly digest's "Topics rising" rank against: feed yield, rising
+interests, and the weekly capture `01_Capture/Radar-Week-YYYY-WW.md`. `gaps` (gaps.py) is the
+weekly search for what the feeds missed; `scout` (scout.py) is the weekly search for what the
+owner does not know exists yet — new feeds, APIs, services, tools, datasets — from what he already
+reads and clips plus a few Kagi launch queries, written to `01_Capture/Radar-Scout-YYYY-WW.md`.
+`kagi search|news|answer|summarize` is the kagi skill's entry point.
 
 What leaves the machine: item titles, summaries and site names, and interest names and glosses,
 to the judgment backend (OpenRouter by default).
@@ -44,6 +50,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import clips as clips_mod
 import discover as discover_mod
 import gaps as gaps_mod
 import interests as interests_mod
@@ -52,6 +59,7 @@ import kagi
 import reader
 import replay
 import reports
+import scout as scout_mod
 from interests import Interest
 from judgments import policy
 from judgments import questions as Q
@@ -495,13 +503,16 @@ def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, fo
         return {"status": "ok", "feeds": reports.feeds(rows, now)}
     if cmd == "trend":
         wk = week or reports.week_of(now.date().isoformat())
-        return {"status": "ok", "week": wk, "interests": reports.trend(rows, wk), "terms": reports.emerging_terms(rows, wk)}
+        wk_clips = clips_mod.load(vault, reports.clip_window_start(wk))
+        return {"status": "ok", "week": wk, "interests": reports.trend(rows, wk),
+                "terms": reports.emerging_terms(rows, wk, wk_clips)}
     wk = week or reports.last_complete_week(now.date())
     if not any(reports.week_of(reports.arrived(r)) == wk for r in rows):
         # A week the radar did not scan has no digest; writing one would hand distill an empty
         # capture. [earned: 2026-09-23, first live week: the last complete week predates the radar]
         return {"status": "empty", "week": wk, "detail": f"no scans in {wk}; nothing to digest"}
-    text = reports.render_weekly(wk, rows, interests_mod.load(vault), now, gaps=gaps_mod.load_week(out, wk))
+    wk_clips = clips_mod.load(vault, reports.clip_window_start(wk))
+    text = reports.render_weekly(wk, rows, interests_mod.load(vault), now, gaps=gaps_mod.load_week(out, wk), clips=wk_clips)
     try:
         path = reports.write_weekly(vault, wk, text, force, out / "weekly.jsonl")
     except FileExistsError as e:
@@ -566,6 +577,12 @@ def main(argv: list[str] | None = None) -> int:
     gp.add_argument("--promote", action="store_true", help="save the strongest to Reader Later, within the daily budget")
     gp.add_argument("--out", type=Path, default=None)
     gp.add_argument("--json", action="store_true")
+    sc = sub.add_parser("scout", help="once a week: new sources (feeds, APIs, services, tools, datasets) the owner does not know about yet")
+    sc.add_argument("--week", default=None, help="ISO week YYYY-Www (default: the current week)")
+    sc.add_argument("--force", action="store_true", help="rewrite an existing scout capture")
+    sc.add_argument("--dry-run", action="store_true", help="print the capture instead of writing it; nothing in the vault changes")
+    sc.add_argument("--out", type=Path, default=None)
+    sc.add_argument("--json", action="store_true")
     kp = sub.add_parser("kagi", help="Kagi on demand: search, news, answer (FastGPT), summarize (a URL)")
     kp.add_argument("mode", choices=("search", "news", "answer", "summarize"))
     kp.add_argument("text", help="the query, or for summarize the URL")
@@ -579,6 +596,8 @@ def main(argv: list[str] | None = None) -> int:
         result = kagi_cmd(vault, args.out or vault / RADAR_DIR, args.mode, args.text)
     elif args.cmd == "gaps":
         result = gaps_mod.gaps(vault, args.out or vault / RADAR_DIR, now, args.promote)
+    elif args.cmd == "scout":
+        result = scout_mod.scout(vault, args.out or vault / RADAR_DIR, now, args.week, args.force, args.dry_run)
     elif args.cmd in ("feeds", "trend", "weekly"):
         result = report(vault, args.out or vault / RADAR_DIR, args.cmd, now, args.week, getattr(args, "force", False))
     elif args.cmd == "discover":

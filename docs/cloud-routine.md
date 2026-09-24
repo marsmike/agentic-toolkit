@@ -51,7 +51,7 @@ RUN, in the skill's order
 - pipeline_run.py begin. "busy" or "skipped": stop and report why. Keep the "token" it returns.
 - Radar: scan --since 1d --promote --todoist --json. With `td` installed (the environment's
   setup script) and TODOIST_API_TOKEN set, --todoist comments the strong items on each epic
-  task itself. Once a week (Saturday): gaps --promote and weekly ("exists" is normal).
+  task itself. Once a week (Saturday): gaps --promote, weekly and scout ("exists" is normal).
 - Readwise ingest.
 - pipeline_run.py queue --json, then distill every capture in the batch (--auto). Rebuild the
   index after each note and before distill_check.

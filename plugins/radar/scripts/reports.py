@@ -11,9 +11,18 @@ Trend: per interest and ISO week of arrival (the item's `saved_at` in the feed, 
 date), rate = strong / scanned. The baseline is the median rate of the TREND_BASELINE_WEEKS weeks
 before and needs at least TREND_MIN_WEEKS of them ("no baseline" otherwise). With
 lambda = baseline x this week's scanned, an interest is rising when strong > lambda + 2 sqrt(lambda)
-and strong >= TREND_MIN_STRONG. Emerging terms (experimental): title words of this week's worth
-items, seen at least 3 times from at least 2 feeds, ranked by smoothed log-ratio against the same
-four weeks before.
+and strong >= TREND_MIN_STRONG.
+
+Emerging terms: title words and adjacent-word bigrams of this week's worth feed items, plus the
+owner's own clips (`clips.py`; a clip's title carries no threshold at all, so one is worth several
+feed mentions), ranked by smoothed log-ratio against the same four weeks before, a bonus for
+looking like a name or product (capitalised mid-title, or carrying a digit — a cheap proxy for a
+proper noun with no training data), and a hard drop for a term that is this vault's own
+always-there vocabulary: present in most of every scanned week regardless of topic, which the
+English `STOPWORDS` below cannot know because it is not a stopword in general, only in this feed
+set. [earned: 2026-09-24, owner: ~15 clips about "Jev" surfaced nothing because a clip never
+entered radar state, and "claude"/"agent"/"code"/"development" — generic to this feed set — won
+every week regardless]
 """
 from __future__ import annotations
 
@@ -22,10 +31,12 @@ import math
 import re
 import statistics
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from clips import Clip
 from interests import Interest
 from judgments import policy
 from vault_utils import atomic_write
@@ -40,7 +51,12 @@ TREND_BASELINE_WEEKS = 4
 TREND_MIN_STRONG = 3
 TERM_MIN_COUNT = 3
 TERM_MIN_FEEDS = 2
-_WORD = re.compile(r"[a-z][a-z0-9+.#-]{2,}")
+CLIP_MIN_COUNT = 2      # a term seen in this many of the owner's own clips needs no feed corroboration
+CLIP_WEIGHT = 1.5       # multiplies log1p(clip mentions): nothing gated a clip, so it outweighs a feed hit
+ENTITY_BONUS = 0.75     # favors capitalised/product-like tokens (see _tokens) over generic words
+DF_STOP_FRAC = 0.6      # a term in this share of all scanned weeks is vault-generic, not emerging
+DF_STOP_MIN_WEEKS = 4   # weeks of history needed before the auto-stoplist activates
+_WORD = re.compile(r"[A-Za-z][A-Za-z0-9+.#-]{2,}")
 STOPWORDS = set("""the and for with from into over under your you our are was were this that these those
 how what why when who via new using use based towards toward between about than then not can will its
 their them they has have had more most less least all any each other such only also just now one two
@@ -59,11 +75,21 @@ def arrived(row: dict) -> str:
     return str(row.get("saved_at") or row["run"])[:10]
 
 
+def week_monday(week: str) -> date:
+    y, w = week.split("-W")
+    return date.fromisocalendar(int(y), int(w), 1)
+
+
 def baseline_weeks(week: str) -> set[str]:
     """The TREND_BASELINE_WEEKS ISO weeks before `week`."""
-    y, w = week.split("-W")
-    monday = date.fromisocalendar(int(y), int(w), 1)
+    monday = week_monday(week)
     return {week_of((monday - timedelta(weeks=k)).isoformat()) for k in range(1, TREND_BASELINE_WEEKS + 1)}
+
+
+def clip_window_start(week: str) -> date:
+    """The earliest date `emerging_terms` can use a clip from: the start of the baseline, same
+    scope as the feed rows it is ranked against."""
+    return week_monday(week) - timedelta(weeks=TREND_BASELINE_WEEKS)
 
 
 def bands(row: dict) -> tuple[set[str], set[str]]:
@@ -143,31 +169,112 @@ def trend(rows: list[dict], week: str) -> dict[str, dict[str, Any]]:
     return out
 
 
-def _terms(title: str) -> set[str]:
-    return {w.strip(".-") for w in _WORD.findall(title.casefold())} - STOPWORDS
+def _tokens(title: str) -> list[tuple[str, bool]]:
+    """(casefolded word, looks-like-a-name) for every non-stopword word in `title`. "Looks like a
+    name": capitalised other than as the title's first word (every title capitalises that one
+    regardless), or carrying a digit (a version or model number) — a cheap proxy for a proper
+    noun or product token, with no training data and no external model."""
+    out = []
+    for i, w in enumerate(_WORD.findall(title)):
+        cf = w.casefold().strip(".-")
+        if not cf or cf in STOPWORDS:
+            continue
+        entity = any(ch.isdigit() for ch in w) or (i > 0 and w[0].isupper())
+        out.append((cf, entity))
+    return out
 
 
-def emerging_terms(rows: list[dict], week: str, limit: int = 10) -> list[dict[str, Any]]:
-    now_c: Counter[str] = Counter()
-    now_feeds: dict[str, set[str]] = defaultdict(set)
-    prior_c: Counter[str] = Counter()
-    before = baseline_weeks(week)
+def _bigrams(tokens: list[tuple[str, bool]]) -> list[tuple[str, bool]]:
+    """Adjacent-word phrases from a title's already-stopword-filtered tokens: "model router" says
+    more than "model" or "router" alone. Adjacency is in the filtered list, not the raw title, so
+    a stopword between two real words is silently elided — good enough for the common case of a
+    name split into two tokens ("system one"). A bigram looks like a name if either of its words
+    does (`_tokens`), so "Vector Loom launches" still gets the entity bonus as a phrase, not just
+    on its own two words."""
+    return [(f"{a} {b}", ea or eb) for (a, ea), (b, eb) in zip(tokens, tokens[1:])]
+
+
+def _auto_stopwords(rows: list[dict], min_week_frac: float = DF_STOP_FRAC,
+                    min_weeks: int = DF_STOP_MIN_WEEKS) -> set[str]:
+    """Terms in title words of worth items present in nearly every scanned week: this feed set's
+    own generic vocabulary, not a topic. Grows with the vault's own history instead of a
+    hand-maintained list, which cannot know what one particular set of feeds always talks about."""
+    weeks: dict[str, set[str]] = defaultdict(set)
     for r in rows:
         w, _ = bands(r)
         if not w:
             continue
-        terms = _terms(r.get("title") or "")
+        toks = _tokens(r.get("title") or "")
+        weeks[week_of(arrived(r))] |= {t for t, _ in toks + _bigrams(toks)}
+    if len(weeks) < min_weeks:
+        return set()
+    df: Counter[str] = Counter()
+    for terms in weeks.values():
+        df.update(terms)
+    return {t for t, n in df.items() if n / len(weeks) >= min_week_frac}
+
+
+def emerging_terms(rows: list[dict], week: str, clips: Sequence[Clip] = (), limit: int = 10) -> list[dict[str, Any]]:
+    """Title words and bigrams of this week's worth feed items and the owner's own clips, ranked
+    against the baseline weeks, a hard drop for this vault's always-there vocabulary
+    (`_auto_stopwords`), and a preference for name-like tokens and bigrams (`_tokens`) and for
+    what the owner clipped himself (`CLIP_WEIGHT`, no feed-diversity gate needed)."""
+    before = baseline_weeks(week)
+    auto_stop = _auto_stopwords(rows)
+
+    def terms_of(title: str) -> list[tuple[str, bool]]:
+        toks = _tokens(title)
+        return [(t, e) for t, e in toks + _bigrams(toks) if t not in auto_stop]
+
+    now_feed_c: Counter[str] = Counter()
+    now_feeds: dict[str, set[str]] = defaultdict(set)
+    now_clip_c: Counter[str] = Counter()
+    now_entity: Counter[str] = Counter()
+    now_seen: Counter[str] = Counter()
+    prior_c: Counter[str] = Counter()
+    examples: dict[str, list[str]] = defaultdict(list)
+
+    def note(term: str, title: str) -> None:
+        if title and title not in examples[term] and len(examples[term]) < 3:
+            examples[term].append(title)
+
+    for r in rows:
+        w, _ = bands(r)
+        if not w:
+            continue
         wk = week_of(arrived(r))
+        title = r.get("title") or ""
         if wk == week:
-            now_c.update(terms)
-            for t in terms:
+            for t, entity in terms_of(title):
+                now_feed_c[t] += 1
+                now_seen[t] += 1
+                now_entity[t] += int(entity)
                 now_feeds[t].add(r.get("feed") or "?")
+                note(t, title)
         elif wk in before:
-            prior_c.update(terms)
-    n_now, n_prior = sum(now_c.values()) or 1, sum(prior_c.values()) or 1
-    scored = [{"term": t, "count": c, "feeds": len(now_feeds[t]),
-               "score": round(math.log((c + 1) / n_now) - math.log((prior_c[t] + 1) / n_prior), 3)}
-              for t, c in now_c.items() if c >= TERM_MIN_COUNT and len(now_feeds[t]) >= TERM_MIN_FEEDS]
+            for t, _ in terms_of(title):
+                prior_c[t] += 1
+
+    for c in clips:
+        if week_of(c.saved_at) != week:
+            continue
+        for t, entity in terms_of(c.title):
+            now_clip_c[t] += 1
+            now_seen[t] += 1
+            now_entity[t] += int(entity)
+            note(t, c.title)
+
+    n_now, n_prior = sum(now_seen.values()) or 1, sum(prior_c.values()) or 1
+    scored = []
+    for t, seen in now_seen.items():
+        feed_n, clip_n = now_feed_c[t], now_clip_c[t]
+        strong_feed = feed_n >= TERM_MIN_COUNT and len(now_feeds[t]) >= TERM_MIN_FEEDS
+        if not strong_feed and clip_n < CLIP_MIN_COUNT:
+            continue
+        base = math.log((seen + 1) / n_now) - math.log((prior_c[t] + 1) / n_prior)
+        score = base + ENTITY_BONUS * (now_entity[t] / seen) + CLIP_WEIGHT * math.log1p(clip_n)
+        scored.append({"term": t, "feed_count": feed_n, "feeds": len(now_feeds[t]), "clip_count": clip_n,
+                       "examples": examples[t], "score": round(score, 3)})
     return sorted(scored, key=lambda x: -x["score"])[:limit]
 
 
@@ -193,7 +300,7 @@ def _vault_ref(path: str | None) -> str:
 
 
 def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: datetime, per_interest: int = 3,
-                  gaps: dict | None = None) -> str:
+                  gaps: dict | None = None, clips: Sequence[Clip] = ()) -> str:
     names = {i.id: i.name for i in interests}
     wk_rows = [r for r in rows if week_of(arrived(r)) == week]
     strong_rows = {iid: [] for iid in names}
@@ -268,18 +375,31 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
         if gaps.get("sites"):
             lines += ["", "Sites that carried them, candidates for `radar.py discover --seed`: "
                       + ", ".join(f"{s} ({n})" for s, n in gaps["sites"][:8])]
-    terms = emerging_terms(rows, week)
-    lines += ["", "## Emerging terms (experimental)", ""]
-    lines.append(" · ".join(f"{t['term']} ({t['count']})" for t in terms) if terms else "None yet.")
+    terms = emerging_terms(rows, week, clips)
+    lines += ["", "## Topics rising", ""]
+    if terms:
+        for t in terms:
+            evidence = [f"{t['feed_count']} feed item{'s' if t['feed_count'] != 1 else ''} ({t['feeds']} feeds)"] \
+                if t["feed_count"] else []
+            if t["clip_count"]:
+                evidence.append(f"{t['clip_count']} of your own clips")
+            title = t["examples"][0] if t["examples"] else ""
+            example = f' — e.g. "{title[:100] + "…" if len(title) > 100 else title}"' if title else ""
+            lines.append(f"- **{t['term']}** — {', '.join(evidence)}{example}")
+    else:
+        lines.append("Nothing rising above the baseline this week.")
     lines += ["", "## Next actions", "", "- [ ] Distill the key items worth keeping; delete this capture after.",
               "- [ ] Act on any feed advice above (unsubscribe in Reader, or run `radar.py discover`).", ""]
     return "\n".join(lines)
 
 
-def write_weekly(vault: Path, week: str, text: str, force: bool = False, written: Path | None = None) -> Path:
-    """Write the week's capture once. `written` (00_Memory/radar/weekly.jsonl) remembers the weeks
-    already written, so a digest distill has retired is not written again by the next run."""
-    path = vault / "01_Capture" / f"Radar-Week-{week}.md"
+def write_weekly(vault: Path, week: str, text: str, force: bool = False, written: Path | None = None,
+                 prefix: str = "Radar-Week") -> Path:
+    """Write the week's capture once. `written` (00_Memory/radar/weekly.jsonl, or scout.jsonl for
+    `prefix="Radar-Scout"`) remembers the weeks already written, so one distill has retired is not
+    written again by the next run. Shared by `weekly` and `scout` — same file, same once-a-week
+    rule, only the name differs."""
+    path = vault / "01_Capture" / f"{prefix}-{week}.md"
     done = written.is_file() and any(json.loads(ln).get("week") == week for ln in written.read_text(encoding="utf-8").splitlines() if ln.strip()) if written else False
     if (path.exists() or done) and not force:
         raise FileExistsError(f"the capture for {week} was already written (it may be distilled or half distilled); --force rewrites it")

@@ -13,6 +13,7 @@ THRESHOLDS: dict[str, dict[str, float]] = {
         "T_WORTH": 0.70,   # worth_reading at or above: listed for that interest
         "T_STRONG": 0.80,  # at or above: strong, the only band --promote ever acts on
         "T_FEED": 0.75,    # feed_worth at or above, for any interest: the feed is proposed
+        "T_SCOUT_VALUE": 0.65,  # scout_value at or above: the candidate makes the week's capture
     },
 }
 
@@ -40,3 +41,12 @@ QUERIES_PER_INTEREST = 2        # Kagi searches per interest per discover run ($
 PAGES_PER_QUERY = 8             # result pages fetched for feed autodiscovery
 FEED_MIN_ITEMS = 3
 FEED_MAX_SILENCE_DAYS = 45      # a feed whose latest item is older than this is dormant
+
+# scout: new sources (feeds, APIs, services, tools, datasets) the owner does not know about yet
+SCOUT_WINDOW_DAYS = 28          # candidates come from state.jsonl and clips over the last four weeks
+SCOUT_QUERIES_PER_INTEREST = 1  # one Kagi *news* query per interest per run ($0.002 each) — cheap
+                                 # on purpose: launches are rare, and gaps.py already covers content
+SCOUT_MAX_JUDGED = 20           # candidates judged per run, ranked by mention count first: kind +
+                                 # value + actionable, 3 questions each — the cap on cost, not a
+                                 # mention-count floor, since one clip can be evidence enough
+SCOUT_TOP_N = 8                 # candidates kept in the week's capture

@@ -18,6 +18,7 @@ EVAL_MODULES = (
     "eval_discover",
     "eval_reports",
     "eval_gaps",
+    "eval_scout",
 )
 
 

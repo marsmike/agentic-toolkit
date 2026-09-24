@@ -21,6 +21,7 @@ R feeds --json                        # which feeds earn their place
 R trend --json                        # which interests are rising this week
 R discover [--interest ID] [--seed URL]   # new feeds via Kagi, as an OPML to import in Reader
 R gaps [--promote] --json              # weekly: what the feeds missed (Kagi news), judged
+R scout [--dry-run] --json             # weekly: new sources — feeds, APIs, services, tools, datasets
 ```
 
 **Daily.** Run `scan`, read `00_Memory/radar/<today>.md`, and reply with a five-line briefing:
@@ -30,7 +31,20 @@ not read. `SKIPPED` means a key is missing: say which, stop.
 
 **Weekly.** Run `weekly`, then hand the capture to `obsidian:distill` like any other capture. Add
 the `feeds` advice to the briefing: a feed with "consider unsubscribing" is a decision for the
-human, never for you.
+human, never for you. The digest's "Topics rising" section ranks title words and bigrams from
+this week's worth feed items *and* the owner's own clips (`scripts/clips.py`, read straight from
+the vault, never the readwise plugin) against the last four weeks and this vault's own
+always-there vocabulary — a clip needs no feed corroboration, since nothing gated it, and a
+name-like token (capitalised, or carrying a version number) outranks a generic one at equal
+frequency.
+
+**Scout.** Run `scout` once a week (it is a no-op, `exists`, if already run this week): it mines
+candidate sources — domains and GitHub repos — from the same worth/strong feed items, the owner's
+clips, and a few Kagi launch queries, drops anything the vault already knows or Reader already
+carries, and judges the survivors (kind, value against the owner's interests, actionable). The
+result is `01_Capture/Radar-Scout-YYYY-Www.md`, handed to distill like any other capture; a
+`feed`-kind pick also joins `discover`'s OPML. `--dry-run` prints the capture instead of writing
+it — use it to preview without committing to the week.
 
 **Curating.** `discover` writes an OPML with the reason on every feed. Reader has no subscription
 API: the human imports it (or subscribes feed by feed), after reading the list.
@@ -43,7 +57,7 @@ API: the human imports it (or subscribes feed by feed), after reading the list.
 - **Thresholds are code.** `scripts/judgments/policy.py` owns every number; question wording is
   `scripts/judgments/questions.py`, changed only through the judgment-calibration loop (`docs/MAINTAINING.md`) and a
   `QUESTIONS_VERSION` bump. Never tune either to make a briefing look better.
-- **Advice, not writes.** The radar writes only `00_Memory/radar/` and, via `weekly`,
+- **Advice, not writes.** The radar writes only `00_Memory/radar/` and, via `weekly` and `scout`,
   `01_Capture/`. Nothing it produces goes into `02_`–`04_` without distill and a human checkpoint.
 - **Queries stay local to discovery.** Interest queries go to Kagi and nowhere else; the judgment
   backend sees interest names and glosses only.
