@@ -320,7 +320,7 @@ by `surprise_gates_ambiguous_band_and_every_row_carries_label_and_model` in `tes
 ## neighbors/path --include-inferred
 
 `neighbors --include-inferred` unions the exact v1 `extracted` BFS (`kind: "extracted"`,
-unchanged) with every note that has a *direct* inferred edge to the queried note (`kind:
+unchanged) with every note that has a *direct* `INFERRED`-labeled edge to the queried note (`kind:
 "inferred"`, always reported at `depth: 1` regardless of `--depth`). Inferred edges are a
 similarity score, not a chain — unlike wikilinks, this crate deliberately does not walk them
 hop-by-hop for `neighbors`, so a note only ever surfaces as an inferred neighbor when it has a
@@ -328,11 +328,15 @@ hop-by-hop for `neighbors`, so a note only ever surfaces as an inferred neighbor
 `extracted` record (contract rule 4 — the deterministic edge always wins a conflict).
 
 `path --include-inferred` has no such ambiguity — a path is one concrete route, not an aggregated
-set — so it runs a real BFS over the union of both edge kinds, letting an inferred edge serve as a
+set — so it runs a real BFS over extracted and `INFERRED`-labeled edges, letting an inferred edge serve as a
 genuine hop when no all-extracted route exists (or a shorter mixed one does). Each hop after the
 first carries its `kind` (`"extracted"`/`"inferred"`, plus `label`/`score` for the latter); the
 first entry is the start note itself, `kind: "start"`. Extracted edges are offered to BFS before
 inferred ones at every node, so a tie in route length prefers the deterministic one.
+
+Both commands exclude `AMBIGUOUS` edges entirely, including with `--include-inferred`;
+neither has an option to include that band in traversal. To inspect it, use
+`candidates --include-ambiguous` or `surprise --include-ambiguous`.
 
 Without `--include-inferred`, both commands call the untouched v1 functions — verified
 byte-identical on an `infer`'d db by
@@ -341,8 +345,10 @@ byte-identical on an `infer`'d db by
 
 ## Testing
 
-`tests/graph_test.rs` is the only test file, run against the repo's own `./vault` (never a user's
-vault, per `CONTRIBUTING.md`) against the planted structure in
+The three integration test files use the repo's own `./vault` or scratch copies of it
+(never a user's vault, per `CONTRIBUTING.md`).
+
+`tests/graph_test.rs` checks the planted structure in
 `vault/04_Resources/Guides/Test-Corpus-Map.md`: node count and link density, the one planted
 dangling edge, zero boundary violations, the Alex-Vega bridge reaching all three clusters within
 depth 2, a birding-to-homelab path, the ambiguous `Weekly-Review` lookup, incremental re-indexing
@@ -360,6 +366,14 @@ directory (`shared_model_dir()`, a fixed path under the system temp dir, not per
 takes the model directory as an explicit argument specifically so tests never need to touch
 process environment (`TOOLKIT_GAIAFIELD_MODEL_DIR` is for real CLI usage, e.g. sharing a cache
 across several vaults).
+
+`tests/incremental_test.rs` checks incremental versus full link resolution after target
+changes, same-second equal-size edits to metadata, links and embeddings, and migration from
+seconds-based cache timestamps. It uses scratch copies of the example vault.
+
+`tests/traversal_test.rs` exercises the public `neighbors` and `path` CLI commands against
+a throwaway graph database, verifying that `--include-inferred` admits `INFERRED` edges and
+excludes `AMBIGUOUS` edges in both directions. It requires no model download.
 
 ## Cross-compilation note
 

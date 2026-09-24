@@ -2008,7 +2008,9 @@ pub struct NeighborNodeV2 {
 /// `neighbors` with `--include-inferred`: the exact `extracted` BFS from `neighbors` above
 /// (`kind: "extracted"`, unchanged — contract rule 4, traversal defaults to deterministic) unioned
 /// with every note that has a *direct* INFERRED-labeled edge to `start`
-/// (`kind: "inferred"`, `depth: 1`). AMBIGUOUS edges require a separate explicit request.
+/// (`kind: "inferred"`, `depth: 1`). Traversal excludes AMBIGUOUS edges entirely;
+/// inspect that band with `candidates --include-ambiguous` or
+/// `surprise --include-ambiguous` instead.
 ///
 /// Inferred edges are a similarity score, not a chain to walk hop-by-hop the way wikilinks are —
 /// so unlike the extracted side, inferred neighbors always surface at "one similarity step" from
