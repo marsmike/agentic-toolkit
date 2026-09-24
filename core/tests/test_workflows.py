@@ -22,6 +22,7 @@ def test_ci_routes_lock_and_workflow_changes_to_required_checks():
         return {name for name, patterns in filters.items() if any(fnmatch.fnmatchcase(path, p) for p in patterns)}
 
     assert selected("Cargo.lock") == {"rust"}
+    assert "python" in selected("uv.lock")
     assert selected(".github/workflows/ci.yml") == set(filters)
 
 
@@ -31,3 +32,11 @@ def test_ci_runs_every_plugin_eval_suite():
     scheduled = set(re.findall(r"uv run python (plugins/[^ /]+/evals/run\.py)\b", commands))
     available = {str(path.relative_to(ROOT)) for path in ROOT.glob("plugins/*/evals/run.py")}
     assert scheduled == available
+
+
+def test_ci_sync_rejects_stale_dependency_locks():
+    jobs = workflow("ci.yml")["jobs"]
+    for job_name in ("python", "contract-consistency", "evals"):
+        commands = [step["run"] for step in jobs[job_name]["steps"] if "run" in step]
+        sync = next(command for command in commands if command.startswith("uv sync "))
+        assert "--locked" in sync.split()
