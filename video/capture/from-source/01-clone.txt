@@ -1,0 +1,8 @@
+$ git clone https://github.com/marsmike/agentic-toolkit
+Cloning into 'agentic-toolkit'...
+remote: Enumerating objects: 1424, done.
+remote: Counting objects: 100% (640/640), done.
+remote: Compressing objects: 100% (404/404), done.
+remote: Total 1424 (delta 326), reused 403 (delta 211), pack-reused 784 (from 1)
+Receiving objects: 100% (1424/1424), 1.18 MiB | 15.85 MiB/s, done.
+Resolving deltas: 100% (554/554), done.

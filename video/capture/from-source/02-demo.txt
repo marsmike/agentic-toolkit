@@ -1,0 +1,12 @@
+$ cd agentic-toolkit && uv run toolkit demo
+Using CPython 3.14.7 interpreter at: /opt/homebrew/opt/python@3.14/bin/python3.14
+Creating virtual environment at: .venv
+      Built toolkit-core @ file:///private/tmp/newcomer/agentic-toolkit/core
+Installed 8 packages in 6ms
+vault: /private/tmp/newcomer/agentic-toolkit/vault (bundled example vault (repo checkout))
+
+[1/4 vault scan] pure Python, no engines required — the same scan `toolkit doctor` runs
+  82 active note(s) across 02_Projects/03_Areas/04_Resources
+
+[engines] not installed — run: toolkit engines install
+  the steps below need the Rust binaries; the vault scan above never did

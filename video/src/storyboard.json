@@ -1,0 +1,141 @@
+{
+  "storyboard": "OPR.99.0.1.1 STORYBOARD.md, locked 2026-09-24 by outcome-lead@toolkit",
+  "capture": "capture/from-source-main-0dd21a7/session.cast",
+  "note": "text, start/end and source are copied verbatim from the locked storyboard's scene table; scripts/check_storyboard.py holds them equal. terminal.lines are session.txt line numbers.",
+  "scenes": [
+    {
+      "n": 1,
+      "start": 0,
+      "end": 5,
+      "onScreen": "Dark title card; the name fades in, then the line under it",
+      "text": "**agentic-toolkit** / Your notes become an operating system for AI agents.",
+      "source": "TYPE"
+    },
+    {
+      "n": 2,
+      "start": 5,
+      "end": 17,
+      "onScreen": "Three short lines appear one by one over a slow pan across a folder of `.md` files (drawn icons, no file names)",
+      "text": "**What it is:** / You already keep notes in plain markdown files: your vault. / agentic-toolkit turns that folder into the memory, knowledge graph and settings of your AI agents. / It works with Claude Code.",
+      "source": "TYPE"
+    },
+    {
+      "n": 3,
+      "start": 17,
+      "end": 29,
+      "onScreen": "Three stacked cards, one after another",
+      "text": "**Who it is for:** / Anyone who writes notes in markdown and works with AI agents. / Try it on the example notes. Build plugins on it. Run it every day on your own notes.",
+      "source": "TYPE"
+    },
+    {
+      "n": 4,
+      "start": 29,
+      "end": 45,
+      "onScreen": "Terminal, with a corner label that stays on through scenes 4–9. T4 below: clone, `cd` and the engines command type in; clone and uv setup lines scroll, the engine lines hold. From 38 s both `warning:` lines are highlighted and held to the end of the scene. Caption bar at the bottom, one caption at a time.",
+      "text": "Label: *From source · bundled example vault* / Caption 1 (29–33 s): *This demo runs locally, without an account or API key.* / Caption 2 (33–38 s): *Clone it, then install its two engines: search and a link map.* / Caption 3 (38–45 s): *Engine downloads are not publisher-verified.*",
+      "source": "REAL: T4; captions TYPE",
+      "terminal": {
+        "block": "T4",
+        "lines": [
+          1,
+          18
+        ]
+      }
+    },
+    {
+      "n": 5,
+      "start": 45,
+      "end": 57,
+      "onScreen": "Terminal text T5 prints; the count line is highlighted",
+      "text": "Caption: *It reads a folder of ordinary notes. This demo uses the example notes that ship with it.*",
+      "source": "REAL: T5",
+      "terminal": {
+        "block": "T5",
+        "lines": [
+          19,
+          23
+        ]
+      }
+    },
+    {
+      "n": 6,
+      "start": 57,
+      "end": 69,
+      "onScreen": "T6 prints; the three hits are highlighted one by one",
+      "text": "Caption: *Search every note in an instant, on your own machine.*",
+      "source": "REAL: T6",
+      "terminal": {
+        "block": "T6",
+        "lines": [
+          25,
+          28
+        ]
+      }
+    },
+    {
+      "n": 7,
+      "start": 69,
+      "end": 81,
+      "onScreen": "T7 prints; zoom on `nodes=83 edges=783`; the neighbours line is cropped exactly as written in T7",
+      "text": "Caption: *The links between your notes become a map your agents can follow.*",
+      "source": "REAL: T7",
+      "terminal": {
+        "block": "T7",
+        "lines": [
+          30,
+          32
+        ],
+        "crop": {
+          "line": 32,
+          "endsWith": "04_Resources/Concepts/Community-Detection-and-Bridge-Notes.md,"
+        }
+      }
+    },
+    {
+      "n": 8,
+      "start": 81,
+      "end": 93,
+      "onScreen": "T8 prints; the clause `never auto-applied, always a human decision` is highlighted, then each `[INFERRED]` tag in turn",
+      "text": "Caption 1 (81–87 s): *It can suggest new connections between notes.* / Caption 2 (87–93 s): *Each suggestion is marked INFERRED and only reported. It is never applied automatically. You decide.*",
+      "source": "REAL: T8",
+      "terminal": {
+        "block": "T8",
+        "lines": [
+          34,
+          38
+        ]
+      }
+    },
+    {
+      "n": 9,
+      "start": 93,
+      "end": 101,
+      "onScreen": "T9 types in; the ✔ line is highlighted",
+      "text": "Caption: *One more command adds its plugin marketplace to Claude Code.*",
+      "source": "REAL: T9",
+      "terminal": {
+        "block": "T9",
+        "lines": [
+          39,
+          40
+        ]
+      }
+    },
+    {
+      "n": 10,
+      "start": 101,
+      "end": 113,
+      "onScreen": "Three numbered lines on a plain card, appearing one by one",
+      "text": "**Why it is different:** / 1. Your own notes are the platform, and they stay yours. / 2. It suggests links but never applies them automatically. / 3. This demo runs locally, without an account or API key.",
+      "source": "TYPE"
+    },
+    {
+      "n": 11,
+      "start": 113,
+      "end": 118,
+      "onScreen": "End card",
+      "text": "**agentic-toolkit** / github.com/marsmike/agentic-toolkit / Your vault is the platform.",
+      "source": "TYPE"
+    }
+  ]
+}

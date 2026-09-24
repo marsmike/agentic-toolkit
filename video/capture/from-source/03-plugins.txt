@@ -1,0 +1,2 @@
+$ cd agentic-toolkit && claude plugin marketplace add .
+✘ Invalid marketplace source format. Try: owner/repo, https://..., or ./path

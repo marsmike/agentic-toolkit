@@ -1,0 +1,5 @@
+{"version": 2, "width": 120, "height": 32, "timestamp": 1790271944, "command": "cd agentic-toolkit && claude plugin marketplace add ."}
+[0.095982, "o", "\u001b7\u001b[r\u001b8\u001b[?25h"]
+[0.271323, "o", "\u001b[0m\u001b[31m\u001b[31m\u2718 Invalid marketplace source format. Try: owner/repo, https://..., or ./path\u001b[39m\u001b[0m\r\n"]
+[0.271356, "o", "\u001b[?25h"]
+[0.271757, "o", "\u001b(B\u000f\u001b[?1016l\u001b[?1006l\u001b[?1003l\u001b[?1002l\u001b[?1000l\u001b[>4m\u001b[?1004l\u001b[?2031l\u001b[?2004l\u001b[<u\u001b[?25h\u001b7\u001b[r\u001b8"]
