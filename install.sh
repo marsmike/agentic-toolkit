@@ -20,7 +20,12 @@ export PATH="$HOME/.local/bin:$PATH"
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "uv (the Python package/tool manager this toolkit uses) was not found on PATH."
-  read -r -p "Install uv now via the official astral.sh installer? [y/N] " reply
+  reply=""
+  # stdin may be the script itself (curl | bash); only a terminal can answer.
+  if { exec 3</dev/tty; } 2>/dev/null; then
+    read -r -p "Install uv now via the official astral.sh installer? [y/N] " reply <&3 || reply=""
+    exec 3<&-
+  fi
   case "$reply" in
     [yY]|[yY][eE][sS])
       curl -LsSf https://astral.sh/uv/install.sh | sh
