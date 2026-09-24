@@ -51,7 +51,14 @@ fn edges(conn: &rusqlite::Connection) -> Vec<Edge> {
 fn incremental_target_changes_match_full_resolution() {
     for change in ["add", "rename", "scope", "boundary", "duplicate", "remove-out-of-scope"] {
         let vault = Fixture::new();
-        vault.write("04_Resources/Regression-Source.md", "[[Regression-Target]] [[Regression-Target]]");
+        // A duplicate must be visible from outside both target folders; otherwise
+        // same-folder precedence keeps the original target and no edge can change.
+        let source = if change == "duplicate" {
+            "02_Projects/Regression-Source.md"
+        } else {
+            "04_Resources/Regression-Source.md"
+        };
+        vault.write(source, "[[Regression-Target]] [[Regression-Target]]");
         match change {
             "rename" => vault.write("04_Resources/Regression-Old.md", "target"),
             "scope" => vault.write("Regression-Target.md", "---\nstatus: dormant\n---\ntarget"),
@@ -73,6 +80,18 @@ fn incremental_target_changes_match_full_resolution() {
         let report = gaiafield::index(&vault.0, &conn, false).unwrap();
         assert_eq!(report.updated, 0, "unchanged sources need only their edges refreshed: {change}");
         let incremental = edges(&conn);
+        if change == "duplicate" {
+            let targets: Vec<_> = incremental.iter()
+                .filter(|edge| edge.0 == source)
+                .map(|edge| edge.1.as_deref())
+                .collect();
+            assert_eq!(targets, [
+                Some("03_Areas/Regression-Target.md"),
+                Some("03_Areas/Regression-Target.md"),
+                Some("04_Resources/Regression-Target.md"),
+                Some("04_Resources/Regression-Target.md"),
+            ], "each repeated link must resolve to both duplicate targets");
+        }
         gaiafield::index(&vault.0, &conn, true).unwrap();
         assert_eq!(incremental, edges(&conn), "incremental differs from full after {change}");
     }
