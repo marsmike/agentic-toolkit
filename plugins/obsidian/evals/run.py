@@ -15,7 +15,9 @@ Exit codes:
 """
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -50,6 +52,23 @@ def resolve_repo_vault() -> Path:
     return here.parent.parent.parent / "vault"
 
 
+@contextlib.contextmanager
+def _stdout_to_stderr():
+    """Evals call builders in-process (`index_build.main([])`) and those spawn subprocesses, all
+    printing progress to stdout; stdout is the results' alone, so `--json` parses. Redirected at
+    the file descriptor, which catches the subprocesses too. [earned: 2026-09-24 review GLM-9 —
+    `run.py --json | jq .` failed; CI only passed because it greps rather than parses]"""
+    sys.stdout.flush()
+    saved = os.dup(1)
+    os.dup2(2, 1)
+    try:
+        yield
+    finally:
+        sys.stdout.flush()
+        os.dup2(saved, 1)
+        os.close(saved)
+
+
 def main() -> int:
     as_json = "--json" in sys.argv
     evals_dir = Path(__file__).resolve().parent
@@ -66,14 +85,15 @@ def main() -> int:
         return 2
 
     results = []
-    for name in EVAL_MODULES:
-        import importlib
-        try:
-            mod = importlib.import_module(name)
-            result = mod.run(vault)
-        except Exception as exc:  # an eval crashing is itself a failure to report, not to propagate
-            result = {"eval": name.removeprefix("eval_"), "pass": False, "detail": f"eval raised {type(exc).__name__}: {exc}"}
-        results.append(result)
+    with _stdout_to_stderr():
+        for name in EVAL_MODULES:
+            import importlib
+            try:
+                mod = importlib.import_module(name)
+                result = mod.run(vault)
+            except Exception as exc:  # an eval crashing is itself a failure to report, not to propagate
+                result = {"eval": name.removeprefix("eval_"), "pass": False, "detail": f"eval raised {type(exc).__name__}: {exc}"}
+            results.append(result)
 
     if as_json:
         print(json.dumps(results, indent=2))
