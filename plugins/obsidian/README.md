@@ -281,9 +281,9 @@ all. Same "surfaces, never mutates" character as the rest of doctor — it never
 
 ## Evals
 
-`evals/run.py` runs eleven capability evals against `./vault`, emitting JSON
-`{eval, pass, detail}` per check. The seven below cover search, graph and lint; the four
-judgment evals (`distill_judge`, `link_adjudication`, `search_judge`, `typed_maintenance`)
+`evals/run.py` runs 21 capability evals against `./vault`, emitting JSON
+`{eval, pass, detail}` per check. The table below covers search, graph, lint and the generated
+views; the four judgment evals (`distill_judge`, `link_adjudication`, `search_judge`, `typed_maintenance`)
 run offline against a stubbed transport in CI and, with `TOOLKIT_EVAL_LIVE_JEV=1` and a
 key, a live phase scored against `evals/golden/`.
 
