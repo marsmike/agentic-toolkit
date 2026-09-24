@@ -48,7 +48,7 @@ claude plugin marketplace add marsmike/agentic-toolkit                          
 toolkit demo                                                                        # see it work, for real
 ```
 
-**From source**: `git clone https://github.com/marsmike/agentic-toolkit && cd agentic-toolkit && uv run toolkit demo` — then `claude plugin marketplace add .` in place of the line above.
+**From source**: `git clone https://github.com/marsmike/agentic-toolkit && cd agentic-toolkit && uv run toolkit engines install && uv run toolkit demo` — then `claude plugin marketplace add ./` in place of the line above.
 
 Then read the [Quick Start](https://marsmike.github.io/agentic-toolkit/04_Resources/Guides/Quick-Start)
 and scaffold your own vault with `uv run toolkit vault init ~/my-vault`
