@@ -6,6 +6,12 @@ description, and one note's frontmatter does not parse. After the rebuild: no da
 without a description is marked ⚙ and keeps its previous summary, the ✓ carries over, every
 other summary is the note's own description, the unparseable note is summarised from its prose
 and not its YAML, and nothing but Index.md (and Log.md) changed.
+
+The root-note clause (contract/VAULT_SCHEMA.md): `Alex-Vega.md` sits at the vault root with
+`status: active`, so it is in Index.md, lint scans it (and so does not report it as a missing
+concept), and `discover_notes` — what map_build and now_build walk — returns it; no other
+root file (Index.md, Now.md, AGENTS.md) qualifies. Search and both engines already did; the
+builders and lint did not (2026-09-24 review GLM-1).
 """
 from __future__ import annotations
 
@@ -18,6 +24,7 @@ NAME = "index_build"
 MARKED = "04_Resources/Concepts/Hybrid-Retrieval"
 UNDESCRIBED = "04_Resources/Concepts/BM25-Dilution"
 UNPARSEABLE = "04_Resources/Concepts/Eval-Unparseable-Yaml"
+ROOT_NOTE = "Alex-Vega"
 
 
 def run(vault: Path) -> dict:
@@ -27,7 +34,7 @@ def run(vault: Path) -> dict:
         sys.path.insert(0, str(scripts_dir))
     import index_build
     import vault_lint
-    from vault_utils import read_frontmatter, write_frontmatter
+    from vault_utils import discover_notes, read_frontmatter, write_frontmatter
 
     problems: list[str] = []
     sandbox, saved = None, os.environ.get("TOOLKIT_VAULT")
@@ -64,6 +71,17 @@ def run(vault: Path) -> dict:
         desc = read_frontmatter(sandbox / f"{sample}.md")[0].get("description", "")
         if " ".join(str(desc).split()) not in built.get(sample, ""):
             problems.append("a summary is not the note's own description")
+        roots = [k for k in built if "/" not in k]
+        if roots != [ROOT_NOTE]:
+            problems.append(f"Index.md must list exactly the root active note {ROOT_NOTE}, got {roots}")
+        if ROOT_NOTE not in notes:
+            problems.append("lint must scan the root active note")
+        missing = {m["term"] for m in vault_lint.find_missing_concepts(notes, vault_lint.scan_vault(sandbox)[1])}
+        if ROOT_NOTE in missing:
+            problems.append("lint reports the root active note as a missing concept")
+        discovered = [p.name for p in discover_notes(sandbox) if p.parent == sandbox]
+        if discovered != [f"{ROOT_NOTE}.md"] or discover_notes(sandbox, scope="04_Resources")[0].parent == sandbox:
+            problems.append(f"discover_notes must add the root active note only when unscoped, got {discovered}")
         after = {p.relative_to(sandbox).as_posix(): p.stat().st_mtime_ns for p in sandbox.rglob("*") if p.is_file()}
         changed = {k for k in before.keys() | after.keys() if before.get(k) != after.get(k)}
         if changed - {"Index.md", "Log.md"}:
@@ -76,4 +94,4 @@ def run(vault: Path) -> dict:
         if sandbox is not None:
             teardown_sandbox(sandbox)
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "rebuild leaves no drift; ⚙ and ✓ handled; only Index.md changed"}
+            "detail": "; ".join(problems) if problems else "rebuild leaves no drift; ⚙ and ✓ handled; root active note indexed, scanned and discovered; only Index.md changed"}

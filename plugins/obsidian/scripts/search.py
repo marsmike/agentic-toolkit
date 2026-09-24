@@ -43,11 +43,9 @@ from typing import Any
 
 from vault_utils import (
     ACTIVE_CONTENT_FOLDERS,
-    UnparseableFrontmatter,
     discover_notes,
     parse_existing_index,
     profile_value,
-    read_frontmatter,
     require_vault,
 )
 
@@ -98,27 +96,9 @@ class Doc:
         self.length = len(self.tokens)
 
 
-def _root_active_notes(vault: Path) -> list[Path]:
-    """Root-level *.md files whose own frontmatter declares `status: active` —
-    contract/VAULT_SCHEMA.md's root-note clause (e.g. a persona/profile note). `Index.md`
-    and `AGENTS.md` never qualify since neither carries frontmatter."""
-    notes = []
-    for p in sorted(vault.glob("*.md")):
-        try:
-            frontmatter, _ = read_frontmatter(p, strict=True)
-        except UnparseableFrontmatter:
-            continue
-        if frontmatter.get("status") == "active":
-            notes.append(p)
-    return notes
-
-
 def build_corpus(vault: Path, scope: str | None = None) -> list[Doc]:
     index_entries = parse_existing_index(vault / "Index.md")
-    notes = discover_notes(vault, scope=scope)
-    # A `scope` narrows to one PARA folder, which a root-level note can never belong to.
-    if scope is None:
-        notes = sorted(notes + _root_active_notes(vault), key=lambda p: p.as_posix())
+    notes = discover_notes(vault, scope=scope)  # root `status: active` notes included when unscoped
     return [Doc(p, vault, index_entries) for p in notes]
 
 
@@ -171,6 +151,18 @@ def semantic_available() -> bool:
     return True
 
 
+MODEL_NAME = "TaylorAI/bge-micro-v2"
+MODEL_REVISION = "3edf6d7de0faa426b09780416fe61009f26ae589"  # pinned: a moved repo head must not change what runs
+
+
+def stale_docs(corpus: list[Doc], cache: dict[str, Any]) -> list[Doc]:
+    """Docs whose cached vector is missing, older than the note, or from another model revision
+    (an entry written before the pin has none) — re-embedded before any query is scored."""
+    return [d for d in corpus
+            if (entry := cache.get(d.rel, {})).get("mtime") != d.path.stat().st_mtime
+            or entry.get("revision") != MODEL_REVISION]
+
+
 def semantic_scores(query: str, corpus: list[Doc], vault: Path, rebuild: bool = False) -> dict[str, float] | None:
     """Cosine similarity between the query and each doc's cached embedding.
 
@@ -191,17 +183,16 @@ def semantic_scores(query: str, corpus: list[Doc], vault: Path, rebuild: bool = 
         except (json.JSONDecodeError, OSError):
             cache = {}
 
-    model_name = "TaylorAI/bge-micro-v2"
-    stale = [d for d in corpus if cache.get(d.rel, {}).get("mtime") != d.path.stat().st_mtime]
+    stale = stale_docs(corpus, cache)
     if stale:
-        model = SentenceTransformer(model_name)
+        model = SentenceTransformer(MODEL_NAME, revision=MODEL_REVISION)
         vectors = model.encode([d.text[:1000] for d in stale], show_progress_bar=False)
         for d, vec in zip(stale, vectors, strict=False):
-            cache[d.rel] = {"mtime": d.path.stat().st_mtime, "vector": vec.tolist()}
+            cache[d.rel] = {"mtime": d.path.stat().st_mtime, "revision": MODEL_REVISION, "vector": vec.tolist()}
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         cache_file.write_text(json.dumps(cache), encoding="utf-8")
 
-    model = SentenceTransformer(model_name)
+    model = SentenceTransformer(MODEL_NAME, revision=MODEL_REVISION)
     q_vec = np.array(model.encode([query], show_progress_bar=False)[0])
     q_norm = q_vec / (np.linalg.norm(q_vec) or 1.0)
 
@@ -266,15 +257,15 @@ def farsight_search(query: str, vault: Path, top: int, binary: str) -> dict | No
     results = [
         {
             "path": r["path"], "title": r["title"], "folder": r["path"].split("/", 1)[0],
-            "score": r["score"], "above_enrichment_gate": r["score"] >= gate,
+            "score": r["score"], "above_enrichment_gate": None,  # raw BM25: no 0-1 gate applies
             "channels": ["keyword"],
         }
         for r in rows
     ]
     note = (
         f"farsight ({binary}) — Rust BM25 engine, R1. Raw scores are not on the "
-        "normalized 0-1 scale score_gate was calibrated against; above_enrichment_gate "
-        "is informational only for farsight-sourced results."
+        "normalized 0-1 scale score_gate was calibrated against, so above_enrichment_gate "
+        "is null for farsight-sourced results."
     )
     return {"query": query, "semantic_available": False, "note": note, "score_gate": gate, "results": results}
 

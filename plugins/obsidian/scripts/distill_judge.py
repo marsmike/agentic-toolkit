@@ -261,7 +261,8 @@ def enrichment_targets(vault: Path, exclude: list[str]) -> list[str]:
     raw = profile_value(vault, "enrichment_targets", []) or []
     if isinstance(raw, str):
         raw = [t for t in re.split(r"[,\n]", raw) if t.strip()]
-    # A profile note usually sits at the vault root, outside the PARA folders search walks.
+    # A profile note usually sits at the vault root; discover_notes returns it only when it
+    # declares `status: active`, so every root note is looked up here.
     by_stem = {p.stem: p.relative_to(vault).as_posix() for p in discover_notes(vault, exclude=exclude)}
     by_stem.update({p.stem: p.name for p in vault.glob("*.md")})
     out = []

@@ -48,9 +48,9 @@ first.** `vault_lint.py` needs nothing but PyYAML. `vault_normalize.py`'s LLM-as
 inference_model configured` without one; that is not an error. A note whose frontmatter does not
 parse is skipped and written to `00_Memory/dlq/`, never guessed at.
 
-Both tools scan `02_Projects/`, `03_Areas/`, `04_Resources/` only; `--exclude <prefix>` keeps
-private paths away from any model call. Link targets are checked vault-wide (a link may point at
-a root or `Config/` note). Links from generated navigation never count as a note's inbound link.
+Both tools scan `02_Projects/`, `03_Areas/`, `04_Resources/` and root notes with `status: active`
+only; `--exclude <prefix>` keeps private paths away from any model call. Link targets are checked
+vault-wide (a link may point at a root or `Config/` note). Links from generated navigation never count as a note's inbound link.
 
 `vault_judge.py`, `link_judge.py` and `vault_sweep.py` (duplicates, contradictions) need a
 judgment key and write nothing: treat their output as a reading list. With a key the `links`

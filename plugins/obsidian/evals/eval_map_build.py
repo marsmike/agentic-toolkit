@@ -14,6 +14,9 @@ config block gives the domain a title, an intro and a "Concepts" section. After 
 6. idempotent — a second build changes no file
 7. untracked — a note git ignores is on no map, not in Index.md, not scanned by lint, and its
                old Index line is not reported as dangling (a clone never has it)
+8. duplicates — a bare [[Dup]] with two `Dup.md` notes resolves to the one in the linking note's
+               own folder, and stays unresolved from any other folder (the example vault has two
+               `Weekly-Review.md`; the first one scanned used to win, 2026-09-24 review CODE-4)
 """
 from __future__ import annotations
 
@@ -143,6 +146,14 @@ def run(vault: Path) -> dict:
         if "04_Resources/EvalHub/Loner" in notes or any(d["path"].endswith("EvalHub/Loner") for d in drift["dangling"]):
             problems.append("phase 7: lint must neither scan a git-ignored note nor report its old Index line as dangling")
         git_ignored.cache_clear()
+        # 8. duplicate names: the linking note's own folder wins; elsewhere it is ambiguous
+        dup = [map_build.Note(rel=rel, name=rel.rsplit("/", 1)[-1], kind="", description="", domains=[], when="",
+                              links=links)
+               for rel, links in (("A/Dup", set()), ("B/Dup", set()), ("B/Linker", {"Dup"}),
+                                  ("C/Stranger", {"Dup"}), ("C/Pathed", {"A/Dup"}))]
+        got = map_build.resolve_links(dup)
+        if got["B/Linker"] != {"B/Dup"} or got["C/Stranger"] or got["C/Pathed"] != {"A/Dup"}:
+            problems.append(f"phase 8: duplicate names must resolve to the own folder or not at all; got {got}")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
@@ -151,4 +162,4 @@ def run(vault: Path) -> dict:
         if sandbox is not None:
             teardown_sandbox(sandbox)
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "hubs, new, config sections, valid canvases, no stale maps, idempotent"}
+            "detail": "; ".join(problems) if problems else "hubs, new, config sections, valid canvases, no stale maps, idempotent, duplicate names by folder"}

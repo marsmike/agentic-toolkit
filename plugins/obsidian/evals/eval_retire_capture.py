@@ -15,7 +15,8 @@ and its folder's manifest together, under a lock.
                   nothing (invariant 8)
 5. refuse: bad note — a `--note` that doesn't exist, and one that fails a distill_check hard
                   gate, both refuse and move nothing
-6. refuse: mode   — neither or both of --line/--dropped refuses
+6. refuse: mode   — neither or both of --line/--dropped refuses, and so does --line with no
+                  --note (a clip archived as "distilled" with no note, 2026-09-24 review CODE-1)
 7. append         — two captures retired into the same folder end with two correct, distinct
                   manifest lines (no interleaving, nothing lost)
 
@@ -186,6 +187,14 @@ def run(vault: Path) -> dict:
                 problems.append(f"phase 6: line={line!r} dropped={dropped!r} was not refused")
             except rc.RetireRefused:
                 pass
+        try:
+            rc.retire(cap("Readwise-Retire-Clip2.md"), sandbox, [], "processed", None)
+            problems.append("phase 6: --line with no --note was not refused")
+        except rc.RetireRefused as e:
+            if "--note" not in str(e):
+                problems.append(f"phase 6: --line with no --note refused for the wrong reason: {e}")
+        if not cap("Readwise-Retire-Clip2.md").is_file():
+            problems.append("phase 6: capture was moved by --line with no --note")
 
         # --- 7. append: two captures into the same folder, two correct lines ---
         rc.retire(cap("Readwise-Retire-Clip2.md"), sandbox, ["04_Resources/Retire-Eval-Good.md"], "→ enrichment only.", None)
@@ -204,4 +213,4 @@ def run(vault: Path) -> dict:
 
     return {"eval": NAME, "pass": not problems,
             "detail": "; ".join(problems) if problems else
-            "lock serializes; move+manifest succeed for --line and --dropped; refuses a dropped clip, a bad --note, and a bad mode; appends accumulate"}
+            "lock serializes; move+manifest succeed for --line and --dropped; refuses a dropped clip, a bad --note, a bad mode and --line without --note; appends accumulate"}

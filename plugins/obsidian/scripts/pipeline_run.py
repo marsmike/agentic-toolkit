@@ -46,7 +46,8 @@ LOCK = Path("00_Memory") / "pipeline.lock"
 STATE = Path("00_Memory") / "pipeline-state.json"
 # What came in is counted from the sources' own ledgers (rows appended between begin and end), so
 # the run's summary is a record, not a recollection. [earned: 2026-09-24 — a cloud run reported
-# "3 promoted as strong" where its radar had promoted none]
+# "3 promoted as strong" where its radar had promoted none] Paths and the row fields read here are
+# contract/KNOWLEDGE_API.md's "Cross-plugin ledgers".
 LEDGERS = {"judged": Path("00_Memory/radar/state.jsonl"), "promoted": Path("00_Memory/radar/promoted.jsonl"),
            "ingested": Path("00_Memory/readwise-ingested.jsonl")}
 LOCK_STALE_HOURS = 6

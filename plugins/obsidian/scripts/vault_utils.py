@@ -112,13 +112,39 @@ def _profile_note_path(vault: Path) -> Path:
 
 
 def read_profile(vault: Path) -> dict:
-    """This plugin's profile frontmatter, or {} if no profile note exists."""
+    """This plugin's profile frontmatter, or {} if no profile note exists.
+
+    Uses `strict=True` so a profile note whose frontmatter fails to parse raises rather than
+    silently reading as "no config" — that ambiguity (a note the user believes is active,
+    quietly ignored) is exactly the unreadable-profile case README's DLQ convention calls
+    out, so it's recorded via `write_dlq_note()` before falling back to defaults: once a day,
+    since every `profile_value()` call reads the profile again. The obsidian, radar and
+    readwise copies of this function are identical but for `PROFILE_PLUGIN_NAME`
+    (core/tests/test_contract.py).
+    """
     path = _profile_note_path(vault)
     if not path.is_file():
         return {}
     try:
-        fm, _ = read_frontmatter(path)
-    except UnparseableFrontmatter:
+        fm, _ = read_frontmatter(path, strict=True)
+    except UnparseableFrontmatter as exc:
+        slug = f"{PROFILE_PLUGIN_NAME}-profile-unreadable"
+        if not (vault / "00_Memory" / "dlq" / f"{time.strftime('%Y-%m-%d')}-{slug}.md").exists():
+            write_dlq_note(
+                vault,
+                slug=slug,
+                title=f"{PROFILE_PLUGIN_NAME.capitalize()} profile note has unparseable frontmatter",
+                what_happened=(
+                    f"{path} exists but its frontmatter did not parse as YAML ({exc}); every "
+                    "profile field fell back to its shipped default for this run."
+                ),
+                why_recorded=(
+                    "Silently defaulting the whole profile from a config note the user believes "
+                    "is active would hide a misconfiguration instead of surfacing it for repair."
+                ),
+                resolution="Fix the YAML frontmatter in the profile note, then re-run.",
+                confidence="medium",
+            )
         return {}
     return fm
 
@@ -199,6 +225,7 @@ def write_frontmatter(path: Path, frontmatter: dict, body: str) -> None:
 
 
 def atomic_write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     try:
         tmp_path.write_text(content, encoding="utf-8")
@@ -240,7 +267,7 @@ def git_ignored(vault: Path) -> frozenset[str]:
     if probe.stdout.strip() != "true":
         return frozenset()
     out = subprocess.run(["git", "-C", str(vault), "ls-files", "--others", "--ignored", "--exclude-standard", "-z",
-                          "--", *ACTIVE_CONTENT_FOLDERS], capture_output=True, text=True, check=False)
+                          "--", *ACTIVE_CONTENT_FOLDERS, ":(glob)*.md"], capture_output=True, text=True, check=False)
     if out.returncode != 0:
         # Fail closed: an empty set here would put notes kept out of git for holding a secret
         # into Index.md and the maps, which are committed and pushed.
@@ -279,6 +306,22 @@ def _is_recent(path: Path, cutoff_ts: float, since: str, distilled_only: bool) -
         return False
 
 
+def root_active_notes(vault: Path) -> list[Path]:
+    """Root-level *.md files whose own frontmatter declares `status: active` —
+    contract/VAULT_SCHEMA.md's root-note clause (e.g. a persona/profile note), mirroring
+    core/toolkit_core/vault.py. `Index.md` and `AGENTS.md` never qualify (no frontmatter);
+    unparseable frontmatter is skipped, as `vault_yaml_repair.py` is the place for that."""
+    notes = []
+    for p in sorted(vault.glob("*.md")):
+        try:
+            frontmatter, _ = read_frontmatter(p, strict=True)
+        except UnparseableFrontmatter:
+            continue
+        if frontmatter.get("status") == "active":
+            notes.append(p)
+    return notes
+
+
 def discover_notes(
     vault: Path,
     scope: str | None = None,
@@ -288,6 +331,8 @@ def discover_notes(
     distilled_only: bool = False,
 ) -> list[Path]:
     """Walk active PARA folders (02-04) and return eligible .md paths, sorted POSIX-wise.
+    Without a `scope`, root-level `status: active` notes join them (`root_active_notes`); a
+    scope narrows to one folder, which a root note never belongs to.
 
     Per contract/VAULT_SCHEMA.md, 00_Memory/01_Capture/05_Archive are excluded from any
     generated view by default; pass include_archive=True to add 05_Archive explicitly
@@ -297,26 +342,28 @@ def discover_notes(
     exclude = tuple(exclude or ())
     cutoff_ts = time.mktime(time.strptime(since, "%Y-%m-%d")) if since else None
 
-    ignored = git_ignored(vault)
-    found: list[Path] = []
+    candidates: list[Path] = []
     for folder in folders:
         root = vault / folder
         if not root.is_dir():
             continue
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
-            for fn in filenames:
-                if not fn.endswith(".md") or fn.startswith("."):
-                    continue
-                p = Path(dirpath) / fn
-                if _has_index_false(p):
-                    continue
-                rel = p.relative_to(vault).as_posix()
-                if rel in ignored or any(rel == e or rel.startswith(e.rstrip("/") + "/") for e in exclude):
-                    continue
-                if cutoff_ts is not None and not _is_recent(p, cutoff_ts, since, distilled_only):
-                    continue
-                found.append(p)
+            candidates += [Path(dirpath) / fn for fn in filenames if fn.endswith(".md") and not fn.startswith(".")]
+    if not scope:
+        candidates += root_active_notes(vault)
+
+    ignored = git_ignored(vault)
+    found: list[Path] = []
+    for p in candidates:
+        if _has_index_false(p):
+            continue
+        rel = p.relative_to(vault).as_posix()
+        if rel in ignored or any(rel == e or rel.startswith(e.rstrip("/") + "/") for e in exclude):
+            continue
+        if cutoff_ts is not None and not _is_recent(p, cutoff_ts, since, distilled_only):
+            continue
+        found.append(p)
     found.sort(key=lambda p: p.as_posix())
     return found
 

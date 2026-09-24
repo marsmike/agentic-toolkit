@@ -6,7 +6,7 @@ import pytest
 from toolkit_core import vault
 
 REPO_ROOT = vault.find_repo_root(Path(__file__).resolve().parent)
-assert REPO_ROOT is not None, "tests must run from inside the agentic-toolkit-v2 repo"
+assert REPO_ROOT is not None, "tests must run from inside the agentic-toolkit repo"
 
 EXAMPLE_VAULT = REPO_ROOT / "vault"
 AGENTS_MD_TEMPLATE = REPO_ROOT / "contract" / "templates" / "VAULT_AGENTS.md"

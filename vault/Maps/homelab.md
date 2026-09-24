@@ -22,6 +22,7 @@ The home-lab migration and the network it runs on.
 - [[02_Projects/home-lab-migration/Backup-Strategy|Backup-Strategy]] — Backup and restore-verification approach used during the home-lab migration, including the restore-drill discipline.
 - [[02_Projects/home-lab-migration/Migration-Runbook|Migration-Runbook]] — The repeatable per-service migration procedure used for each of the five home-lab services.
 - [[02_Projects/home-lab-migration/Network-Topology|Network-Topology]] — Current and target network layout for the home-lab migration — VLANs, static addresses, and the old-vs-new box path.
+- [[02_Projects/home-lab-migration/Weekly-Review|Weekly-Review]] — Weekly review for the home-lab migration project, week of 2026-07-20.
 
 ## New (last 30 days)
 

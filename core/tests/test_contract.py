@@ -123,6 +123,37 @@ def test_core_and_plugin_frontmatter_implementations_agree(tmp_path):
         assert plugin_fm["unknown_field"] == "keep-me"
 
 
+def test_plugin_vault_utils_profile_and_write_agree(tmp_path):
+    """The three plugin copies of vault_utils once disagreed on two contracts: `atomic_write` into
+    a missing folder (radar created it, obsidian and readwise raised) and an unparseable profile
+    note (readwise wrote a DLQ note, obsidian and radar silently read `{}` through a dead
+    `except`) [earned: 2026-09-24 review GLM-3]. Each copy must now create the folder, and read a
+    broken profile as defaults plus one DLQ note a day, however often it is read."""
+    import sys
+
+    for plugin_name in ("obsidian", "readwise", "radar"):
+        vault = tmp_path / plugin_name
+        scripts_dir = EXAMPLE_VAULT.parent / "plugins" / plugin_name / "scripts"
+        sys.path.insert(0, str(scripts_dir))
+        sys.modules.pop("vault_utils", None)
+        try:
+            import vault_utils
+
+            vault_utils.atomic_write(vault / "new" / "folder" / "note.md", "written\n")
+            profile = vault / "Config" / "toolkit" / f"{plugin_name}.md"
+            profile.parent.mkdir(parents=True)
+            profile.write_text("---\nbatch: [25\n---\n", encoding="utf-8")
+            reads = [vault_utils.read_profile(vault), vault_utils.read_profile(vault)]
+        finally:
+            sys.path.remove(str(scripts_dir))
+            sys.modules.pop("vault_utils", None)
+
+        assert (vault / "new" / "folder" / "note.md").read_text(encoding="utf-8") == "written\n", plugin_name
+        assert reads == [{}, {}], f"{plugin_name}: an unparseable profile must read as defaults"
+        dlq = sorted(p.name for p in (vault / "00_Memory" / "dlq").glob("*.md"))
+        assert len(dlq) == 1 and dlq[0].endswith(f"{plugin_name}-profile-unreadable.md"), f"{plugin_name}: {dlq}"
+
+
 def test_shared_judgment_modules_are_byte_identical():
     """The judgment client and its helpers exist twice, in obsidian and radar, because a plugin
     never imports a sibling (contract/KNOWLEDGE_API.md). The copies are only safe while they are
@@ -168,3 +199,129 @@ def test_core_and_plugin_graph_discovery_agree(tmp_path, monkeypatch):
     assert knowledge.gaiafield_binary() == graph_mod.gaiafield_binary() == "/custom/gaiafield-bin"
 
     assert knowledge.default_db_path(tmp_path) == graph_mod.default_db_path(tmp_path)
+
+
+def _ledger_table() -> dict[str, tuple[str, set[str]]]:
+    """contract/KNOWLEDGE_API.md's "Cross-plugin ledgers" table → {name: (path, fields)}."""
+    import re
+
+    text = (EXAMPLE_VAULT.parent / "contract" / "KNOWLEDGE_API.md").read_text(encoding="utf-8")
+    section = text.split("## Cross-plugin ledgers", 1)[1].split("\n## ", 1)[0]
+    table = {}
+    for line in section.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) == 5 and cells[1].startswith("`00_Memory/"):
+            table[cells[0]] = (cells[1].strip("`"), set(re.findall(r"`(\w+)`", cells[4])))
+    return table
+
+
+def _row_keys_read(source: str, functions: set[str]) -> set[str]:
+    """String keys read from a `row`/`r` dict in the named functions, less keys they set themselves."""
+    import ast
+
+    read, written = set(), set()
+    for fn in ast.walk(ast.parse(source)):
+        if not (isinstance(fn, ast.FunctionDef) and fn.name in functions):
+            continue
+        for node in ast.walk(fn):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get"
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id in ("row", "r")
+                    and node.args and isinstance(node.args[0], ast.Constant)):
+                read.add(node.args[0].value)
+            elif (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name)
+                  and node.value.id in ("row", "r") and isinstance(node.slice, ast.Constant)):
+                (written if isinstance(node.ctx, ast.Store) else read).add(node.slice.value)
+    return read - written
+
+
+def _row_keys_written(source: str, function: str, marker: str) -> set[str]:
+    """Keys of the dict literal(s) in `function` that carry the key `marker`: the rows it writes."""
+    import ast
+
+    keys: set[str] = set()
+    for fn in ast.walk(ast.parse(source)):
+        if isinstance(fn, ast.FunctionDef) and fn.name == function:
+            for node in ast.walk(fn):
+                if isinstance(node, ast.Dict):
+                    literal = {k.value for k in node.keys if isinstance(k, ast.Constant)}
+                    if marker in literal:
+                        keys |= literal
+    return keys
+
+
+def test_cross_plugin_ledgers_match_the_contract():
+    """The pipeline and Now.md read radar's and readwise's JSONL ledgers; the path and row fields
+    both sides use are the ones contract/KNOWLEDGE_API.md lists [earned: 2026-09-24 review GLM-2 —
+    the schemas were private to each producer, and a rename would have zeroed the run summary
+    silently]. Remove with that contract section."""
+    import sys
+
+    plugins = EXAMPLE_VAULT.parent / "plugins"
+    table = _ledger_table()
+    assert set(table) == {"judged", "promoted", "ingested"}, f"ledger table not parsed: {table}"
+
+    scripts_dir = plugins / "obsidian" / "scripts"
+    sys.path.insert(0, str(scripts_dir))
+    try:
+        import pipeline_run
+    finally:
+        sys.path.remove(str(scripts_dir))
+    assert {k: p.as_posix() for k, p in pipeline_run.LEDGERS.items()} == {k: v[0] for k, v in table.items()}
+
+    producers = {  # ledger → (file, the function that builds its row, a key only that row has)
+        "judged": (plugins / "radar" / "scripts" / "radar.py", "to_row", "questions_version"),
+        "promoted": (plugins / "radar" / "scripts" / "radar.py", "settle", "canonical"),
+        "ingested": (plugins / "readwise" / "scripts" / "ingest.py", "ingest", "doc_id"),
+    }
+    for name, (path, fields) in table.items():
+        file, function, marker = producers[name]
+        source = file.read_text(encoding="utf-8")
+        assert path.rsplit("/", 1)[-1] in source, f"{file.name} no longer names {path}"
+        written = _row_keys_written(source, function, marker)
+        assert written, f"{name}: no row found in {file.name}:{function} — the writer moved; update this test"
+        assert fields <= written, f"{name}: {file.name}:{function} no longer writes {sorted(fields - written)}"
+
+    now_build = (scripts_dir / "now_build.py").read_text(encoding="utf-8")
+    assert '"radar" / "state.jsonl"' in now_build
+    readers = {"judged": _row_keys_read(now_build, {"radar", "_radar_line"}),
+               "ingested": _row_keys_read((scripts_dir / "pipeline_run.py").read_text(encoding="utf-8"), {"came_in"})}
+    for name, keys in readers.items():
+        assert keys, f"{name}: found no field reads — the reader moved; update this test"
+        assert keys <= table[name][1], f"{name}: reader relies on undocumented fields {sorted(keys - table[name][1])}"
+
+
+def test_core_and_plugin_engine_install_paths_agree(tmp_path, monkeypatch):
+    """search.py's farsight discovery mirrors engines.py the way graph.py's gaiafield discovery
+    does, but only graph.py had a parity test: moving the install dir in engines.py and graph.py
+    alone would leave search silently on pure-Python BM25 [earned: 2026-09-24 review GLM-4].
+    Both plugin mirrors must compute `engines.binary_path()` and fall back to it after the env
+    var and PATH, in that order."""
+    import sys
+
+    from toolkit_core import engines
+
+    scripts_dir = EXAMPLE_VAULT.parent / "plugins" / "obsidian" / "scripts"
+    sys.path.insert(0, str(scripts_dir))
+    try:
+        import graph as graph_mod
+        import search as search_mod
+    finally:
+        sys.path.remove(str(scripts_dir))
+
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    assert search_mod._engines_install_dir() == engines.binary_path("farsight")
+    assert graph_mod._engines_install_dir() == engines.binary_path("gaiafield")
+
+    for name, env, find in (("farsight", "TOOLKIT_FARSIGHT_BIN", search_mod.farsight_binary),
+                            ("gaiafield", knowledge.GAIAFIELD_BIN_ENV, graph_mod.gaiafield_binary)):
+        monkeypatch.delenv(env, raising=False)
+        monkeypatch.setattr(search_mod.shutil, "which", lambda _: None)
+        assert find() is None, f"{name}: nothing installed must find nothing"
+        installed = engines.binary_path(name)
+        installed.parent.mkdir(parents=True, exist_ok=True)
+        installed.write_text("", encoding="utf-8")
+        assert find() == str(installed), f"{name}: the engines install dir must be the last fallback"
+        monkeypatch.setattr(search_mod.shutil, "which", lambda n, name=name: f"/usr/bin/{n}" if n == name else None)
+        assert find() == f"/usr/bin/{name}", f"{name}: PATH must win over the install dir"
+        monkeypatch.setenv(env, f"/custom/{name}-bin")
+        assert find() == f"/custom/{name}-bin", f"{name}: the env var must win"
