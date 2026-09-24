@@ -26,18 +26,29 @@ for (const name of casts) {
 }
 
 test("carriage-return redraws keep only the last state", () => {
-  assert.deepEqual(screenLines("50%\r100% done\r\n"), ["100% done"]);
+  assert.deepEqual(screenLines("50%\r100% done\r\n", 80), ["100% done"]);
 });
 
 test("cursor-column and cursor-up redraws overwrite in place", () => {
   // What `claude plugin marketplace add` prints: the success line is drawn
   // over the progress line, reusing characters that already match.
   const raw = "Adding\x1b[8Gmarketplace…\r\n\x1b[1A✔ Successfully \x1b[17Gdded\x1b[22Gmarketplace\r\n";
-  assert.deepEqual(screenLines(raw), ["✔ Successfully added marketplace"]);
+  assert.deepEqual(screenLines(raw, 80), ["✔ Successfully added marketplace"]);
 });
 
 test("colours and private modes change no text", () => {
-  assert.deepEqual(screenLines("\x1b[?25l\x1b[1mbold\x1b[0m \x1b[>4m\x1b[<uok\r\n"), ["bold ok"]);
+  assert.deepEqual(screenLines("\x1b[?25l\x1b[1mbold\x1b[0m \x1b[>4m\x1b[<uok\r\n", 80), ["bold ok"]);
+});
+
+test("cursor-up counts wrapped rows, so a progress redraw keeps earlier lines", () => {
+  // uv's shape: a done line, then a progress line one column too wide for a
+  // 10-column terminal (two rows), erased by moving up two rows.
+  const raw = "done\r\n" + "x".repeat(11) + "\r\x1b[2K\x1b[1A\r\x1b[2Kfinal\r\n";
+  assert.deepEqual(screenLines(raw, 10), ["done", "final"]);
+});
+
+test("a soft-wrapped line is joined back into one line", () => {
+  assert.deepEqual(screenLines("0123456789abc\r\n", 10), ["0123456789abc"]);
 });
 
 test("screenAt shows only output recorded by then", () => {

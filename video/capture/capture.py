@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Capture the README newcomer commands, verbatim, in a clean empty HOME.
 
-Usage: capture.py [headline|from-source|from-source-fixed ...]   (default: all)
+Usage: capture.py [headline|from-source|from-source-fixed|from-source-main-0dd21a7 ...]   (default: all)
 
 For each path: delete and recreate the throwaway HOME, record the starting
 state (OS, tool versions, empty `ls -A $HOME`) in <path>/env.txt, then run
@@ -57,6 +57,21 @@ PATHS = {
     ],
 }
 
+# Paths recorded as ONE continuous interactive shell session (`/bin/sh -i`,
+# prompt "$ "): the commands are typed in order, so `cd` happens once and
+# nothing resets between steps. The typed lines are saved as commands.txt.
+SESSIONS = {
+    # README "From source" journey on main 0dd21a7 (the README now includes
+    # the engines step and `add ./`).
+    "from-source-main-0dd21a7": [
+        f"git clone {REPO}",
+        "cd agentic-toolkit",
+        "uv run toolkit engines install",
+        "uv run toolkit demo",
+        "claude plugin marketplace add ./",
+    ],
+}
+
 
 def run(cmd: str) -> str:
     r = subprocess.run(cmd, shell=True, env=ENV, cwd=HOME, capture_output=True, text=True)
@@ -67,6 +82,20 @@ def fresh_home() -> None:
     if HOME.exists():
         shutil.rmtree(HOME)
     HOME.mkdir(parents=True)
+
+
+def record_session(out: Path, commands: list[str]) -> int:
+    typed = out / "commands.txt"
+    typed.write_text("\n".join(commands) + "\n")
+    cast = out / "session.cast"
+    code = subprocess.run(
+        [sys.executable, str(HERE / "record.py"), str(cast), str(COLS), str(ROWS),
+         "--session", str(typed), "--", "/bin/sh", "-i"],
+        env={**ENV, "PS1": "$ "}, cwd=HOME,
+    ).returncode
+    convert(cast)
+    print(f"[exit {code}]")
+    return 1 if code else 0
 
 
 def capture(name: str) -> int:
@@ -85,11 +114,15 @@ def capture(name: str) -> int:
         f"PATH: {PATH}",
         f"ls -A $HOME: [{run('ls -A')}]",
     ]
+    if name in SESSIONS:
+        env_lines.append('session: one interactive /bin/sh -i, prompt "$ ", commands typed from commands.txt')
     (out / "env.txt").write_text("\n".join(env_lines) + "\n")
     print("\n".join(env_lines))
 
     failed = 0
-    for i, (step, cmd) in enumerate(PATHS[name], 1):
+    if name in SESSIONS:
+        failed = record_session(out, SESSIONS[name])
+    for i, (step, cmd) in enumerate(PATHS.get(name, []), 1):
         print(f"\n$ {cmd}", flush=True)
         cast = out / f"{i:02d}-{step}.cast"
         code = subprocess.run(
@@ -110,7 +143,7 @@ def capture(name: str) -> int:
 
 
 def main() -> int:
-    names = sys.argv[1:] or list(PATHS)
+    names = sys.argv[1:] or [*PATHS, *SESSIONS]
     if not (PREREQ_BIN / "claude").exists():
         print(f"missing {PREREQ_BIN}/claude: symlink the claude binary there first", file=sys.stderr)
         return 2

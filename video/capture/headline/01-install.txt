@@ -1,4 +1,6 @@
 $ uv tool install git+https://github.com/marsmike/agentic-toolkit#subdirectory=core
+Resolved 2 packages in 103ms
+      Built toolkit-core @ git+https://github.com/marsmike/agentic-toolkit@72bb351503a1b0e30646c53016188b54180bdadf#subd
 Prepared 2 packages in 356ms
 Installed 2 packages in 1ms
  + pyyaml==6.0.3

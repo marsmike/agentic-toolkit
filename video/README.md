@@ -8,24 +8,25 @@ output**. Terminal scenes replay the recorded bytes in `capture/`; nothing is re
 
 | Path | What it is |
 |---|---|
-| `capture/record.py` | Records one command in a pseudo-terminal as asciicast v2 (`.cast`: output + timing). Stdlib only. |
+| `capture/record.py` | Records one command, or one interactive shell session with typed commands, in a pseudo-terminal as asciicast v2 (`.cast`: output + timing). Stdlib only. |
 | `capture/capture.py` | Runs the README newcomer commands in a clean, empty HOME and records each one. |
 | `capture/cast_text.py` | Writes each capture's final screen as `.txt`: the verbatim text the storyboard quotes. |
-| `capture/<path>/` | One folder per install path: `env.txt` (starting state, tool versions, source revision), `NN-<step>.cast`, `NN-<step>.txt`. |
+| `capture/<path>/` | One folder per install path: `env.txt` (starting state, tool versions, source revision), then `NN-<step>.cast` + `.txt` per command, or for a session `commands.txt` (typed lines) + `session.cast` + `session.txt`. |
 | `src/cast.ts` | Replays a `.cast` into screen text (same rules as `cast_text.py`). |
 | `src/Terminal.tsx`, `src/Root.tsx` | Remotion scenes. |
 | `test/cast.test.ts` | Holds the replay and the `.txt` transcripts equal, capture by capture. |
 
 ## The captures
 
-| Folder | Commands | Result (rev 72bb351) |
-|---|---|---|
-| `headline/` | README "New here" block, verbatim | All exit 0; the demo uses a 3-note temp vault (no checkout), so no `[INFERRED]` line |
-| `from-source/` | README "From source" line, verbatim | Demo stops after step 1 (`[engines] not installed`); `claude plugin marketplace add .` is rejected |
-| `from-source-fixed/` | From source + `uv run toolkit engines install`, `add ./` | All exit 0; 82 notes, 783 edges, 3 `[INFERRED]` lines. **The filmed path (decision D6)** |
+| Folder | Rev | Commands | Result |
+|---|---|---|---|
+| `headline/` | 72bb351 | README "New here" block, verbatim | All exit 0; the demo uses a 3-note temp vault (no checkout), so no `[INFERRED]` line |
+| `from-source/` | 72bb351 | README "From source" line, verbatim | Demo stops after step 1 (`[engines] not installed`); `claude plugin marketplace add .` is rejected |
+| `from-source-fixed/` | 72bb351 | From source + `uv run toolkit engines install`, `add ./`, one shell per command | All exit 0; 82 notes, 783 edges, 3 `[INFERRED]` lines (decision D6) |
+| `from-source-main-0dd21a7/` | 0dd21a7 | main's README From-source journey as **one continuous `/bin/sh -i` session**: clone, `cd` once, engines, demo, `add ./` | All exit 0; both engines print `installed unverified` (no published `.sha256`); demo as above |
 
-`from-source-fixed` is not what the README says yet; the video labels it "From source · bundled example vault"
-and shows the engines step. When the README is fixed, re-capture so the two agree.
+Which capture is filmed is decision D8 (outcome-lead). `main` moved from 72bb351 to 0dd21a7 on 2026-09-24, so the
+72bb351 folders no longer show what `main` installs.
 
 ## Re-capture
 
@@ -39,9 +40,13 @@ python3 capture/capture.py                  # all paths; or: capture.py from-sou
 npm test                                    # replay still matches the transcripts
 ```
 
-`capture.py` **deletes and recreates `/private/tmp/newcomer`** for each path, then runs every command under
-`env -i` with only `HOME`, `PATH` (`$HOME/.local/bin`, the claude directory, `/usr/bin:/bin:/opt/homebrew/bin`),
-`TERM` and `LANG`. `claude plugin marketplace add` works there without logging in. The headline path installs
+The transcripts follow a real terminal: output wraps at the recorded width (120 columns), cursor moves count
+wrapped rows, and wrapped rows are joined back into one line. To cross-check a capture against tmux, replay its
+bytes into a 120-column pane and compare with `tmux capture-pane -p -J -S -`; every committed capture matches.
+
+`capture.py` **deletes and recreates `/private/tmp/newcomer`** for each path, then runs every command (or the
+session shell) under `env -i` with only `HOME`, `PATH` (`$HOME/.local/bin`, the claude directory,
+`/usr/bin:/bin:/opt/homebrew/bin`), `TERM` and `LANG`, plus `PS1='$ '` for a session. `claude plugin marketplace add` works there without logging in. The headline path installs
 whatever `main` is at capture time; re-capture if `main` changes before publishing.
 
 ## Render

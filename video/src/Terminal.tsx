@@ -1,10 +1,10 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 
-import { Cast, screenAt } from "./cast";
+import { Cast, promptLines, screenAt } from "./cast";
 
 // One recorded command, replayed at its recorded pace (times `speed`): the
-// prompt line from the capture header, then the screen as it stood at this
+// prompt line from the capture header (a session has its own), then the screen as it stood at this
 // frame. Long lines wrap at the recorded terminal width, as they did live.
 export const Terminal: React.FC<{ cast: Cast; speed?: number; label?: string }> = ({
   cast,
@@ -13,7 +13,7 @@ export const Terminal: React.FC<{ cast: Cast; speed?: number; label?: string }> 
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const lines = [`$ ${cast.command}`, ...screenAt(cast, (frame / fps) * speed)].flatMap((l) =>
+  const lines = [...promptLines(cast), ...screenAt(cast, (frame / fps) * speed)].flatMap((l) =>
     l.length <= cast.width ? [l] : (l.match(new RegExp(`.{1,${cast.width}}`, "gu")) ?? [l]),
   );
   const visible = lines.slice(-cast.height);

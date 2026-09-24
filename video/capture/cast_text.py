@@ -5,9 +5,11 @@ Usage: cast_text.py CAST...
 
 The .txt is what the terminal showed once the command finished, with the
 prompt line `$ <command>` first: a small terminal emulator replays the
-output, so spinners, progress counters and cursor-positioned redraws end in
-their last state, and colours are dropped. Lines are not wrapped. It is the
-verbatim source the storyboard quotes from; the .cast stays the source of
+output at the recorded width, so spinners, progress counters and
+cursor-positioned redraws end in their last state, and colours are dropped.
+Soft-wrapped rows are joined, so each line is one logical line. It is the
+verbatim source the storyboard quotes from (a session recording has no
+prompt line added: its prompts are the shell's own); the .cast stays the source of
 timing.
 """
 import json
@@ -24,9 +26,21 @@ TOKEN = re.compile(
 )
 
 
-def screen_text(raw: str) -> str:
+def screen_text(raw: str, width: int) -> str:
+    # Rows are screen rows of `width` columns, as the terminal drew them:
+    # printing past the last column wraps to a new row, and cursor moves
+    # count wrapped rows (progress bars redraw by moving up that many).
+    # Rows that are soft-wrap continuations are joined back on output, so
+    # a transcript line is one logical line however wide it is.
     screen: list[list[str]] = [[]]
+    wrapped: set[int] = set()
     row = col = 0
+
+    def line() -> list[str]:
+        while len(screen) <= row:
+            screen.append([])
+        return screen[row]
+
     for m in TOKEN.finditer(raw):
         tok = m.group(0)
         if tok == "\r":
@@ -35,48 +49,59 @@ def screen_text(raw: str) -> str:
             row += 1
             col = 0
         elif tok == "\b":
-            col = max(0, col - 1)
+            col = max(0, min(col, width - 1) - 1)
         elif m.group(2):
             params, final = m.group(1), m.group(2)
             if not re.fullmatch(r"[\d;]*", params):
                 continue  # private modes (`?25l`, `>4m`, `<u`) change no text
             n = int(params.split(";")[0] or 0)
             if final == "G":
-                col = max(0, n - 1)
+                col = min(max(0, n - 1), width - 1)
             elif final == "A":
                 row = max(0, row - max(n, 1))
             elif final == "B":
                 row += max(n, 1)
             elif final == "C":
-                col += max(n, 1)
+                col = min(col + max(n, 1), width - 1)
             elif final == "D":
-                col = max(0, col - max(n, 1))
+                col = max(0, min(col, width - 1) - max(n, 1))
             elif final == "K":
-                while len(screen) <= row:
-                    screen.append([])
-                line = screen[row]
+                cells = line()
                 if n == 0:
-                    del line[col:]
+                    del cells[col:]
+                    if col == 0:
+                        wrapped.discard(row)  # the row is redrawn from scratch
                 elif n == 1:
-                    line[:col] = [" "] * min(col, len(line))
+                    cells[: col + 1] = [" "] * min(col + 1, len(cells))
                 else:
-                    line.clear()
+                    cells.clear()
+                    wrapped.discard(row)  # the row is redrawn from scratch
             # Colours, modes and everything else change no text.
         elif not tok.startswith("\x1b"):
-            while len(screen) <= row:
-                screen.append([])
-            line = screen[row]
             for ch in tok:
                 if ch < " " and ch != "\t":
                     continue
-                if col > len(line):
-                    line.extend(" " * (col - len(line)))
-                if col == len(line):
-                    line.append(ch)
+                if col >= width:  # deferred autowrap, as xterm does
+                    row += 1
+                    col = 0
+                    wrapped.add(row)
+                cells = line()
+                if col > len(cells):
+                    cells.extend(" " * (col - len(cells)))
+                if col == len(cells):
+                    cells.append(ch)
                 else:
-                    line[col] = ch
+                    cells[col] = ch
                 col += 1
-    return "\n".join("".join(line).rstrip() for line in screen).strip("\n")
+
+    logical: list[str] = []
+    for i, cells in enumerate(screen):
+        text = "".join(cells)
+        if i in wrapped and logical:
+            logical[-1] += text
+        else:
+            logical.append(text)
+    return "\n".join(l.rstrip() for l in logical).strip("\n")
 
 
 def convert(cast: Path) -> Path:
@@ -84,7 +109,9 @@ def convert(cast: Path) -> Path:
     header = json.loads(rows[0])
     raw = "".join(json.loads(r)[2] for r in rows[1:] if r.strip())
     txt = cast.with_suffix(".txt")
-    txt.write_text(f"$ {header['command']}\n{screen_text(raw)}\n", encoding="utf-8")
+    # A session's prompts and commands are in its output already.
+    prompt = "" if header.get("session") else f"$ {header['command']}\n"
+    txt.write_text(f"{prompt}{screen_text(raw, header['width'])}\n", encoding="utf-8")
     return txt
 
 
