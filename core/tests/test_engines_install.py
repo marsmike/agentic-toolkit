@@ -100,3 +100,14 @@ def test_status_of_a_modified_binary_is_not_up_to_date(monkeypatch, fake_net):
     _installed(monkeypatch, fake_net).write_bytes(b"something else entirely")
     row = _farsight_status()
     assert row["up_to_date"] is False and "does not match the sha256" in row["note"]
+
+
+def test_a_failed_install_step_leaves_no_staged_file(monkeypatch, fake_net):
+    def refuse(self, *a, **k):
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(engines.Path, "chmod", refuse)
+    result = engines.install_engine("farsight", [_release(checksum=None)])
+    dest = engines.binary_path("farsight")
+    assert not result["ok"] and "could not install" in result["error"]
+    assert not dest.with_name(dest.name + ".new").exists() and not dest.exists()

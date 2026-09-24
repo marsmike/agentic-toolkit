@@ -22,7 +22,9 @@ def _allowed_tools() -> list[str]:
     return [t.strip() for t in match.group(1).split(",")]
 
 
-def test_run_pipeline_grants_no_shell_escape_the_skills_do_not_use():
+def test_run_pipeline_drops_the_grants_no_skill_uses():
+    # This pins the grants review-01 dropped; it does not make the run safe. `Bash(uv run:*)`
+    # still runs any code — narrowing it is an owner decision (review-01 SEC-1, impl-01).
     tools = _allowed_tools()
     for grant in ("Bash(env:*)", "Bash(python3:*)", "Bash(git -C:*)", "Bash(git:*)", "Bash(sh:*)",
                   "Bash(bash:*)", "Bash(curl:*)", "Bash"):

@@ -316,9 +316,13 @@ def install_engine(engine: str, releases: list[dict] | None = None, *, force: bo
         return {"ok": False, "engine": engine,
                 "error": f"checksum mismatch for {filename} in {tag}: expected {expected}, got {sha256}; nothing installed"}
 
-    if not is_windows_triple(triple):
-        staged.chmod(staged.stat().st_mode | 0o111)
-    staged.replace(dest)
+    try:
+        if not is_windows_triple(triple):
+            staged.chmod(staged.stat().st_mode | 0o111)
+        staged.replace(dest)
+    except OSError as exc:
+        staged.unlink(missing_ok=True)
+        return {"ok": False, "engine": engine, "error": f"could not install {dest}: {exc}"}
 
     manifest[engine] = {
         "tag": tag,
