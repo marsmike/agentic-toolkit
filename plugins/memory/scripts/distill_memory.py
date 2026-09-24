@@ -58,6 +58,10 @@ def write_memory_note(
     """
     if kind not in VALID_KINDS:
         raise ValueError(f"kind must be one of {VALID_KINDS}, got {kind!r}")
+    # The slug is proposed by a model: it names one file in 00_Memory/notes/, never a path.
+    # [earned: 2026-09-24, review-01 SEC-5 — "/x" or "../x" wrote outside notes/]
+    if not slug or slug in (".", "..") or "/" in slug or "\\" in slug or "\0" in slug:
+        raise ValueError(f"slug must be a plain file name, got {slug!r}")
     today = today or time.strftime("%Y-%m-%d")
     notes_dir = Path(vault) / "00_Memory" / "notes"
     dest = notes_dir / f"{slug}.md"
