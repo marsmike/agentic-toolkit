@@ -5,7 +5,8 @@
 2. end      — Index.md rebuilt, one Log.md line, one git commit carrying the run's summary; the
               lock is released and never committed; what came in is counted from the rows the
               radar and Readwise ledgers gained since begin, never from rows that were there
-3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted
+3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted;
+              `--failed ""` or a path no longer in 01_Capture/ counts no failure
 4. secrets  — a staged note holding a key-shaped string makes `end` refuse the commit and write one DLQ
               note that names the file, never the key; the next clean run commits
 5. sync     — with a bare upstream: a second clone's commit arrives with `begin`, `end` pushes, and a
@@ -216,7 +217,9 @@ def run(vault: Path) -> dict:
         dlq = list((sandbox / "00_Memory" / "dlq").glob("*pipeline-parked-*.md"))
         if len(dlq) != 1 or not (sandbox / failed).is_file():
             problems.append(f"phase 3: parking writes one DLQ note and keeps the capture, got {len(dlq)} notes")
-        _end(pr, sandbox, NOW + timedelta(hours=6), 0, 0, [])
+        r = _end(pr, sandbox, NOW + timedelta(hours=6), 0, 0, ["", "01_Capture/Gone-Already.md"])
+        if "0 failed" not in r.get("summary", "") or r.get("failed_not_found") != ["01_Capture/Gone-Already.md"]:
+            problems.append(f"phase 3: a blank --failed or a capture not in 01_Capture is no failure, got {r.get('summary')}")
         _begin(pr, sandbox, NOW + timedelta(hours=9))
         if pr.queue(sandbox).get("parked_now"):
             problems.append("phase 3: a parked capture gets its DLQ note once")

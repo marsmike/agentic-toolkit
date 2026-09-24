@@ -336,6 +336,11 @@ def _push(vault: Path, now: datetime) -> dict[str, Any]:
 
 def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "",
         token: str | None = None) -> dict[str, Any]:
+    # A failed capture is one still in 01_Capture/; a blank or a path that is not there is no
+    # failure. [earned: 2026-09-24 — `--failed ""` logged "1 failed" for a clean run]
+    named = [f.strip() for f in failed if f.strip()]
+    failed = [f for f in named if (vault / f).is_file()]
+    not_found = [f for f in named if f not in failed]
     state = _state(vault)
     attempts: dict[str, int] = state.get("attempts", {})
     for rel in failed:
@@ -372,7 +377,8 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
         summary += f"; build failed: {', '.join(f['script'] for f in failed_builds)}"
     subprocess.run([sys.executable, str(SCRIPTS / "log_vault.py"), "pipeline", summary], capture_output=True, check=False, env=env)
 
-    result: dict[str, Any] = {"status": "ok", "summary": summary, "commit": None}
+    result: dict[str, Any] = {"status": "ok", "summary": summary, "commit": None,
+                               **({"failed_not_found": not_found} if not_found else {})}
     if failed_builds:
         result["build_failed"] = failed_builds
     # The lock is held through commit and push (and never staged), so no other run starts its
