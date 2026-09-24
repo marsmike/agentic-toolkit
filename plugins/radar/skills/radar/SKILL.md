@@ -21,7 +21,7 @@ R feeds --json                        # which feeds earn their place
 R trend --json                        # which interests are rising this week
 R discover [--interest ID] [--seed URL]   # new feeds via Kagi, as an OPML to import in Reader
 R gaps [--promote] --json              # weekly: what the feeds missed (Kagi news), judged
-R scout [--dry-run] --json             # weekly: new sources — feeds, APIs, services, tools, datasets
+R scout --dry-run --json               # by hand: new sources — feeds, APIs, services, tools, datasets
 ```
 
 **Daily.** Run `scan`, read `00_Memory/radar/<today>.md`, and reply with a five-line briefing:
@@ -38,7 +38,9 @@ always-there vocabulary — a clip needs no feed corroboration, since nothing ga
 name-like token (capitalised, or carrying a version number) outranks a generic one at equal
 frequency.
 
-**Scout.** Run `scout` once a week (it is a no-op, `exists`, if already run this week): it mines
+**Scout** (by hand for now, `--dry-run` first; not in the unattended pipeline until its picks hold
+up — the first live runs proposed sites the owner already knew [2026-09-24]). Once a week at most
+(a no-op, `exists`, if already run this week): it mines
 candidate sources — domains and GitHub repos — from the same worth/strong feed items, the owner's
 clips, and a few Kagi launch queries, drops anything the vault already knows or Reader already
 carries, and judges the survivors (kind, value against the owner's interests, actionable). The
