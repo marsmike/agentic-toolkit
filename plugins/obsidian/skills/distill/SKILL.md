@@ -20,6 +20,7 @@ decide how; two tools do the mechanical parts and check the result.
 S() { uv run --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/$1" "${@:2}"; }  # a function, not a string: zsh does not word-split [earned: 2026-09-23 first pipeline run]
 S distill_judge.py 01_Capture/<capture>.md --dossier --json   # everything known about it, before you read it
 S distill_check.py <note> 01_Capture/<capture>.md --ask "<a question a reader would type>" --ask "…"
+S retire_capture.py 01_Capture/<capture>.md --note <note> --line "<what became of it>"   # invariant 6, one call
 ```
 
 **The dossier** is one JSON block per capture: what kind of material it is, which existing
@@ -76,9 +77,14 @@ third, longer than ingest's wall check, held someone else's LinkedIn feed]
 5. **Cluster mode is member notes plus a hub.** One note per capture that has its own
    specifics, a hub that states the shared principle and links them. A synthesis alone
    dropped two thirds of the specifics [earned: 2026-09-22 acceptance run].
-6. **The capture leaves `01_Capture/`**: archived (default) as
-   `05_Archive/<Origin>-Captures-<YYYY-MM>/<stem>--FULLCAPTURE.md` plus one line in that
-   folder's `README.md` manifest, or deleted (`trash` if present) only for duplicates and stubs.
+6. **The capture leaves `01_Capture/`** through `retire_capture.py <capture> --note <note>...
+   --line "<what became of it>"` (or `--dropped "<reason>"` for a discard) — one call moves it
+   to `05_Archive/<Origin>-Captures-<YYYY-MM>/<stem>--FULLCAPTURE.md`, creates the folder and
+   manifest `README.md` if this is the first capture retired there, and appends the manifest
+   line under a lock. It refuses a `--note` that doesn't exist or fails `distill_check`, and
+   refuses `--dropped` on a clip (invariant 8). Never `printf` a manifest line by hand: five
+   workers doing that in parallel raced the appends and one literal `%` broke a line
+   [earned: 2026-09-24]. Deletion (`trash` if present) is only ever for duplicates and stubs.
 7. **Ambiguity goes to the DLQ**, not a guess: `vault_utils.write_dlq_note()`, and say so.
 8. **The owner's clips never drop.** Every capture is distilled the same way whatever its
    source; `provenance.via` decides only whether it may leave without a note. A `clip` (or a
