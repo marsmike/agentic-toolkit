@@ -168,3 +168,92 @@ def test_core_and_plugin_graph_discovery_agree(tmp_path, monkeypatch):
     assert knowledge.gaiafield_binary() == graph_mod.gaiafield_binary() == "/custom/gaiafield-bin"
 
     assert knowledge.default_db_path(tmp_path) == graph_mod.default_db_path(tmp_path)
+
+
+def _ledger_table() -> dict[str, tuple[str, set[str]]]:
+    """contract/KNOWLEDGE_API.md's "Cross-plugin ledgers" table → {name: (path, fields)}."""
+    import re
+
+    text = (EXAMPLE_VAULT.parent / "contract" / "KNOWLEDGE_API.md").read_text(encoding="utf-8")
+    section = text.split("## Cross-plugin ledgers", 1)[1].split("\n## ", 1)[0]
+    table = {}
+    for line in section.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) == 5 and cells[1].startswith("`00_Memory/"):
+            table[cells[0]] = (cells[1].strip("`"), set(re.findall(r"`(\w+)`", cells[4])))
+    return table
+
+
+def _row_keys_read(source: str, functions: set[str]) -> set[str]:
+    """String keys read from a `row`/`r` dict in the named functions, less keys they set themselves."""
+    import ast
+
+    read, written = set(), set()
+    for fn in ast.walk(ast.parse(source)):
+        if not (isinstance(fn, ast.FunctionDef) and fn.name in functions):
+            continue
+        for node in ast.walk(fn):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get"
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id in ("row", "r")
+                    and node.args and isinstance(node.args[0], ast.Constant)):
+                read.add(node.args[0].value)
+            elif (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name)
+                  and node.value.id in ("row", "r") and isinstance(node.slice, ast.Constant)):
+                (written if isinstance(node.ctx, ast.Store) else read).add(node.slice.value)
+    return read - written
+
+
+def _row_keys_written(source: str, function: str, marker: str) -> set[str]:
+    """Keys of the dict literal(s) in `function` that carry the key `marker`: the rows it writes."""
+    import ast
+
+    keys: set[str] = set()
+    for fn in ast.walk(ast.parse(source)):
+        if isinstance(fn, ast.FunctionDef) and fn.name == function:
+            for node in ast.walk(fn):
+                if isinstance(node, ast.Dict):
+                    literal = {k.value for k in node.keys if isinstance(k, ast.Constant)}
+                    if marker in literal:
+                        keys |= literal
+    return keys
+
+
+def test_cross_plugin_ledgers_match_the_contract():
+    """The pipeline and Now.md read radar's and readwise's JSONL ledgers; the path and row fields
+    both sides use are the ones contract/KNOWLEDGE_API.md lists [earned: 2026-09-24 review GLM-2 —
+    the schemas were private to each producer, and a rename would have zeroed the run summary
+    silently]. Remove with that contract section."""
+    import sys
+
+    plugins = EXAMPLE_VAULT.parent / "plugins"
+    table = _ledger_table()
+    assert set(table) == {"judged", "promoted", "ingested"}, f"ledger table not parsed: {table}"
+
+    scripts_dir = plugins / "obsidian" / "scripts"
+    sys.path.insert(0, str(scripts_dir))
+    try:
+        import pipeline_run
+    finally:
+        sys.path.remove(str(scripts_dir))
+    assert {k: p.as_posix() for k, p in pipeline_run.LEDGERS.items()} == {k: v[0] for k, v in table.items()}
+
+    producers = {  # ledger → (file, the function that builds its row, a key only that row has)
+        "judged": (plugins / "radar" / "scripts" / "radar.py", "to_row", "questions_version"),
+        "promoted": (plugins / "radar" / "scripts" / "radar.py", "settle", "canonical"),
+        "ingested": (plugins / "readwise" / "scripts" / "ingest.py", "ingest", "doc_id"),
+    }
+    for name, (path, fields) in table.items():
+        file, function, marker = producers[name]
+        source = file.read_text(encoding="utf-8")
+        assert path.rsplit("/", 1)[-1] in source, f"{file.name} no longer names {path}"
+        written = _row_keys_written(source, function, marker)
+        assert written, f"{name}: no row found in {file.name}:{function} — the writer moved; update this test"
+        assert fields <= written, f"{name}: {file.name}:{function} no longer writes {sorted(fields - written)}"
+
+    now_build = (scripts_dir / "now_build.py").read_text(encoding="utf-8")
+    assert '"radar" / "state.jsonl"' in now_build
+    readers = {"judged": _row_keys_read(now_build, {"radar", "_radar_line"}),
+               "ingested": _row_keys_read((scripts_dir / "pipeline_run.py").read_text(encoding="utf-8"), {"came_in"})}
+    for name, keys in readers.items():
+        assert keys, f"{name}: found no field reads — the reader moved; update this test"
+        assert keys <= table[name][1], f"{name}: reader relies on undocumented fields {sorted(keys - table[name][1])}"
