@@ -9,11 +9,12 @@ skill, and pushes the vault back. Everything the next run needs is committed in 
 
 ## Routine prompt
 
-A routine cannot attach repositories, so it starts with an empty workspace: its instruction
-clones this (public) repo, then follows this file, which stays the one place to change:
+The routine attaches both repositories as sources (see Routine settings), so the session starts
+with a checkout of each, and its instruction only points here; this file stays the one place to
+change:
 
 ```text
-Clone https://github.com/marsmike/agentic-toolkit.git into ~/agentic-toolkit (if it already exists: git -C ~/agentic-toolkit pull), cd into it, then follow the "Routine prompt" in docs/cloud-routine.md exactly: run the TheVoid pipeline once, unattended.
+Follow the "Routine prompt" in docs/cloud-routine.md (in the agentic-toolkit checkout) exactly: run the TheVoid pipeline once, unattended.
 ```
 
 The prompt it points at (paste it in full instead if you prefer the routine to be self-contained):
@@ -23,14 +24,18 @@ Run the TheVoid knowledge pipeline once, unattended, then stop. Ask no questions
 blocks, record it (the scripts write DLQ notes) and finish the run.
 
 SETUP
-1. You are in the agentic-toolkit repo (code and skills). Work from its root:
+1. Toolkit: cd into the agentic-toolkit checkout (the directory holding docs/cloud-routine.md;
+   if there is none, git clone https://github.com/marsmike/agentic-toolkit.git). Work from its root:
      export TOOLKIT_REPO="$PWD" CLAUDE_PLUGIN_ROOT="$PWD/plugins/obsidian"
    If `uv` is missing: pip install uv
-2. Vault: run
-     scripts/cloud-vault.sh open
-   (it clones the private TheVoid from $TOOLKIT_VAULT_REMOTE, with GH_TOKEN if it is set) and
-   export TOOLKIT_VAULT="$PWD/.vault-live". If the clone fails for lack of access, stop and
-   report "TheVoid not reachable: set GH_TOKEN". Never commit the vault into agentic-toolkit.
+2. Vault: use the session's TheVoid checkout (the directory holding AGENTS.md and 00_Memory/;
+   the routine attaches the repository, so this checkout is the one git may push from):
+     export TOOLKIT_VAULT=<that path>
+   Make sure its branch tracks origin: git -C "$TOOLKIT_VAULT" branch --set-upstream-to=origin/main
+   (harmless if already set). Only if there is no TheVoid checkout: scripts/cloud-vault.sh open
+   and export TOOLKIT_VAULT="$PWD/.vault-live". Never commit the vault into agentic-toolkit.
+   If the final push is refused with "not in this session's authorized repository set", report
+   exactly that: TheVoid must be attached to the routine as a source.
 3. Keys: check by name only, never print a value:
      python3 -c "import os; print({k: bool(os.environ.get(k)) for k in ('OPENROUTER_API_KEY','READWISE_TOKEN','KAGI_API_KEY')})"
    A missing key means that source prints SKIPPED. That is fine; go on.
@@ -65,7 +70,8 @@ HARD RULES
   without a note.
 - Stay within the batch.
 - Never edit generated files (Index.md, Now.md, Maps/, Boards/, Log.md).
-- Never run git in the vault yourself: begin and end are its only committer.
+- Never run git in the vault yourself (beyond the upstream check in SETUP 2): begin and end are
+  its only committer.
 - Never print, write or commit a key.
 
 FINISH with one line: what came in (radar, readwise), distilled / dropped / failed, the commit,
@@ -74,22 +80,25 @@ and whether it was pushed.
 
 ## Routine settings
 
-- **Repositories:** none can be attached. The instruction clones agentic-toolkit (public);
-  `cloud-vault.sh open` clones TheVoid (private). The GitHub connector gives API tools; whether
-  the session's plain `git clone`/`git push` also authenticate through it is not documented, so
-  run once without `GH_TOKEN`: if TheVoid cannot be cloned or pushed, add `GH_TOKEN`.
+- **Repositories:** attach both as the routine's sources: `https://github.com/marsmike/agentic-toolkit`
+  and `https://github.com/marsmike/TheVoid`. The session's git proxy lets it push only to
+  attached repositories; a `GH_TOKEN` does not get around that. [earned: 2026-09-23/24, two runs
+  distilled ten captures each and could not push: "marsmike/TheVoid is not in this session's
+  authorized repository set"] If the routine form does not offer repositories, set
+  `job_config.ccr.session_context.sources` through the routines API (Claude Code's `/schedule`
+  can do it): `[{"git_repository": {"url": "https://github.com/marsmike/TheVoid"}}, …]`.
 - **Environment variables** (the environment's `.env` field; visible to everyone who uses the
-  environment, so keep it yours alone): `TOOLKIT_VAULT_REMOTE=https://github.com/marsmike/TheVoid.git`,
-  `OPENROUTER_API_KEY`, `READWISE_TOKEN`, `KAGI_API_KEY`, `TODOIST_API_TOKEN` (read by `td`);
-  only if git needs it, `GH_TOKEN` (a fine-grained GitHub token for `marsmike/TheVoid` only,
-  permission Contents: read and write); optional `TOOLKIT_OBSIDIAN_PIPELINE_BATCH=10`. Never in
-  a file in a repo.
+  environment, so keep it yours alone): `TOOLKIT_VAULT_REMOTE=https://github.com/marsmike/TheVoid.git`
+  (used only by the `cloud-vault.sh` fallback), `OPENROUTER_API_KEY`, `READWISE_TOKEN`,
+  `KAGI_API_KEY`, `TODOIST_API_TOKEN` (read by `td`); optional
+  `TOOLKIT_OBSIDIAN_PIPELINE_BATCH=10`. `GH_TOKEN` is not needed once TheVoid is attached. Never
+  in a file in a repo.
 - **Setup script** (below): tools and the git credential; it assumes no repository exists yet.
 - **Network access:** the run calls `openrouter.ai`, `readwise.io`, `kagi.com`, `api.todoist.com`,
   GitHub, PyPI and npm. If the environment's network level is restricted, allow those hosts or
   use full access; otherwise each source just prints `SKIPPED`.
 - **Connectors:** Todoist, only as the fallback when `td` is missing.
-- **Schedule:** every 3 hours.
+- **Schedule:** every 3 hours (`58 */3 * * *` UTC).
 
 ## Environment setup script
 
@@ -127,8 +136,9 @@ the environment provides (the run reports "TheVoid not reachable" if that is non
 ## On the Mac, once the first cloud run has pushed
 
 1. **Run only one scheduler.** The run lock (`00_Memory/pipeline.lock`) is a local file git does
-   not carry, so it cannot stop a Mac run and a cloud run from overlapping. Stop the launchd job:
-   `launchctl unload ~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist`
+   not carry, so it cannot stop a Mac run and a cloud run from overlapping. Stop the launchd job
+   for good (unload, then rename the plist so it does not load again at login):
+   `launchctl unload ~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist && mv ~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist{,.disabled}`
    (`skills/pipeline/references/scheduling.md` describes it).
 2. **Obsidian Git takes over the Mac's sync.** The Mac pipeline used to commit hand edits and pull
    from GitHub. With it off, set Obsidian Git to auto commit-and-sync every 10 minutes, pull on
