@@ -55,8 +55,10 @@ counts are disjoint: `--distilled` = captures that became a note or an enrichmen
 them is also archived; that is not a drop), `--dropped` = captures that left *without* a note (a
 radar or newsletter discard; never a clip), `--failed` = captures still in `01_Capture/`.
 [earned: 2026-09-23, a run logged "10 distilled, 10 retired" for ten captures]
-Reply with one line: what came in, what was distilled or dropped, what failed, the commit, and
-whether it was pushed.
+Reply with one line: `end`'s `summary` as printed (it counts what came in from the radar and
+Readwise ledgers), the commit, and whether it was pushed. Add nothing from memory; a number the
+scripts did not print is not in the reply. [earned: 2026-09-24, a run reported "3 promoted" and
+had promoted none]
 
 ## Hard requirements
 

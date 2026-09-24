@@ -74,8 +74,8 @@ HARD RULES
   its only committer.
 - Never print, write or commit a key.
 
-FINISH with one line: what came in (radar, readwise), distilled / dropped / failed, the commit,
-and whether it was pushed.
+FINISH with one line: end's "summary" exactly as printed (it counts what came in from the
+ledgers), the commit, and whether it was pushed. No number the scripts did not print.
 ```
 
 ## Routine settings

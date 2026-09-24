@@ -3,7 +3,8 @@
 1. queue    — the owner's clips come first, then radar/newsletter captures, oldest first, capped
               at the batch size; a second begin while the lock is held is `busy`
 2. end      — Index.md rebuilt, one Log.md line, one git commit carrying the run's summary; the
-              lock is released and never committed
+              lock is released and never committed; what came in is counted from the rows the
+              radar and Readwise ledgers gained since begin, never from rows that were there
 3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted
 4. secrets  — a staged note holding a key-shaped string makes `end` refuse the commit and write one DLQ
               note that names the file, never the key; the next clean run commits
@@ -158,6 +159,9 @@ def run(vault: Path) -> dict:
                      ("add", "-A"), ("commit", "-q", "-m", "base")):
             _git(sandbox, *args)
         head0 = _git(sandbox, "rev-parse", "HEAD").strip()
+        old = sandbox / pr.LEDGERS["ingested"]  # an earlier run's capture: not this run's
+        old.parent.mkdir(parents=True, exist_ok=True)
+        old.write_text('{"doc_id": "0", "capture": "01_Capture/old.md", "via": "clip"}\n', encoding="utf-8")
 
         # 1. begin
         _begin(pr, sandbox, NOW)
@@ -179,12 +183,23 @@ def run(vault: Path) -> dict:
             problems.append("phase 1: a run must not release a lock another run took over")
         lock.write_text(f"{NOW.isoformat()}\n{_TOKEN['last']}\n", encoding="utf-8")  # back to the phase-1 run
 
-        # 2. end
+        # 2. end — the sources ran between begin and end: two judged, one promoted, two captures
+        def add(rel: Path, *rows: str) -> None:
+            path = sandbox / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as f:
+                f.write("".join(r + "\n" for r in rows))
+        add(pr.LEDGERS["judged"], '{"canonical": "a"}', '{"canonical": "b"}')
+        add(pr.LEDGERS["promoted"], '{"canonical": "a", "date": "2026-09-23"}')
+        add(pr.LEDGERS["ingested"], '{"doc_id": "1", "capture": "01_Capture/x.md", "via": "clip"}',
+            '{"doc_id": "2", "capture": "01_Capture/y.md", "via": "radar"}', '{"doc_id": "3", "found": "04_Resources/z.md"}')
         failed = "01_Capture/Readwise-Newsletter-news.md"
         r = _end(pr, sandbox, NOW, distilled=2, dropped=1, failed=[failed])
         log = _git(sandbox, "log", "--format=%s", f"{head0}..HEAD").splitlines()
         if len(log) != 1 or "2 distilled, 1 dropped, 1 failed" not in log[0]:
             problems.append(f"phase 2: expected one commit with the summary, got {log}")
+        if "in: radar 2 judged, 1 promoted; readwise 2 new (1 clip, 1 radar)" not in r.get("summary", ""):
+            problems.append(f"phase 2: what came in must be counted from the ledgers' new rows, got {r.get('summary')}")
         committed = _git(sandbox, "show", "--name-only", "--format=", "HEAD").split()
         if "00_Memory/pipeline.lock" in committed or (sandbox / pr.LOCK).exists():
             problems.append("phase 2: the lock must be released and never committed")

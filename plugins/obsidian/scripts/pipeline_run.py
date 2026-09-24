@@ -44,6 +44,11 @@ from vault_utils import profile_value, read_frontmatter, require_vault, write_dl
 
 LOCK = Path("00_Memory") / "pipeline.lock"
 STATE = Path("00_Memory") / "pipeline-state.json"
+# What came in is counted from the sources' own ledgers (rows appended between begin and end), so
+# the run's summary is a record, not a recollection. [earned: 2026-09-24 — a cloud run reported
+# "3 promoted as strong" where its radar had promoted none]
+LEDGERS = {"judged": Path("00_Memory/radar/state.jsonl"), "promoted": Path("00_Memory/radar/promoted.jsonl"),
+           "ingested": Path("00_Memory/readwise-ingested.jsonl")}
 LOCK_STALE_HOURS = 6
 MAX_ATTEMPTS = 2
 DEFAULT_BATCH = 25
@@ -162,7 +167,33 @@ def begin(vault: Path, now: datetime) -> dict[str, Any]:
     # distilling needs no network, the run's commit stays local, and the next run's pull and push
     # reconcile it. A real conflict is the only reason to skip. `sync.pulled` says which it was.
     # Pass `token` to `end --token` so it releases only this run's lock.
+    state = _state(vault)
+    state["marks"] = {k: len(_rows(vault / rel)) for k, rel in LEDGERS.items()}
+    _save_state(vault, state)
     return {"status": "ok", "locked_at": now.isoformat(), "token": token, "sync": sync}
+
+
+def _rows(path: Path) -> list[dict]:
+    rows = []
+    if path.is_file():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                rows.append(json.loads(line)) if line.strip() else None
+            except json.JSONDecodeError:
+                rows.append({})
+    return rows
+
+
+def came_in(vault: Path, marks: dict[str, int]) -> str:
+    """'radar 12 judged, 2 promoted; readwise 3 new (2 clip, 1 radar)' from the rows appended since begin."""
+    new = {k: _rows(vault / rel)[marks.get(k, 0):] for k, rel in LEDGERS.items()}
+    captures = [r for r in new["ingested"] if r.get("capture")]
+    by_via: dict[str, int] = {}
+    for r in captures:
+        by_via[r.get("via") or "clip"] = by_via.get(r.get("via") or "clip", 0) + 1
+    vias = ", ".join(f"{n} {v}" for v, n in sorted(by_via.items()))
+    return (f"radar {len(new['judged'])} judged, {len(new['promoted'])} promoted; "
+            f"readwise {len(captures)} new" + (f" ({vias})" if vias else ""))
 
 
 def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
@@ -311,9 +342,14 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
         attempts[rel] = attempts.get(rel, 0) + 1
     state["attempts"] = {k: v for k, v in attempts.items() if (vault / k).is_file()}
     state["last_run"] = {"at": now.isoformat(), "distilled": distilled, "dropped": dropped, "failed": len(failed)}
+    marks = state.pop("marks", None)
     _save_state(vault, state)
 
-    summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed" + (f"; {note}" if note else "")
+    summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed"
+    if marks is not None:
+        summary += f"; in: {came_in(vault, marks)}"
+    left = sum(1 for p in (vault / "01_Capture").glob("*.md") if p.is_file())
+    summary += f"; {left} in the inbox" + (f"; {note}" if note else "")
     env = {**os.environ, "TOOLKIT_VAULT": str(vault)}
     # A generator that fails may have replaced some of its files and not others, so its files go
     # back to how they were before it ran: navigation is this run's or the last one's, never a mix.
