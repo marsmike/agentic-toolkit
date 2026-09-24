@@ -27,7 +27,8 @@ import re
 import tempfile
 import urllib.error
 import urllib.request
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Any
 

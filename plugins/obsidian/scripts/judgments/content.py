@@ -16,9 +16,10 @@ from pathlib import Path
 from typing import Any
 
 import judge
+from vault_utils import read_frontmatter
+
 from judgments import questions as Q
 from judgments.capture import full_text_section, read_capture
-from vault_utils import read_frontmatter
 
 FULL_TEXT_CHARS = 4000
 

@@ -101,7 +101,10 @@ def run(vault: Path) -> dict:
                 events.append("waiter-in")
 
         t1, t2 = threading.Thread(target=holder), threading.Thread(target=waiter)
-        t1.start(); t2.start(); t1.join(); t2.join()
+        for t in (t1, t2):
+            t.start()
+        for t in (t1, t2):
+            t.join()
         if events != ["holder-in", "holder-out", "waiter-in"]:
             problems.append(f"phase 1: lock did not serialize: {events}")
 
