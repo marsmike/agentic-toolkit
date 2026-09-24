@@ -40,8 +40,40 @@ this plugin's own eval suite.
 
 Reads `$VAULT/Config/toolkit/readwise.md` if present, per `contract/PROFILE.md`'s "fill
 from Obsidian" convention. See `profile.example.md` for the exact frontmatter shape
-(`backlog_sweep`, `attachments_folder`) and what each field controls. Every field also has a
+(`backlog_sweep`, `newsletter_senders`) and what each field controls. Every field also has a
 `TOOLKIT_READWISE_<FIELD>` environment variable that overrides the note.
+
+## PDFs: converted, never stored
+
+[earned: 2026-09-24, owner's request — a stored PDF bloated the git repo on every real run,
+and the vault's own `.gitignore` excludes `*.pdf` anyway, so the file vanished from a cloud
+container the moment it exited while the note kept linking it]
+
+A `pdf` clipping's file is downloaded to a temp dir, converted, and discarded — never written
+into `04_Resources/Attachments/` or anywhere else in the vault. `pdf_extract.py` does the
+conversion; `build_captures.write_capture()` calls it for `category: pdf` items only. The
+capture's Full Text is the conversion, page-anchored (`<!-- page N -->`) so a distilled note
+can cite page ranges; a PDF long enough to need one (15+ pages) gets a `## Outline` of its
+headings above the full text, and the whole thing is capped at ~400k characters with a visible
+truncation note naming the page reached. Frontmatter carries `pdf_pages`, `pdf_sha256` and
+`extractor` — no `attachment` field, ever, for a capture written this way (a legacy capture
+from before this change may still carry one; `distill_check.py`'s attachment gate stays
+conditional on the field being present at all).
+
+**Library, and why:** [LiteParse](https://github.com/run-llama/liteparse) (run-llama) — a Rust
+core exposed to Python via PyO3, Apache-2.0, fully local (no LLM call, no network call, no
+GPU). Chosen from the owner's own July 2026 licence-ranked research note over `pymupdf4llm`
+(AGPL — excluded outright) and `marker`/Chandra (revenue-capped licences — excluded as a
+default). PyPI ships prebuilt wheels for macOS arm64 and Linux x86_64/aarch64
+(`manylinux_2_28`) at ~12–14MB each, small enough for the cloud pipeline's `uv run` to install
+fresh on every container without a second thought — see `scripts/pyproject.toml`. A conversion
+failure (a missing native wheel, a corrupt or password-locked PDF, an image-only scan
+LiteParse's own OCR can't read) falls back to Reader's own extraction (`html_content`) rather
+than losing the capture — `extractor: reader` in frontmatter says so; the owner's clips never
+drop over a conversion failure (`obsidian:distill` SKILL.md invariant 8). Docling (IBM, MIT)
+is the documented opt-in for a table-heavy document that needs its layout model instead — not
+wired into `pdf_extract.py`'s default path, since it pulls in a multi-GB model download the
+"a lean dependency the cloud container installs on every run" bar rules out as a default.
 
 ## Env vars
 
@@ -53,10 +85,10 @@ from Obsidian" convention. See `profile.example.md` for the exact frontmatter sh
 
 ## Dependencies
 
-`scripts/pyproject.toml` declares one dependency: PyYAML, for frontmatter I/O. The
-Readwise API client (`readwise_api.py`) is stdlib-only (`urllib`) — no `requests`, no
-`curl` shelling. Run any script via `uv run --project scripts python3
-scripts/<name>.py ...` from the plugin root.
+`scripts/pyproject.toml` declares two: PyYAML for frontmatter I/O, and LiteParse for PDF
+conversion (`pdf_extract.py` — see "PDFs: converted, never stored" above). The Readwise API
+client (`readwise_api.py`) is stdlib-only (`urllib`) — no `requests`, no `curl` shelling. Run
+any script via `uv run --project scripts python3 scripts/<name>.py ...` from the plugin root.
 
 ## Dead-letter queue
 
@@ -141,6 +173,7 @@ for distill to collide on. See `evals/eval_dedup_guard.py`.
 | `dedup_guard` | Calling `write_capture()` twice with the same fixture item writes exactly one capture file, not two — the second call returns `skipped-duplicate` |
 | `book_capture_dedup` | Given a fixture Classic v2 book + highlights (`evals/fixtures/reader_book.json`), `build_captures.write_book_capture()` produces a conformant `category: book` note with the highlights rendered, and a second call over the same book dedups via the title+author slug key rather than writing a second file |
 | `ingest` | `ingest.py` end to end against a stubbed Reader API: captures, provenance, ledger dedup, and a DLQ note with the watermark held when an item fails |
+| `pdf_convert` | A `pdf` item's converted text carries page anchors and `pdf_pages`/`pdf_sha256`/`extractor`, with no `attachment` field and no PDF file written anywhere in the vault; a failed conversion and a failed download both fall back to Reader's `html_content` with `extractor: reader` |
 
 Every eval that writes runs against a throwaway copy (`evals/_sandbox.py`), so `./vault`
 is never touched. If `./vault` doesn't exist yet, `run.py` exits `2` with a `corpus not

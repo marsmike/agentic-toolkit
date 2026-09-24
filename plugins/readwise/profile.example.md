@@ -6,7 +6,6 @@ plugin: readwise
 backlog_sweep: true
 newsletter_senders:
   - Readwise
-attachments_folder: 04_Resources/Attachments
 tags:
   - domain/toolkit-meta
   - profile
@@ -42,9 +41,12 @@ Get a token at https://readwise.io/access_token.
 Every field above also has a `TOOLKIT_READWISE_<FIELD>` environment variable that wins over
 this note, per `contract/PROFILE.md`'s resolution order — e.g. `TOOLKIT_READWISE_BACKLOG_SWEEP=false`.
 
-## Attachments
+## PDFs
 
-- **`attachments_folder`** — where a `pdf` clipping's original file is stored (vault-relative;
-  default `04_Resources/Attachments`). The capture gets `attachment:` in its frontmatter and a
-  `**Document:** [[path]]` line; the distilled note must keep that link (distill workflow, step
-  6). The extracted text stays in the capture and its archive copy; the note is the map.
+A `pdf` clipping's file is never stored in the vault (`attachments_folder` and the old
+`attachment:`/`**Document:**` link are gone — [earned: 2026-09-24, owner's request: PDFs bloated
+the git repo, and the vault's own `.gitignore` excludes `*.pdf` anyway, so a cloud run's stored
+copy vanished with the container while the note kept linking it]). `pdf_extract.py` downloads
+the file to a temp dir, converts it to page-anchored Markdown (LiteParse, see README's Library
+note) and discards the download; the capture keeps `pdf_pages`, `pdf_sha256` and `extractor` in
+frontmatter, and the Source line is the only link to the document itself.

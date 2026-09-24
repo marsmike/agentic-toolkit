@@ -15,65 +15,23 @@ second file, which is the readwise plugin's own share of the dedup-before-distil
 (contract/templates/VAULT_AGENTS.md, earned by the 2026-07-26 X-Bookmark/Readwise
 double-distill collision) — cross-origin dedup is distill's job; not re-emitting duplicate
 raw captures on every ingest run is this plugin's job.
+
+A `pdf` clipping's file is never written into the vault: it is downloaded to a temp dir and
+converted to page-anchored Markdown by `pdf_extract.extract_pdf()`, and only the conversion
+(plus `pdf_pages`/`pdf_sha256`/`extractor`) lands in the capture. [earned: 2026-09-24, owner's
+request — the vault's own .gitignore excludes *.pdf, so the old `store_attachment()` path
+bloated the git repo on every real run and the stored file vanished from a cloud container
+the moment it exited, leaving a note that linked nowhere]
 """
 from __future__ import annotations
 
-import http.client
 import re
-import urllib.error
-import urllib.request
 from html import unescape
 from pathlib import Path
 from typing import Any
 
-from vault_utils import find_capture_by_doc_id, profile_value, unique_path, write_dlq_note, write_frontmatter
-
-ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024
-ATTACHMENT_TIMEOUT = 120
-
-
-def store_attachment(vault: Path, item: dict[str, Any], slug: str) -> Path | None:
-    """For a `pdf` clipping, download the original file into the vault's attachment folder
-    (profile key `attachments_folder`, default `04_Resources/Attachments`) and return its
-    vault-relative path. The capture and later the distilled note link the file; the
-    extracted text stays in the capture. A file that is already there is reused; a failed
-    download returns None and the capture is written without an attachment.
-    [earned: 2026-09-22 acceptance run — a 300 KB extracted-text capture of a 150-page
-    report became one 10 KB note; the reader needs the document itself one click away]"""
-    if item.get("category") != "pdf":
-        return None
-    url = str(item.get("source_url") or "")
-    if not url.startswith("http"):
-        return None
-    folder = vault / str(profile_value(vault, "attachments_folder", "04_Resources/Attachments"))
-    folder.mkdir(parents=True, exist_ok=True)
-    # Keyed on the item's own doc_id, not the title-derived slug alone: two different PDF
-    # items can slugify to the same (or, both title-less, an identical "untitled") string, and
-    # unlike the capture note's own unique_path() call, this name must also stay stable across
-    # a re-run of the *same* item (an ingest interrupted after the download but before the
-    # capture note was written must not re-fetch it) -- the doc_id gives both at once.
-    doc_id = str(item.get("id") or "")
-    stem = f"{slug}-{_slugify(doc_id, maxlen=24)}" if doc_id else slug
-    dest = folder / f"{stem}.pdf"
-    if dest.is_file():
-        return dest.relative_to(vault)
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "agentic-toolkit-readwise/1.0"})
-        with urllib.request.urlopen(req, timeout=ATTACHMENT_TIMEOUT) as resp:
-            if "pdf" not in (resp.headers.get("Content-Type") or "").lower() and not url.lower().endswith(".pdf"):
-                return None
-            data = resp.read(ATTACHMENT_MAX_BYTES + 1)
-    # A malformed source_url (a bad scheme, a stray space or control character, a broken
-    # IPv6-literal host — all seen from real API payloads) makes urlopen() raise a bare
-    # ValueError or http.client.InvalidURL instead of URLError; this function's contract is
-    # "a failed download returns None", not "crashes the whole capture write", so those must
-    # degrade the same way as a network failure.
-    except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError, ValueError):
-        return None
-    if len(data) > ATTACHMENT_MAX_BYTES or not data.startswith(b"%PDF"):
-        return None
-    dest.write_bytes(data)
-    return dest.relative_to(vault)
+import pdf_extract
+from vault_utils import find_capture_by_doc_id, unique_path, write_dlq_note, write_frontmatter
 
 STUB_CHARS = 200        # less real text than this is not the article (a short X post via RSS has ~270)
 STUB_CEILING = 1500     # a known wall phrase in a text shorter than this marks a stub
@@ -185,9 +143,12 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
     capture_dir.mkdir(parents=True, exist_ok=True)
     dest = unique_path(capture_dir, f"Readwise-{label}-{slug}-{saved_at or 'undated'}")
 
-    attachment = store_attachment(vault, item, slug)
-    text = _html_to_md_basic(html)
-    stub = not attachment and is_stub(text, category)
+    # A `pdf` item's file is never written into the vault (see module docstring): only the
+    # conversion, its page count and hash reach the capture. `extract_pdf()` itself degrades to
+    # `extractor: "reader"` on a bad/missing URL, so it is always safe to call for this category.
+    pdf_info = pdf_extract.extract_pdf(source_url) if category == "pdf" else None
+    text = pdf_info["text"] if pdf_info and pdf_info["text"] else _html_to_md_basic(html)
+    stub = is_stub(text, category)
     fm = {
         "source": source_url,
         "origin": "readwise",
@@ -196,7 +157,9 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
         "author": author or None,
         "saved_at": saved_at or None,
         "created": saved_at or None,
-        "attachment": attachment.as_posix() if attachment else None,
+        "pdf_pages": pdf_info.get("pages") if pdf_info else None,
+        "pdf_sha256": pdf_info.get("sha256") if pdf_info else None,
+        "extractor": pdf_info.get("extractor") if pdf_info else None,
         "content": "stub" if stub else None,
         **(provenance or {}),
         "tags": ["readwise", category, *(["radar"] if (provenance or {}).get("via") == "radar" else [])],
@@ -206,11 +169,20 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
     body_lines = [f"# {title}", "", f"*Source: [{source_url}]({source_url})*"]
     if author:
         body_lines[-1] += f" — {author}"
-    if attachment:
-        body_lines += ["", f"**Document:** [[{attachment.as_posix()}]] (stored in the vault; the text below is the extraction)"]
+    if pdf_info and pdf_info.get("pages"):
+        body_lines += ["", f"*PDF: {pdf_info['pages']} pages, converted by {pdf_info['extractor']} "
+                           f"(sha256 {pdf_info['sha256'][:12]}…). The file itself is not stored here — "
+                           "only at the Source link above; cite page ranges (`<!-- page N -->` anchors below) "
+                           "instead of linking a document.*"]
+    elif pdf_info:
+        body_lines += ["", "*PDF: conversion did not run for this item (see `extractor: reader` in frontmatter); "
+                           "the text below is Reader's own extraction, and the file itself is not stored here — "
+                           "only at the Source link above.*"]
     body_lines.append("")
     if summary:
         body_lines += ["## Readwise summary", "", summary, ""]
+    if pdf_info and pdf_info.get("outline"):
+        body_lines += [pdf_info["outline"]]
     body_lines.append("## Full Text")
     body_lines.append("")
     if stub:
