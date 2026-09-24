@@ -53,6 +53,12 @@ from vault_utils import (
 
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 BODY_HEAD = 2000  # chars of body considered per note — enough for topic signal, cheap to scan
+HEADING_RE = re.compile(r"^#{1,6}\s+(.+)$", re.M)
+HEADINGS_CHARS = 500  # a long note's own section titles, regardless of where they fall in
+# the body — a query answered by one late section (e.g. "## Result: contrails solved") missed
+# entirely at BODY_HEAD=2000 chars in an 8 KB note otherwise never gets a chance to match.
+# [earned: 2026-09-24, "how were contrails solved" ranked a note with "solved" in its *title*
+# above the note whose only match was a heading past the truncation point]
 STOPWORDS = {
     "the", "a", "an", "of", "to", "in", "and", "or", "is", "are", "for", "on", "with",
     "this", "that", "it", "as", "by", "at", "be", "was", "were", "from", "into",
@@ -79,12 +85,14 @@ class Doc:
         rel_key = path.relative_to(vault).with_suffix("").as_posix()
         summary = index_entries.get(rel_key, ("", ""))[0]
         try:
-            body = path.read_text(encoding="utf-8", errors="replace")[:BODY_HEAD]
+            full_body = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
-            body = ""
-        # Title and Index.md summary count for extra weight by repetition, not a separate
-        # scoring path — keeps the ranker to one formula.
-        self.text = f"{self.title} {self.title} {summary} {summary} {body}"
+            full_body = ""
+        body = full_body[:BODY_HEAD]
+        headings = " ".join(HEADING_RE.findall(full_body))[:HEADINGS_CHARS]
+        # Title, Index.md summary and the note's own headings count for extra weight by
+        # repetition, not a separate scoring path — keeps the ranker to one formula.
+        self.text = f"{self.title} {self.title} {summary} {summary} {headings} {headings} {body}"
         self.tokens = tokenize(self.text)
         self.term_counts = Counter(self.tokens)
         self.length = len(self.tokens)

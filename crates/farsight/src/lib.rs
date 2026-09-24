@@ -48,6 +48,12 @@ pub const B: f64 = 0.75;
 /// Matches `search.py::BODY_HEAD`.
 const BODY_HEAD: usize = 2000;
 
+/// Cap on the joined heading text pulled from the *whole* body, not just the `BODY_HEAD`
+/// window. Matches `search.py::HEADINGS_CHARS`. [earned: 2026-09-24 — "how were contrails
+/// solved" ranked a note with "solved" in its title above the note whose only match was a
+/// heading past `BODY_HEAD` in an 8 KB note; see search.py's own note on this constant]
+const HEADINGS_CHARS: usize = 500;
+
 const STOPWORDS: &[&str] = &[
     "the", "a", "an", "of", "to", "in", "and", "or", "is", "are", "for", "on", "with", "this",
     "that", "it", "as", "by", "at", "be", "was", "were", "from", "into",
@@ -273,9 +279,12 @@ impl Doc {
             .unwrap_or_default();
 
         let body_head: String = body.chars().take(BODY_HEAD).collect();
-        // Title and description count for extra weight by repetition, not a separate
-        // scoring path — keeps the ranker to one formula (mirrors search.py).
-        let text = format!("{title} {title} {description} {description} {body_head}");
+        let headings: String = extract_headings(&body).chars().take(HEADINGS_CHARS).collect();
+        // Title, description and the note's own headings count for extra weight by
+        // repetition, not a separate scoring path — keeps the ranker to one formula
+        // (mirrors search.py). Headings are pulled from the whole body, not just
+        // `body_head`, so a late section title still reaches the ranker.
+        let text = format!("{title} {title} {description} {description} {headings} {headings} {body_head}");
         let tokens = tokenize(&text);
         let mut term_counts: HashMap<String, u32> = HashMap::new();
         for t in &tokens {
@@ -291,6 +300,29 @@ impl Doc {
             term_counts,
         }
     }
+}
+
+/// Every Markdown heading line (`#` through `######`, followed by whitespace) in `body`,
+/// joined with the leading `#`s and surrounding whitespace stripped — matches
+/// `search.py::HEADING_RE`. No `regex` crate dependency: a heading line is simple enough
+/// to recognise by hand, same spirit as `tokenize` below.
+fn extract_headings(body: &str) -> String {
+    let mut out = Vec::new();
+    for line in body.lines() {
+        let stripped = line.trim_start();
+        let hashes = stripped.chars().take_while(|c| *c == '#').count();
+        if hashes == 0 || hashes > 6 {
+            continue;
+        }
+        let rest = &stripped[hashes..];
+        if rest.starts_with(char::is_whitespace) {
+            let text = rest.trim();
+            if !text.is_empty() {
+                out.push(text);
+            }
+        }
+    }
+    out.join(" ")
 }
 
 pub fn build_corpus(vault: &Path) -> Vec<Doc> {
