@@ -39,7 +39,8 @@ holds nothing else, so no installed `toolkit` can leak onto PATH:
 ```bash
 mkdir -p /private/tmp/prereq-bin
 ln -sf "$(readlink -f "$(command -v claude)")" /private/tmp/prereq-bin/claude
-python3 capture/capture.py                  # all paths; or: capture.py from-source-fixed
+python3 capture/capture.py                  # lists the paths and the main revision each one records
+python3 capture/capture.py from-source-main-0dd21a7
 npm test                                    # replay still matches the transcripts
 ```
 
@@ -47,10 +48,22 @@ The transcripts follow a real terminal: output wraps at the recorded width (120 
 wrapped rows, and wrapped rows are joined back into one line. To cross-check a capture against tmux, replay its
 bytes into a 120-column pane and compare with `tmux capture-pane -p -J -S -`; every committed capture matches.
 
-`capture.py` **deletes and recreates `/private/tmp/newcomer`** for each path, then runs every command (or the
-session shell) under `env -i` with only `HOME`, `PATH` (`$HOME/.local/bin`, the claude directory,
-`/usr/bin:/bin:/opt/homebrew/bin`), `TERM` and `LANG`, plus `PS1='$ '` for a session. `claude plugin marketplace add` works there without logging in. The headline path installs
-whatever `main` is at capture time; re-capture if `main` changes before publishing.
+**The throwaway HOME.** For each path, `capture.py` deletes and recreates `/private/tmp/newcomer`, but only the
+directory it created itself: a marker beside it (`/private/tmp/newcomer.capture-owned`) holds that directory's
+device and inode. If the path exists without a matching marker (someone else's directory, or one replaced since),
+or is a symlink, it refuses and deletes nothing. Remove such a directory yourself if it is disposable.
+
+**The environment.** Every command (or the session shell) runs under `env -i` with only `HOME`, `PATH`
+(`$HOME/.local/bin`, the claude directory, `/usr/bin:/bin:/opt/homebrew/bin`), `TERM` and `LANG`, plus
+`PS1='$ '` for a session. `claude plugin marketplace add` works there without logging in.
+
+**Revisions.** Every path installs or clones `main` as it is at capture time, and each folder records one revision
+(`RECORDED` in `capture.py`). `capture.py` checks `main` with `git ls-remote` first and refuses to re-capture a
+folder recorded at another revision, since that would replace the evidence, unless given `--new-revision`. If you
+do, update `RECORDED` and rename the folder.
+
+**Exit status.** It counts commands whose exit code differs from the recorded expectation. `from-source` expects
+its `add .` step to fail, because that failure is what it records. A refusal exits 2.
 
 ## Render
 

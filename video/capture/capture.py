@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Capture the README newcomer commands, verbatim, in a clean empty HOME.
 
-Usage: capture.py [headline|from-source|from-source-fixed|from-source-main-0dd21a7 ...]   (default: all)
+Usage: capture.py [--new-revision] PATH...   (no PATH: list the paths)
+
+Exit status: the number of commands whose exit code differs from what
+RECORDED expects (from-source's `add .` is expected to fail), or 2 when it
+refuses: an unknown path, a HOME it did not create, or main having moved
+past the revision a folder records (--new-revision overrides that one).
 
 For each path: delete and recreate the throwaway HOME, record the starting
 state (OS, tool versions, empty `ls -A $HOME`) in <path>/env.txt, then run
@@ -73,15 +78,57 @@ SESSIONS = {
 }
 
 
+# What each folder records: the main revision it was captured at, and the
+# exit codes it is expected to have (step number -> code; default 0).
+# `from-source` records the README's broken From-source line at 72bb351, so
+# its `add .` step failing is the finding, not a capture error.
+RECORDED = {
+    "headline": {"rev": "72bb351503a1b0e30646c53016188b54180bdadf"},
+    "from-source": {"rev": "72bb351503a1b0e30646c53016188b54180bdadf", "exits": {3: 1}},
+    "from-source-fixed": {"rev": "72bb351503a1b0e30646c53016188b54180bdadf"},
+    "from-source-main-0dd21a7": {"rev": "0dd21a7f29ce736b53b3f8dded14035491b4599d"},
+}
+
+
 def run(cmd: str) -> str:
     r = subprocess.run(cmd, shell=True, env=ENV, cwd=HOME, capture_output=True, text=True)
     return (r.stdout + r.stderr).strip()
 
 
-def fresh_home() -> None:
-    if HOME.exists():
-        shutil.rmtree(HOME)
-    HOME.mkdir(parents=True)
+OWNER_NOTE = "created by agentic-toolkit video/capture/capture.py; deleted and recreated on every capture"
+
+
+class NotOurs(Exception):
+    pass
+
+
+def _identity(path: Path) -> str:
+    st = path.lstat()
+    return f"{st.st_dev}:{st.st_ino}"
+
+
+def fresh_home(home: Path = HOME) -> None:
+    """Delete and recreate the throwaway HOME, but only the one this script made.
+
+    Ownership is a marker file beside the directory (HOME itself must start
+    empty) holding the device and inode of the directory it created, so a
+    directory removed and replaced by anyone else no longer matches. A path
+    that exists without a matching marker, or is a symlink, is someone
+    else's: refuse rather than delete it.
+    """
+    marker = home.with_name(home.name + ".capture-owned")
+    if home.is_symlink() or marker.is_symlink():
+        raise NotOurs(f"{home} (or its marker) is a symlink; refusing to touch it")
+    if home.exists():
+        owned = marker.is_file() and marker.read_text() == f"{OWNER_NOTE}\n{_identity(home)}\n"
+        if not owned:
+            raise NotOurs(
+                f"{home} exists and is not the directory capture.py created (no matching {marker.name}); "
+                "remove it yourself if it is disposable, then re-run"
+            )
+        shutil.rmtree(home)
+    home.mkdir(parents=True)
+    marker.write_text(f"{OWNER_NOTE}\n{_identity(home)}\n")
 
 
 def record_session(out: Path, commands: list[str]) -> int:
@@ -95,15 +142,15 @@ def record_session(out: Path, commands: list[str]) -> int:
     ).returncode
     convert(cast)
     print(f"[exit {code}]")
-    return 1 if code else 0
+    return 0 if code == RECORDED.get(out.name, {}).get("exits", {}).get(1, 0) else 1
 
 
 def capture(name: str) -> int:
+    fresh_home()  # first: if HOME is not ours, stop before deleting anything
     out = HERE / name
     out.mkdir(exist_ok=True)
     for old in [*out.glob("*.cast"), *out.glob("*.txt")]:
         old.unlink()
-    fresh_home()
     env_lines = [
         f"path: {name}",
         f"os: macOS {platform.mac_ver()[0]} {platform.machine()}",
@@ -131,8 +178,9 @@ def capture(name: str) -> int:
             env=ENV, cwd=HOME,
         ).returncode
         convert(cast)
-        print(f"[exit {code}]")
-        if code:
+        expected = RECORDED.get(name, {}).get("exits", {}).get(i, 0)
+        print(f"[exit {code}{'' if code == expected else f', expected {expected}'}]")
+        if code != expected:
             failed += 1
     clone = HOME / "agentic-toolkit"
     if clone.is_dir():
@@ -143,11 +191,37 @@ def capture(name: str) -> int:
 
 
 def main() -> int:
-    names = sys.argv[1:] or [*PATHS, *SESSIONS]
+    args = sys.argv[1:]
+    new_revision = "--new-revision" in args
+    names = [a for a in args if a != "--new-revision"]
+    if not names:
+        print(__doc__, file=sys.stderr)
+        for name in [*PATHS, *SESSIONS]:
+            print(f"  {name:28} recorded at main {RECORDED[name]['rev'][:7]}", file=sys.stderr)
+        return 2
+    unknown = [n for n in names if n not in PATHS and n not in SESSIONS]
+    if unknown:
+        print(f"unknown path(s): {', '.join(unknown)}", file=sys.stderr)
+        return 2
     if not (PREREQ_BIN / "claude").exists():
         print(f"missing {PREREQ_BIN}/claude: symlink the claude binary there first", file=sys.stderr)
         return 2
-    return sum(capture(n) for n in names)
+    # Every path installs or clones main as it is now. Re-capturing a folder
+    # recorded at another revision would overwrite that evidence, so it needs
+    # --new-revision (and then RECORDED and the folder name need updating).
+    main_rev = subprocess.run(["git", "ls-remote", REPO, "refs/heads/main"],
+                              capture_output=True, text=True, check=True).stdout.split()[0]
+    stale = [n for n in names if RECORDED[n]["rev"] != main_rev]
+    if stale and not new_revision:
+        print(f"refusing: main is now {main_rev[:7]}, but {', '.join(stale)} recorded "
+              f"{', '.join(sorted({RECORDED[n]['rev'][:7] for n in stale}))}; re-capturing would replace that "
+              "evidence. Pass --new-revision to do it anyway.", file=sys.stderr)
+        return 2
+    try:
+        return sum(capture(n) for n in names)
+    except NotOurs as e:
+        print(f"refusing: {e}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
