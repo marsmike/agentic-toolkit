@@ -7,6 +7,10 @@ Every release entry links the change to the research or the dated failure that m
 A Claude cloud task runs in this repo, where the code and skills are, and reaches the vault through
 git; the vault stays knowledge only and gets no copy of the code.
 
+- **farsight 0.1.2** — a note's own headings are weighted like its title wherever they fall, not only
+  within the first 2,000 characters scored: "how were contrails solved" found nothing although a
+  note has a section "Result: contrails solved" at character 3,512; it now ranks first. Mirrors
+  `search.py`. [earned: 2026-09-24 pipeline run, a distill worker's findability check]
 - **`scripts/cloud-vault.sh`** — `open` clones (or updates) `$TOOLKIT_VAULT_REMOTE` into the
   git-ignored `.vault-live/`, syncs the scripts' environment and reports keys by name;
   `close` is the pipeline's own `end` (index, maps, Now, secret scan, commit, pull, push).
