@@ -18,9 +18,9 @@ Only the `claude` binary is taken from this machine: PREREQ_BIN holds a
 symlink to it and nothing else, so no installed toolkit leaks onto PATH.
 """
 import platform
-import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from cast_text import convert
@@ -94,7 +94,7 @@ def run(cmd: str) -> str:
     return (r.stdout + r.stderr).strip()
 
 
-OWNER_NOTE = "created by agentic-toolkit video/capture/capture.py; deleted and recreated on every capture"
+OWNER_NOTE = "created by agentic-toolkit video/capture/capture.py; moved aside and recreated on every capture"
 
 
 class NotOurs(Exception):
@@ -107,13 +107,15 @@ def _identity(path: Path) -> str:
 
 
 def fresh_home(home: Path = HOME) -> None:
-    """Delete and recreate the throwaway HOME, but only the one this script made.
+    """Recreate the throwaway HOME, but only in place of the one this script made.
 
     Ownership is a marker file beside the directory (HOME itself must start
-    empty) holding the device and inode of the directory it created, so a
-    directory removed and replaced by anyone else no longer matches. A path
+    empty) holding the device and inode of the directory it created. A path
     that exists without a matching marker, or is a symlink, is someone
-    else's: refuse rather than delete it.
+    else's: refuse. A matching one is moved aside (`<name>.old-<ns>`), never
+    deleted: Linux hands a freshly created directory the inode just freed, so
+    a directory someone put in its place can match the marker, and moving it
+    loses nothing. [earned: 2026-09-24, first Linux CI run of #27]
     """
     marker = home.with_name(home.name + ".capture-owned")
     if home.is_symlink() or marker.is_symlink():
@@ -125,7 +127,7 @@ def fresh_home(home: Path = HOME) -> None:
                 f"{home} exists and is not the directory capture.py created (no matching {marker.name}); "
                 "remove it yourself if it is disposable, then re-run"
             )
-        shutil.rmtree(home)
+        home.rename(home.with_name(f"{home.name}.old-{time.time_ns()}"))
     home.mkdir(parents=True)
     marker.write_text(f"{OWNER_NOTE}\n{_identity(home)}\n")
 
@@ -136,7 +138,9 @@ def record_session(out: Path, commands: list[str]) -> int:
     cast = out / "session.cast"
     code = subprocess.run(
         [sys.executable, str(HERE / "record.py"), str(cast), str(COLS), str(ROWS),
-         "--session", str(typed), "--", "/bin/sh", "-i"],
+         # -e: the first failing step ends the session with its status, so a later success
+         # cannot mask it. [earned: 2026-09-24, Copilot review of #27]
+         "--session", str(typed), "--", "/bin/sh", "-e", "-i"],
         env={**ENV, "PS1": "$ "}, cwd=HOME,
     ).returncode
     convert(cast)
@@ -147,9 +151,11 @@ def record_session(out: Path, commands: list[str]) -> int:
 def capture(name: str) -> int:
     fresh_home()  # first: if HOME is not ours, stop before deleting anything
     out = HERE / name
-    out.mkdir(exist_ok=True)
-    for old in [*out.glob("*.cast"), *out.glob("*.txt")]:
-        old.unlink()
+    # A capture directory is committed evidence: never overwrite it. A new revision is recorded
+    # into a new directory (and a new RECORDED entry). [earned: 2026-09-24, Copilot review of #27]
+    if out.is_dir() and any(out.iterdir()):
+        raise SystemExit(f"{out} already holds a capture; record a new revision into a new directory")
+    out.mkdir(parents=True, exist_ok=True)
     env_lines = [
         f"path: {name}",
         f"os: macOS {platform.mac_ver()[0]} {platform.machine()}",
@@ -161,7 +167,7 @@ def capture(name: str) -> int:
         f"ls -A $HOME: [{run('ls -A')}]",
     ]
     if name in SESSIONS:
-        env_lines.append('session: one interactive /bin/sh -i, prompt "$ ", commands typed from commands.txt')
+        env_lines.append('session: one interactive /bin/sh -e -i (stops at the first failing step), prompt "$ ", commands typed from commands.txt')
     (out / "env.txt").write_text("\n".join(env_lines) + "\n")
     print("\n".join(env_lines))
 

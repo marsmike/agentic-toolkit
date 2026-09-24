@@ -2,7 +2,7 @@
 // only ever delete a directory it created itself.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -45,15 +45,55 @@ test("creates an empty HOME, then recreates its own on the next run", () => {
   assert.deepEqual(readdirSync(home), []);
 });
 
-test("refuses a directory replaced by someone else even though the marker remains", () => {
-  const home = join(mkdtempSync(join(tmpdir(), "guard-")), "newcomer");
+test("a directory replaced by someone else loses nothing, even when it reuses the inode", () => {
+  // Linux hands the new directory the inode just freed, so it can match the marker (first Linux CI
+  // run of #27). Refused or moved aside, its contents must survive; nothing is ever deleted.
+  const base = mkdtempSync(join(tmpdir(), "guard-"));
+  const home = join(base, "newcomer");
   assert.equal(freshHome(home).ok, true); // ours, marker written
   rmSync(home, { recursive: true });
-  mkdirSync(home); // someone else's directory at the same path, new inode
+  mkdirSync(home); // someone else's directory at the same path
   writeFileSync(join(home, "precious.txt"), "someone else's");
-  const r = freshHome(home);
-  assert.equal(r.ok, false);
-  assert.ok(existsSync(join(home, "precious.txt")));
+  freshHome(home);
+  const survivors = [home, ...readdirSync(base).filter((n) => n.startsWith("newcomer.old-")).map((n) => join(base, n))];
+  assert.ok(survivors.some((d) => existsSync(join(d, "precious.txt"))), "someone else's file was deleted");
+});
+
+test("refuses to overwrite a capture directory that already holds evidence", () => {
+  const base = mkdtempSync(join(tmpdir(), "guard-"));
+  mkdirSync(join(base, "out", "headline"), { recursive: true });
+  writeFileSync(join(base, "out", "headline", "01-install.cast"), "committed capture");
+  const script = [
+    "import sys; from pathlib import Path; import capture",
+    "capture.HERE = Path(sys.argv[1]) / 'out'; capture.HOME = Path(sys.argv[1]) / 'home'",
+    "capture.fresh_home.__defaults__ = (capture.HOME,)",
+    "capture.capture('headline')",
+  ].join("\n");
+  let err = "";
+  try {
+    execFileSync("python3", ["-c", script, base], { cwd: capture, stdio: "pipe" });
+  } catch (e) {
+    err = String((e as { stderr: Buffer }).stderr);
+  }
+  assert.match(err, /already holds a capture/);
+  assert.equal(readFileSync(join(base, "out", "headline", "01-install.cast"), "utf8"), "committed capture");
+});
+
+test("a recorded session stops at the first failing step", () => {
+  // Copilot review of #27: with a trailing `exit`, only the last command's status counted.
+  const out = mkdtempSync(join(tmpdir(), "session-"));
+  const cmds = join(out, "commands.txt");
+  writeFileSync(cmds, "false\necho SHOULD-NOT-RUN\n");
+  let status = 0;
+  try {
+    execFileSync("python3", [join(capture, "record.py"), join(out, "s.cast"), "80", "24", "--session", cmds, "--", "/bin/sh", "-e", "-i"],
+      { stdio: "pipe", env: { ...process.env, PS1: "$ " }, timeout: 30000 });
+  } catch (e) {
+    status = (e as { status: number }).status;
+  }
+  assert.notEqual(status, 0);
+  assert.ok(!readFileSync(join(out, "s.cast"), "utf8").includes("SHOULD-NOT-RUN"));
+  assert.match(readFileSync(join(capture, "capture.py"), "utf8"), /"--", "\/bin\/sh", "-e", "-i"/);
 });
 
 test("a refused run deletes nothing, not even the old captures", () => {
