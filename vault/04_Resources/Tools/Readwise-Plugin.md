@@ -27,7 +27,8 @@ because of collisions exactly like this one.
 
 ## Credentials
 
-The Readwise API token is an environment variable, never a vault field — see the Secrets section
+The Readwise API token (`READWISE_TOKEN`) comes from the environment or the owner's key file (`TOOLKIT_KEYS_FILE`, default `~/.env`),
+read by the script itself, never a vault field — see the Secrets section
 of `contract/PROFILE.md` and [[Fill-From-Obsidian-Profiles]] for the general rule this follows.
 
 ## Related

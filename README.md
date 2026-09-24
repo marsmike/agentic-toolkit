@@ -154,6 +154,9 @@ claude -p --allowedTools "Bash(uv run:*),Bash(uv:*),Bash(env:*),Bash(python3:*)"
 
 Note: `--allowedTools` takes **one comma-separated argument**, and `Bash(env:*)`
 is required because skills compose `env VAR=... uv run ...` command lines.
+An unattended run needs narrower grants than this: `plugins/obsidian/scripts/run-pipeline.sh` grants
+each pipeline script by name and starts the agent with no key in its environment (each script
+reads its own).
 Full guide: [Scripting the Toolkit](https://marsmike.github.io/agentic-toolkit/04_Resources/Guides/Scripting-the-Toolkit-Headless).
 
 ## Principles

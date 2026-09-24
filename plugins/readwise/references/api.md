@@ -1,7 +1,8 @@
 # Readwise API Reference
 
 All calls go through `scripts/readwise_api.py` (a stdlib-only Python client — no `curl`
-shelling, no third-party HTTP library). Token: `READWISE_TOKEN` environment variable.
+shelling, no third-party HTTP library). Token: `READWISE_TOKEN`, from the
+environment or the owner's key file (`~/.env`), via `vault_utils.secret`.
 
 ```python
 import readwise_api as rw
