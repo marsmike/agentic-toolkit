@@ -118,6 +118,12 @@ def inside(path: Path, root: Path) -> bool:
     return path.resolve().is_relative_to(root.resolve())
 
 
+def contained(paths, vault: Path) -> list[Path]:
+    """Keep only paths that resolve inside the vault: a `.md` symlink to a file elsewhere must not
+    be read, indexed or sent on by an unattended run. [earned: 2026-09-24, Copilot review of #26]"""
+    return [p for p in paths if inside(p, vault)]
+
+
 # ---------------------------------------------------------------------------
 # Profile (contract/PROFILE.md resolution order: env -> vault note -> default)
 # ---------------------------------------------------------------------------
@@ -355,7 +361,7 @@ def root_active_notes(vault: Path) -> list[Path]:
     core/toolkit_core/vault.py. `Index.md` and `AGENTS.md` never qualify (no frontmatter);
     unparseable frontmatter is skipped, as `vault_yaml_repair.py` is the place for that."""
     notes = []
-    for p in sorted(vault.glob("*.md")):
+    for p in contained(sorted(vault.glob("*.md")), vault):
         try:
             frontmatter, _ = read_frontmatter(p, strict=True)
         except UnparseableFrontmatter:
@@ -392,7 +398,7 @@ def discover_notes(
             continue
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
-            candidates += [Path(dirpath) / fn for fn in filenames if fn.endswith(".md") and not fn.startswith(".")]
+            candidates += contained([Path(dirpath) / fn for fn in filenames if fn.endswith(".md") and not fn.startswith(".")], vault)
     if not scope:
         candidates += root_active_notes(vault)
 

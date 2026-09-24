@@ -37,6 +37,7 @@ from vault_utils import (
     WARNING,
     UnparseableFrontmatter,
     atomic_write,
+    contained,
     git_ignored,
     parse_existing_index,
     read_frontmatter,
@@ -68,7 +69,7 @@ def collect(vault: Path) -> dict[str, Path]:
         root = vault / folder
         if not root.exists():
             continue
-        for md in root.rglob("*.md"):
+        for md in contained(root.rglob("*.md"), vault):
             if any(part in EXCLUDE_DIRS for part in md.relative_to(vault).parts[:-1]):
                 continue
             if md.relative_to(vault).as_posix() in ignored:
