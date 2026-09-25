@@ -1,27 +1,21 @@
-# Music (decision D5: proposed, awaiting the operator's approval)
+# Music
 
-One instrumental track under all 118 seconds. It is **not committed**: `npm run fetch-music` downloads it to
-`public/music/` (gitignored) and refuses a file whose sha256 differs. `music.json` is what the script and the
-render read; this page is for people.
+One instrumental bed under the whole film, **generated**, not downloaded: `npm run music` runs
+`scripts/make_music.py`, which writes `public/music/explainer-bed.wav` (gitignored). It is deterministic (a fixed seed),
+so there is no licence to check and no attribution to give.
 
-| | |
-|---|---|
-| Work | Erik Satie, *Gymnopédie No. 1* ("Lent et douloureux"), 1888 |
-| Performer | Robin Alciatore (piano), recording published by [Musopen](https://musopen.org) |
-| Source page | https://commons.wikimedia.org/wiki/File:Erik_Satie_-_gymnopedies_-_la_1_ere._lent_et_douloureux.ogg |
-| File URL | https://upload.wikimedia.org/wikipedia/commons/9/90/Erik_Satie_-_gymnopedies_-_la_1_ere._lent_et_douloureux.ogg |
-| sha256 | `419e37656856224227086df32d6d481a00a738961e08fca9f6147e472beea53e` |
-| sha1 | `96b2343c81047abd9723488d8540b5a2af688233` (matches the sha1 Wikimedia Commons publishes for the file) |
-| Format | Ogg Vorbis, stereo, 44.1 kHz, 3:03.6, 3,696,351 bytes |
-| Licence | **Public domain**, as Wikimedia Commons lists it (`LicenseShortName` "Public domain", `AttributionRequired` false, credit musopen.com). The composition is out of copyright (Satie died in 1925). Only the Commons listing was checked, not Musopen's own terms. |
-| Attribution | None required. Crediting "Music: Erik Satie, Gymnopédie No. 1, performed by Robin Alciatore (Musopen), public domain" in the release notes is a courtesy, not an obligation, so the locked end card is unchanged. |
+**What it is:** calm and understated. A warm pad in D major (Dmaj9, Bm9, Gmaj9, Asus2, one chord every two bars), a
+soft plucked arpeggio from the vault scene on, and a quiet sub pulse from the plugins scene to the end card. No
+drums and no drops. It is loud enough to carry the film (about -17 LUFS before the render's 0.8 volume), never
+louder than the picture.
 
-**How it is used:** playback starts 2.0 s into the recording (`startSeconds`, skipping its 2.2 s of silent lead-in),
-fades in over the first second, plays at 70 % volume and fades out over the last 3 seconds; the video ends at 118 s,
-before the piece does. No voice anywhere.
+**How it follows the picture:** it reads `src/timeline.json`, the file the video reads. 80 BPM puts one bar at
+3 s, and every scene starts on a bar, so the music changes where the picture does. A low-pass filter opens as the
+graph forms and again for INFERRED, then settles for the end card. Each cue gets one soft bell in key: the three
+search hits, the neighbours lighting up, the three INFERRED pairs and "your call".
 
-**Why this track:** solo piano, slow and quiet, so it sits under dense on-screen text without competing; no
-lyrics; and a public-domain licence removes the attribution the locked storyboard has no place for.
+**In the render:** `src/Explainer.tsx` plays it from the first frame at `volume` 0.8 (`music.json`), fades in over
+1.5 s and out over the last 3 s. No voice anywhere.
 
-**Checked on 2026-09-24:** the licence fields above were read from the Commons API (`prop=imageinfo`,
-`extmetadata`). The operator approves the track before the render is accepted.
+**Replaces** the Satie *Gymnopédie No. 1* recording the first cut used (decision D5): slow, sad piano was too heavy
+for a short product film. The operator approves this bed before any publish.

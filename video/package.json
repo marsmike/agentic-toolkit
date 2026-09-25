@@ -5,10 +5,11 @@
   "description": "The agentic-toolkit explainer video, rendered with Remotion from real captured CLI output.",
   "scripts": {
     "studio": "remotion studio src/index.ts",
-    "fetch-music": "node scripts/fetch-music.mjs",
     "render": "remotion render src/index.ts Explainer out/explainer.mp4",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.ts"
+    "test": "node --test test/*.test.ts",
+    "music": "uv run scripts/make_music.py",
+    "graph": "uv run scripts/build_graph.py"
   },
   "dependencies": {
     "@remotion/cli": "4.0.528",

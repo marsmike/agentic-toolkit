@@ -10,14 +10,13 @@ output**. Terminal scenes replay the recorded bytes in `capture/`; nothing is re
 |---|---|
 | `capture/record.py` | Records one command, or one interactive shell session with typed commands, in a pseudo-terminal as asciicast v2 (`.cast`: output + timing). Stdlib only. |
 | `capture/capture.py` | Runs the README newcomer commands in a clean, empty HOME and records each one. |
-| `capture/cast_text.py` | Writes each capture's final screen as `.txt`: the verbatim text the storyboard quotes. |
-| `capture/<path>/` | One folder per install path: `env.txt` (starting state, tool versions, source revision), then `NN-<step>.cast` + `.txt` per command, or for a session `commands.txt` (typed lines) + `session.cast` + `session.txt`. |
-| `src/storyboard.json` | The locked storyboard's scene table, copied verbatim (times, composed text, source), plus the `session.txt` lines each terminal scene shows. |
-| `src/Explainer.tsx`, `src/Root.tsx` | The `Explainer` composition: one sequence per storyboard scene. It decides pacing and highlights only; terminal text comes from the capture, composed text from `storyboard.json`. |
-| `src/cast.ts`, `src/scene-text.ts` | Replay of a `.cast` into screen text (same rules as `cast_text.py`); parser for the storyboard's text markup. |
-| `scripts/check_storyboard.py` | Compares `storyboard.json` and the capture with the locked `STORYBOARD.md`: scenes, times, every caption byte for byte, every terminal block. |
-| `music.json`, `MUSIC.md`, `scripts/fetch-music.mjs` | The music track (not committed): URL, sha256, licence; the verified download. |
-| `test/` | Replay vs transcripts, text parsing, storyboard and music consistency. |
+| `capture/cast_text.py` | Writes each capture's final screen as `.txt`: the verbatim transcript the video's numbers and names are checked against. |
+| `src/timeline.json` | The film on one page: eight scenes on a 3-second bar grid (80 BPM), one label per scene, and the cue times. The picture and the music both read it. |
+| `src/graph.json`, `scripts/build_graph.py` | The example vault's real link graph (gaiafield: 83 notes, 783 links) with a fixed layout, plus the search hits, neighbours and INFERRED pairs looked up from the capture. |
+| `src/Explainer.tsx`, `src/Root.tsx` | The `Explainer` composition: one graph layer on screen the whole time, a camera gliding over it, scene layers crossfading on top. Nothing cuts. The terminal scene replays real session lines through `src/cast.ts`. |
+| `src/cast.ts` | Replay of a `.cast` into screen text (same rules as `cast_text.py`). |
+| `music.json`, `MUSIC.md`, `scripts/make_music.py` | The music bed, generated from `src/timeline.json` (not committed). |
+| `test/` | Replay vs transcripts; timeline, graph and capture agree; music is documented. |
 
 ## The captures
 
@@ -69,17 +68,17 @@ its `add .` step to fail, because that failure is what it records. A refusal exi
 
 ```bash
 npm ci --ignore-scripts                     # no install scripts are needed
-npm run fetch-music                         # public/music/gymnopedie-1.ogg, sha256-checked
+npm run graph                               # src/graph.json from vault/ (needs gaiafield; committed, rerun only if vault/ changes)
+npm run music                               # public/music/explainer-bed.wav from src/timeline.json
 npm test && npm run typecheck
-python3 scripts/check_storyboard.py <path>/STORYBOARD.md   # the locked slice 01 storyboard
-npm run render                              # out/explainer.mp4: 1920x1080 H.264 + AAC, 118 s
+npm run render                              # out/explainer.mp4: 1920x1080 H.264 + AAC, 93 s
 ```
 
-The first render downloads Chrome Headless Shell into `node_modules/.remotion/`. Terminal text is set in Menlo
-(macOS); on another system the fallback monospace font may wrap long lines slightly differently.
+The first render downloads Chrome Headless Shell into `node_modules/.remotion/`. Labels are set in DIN Condensed
+and terminal text in Menlo (both ship with macOS); elsewhere the fallback fonts change the look slightly.
 
-Changing what the video says means amending the locked storyboard first, then copying the changed cells into
-`storyboard.json`; `check_storyboard.py` fails until the two agree.
+Changing what the video says means editing `src/timeline.json`: the labels, and the scene and cue times the music
+follows. Rerun `npm run music` after a time changes.
 
 **Licence:** Remotion is free for individuals and companies of up to three people; larger companies need a
 [company licence](https://www.remotion.dev/license).
