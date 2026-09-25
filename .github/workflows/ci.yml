@@ -22,6 +22,7 @@ jobs:
       contract: ${{ steps.filter.outputs.contract }}
       evals: ${{ steps.filter.outputs.evals }}
       rust: ${{ steps.filter.outputs.rust }}
+      video: ${{ steps.filter.outputs.video }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -33,6 +34,7 @@ jobs:
               - '.github/workflows/release-binaries.yml'
               - 'core/**'
               - 'plugins/**'
+              - 'video/**/*.py'
               - 'pyproject.toml'
               - 'uv.lock'
             contract:
@@ -49,6 +51,32 @@ jobs:
               - 'crates/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
+            video:
+              - '.github/workflows/ci.yml'
+              - 'video/**'
+
+  video:
+    needs: changes
+    if: needs.changes.outputs.video == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: video
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: video/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run typecheck
 
   python:
     needs: changes

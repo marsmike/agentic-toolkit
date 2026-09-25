@@ -1,0 +1,7 @@
+$ cd agentic-toolkit && uv run toolkit engines install
+Using CPython 3.14.7 interpreter at: /opt/homebrew/opt/python@3.14/bin/python3.14
+Creating virtual environment at: .venv
+      Built toolkit-core @ file:///private/tmp/newcomer/agentic-toolkit/core
+Installed 8 packages in 5ms
+  farsight   installed farsight-v0.1.2 -> /private/tmp/newcomer/.local/share/agentic-toolkit/bin/farsight
+  gaiafield  installed gaiafield-v0.2.0 -> /private/tmp/newcomer/.local/share/agentic-toolkit/bin/gaiafield

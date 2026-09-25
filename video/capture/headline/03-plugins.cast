@@ -1,0 +1,9 @@
+{"version": 2, "width": 120, "height": 32, "timestamp": 1790271933, "command": "claude plugin marketplace add marsmike/agentic-toolkit"}
+[0.11131, "o", "\u001b7\u001b[r\u001b8\u001b[?25h"]
+[0.113361, "o", "Adding\u001b[8Gmarketplace\u2026\r\r\n"]
+[0.129588, "o", "\u001b[?25l"]
+[1.374945, "o", "\r\u001b[1ASSH \u001b[6Got configured,\u001b[21Gcloning\u001b[29Gvia\u001b[33GHTTPS:\u001b[40Ghttps://github.com/marsmike/agentic-toolkit.git\r\r\nRefreshing\u001b[12Gmarketplace\u001b[24Gcache\u001b[30G(timeout:\u001b[40G120s)\u2026\r\r\nCloning\u001b[9Grepository\u001b[20G(timeout:\u001b[30G120s):\u001b[37Ghttps://github.com/marsmike/agentic-toolkit.git\r\r\nClone\u001b[7Gcomplete,\u001b[17Gvalidating\u001b[28Gmarketplace\u2026\r\r\nCleaning\u001b[10Gup\u001b[13Gold\u001b[17Gmarketplace\u001b[29Gcache\u2026\r\r\n\u2714\u001b[3GSuccessfully\u001b[16Gadded\u001b[22Gmarketplace:\u001b[35Gagentic-toolkit\u001b[51G(declared\u001b[61Gin\u001b[64Guser\u001b[69Gsettings)\r\r\n"]
+[1.376191, "o", "\u001b[?25h"]
+[1.376295, "o", "\u001b(B\u000f\u001b[?1016l\u001b[?1006l\u001b[?1003l\u001b[?1002l\u001b[?1000l\u001b[>4m\u001b[?1004l\u001b[?2031l\u001b[?2004l\u001b[<u\u001b[?25h\u001b7\u001b[r\u001b8"]
+[1.376571, "o", "\u001b[?25h"]
+[1.551549, "o", "\u001b[?25h"]

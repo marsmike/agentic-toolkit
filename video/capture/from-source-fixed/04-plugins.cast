@@ -1,0 +1,9 @@
+{"version": 2, "width": 120, "height": 32, "timestamp": 1790271961, "command": "cd agentic-toolkit && claude plugin marketplace add ./"}
+[0.120346, "o", "\u001b7\u001b[r\u001b8\u001b[?25h"]
+[0.122646, "o", "Adding\u001b[8Gmarketplace\u2026\r\r\n"]
+[0.137538, "o", "\u001b[?25l"]
+[0.137708, "o", "\r\u001b[1A\u2714 Successfully \u001b[17Gdded\u001b[22Gmarketplace:\u001b[35Gagentic-toolkit\u001b[51G(declared\u001b[61Gin\u001b[64Guser\u001b[69Gsettings)\r\r\n"]
+[0.137846, "o", "\u001b[?25h"]
+[0.137962, "o", "\u001b(B\u000f\u001b[?1016l\u001b[?1006l\u001b[?1003l\u001b[?1002l\u001b[?1000l\u001b[>4m\u001b[?1004l\u001b[?2031l\u001b[?2004l\u001b[<u\u001b[?25h\u001b7\u001b[r\u001b8"]
+[0.138084, "o", "\u001b[?25h"]
+[0.32708, "o", "\u001b[?25h"]

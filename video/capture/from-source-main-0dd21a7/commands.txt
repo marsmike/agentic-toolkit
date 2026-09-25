@@ -1,0 +1,5 @@
+git clone https://github.com/marsmike/agentic-toolkit
+cd agentic-toolkit
+uv run toolkit engines install
+uv run toolkit demo
+claude plugin marketplace add ./

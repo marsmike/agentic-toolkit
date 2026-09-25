@@ -1,0 +1,15 @@
+$ toolkit demo
+vault: /tmp/agentic-toolkit-demo-38i3qqqr/vault (scaffolded temp mini-vault (no repo checkout found))
+
+[1/4 vault scan] pure Python, no engines required — the same scan `toolkit doctor` runs
+  3 active note(s) across 02_Projects/03_Areas/04_Resources
+
+[2/4 farsight query] `farsight query "graph"` — Rust BM25 search over active notes
+  1.376  04_Resources/Concepts/Knowledge-Graphs.md
+
+[3/4 gaiafield graph] `gaiafield stats` + one `neighbors` call — your wikilinks as a queryable graph
+  nodes=3 edges=4
+  neighbors of 04_Resources/Concepts/Knowledge-Graphs.md: 03_Areas/Demo-Area.md, 04_Resources/Concepts/BM25-Search.md
+
+[4/4 inferred candidates] report-only semantic similarity — never auto-applied, always a human decision
+  no inferred candidates anywhere in the vault — likely cause: a highly-linked corpus (every plausible pair already has an extracted wikilink) or gaiafield's gates filtering out every pair as too weak, not a broken binary
