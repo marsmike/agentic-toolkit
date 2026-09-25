@@ -12,6 +12,7 @@ enrichment never blocks a capture. `TOOLKIT_READWISE_ENRICH=0` turns it off.
 """
 from __future__ import annotations
 
+import http.client
 import ipaddress
 import json
 import os
@@ -51,19 +52,64 @@ def public(url: str) -> bool:
     doesn't resolve is refused. [earned: 2026-09-25, Copilot review of PR #33 — SSRF]"""
     try:
         parts = urlsplit(url)
-        host = parts.hostname
+        host, port = parts.hostname, parts.port  # an out-of-range port raises here, and is refused
     except ValueError:
         return False
     if parts.scheme not in ("http", "https") or not host:
         return False
     try:
-        infos = socket.getaddrinfo(host, parts.port or (443 if parts.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+        infos = socket.getaddrinfo(host, port or (443 if parts.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
     except (OSError, UnicodeError):
         return False
     try:
         return bool(infos) and all(ipaddress.ip_address(i[4][0].split("%")[0]).is_global for i in infos)
     except ValueError:
         return False
+
+
+def _global(addr: str) -> bool:
+    try:
+        return ipaddress.ip_address(addr.split("%")[0]).is_global
+    except ValueError:
+        return False
+
+
+class _PeerChecked:
+    """Check the address actually connected to, so a name that resolved to a public address for
+    `public()` and to a private one at connect time (DNS rebinding) is refused before any request
+    is sent. Skipped behind a configured proxy: the peer is then the proxy, which resolves the
+    name itself. [earned: 2026-09-25, Copilot review of PR #37]"""
+    def connect(self) -> None:
+        super().connect()  # type: ignore[misc]
+        peer = self.sock.getpeername()[0]  # type: ignore[attr-defined]
+        if not getattr(self, "_tunnel_host", None) and not _global(peer):
+            self.sock.close()  # type: ignore[attr-defined]
+            raise OSError(f"connected to a non-public address: {peer}")
+
+
+class _CheckedHTTP(_PeerChecked, http.client.HTTPConnection):
+    pass
+
+
+class _CheckedHTTPS(_PeerChecked, http.client.HTTPSConnection):
+    pass
+
+
+class _CheckedHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):  # noqa: ANN001 — urllib's signature
+        return self.do_open(_CheckedHTTP, req)
+
+
+class _CheckedHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):  # noqa: ANN001 — urllib's signature
+        return self.do_open(_CheckedHTTPS, req, context=self._context)
+
+
+def _opener(redirects: urllib.request.HTTPRedirectHandler) -> urllib.request.OpenerDirector:
+    # Behind a proxy the proxy connects, not us: keep urllib's own handlers there.
+    if urllib.request.getproxies():
+        return urllib.request.build_opener(redirects)
+    return urllib.request.build_opener(_CheckedHTTPHandler, _CheckedHTTPSHandler, redirects)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -79,7 +125,7 @@ class _PublicRedirects(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-_OPENER = urllib.request.build_opener(_PublicRedirects)
+_OPENER = _opener(_PublicRedirects())
 
 
 def enabled() -> bool:
@@ -90,7 +136,7 @@ def resolve(url: str) -> str | None:
     """Where a t.co link redirects to, from its Location header; None if it can't be read."""
     if not public(url):
         return None
-    opener = urllib.request.build_opener(_NoRedirect)
+    opener = _opener(_NoRedirect())
     req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "curl/8"})
     try:
         opener.open(req, timeout=TIMEOUT)

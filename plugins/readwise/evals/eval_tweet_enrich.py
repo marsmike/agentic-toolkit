@@ -81,9 +81,21 @@ def run(vault: Path) -> dict:
         problems.append(f"partial: status {p['status']}")
 
     for bad in ("http://127.0.0.1/x", "http://169.254.169.254/latest/meta-data", "http://10.1.2.3/",
-                "http://localhost:8080/", "file:///etc/passwd", "https://[bad"):
+                "http://localhost:8080/", "file:///etc/passwd", "https://[bad", "https://example.com:99999/x"):
         if te.public(bad) or te.get(bad) is not None or te.get_bytes(bad) is not None or te.resolve(bad) is not None:
             problems.append(f"safety: {bad} was not refused")
+    import http.server
+    import threading
+    srv = http.server.HTTPServer(("127.0.0.1", 0), http.server.BaseHTTPRequestHandler)
+    threading.Thread(target=srv.handle_request, daemon=True).start()
+    conn = te._CheckedHTTP("127.0.0.1", srv.server_address[1], timeout=2)
+    try:
+        conn.connect()
+        problems.append("safety: a connection that landed on loopback was not refused (rebinding)")
+    except OSError:
+        pass
+    finally:
+        srv.server_close()
     if te.external_links("see https://[not-a-host and https://github.com/acme/widget") != ["https://github.com/acme/widget"]:
         problems.append("safety: a malformed URL was not ignored")
     blocker = Path(__import__("tempfile").mkdtemp()) / "not-a-dir"
