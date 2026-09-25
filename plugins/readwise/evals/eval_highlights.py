@@ -78,6 +78,10 @@ def run(vault: Path) -> dict:
                     "> Sustained fifty tokens a second for code" not in body or "*my note:* check this on the M5" not in body \
                     or "*Note (2026-09-12):* Try this on the M5 Max" not in body:
                 problems.append(f"capture/note: content of {p_cap}")
+            # Numeric order across a string "7" and ints 1, 2; the note (no location, 0) comes first.
+            marks = ["Try this on the M5 Max", "Sustained fifty tokens", "The second highlight", "and then much more"]
+            if [body.find(m) for m in marks] != sorted(body.find(m) for m in marks) or -1 in [body.find(m) for m in marks]:
+                problems.append("capture: highlights not in location order")
             if "h5" not in (fm.get("readwise_highlight_ids") or []) and not any(r["doc_id"] == "h5" and r.get("capture") for r in rows):
                 problems.append("prefix: a highlight matched only by its first words was not captured")
         if not any("Unseen-Doc" in c for c in caps):
