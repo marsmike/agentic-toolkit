@@ -10,6 +10,8 @@ In a git sandbox with a `pipeline …` commit an hour old:
 7. dlq       — an open DLQ note created today is a problem; an older open one is listed in the facts only
 8. exit      — the CLI exits 1 on a problem and 0 when ok
 9. notify    — `notification` names every kind and is cut to 600 characters however many problems there are
+10. stats    — `facts.week` counts the window's runs and what they distilled; the Sunday-evening check carries a
+              `weekly_digest` (≤ 600 chars) and any other time it is empty
 """
 from __future__ import annotations
 
@@ -123,6 +125,16 @@ def run(vault: Path) -> dict:
         for i in range(6):
             (dlq / f"long-{i}.md").unlink()
         (sandbox / "00_Memory" / "pipeline-state.json").write_text(json.dumps({"attempts": {}, "parked": []}), encoding="utf-8")
+        r = watchdog.check(sandbox, now)
+        wk = r["facts"].get("week") or {}
+        if wk.get("runs") != 4 or wk.get("distilled") != 13 or wk.get("failed") != 1 or wk.get("runs_expected") != 56:
+            problems.append(f"stats: week {wk}")
+        sunday = (now + timedelta(days=(6 - now.weekday()) % 7)).replace(hour=20, minute=58)
+        d = watchdog.check(sandbox, sunday)["weekly_digest"]
+        if not d.startswith("TheVoid, week to") or "runs" not in d or len(d) > watchdog.NOTIFY_CHARS:
+            problems.append(f"stats: digest {d[:60]!r}")
+        if watchdog.check(sandbox, sunday + timedelta(days=1))["weekly_digest"] != "":
+            problems.append("stats: a Monday check must carry no digest")
         cli = subprocess.run([sys.executable, str(scripts_dir / "watchdog.py"), "--json"], capture_output=True, text=True, check=False,
                              env={**os.environ, "TOOLKIT_VAULT": str(sandbox)})
         if cli.returncode != 1 or not json.loads(cli.stdout)["problems"]:

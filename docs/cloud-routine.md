@@ -97,7 +97,9 @@ A second routine, **Pipeline watchdog**, answers what the pipeline routine canno
 started, died, or keeps failing. It runs `plugins/obsidian/scripts/watchdog.py` between pipeline
 runs and sends one notification only when something is wrong: no `pipeline …` commit for more than
 4 h, a failure in the last run's summary, parked captures, more than a batch waiting, or a DLQ note
-less than a day old. It reads the vault and changes nothing. [earned: 2026-09-25, owner's request —
+less than a day old. It reads the vault and changes nothing. Its `facts.week` carries the last
+seven days as numbers (runs, distilled, imported, what the radar judged, rated strong and
+promoted, rising interests), and the Sunday evening check sends them as a digest. [earned: 2026-09-25, owner's request —
 "alert me if something is not working"; that day an OpenRouter key died between two runs]
 
 Its instruction is one line, and this file holds the prompt it points at:
@@ -115,6 +117,8 @@ nothing, print no environment value.
 3. If "ok" is true: finish with one line, `OK <facts.last_run>: <facts.last_summary>`, and send nothing.
    If "ok" is false: send ONE push notification whose text is the result's `notification` field,
    exactly as printed (the script already cut it to 600 characters), then finish with that text.
+   Whenever `weekly_digest` is non-empty (the Sunday evening check): send it as a push notification
+   of its own, exactly as printed, in addition to the above.
 ```
 
 Settings: attach both repositories as sources (the vault checkout is what it reads); schedule

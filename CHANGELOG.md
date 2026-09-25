@@ -4,6 +4,14 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **What's moving.** The dashboard gets a "What's moving" section from the radar's ledgers (per
+  interest: worth / strong / promoted for the selected range, rising markers, strong items per
+  ISO week stacked by top interest, the top feed items with their fate: promoted, in vault, or
+  strong-but-not-promoted); the run report gets "What the feeds brought today"; the watchdog's
+  `facts.week` carries seven days of numbers and the Sunday evening check sends them as a digest.
+  All from `radar_ledger.py`, a reader of the cross-plugin ledgers. [earned: 2026-09-25, owner's
+  request — "I need to see what is moving out there"; the radar's daily note sat unseen in 00_Memory]
+
 - **`promote_per_day` is a radar profile key** (default 5, the old constant). The judgment
   thresholds stay policy in code; how many strong items a day may enter Reader is the owner's
   appetite. [earned: 2026-09-25 — 93 items rated strong in a week, the fixed cap of five let

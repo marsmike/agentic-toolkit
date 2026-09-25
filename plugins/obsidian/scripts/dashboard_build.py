@@ -12,6 +12,8 @@ back into Obsidian (`obsidian://open`).
              window; `processed_date_estimated: true` notes (a backfilled legacy date) are left out
     source   what the note came from, by its `source` address: tweet, article, video, paper, repo,
              podcast, or own (no address)
+    radar    what the feeds brought (radar_ledger): worth-or-strong items, per-interest counts, strong per
+             ISO week, rising interests; the page filters them by the same range as the notes
     runs     the pipeline's commits in the window (`git log --grep=^pipeline`), with their counts and
              what each imported and what became of it (imports_log.py, the data behind Imports.md)
     inbox    captures waiting in 01_Capture/
@@ -31,6 +33,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import imports_log
+import radar_ledger
 from map_build import _date, _one_line, _tags
 from vault_utils import atomic_write, contained, discover_notes, profile_value, read_frontmatter, require_vault
 
@@ -120,7 +123,8 @@ def build(vault: Path, today: date) -> dict:
             "today": today.isoformat(), "window": WINDOW_DAYS, "inbox": inbox(vault),
             "report": str(profile_value(vault, "report_artifact_url") or ""),
             "notes": notes(vault, since), "runs": runs(vault, since, imports),
-            "missing": sum(1 for r in imports for it in r["items"] if it["fate"]["status"] == "missing")}
+            "missing": sum(1 for r in imports for it in r["items"] if it["fate"]["status"] == "missing"),
+            "radar": radar_ledger.load(vault, since, today)}
 
 
 def render(data: dict) -> str:
