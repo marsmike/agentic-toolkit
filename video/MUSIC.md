@@ -6,7 +6,7 @@ so there is no licence to check and no attribution to give.
 
 **What it is:** calm and understated. A warm pad in D major (Dmaj9, Bm9, Gmaj9, Asus2, one chord every two bars), a
 soft plucked arpeggio from the vault scene on, and a quiet sub pulse from the plugins scene to the end card. No
-drums and no drops. It is loud enough to carry the film (about -17 LUFS before the render's 0.8 volume), never
+drums and no drops. It is loud enough to carry the film (about -18 LUFS before the render's 0.8 volume), never
 louder than the picture.
 
 **How it follows the picture:** it reads `src/timeline.json`, the file the video reads. 80 BPM puts one bar at

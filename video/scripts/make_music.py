@@ -85,8 +85,8 @@ def pad() -> np.ndarray:
                 for d in (det, det * 2.3):
                     ph = rng.uniform()
                     v = 2 * ((f * 2 ** (d / 12) * t + ph) % 1) - 1
-                    out[a:b, side] += v * env * 0.022
-            out[a:b] += (np.sin(2 * np.pi * f * t) * env * 0.012)[:, None]         # a little sine body
+                    out[a:b, side] += v * env * 0.016
+            out[a:b] += (np.sin(2 * np.pi * f * t) * env * 0.009)[:, None]         # a little sine body
     return sosfilt(butter(2, 140, "high", fs=SR, output="sos"), out, axis=0)  # the pulse owns the low end
 
 
