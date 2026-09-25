@@ -37,7 +37,8 @@ INBOX_LIMIT = 25           # pipeline_run.DEFAULT_BATCH: more than one batch wai
 NOTIFY_CHARS = 600         # a push notification's budget; the text is cut here, never by the routine
 STATS_DAYS = 7             # the rolling window of `facts.week`
 RUNS_PER_DAY = 8           # the pipeline's cadence (every 3 h): what a full week of runs looks like
-DIGEST_WEEKDAY, DIGEST_HOUR = 6, 20  # Sunday, the 20:58 UTC check only (23:58 runs too): the digest goes out once
+DIGEST_WEEKDAY, DIGEST_HOUR, DIGEST_MINUTE = 6, 20, 50  # Sunday, the 20:58 UTC check (20:50–20:59, allowing for
+                                                        # start-up); the 23:58 check runs too and must not repeat it
 FAIL_WORDS = ("failed", "build failed", "git-ignored", "missing", "not attempted", "refused")
 
 
@@ -122,7 +123,8 @@ def check(vault: Path, now: datetime, max_age_hours: float = MAX_AGE_HOURS) -> d
         problems.append({"kind": "dlq", "detail": f"{len(new_notes)} new DLQ note(s): " + "; ".join(new_notes[:5])})
 
     facts["week"] = week_stats(vault, now)
-    digest = weekly_digest(facts["week"], now) if now.weekday() == DIGEST_WEEKDAY and now.hour == DIGEST_HOUR else ""
+    digest = (weekly_digest(facts["week"], now)
+              if now.weekday() == DIGEST_WEEKDAY and now.hour == DIGEST_HOUR and now.minute >= DIGEST_MINUTE else "")
     return {"ok": not problems, "checked_at": now.isoformat(timespec="minutes"), "problems": problems, "facts": facts,
             "notification": notification(problems), "weekly_digest": digest}
 

@@ -117,7 +117,7 @@ nothing, print no environment value.
 3. If "ok" is true: finish with one line, `OK <facts.last_run>: <facts.last_summary>`, and send nothing.
    If "ok" is false: send ONE push notification whose text is the result's `notification` field,
    exactly as printed (the script already cut it to 600 characters), then finish with that text.
-   Whenever `weekly_digest` is non-empty (the Sunday 20:58 UTC check only): send it as a push notification
+   Whenever `weekly_digest` is non-empty (only the Sunday 20:58 UTC check, judged by the clock): send it as a push notification
    of its own, exactly as printed, in addition to the above.
 ```
 
