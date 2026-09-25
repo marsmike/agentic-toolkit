@@ -45,7 +45,8 @@ def run(vault: Path) -> dict:
                              _hl("h2", "P", "The second highlight", note="check this on the M5"),
                              _hl("h3", "Q", "A highlight on an unseen doc"),
                              _hl("h4", "P", "Already quoted in a vault note, word for word"),
-                             _hl("h5", "P", "Already quoted in a vault note, word for word, and then much more"),
+                             {**_hl("h5", "P", "Already quoted in a vault note, word for word, and then much more"),
+                              "highlight_location": "7"},  # Reader mixes numbers and strings
                              _hl("h6", "R", "On a document Reader can't return right now")],
                "note": [{"id": "n7", "parent_id": "P", "category": "note", "content": "",
                          "notes": "Try this on the M5 Max", "created_at": "2026-09-12T08:00:00+00:00"}]}

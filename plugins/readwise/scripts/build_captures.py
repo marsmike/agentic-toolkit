@@ -269,7 +269,16 @@ def write_highlights_capture(vault: Path, parent: dict[str, Any], highlights: li
         body += ["*The document itself is no longer in Reader: these highlights are all that is left of it. "
                  "Keep them whole, and find the source by their text if it matters.*", ""]
     body += [f"## My highlights ({len(highlights)})", ""]
-    for h in sorted(highlights, key=lambda h: (h.get("highlight_location") or 0, h.get("created_at") or "")):
+    def position(h: dict[str, Any]) -> tuple[float, str]:
+        # Reader gives `highlight_location` as a number or a string. [earned: 2026-09-25 correction
+        # run — sorting a mix raised TypeError and stopped ingest]
+        try:
+            loc = float(h.get("highlight_location") or 0)
+        except (TypeError, ValueError):
+            loc = 0.0
+        return loc, str(h.get("created_at") or "")
+
+    for h in sorted(highlights, key=position):
         text = (h.get("content") or "").strip()
         if h.get("category") == "note" or not text:
             body += [f"- *Note ({(h.get('created_at') or '')[:10]}):* {(h.get('notes') or text).strip()}", ""]
