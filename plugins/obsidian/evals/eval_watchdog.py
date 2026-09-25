@@ -135,6 +135,10 @@ def run(vault: Path) -> dict:
             problems.append(f"stats: digest {d[:60]!r}")
         if watchdog.check(sandbox, sunday + timedelta(days=1))["weekly_digest"] != "":
             problems.append("stats: a Monday check must carry no digest")
+        if watchdog.check(sandbox, sunday.replace(hour=23))["weekly_digest"] != "":
+            problems.append("stats: the Sunday 23:58 check must not send the digest a second time")
+        if watchdog.check(sandbox, sunday.replace(minute=5))["weekly_digest"] != "":
+            problems.append("stats: a manual check at 20:05 on Sunday must not send the digest")
         cli = subprocess.run([sys.executable, str(scripts_dir / "watchdog.py"), "--json"], capture_output=True, text=True, check=False,
                              env={**os.environ, "TOOLKIT_VAULT": str(sandbox)})
         if cli.returncode != 1 or not json.loads(cli.stdout)["problems"]:

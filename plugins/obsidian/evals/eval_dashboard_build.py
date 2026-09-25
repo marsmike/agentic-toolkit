@@ -83,6 +83,7 @@ def run(vault: Path) -> dict:
                  "feed": "LWN", "kind": "news", "p": {"agent-memory": 0.1}, "worth": [], "strong": [], "in_vault": None}]
         (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
         (rd / "promoted.jsonl").write_text(json.dumps({"canonical": "example.org/strong", "date": today.isoformat()}) + "\n", encoding="utf-8")
+        import radar_ledger
         data = dashboard_build.build(sandbox, today)
         rad = data.get("radar") or {}
         if rad.get("counts") != {"judged": 3, "worth": 2, "strong": 1, "promoted": 1} or rad.get("today") != {"judged": 2, "strong": 1, "promoted": 1}:
@@ -91,6 +92,27 @@ def run(vault: Path) -> dict:
             problems.append(f"radar: items {rad.get('items')}")
         if rad.get("interests", {}).get("agent-memory", {}).get("name") != "Agent Memory" or rad["interests"]["agent-memory"]["strong"] != 1:
             problems.append(f"radar: interests {rad.get('interests')}")
+        wk = lambda d: "{}-W{:02d}".format(*d.isocalendar()[:2])  # noqa: E731
+        # the quiet-week path: with no current-week rows at all, the week is still a (zero) column
+        (rd / "state.jsonl").write_text(json.dumps({**rows[1], "run": (today - timedelta(days=21)).isoformat(), "strong": ["agent-memory"]}) + "\n", encoding="utf-8")
+        quiet = radar_ledger.load(sandbox, (today - timedelta(days=83)).isoformat(), today)
+        if wk(today) not in quiet.get("weeks", {}) or quiet["weeks"][wk(today)] != {} or list(quiet["weeks"])[-1] != wk(today):
+            problems.append(f"radar: the current week must be the last, zero column when quiet, got {list(quiet.get('weeks', {}))}")
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        # rising: earlier weeks [2, 4] (median 3), this week 5 → rising; this week 4 → not (needs ≥ 1.5 × 3)
+        hist = [(today - timedelta(weeks=3), 2), (today - timedelta(weeks=2), 4), (today - timedelta(weeks=1), 4)]
+        extra = [{"run": (d - timedelta(days=d.weekday())).isoformat(), "canonical": f"e/{i}-{j}", "url": "", "title": "t", "feed": "f", "kind": "paper",
+                  "p": {"agent-memory": 0.9}, "worth": ["agent-memory"], "strong": ["agent-memory"], "in_vault": None}
+                 for i, (d, n) in enumerate(hist[:2]) for j in range(n)]
+        this = [{**extra[0], "canonical": f"now/{j}", "run": today.isoformat()} for j in range(5)]
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in extra + this), encoding="utf-8")
+        r2 = radar_ledger.load(sandbox, (today - timedelta(days=83)).isoformat(), today)
+        if r2["rising"] != ["agent-memory"]:
+            problems.append(f"radar: 5 strong against a median of 3 must be rising, got {r2['rising']}")
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in extra + this[:4]), encoding="utf-8")
+        if radar_ledger.load(sandbox, (today - timedelta(days=83)).isoformat(), today)["rising"]:
+            problems.append("radar: 4 strong against a median of 3 must not be rising")
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
         run = next((r for r in data["runs"] if r.get("run") == "2026-09-25 13:06"), {})
         fates = [(i["title"], i["status"], i["notes"]) for i in run.get("items", [])]
         if fates != [("Wait", "waiting", []), ("04_Resources/Eval-Dash-Paper.md", "known", ["04_Resources/Eval-Dash-Paper.md"]),

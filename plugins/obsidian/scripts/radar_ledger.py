@@ -1,6 +1,7 @@
 """Read the radar's ledgers for the vault's own views: what the feeds brought, what the judge rated,
 what was promoted. Read-only, from `00_Memory/radar/state.jsonl` and `promoted.jsonl`, the
-cross-plugin ledgers contract/KNOWLEDGE_API.md names (never radar's code: plugins depend on
+cross-plugin ledgers contract/KNOWLEDGE_API.md names, using only the fields that contract lists
+(`worth`, `feed` and `kind` were added to it for this reader; never radar's code: plugins depend on
 core/contract only). Interest ids are slugs of the names in the radar profile's interests note;
 Todoist epics carry `epic-` ids. [earned: 2026-09-25, owner's request — "I also need to see what
 is moving out there": the radar's daily note sat in 00_Memory where nothing showed it]
@@ -134,13 +135,16 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
                           "top": top, "strong": strong, "worth": worth, "promoted": promoted,
                           "in_vault": bool(r.get("in_vault"))})
     items.sort(key=lambda it: (it["day"], it["p"]), reverse=True)
-    week_labels = sorted(weeks)[-8:]
-    this_week = week_labels[-1] if week_labels else ""
+    y, w, _ = today.isocalendar()
+    this_week = f"{y}-W{w:02d}"
+    weeks.setdefault(this_week, Counter())  # a quiet week is a zero column, and never mistaken for an older one
+    week_labels = sorted(k for k in weeks if k <= this_week)[-8:]
     rising: list[str] = []
     if len(week_labels) > RISING_MIN_WEEKS:
         for iid in {i for w in week_labels for i in weeks[w]}:
             earlier = sorted(weeks[w].get(iid, 0) for w in week_labels[:-1])
-            median = earlier[len(earlier) // 2] if earlier else 0
+            median = (earlier[len(earlier) // 2] if len(earlier) % 2 else
+                      (earlier[len(earlier) // 2 - 1] + earlier[len(earlier) // 2]) / 2) if earlier else 0
             now = weeks[this_week].get(iid, 0)
             if now >= RISING_MIN_STRONG and now >= RISING_FACTOR * max(median, 1):
                 rising.append(iid)

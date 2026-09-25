@@ -37,7 +37,8 @@ INBOX_LIMIT = 25           # pipeline_run.DEFAULT_BATCH: more than one batch wai
 NOTIFY_CHARS = 600         # a push notification's budget; the text is cut here, never by the routine
 STATS_DAYS = 7             # the rolling window of `facts.week`
 RUNS_PER_DAY = 8           # the pipeline's cadence (every 3 h): what a full week of runs looks like
-DIGEST_WEEKDAY, DIGEST_HOURS = 6, range(18, 24)  # Sunday, the 20:58 UTC check: the week's digest goes out once
+DIGEST_WEEKDAY, DIGEST_HOUR, DIGEST_MINUTE = 6, 20, 50  # Sunday, the 20:58 UTC check (20:50–20:59, allowing for
+                                                        # start-up); the 23:58 check runs too and must not repeat it
 FAIL_WORDS = ("failed", "build failed", "git-ignored", "missing", "not attempted", "refused")
 
 
@@ -122,23 +123,26 @@ def check(vault: Path, now: datetime, max_age_hours: float = MAX_AGE_HOURS) -> d
         problems.append({"kind": "dlq", "detail": f"{len(new_notes)} new DLQ note(s): " + "; ".join(new_notes[:5])})
 
     facts["week"] = week_stats(vault, now)
-    digest = weekly_digest(facts["week"], now) if now.weekday() == DIGEST_WEEKDAY and now.hour in DIGEST_HOURS else ""
+    digest = (weekly_digest(facts["week"], now)
+              if now.weekday() == DIGEST_WEEKDAY and now.hour == DIGEST_HOUR and now.minute >= DIGEST_MINUTE else "")
     return {"ok": not problems, "checked_at": now.isoformat(timespec="minutes"), "problems": problems, "facts": facts,
             "notification": notification(problems), "weekly_digest": digest}
 
 
 def week_stats(vault: Path, now: datetime) -> dict:
-    """The last STATS_DAYS as numbers: runs and what they distilled (from the `pipeline …` commits),
+    """The last STATS_DAYS calendar days (today and the six before it, one boundary for every
+    source) as numbers: runs and what they distilled (from the `pipeline …` commits),
     what came in (the imports log), what the feeds brought (the radar ledgers). Derived every time
     from the vault; nothing is persisted, so the watchdog stays a reader. [earned: 2026-09-25,
     owner's request — "the monitoring job can collect stats too"]"""
-    since = now - timedelta(days=STATS_DAYS)
+    first_day = now.date() - timedelta(days=STATS_DAYS - 1)  # today and the six dates before it, for every source
+    since = datetime.combine(first_day, datetime.min.time(), tzinfo=UTC)
     log = _git(vault, "log", f"--since={since.isoformat()}", "--grep=^pipeline", "--format=%s")
     runs = [s for s in log.splitlines() if s.strip()]
     distilled = sum(_counts(s).get("distilled", 0) for s in runs)
     failed = sum(_counts(s).get("failed", 0) for s in runs)
-    imported = sum(len(r["items"]) for r in imports_log.load(vault) if r["run"][:10] >= since.date().isoformat())
-    radar = radar_ledger.load(vault, since.date().isoformat(), now.date())
+    imported = sum(len(r["items"]) for r in imports_log.load(vault) if r["run"][:10] >= first_day.isoformat())
+    radar = radar_ledger.load(vault, first_day.isoformat(), now.date())
     top = next(iter(radar["interests"]), "")
     return {"days": STATS_DAYS, "runs": len(runs), "runs_expected": STATS_DAYS * RUNS_PER_DAY, "distilled": distilled,
             "failed": failed, "imported": imported, "radar_judged": radar["counts"].get("judged", 0),
