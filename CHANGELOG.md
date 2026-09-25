@@ -2,6 +2,25 @@
 
 Every release entry links the change to the research or the dated failure that motivated it — this file is the public ratchet.
 
+## [Unreleased] — R12, enriched tweets and a dashboard
+
+- **Tweets are enriched at ingest** (`plugins/readwise/scripts/tweet_enrich.py`): `t.co` links are
+  expanded in place and listed in `links:`, and up to three linked pages are excerpted into a
+  `## Linked` section (GitHub repos through the API and README, arXiv papers through the API,
+  any other page by title, description and main text). Images and video posters are kept, a
+  quoted post is named. Stdlib, fixed timeouts; a failure only marks `enrichment: partial`.
+  [earned: 2026-09-25 — tweets are 47% of Readwise captures; 17 of 42 in September held only
+  t.co links, a screenshot prompt arrived as nothing, ~16 read "Your browser does not support
+  the video tag."]
+- **Distill has tweet rules**: a pointer tweet becomes a note about the thing it points at
+  (named for it, `tool-landmark` / `research-finding`, `sources:` with the links); a thread or
+  field report keeps the author's claim; `## Linked` is material fetched from the capture's own
+  links, so invariant 9 holds.
+- **`Dashboard.html`** (`dashboard_build.py`, a fourth generator in `end`): twelve weeks of
+  distilling in one self-contained page — today / yesterday / 7 / 30 days, per day by source, a
+  twelve-week heatmap, domains, kinds, search, the notes (opening in Obsidian) and the runs.
+  Notes with a backfilled `processed_date_estimated: true` stay out.
+
 ## [Unreleased] — R12, the vault from a cloud session
 
 A Claude cloud task runs in this repo, where the code and skills are, and reaches the vault through

@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 import pdf_extract
+import tweet_enrich
 from vault_utils import find_capture_by_doc_id, unique_path, write_dlq_note, write_frontmatter
 
 STUB_CHARS = 200        # less real text than this is not the article (a short X post via RSS has ~270)
@@ -65,13 +66,32 @@ def _slugify(text: str, maxlen: int = 70) -> str:
     return (slug or "untitled")[:maxlen].rstrip("-")
 
 
-def _html_to_md_basic(html: str) -> str:
+# Avatars and emoji glyphs in Reader's tweet HTML are chrome, not content.
+MEDIA_SKIP = re.compile(r"profile_images|/emoji/|abs\.twimg\.com")
+
+
+def _media(match: re.Match) -> str:
+    src = match.group(1)
+    return "" if MEDIA_SKIP.search(src) or src.startswith("data:") else f" ![]({src}) "
+
+
+def _html_to_md_basic(html: str, keep_media: bool = False) -> str:
     """Last-resort HTML→MD when no richer cleanup tool is available. Deliberately tiny —
-    a full readability pipeline is out of scope; see README's dropped-components table."""
+    a full readability pipeline is out of scope; see README's dropped-components table.
+
+    `keep_media` (tweets) keeps images as `![](src)` and a video as its poster plus a marker,
+    since a tweet's point often sits in a screenshot. [earned: 2026-09-25 — a prompt shared as a
+    screenshot reached the capture as nothing, and ~16 September tweet captures read "Your
+    browser does not support the video tag."]"""
     if not html:
         return ""
     h = re.sub(r"<script.*?</script>", "", html, flags=re.S | re.I)
     h = re.sub(r"<style.*?</style>", "", h, flags=re.S | re.I)
+    if keep_media:
+        h = re.sub(r'<video[^>]*?poster="([^"]+)"[^>]*>.*?</video>',
+                   lambda m: _media(m) + "*(video: watch it at the source)*\n", h, flags=re.S | re.I)
+        h = re.sub(r"<video.*?</video>", "\n*(video: watch it at the source)*\n", h, flags=re.S | re.I)
+        h = re.sub(r'<img[^>]*?src="([^"]+)"[^>]*>', _media, h, flags=re.I)
     h = re.sub(r"<br\s*/?>", "\n", h, flags=re.I)
     h = re.sub(r"</p>", "\n\n", h, flags=re.I)
     h = re.sub(r"<li[^>]*>", "- ", h, flags=re.I)
@@ -81,6 +101,9 @@ def _html_to_md_basic(html: str) -> str:
     h = re.sub(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', r"[\2](\1)", h, flags=re.S | re.I)
     h = re.sub(r"<[^>]+>", "", h)
     h = unescape(h)
+    h = h.replace("Your browser does not support the video tag.", "*(video: watch it at the source)*")
+    # A quoted tweet arrives as a link with no text: say what it is.
+    h = re.sub(r"\[\s*\]\((https?://[^)]+/status/[^)]+)\)", r"Quoted post: <\1>", h)
     return re.sub(r"\n\s*\n\s*\n+", "\n\n", h).strip()
 
 
@@ -147,7 +170,10 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
     # conversion, its page count and hash reach the capture. `extract_pdf()` itself degrades to
     # `extractor: "reader"` on a bad/missing URL, so it is always safe to call for this category.
     pdf_info = pdf_extract.extract_pdf(source_url) if category == "pdf" else None
-    text = pdf_info["text"] if pdf_info and pdf_info["text"] else _html_to_md_basic(html)
+    text = pdf_info["text"] if pdf_info and pdf_info["text"] else _html_to_md_basic(html, keep_media=category == "tweet")
+    enriched = tweet_enrich.enrich(summary, text, _html_to_md_basic) if category == "tweet" and tweet_enrich.enabled() else None
+    if enriched:
+        summary, text = enriched["summary"], enriched["text"]
     stub = is_stub(text, category)
     fm = {
         "source": source_url,
@@ -161,6 +187,8 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
         "pdf_sha256": pdf_info.get("sha256") if pdf_info else None,
         "extractor": pdf_info.get("extractor") if pdf_info else None,
         "content": "stub" if stub else None,
+        "links": (enriched["links"] or None) if enriched else None,
+        "enrichment": enriched["status"] if enriched and enriched["status"] != "none" else None,
         **(provenance or {}),
         "tags": ["readwise", category, *(["radar"] if (provenance or {}).get("via") == "radar" else [])],
     }
@@ -190,6 +218,8 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
                        "Fetch the source before distilling.", ""]
     body_lines.append(text if text else "_(no body content returned by the API for this item)_")
     body_lines.append("")
+    if enriched:
+        body_lines += tweet_enrich.linked_section(enriched["linked"])
     if notes:
         body_lines += ["## My notes", "", notes, ""]
     body_lines += [

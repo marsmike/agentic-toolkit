@@ -27,6 +27,7 @@ EVAL_MODULES = (
     "eval_ingest",
     "eval_pdf_convert",
     "eval_pdf_scheme",
+    "eval_tweet_enrich",
 )
 
 
@@ -41,6 +42,8 @@ def main() -> int:
     # Keys come from the environment only, as before: the key-file fallback (vault_utils.secret)
     # would hand a "no key" case the developer's real ~/.env.
     os.environ["TOOLKIT_KEYS_FILE"] = os.devnull
+    # Evals never touch the network: tweet enrichment is tested with fakes (eval_tweet_enrich).
+    os.environ["TOOLKIT_READWISE_ENRICH"] = "0"
     evals_dir = Path(__file__).resolve().parent
     if str(evals_dir) not in sys.path:
         sys.path.insert(0, str(evals_dir))

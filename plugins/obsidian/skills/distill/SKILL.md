@@ -63,6 +63,25 @@ L1 enrichment (what it is, who published it, the link), never dropped.
 [earned: 2026-09-24, two clips held "Create a free account" and "This page does not exist"; a
 third, longer than ingest's wall check, held someone else's LinkedIn feed]
 
+**A tweet is usually a pointer.** Ingest expands its `t.co` links in place, lists them in
+`links:`, and puts an excerpt of up to three linked pages in `## Linked` (`enrichment: full`,
+or `partial` when a link didn't resolve or a page didn't load). Distill from all of it, the
+same way every run:
+- The tweet points at something (a repo, a paper, a release, an article) → the note is about
+  *that thing*: title it by the thing, not by the tweet; `kind: tool-landmark` for a tool,
+  model or release, `research-finding` for a paper or result; `source:` the tweet,
+  `sources:` the tweet plus every link the note uses; credit the author in one line. If the
+  dossier says a note already covers the thing, enrich that note (L1) instead.
+- The tweet says its own thing (a thread, a field report, a take) → the note is the claim in
+  the author's words, condensed in order; `kind: field-report` for hands-on experience.
+- A screenshot (`![](https://pbs.twimg.com/media/…)`) may hold the point: say so and keep its
+  link. A `*(video: …)*` marker means the point is at the source: say that, don't guess.
+- `Quoted post:` is context, not the claim, unless the tweet only adds "this".
+- `## Linked` was fetched by ingest from the capture's own links, so using it keeps invariant 9;
+  it is material like the rest. Don't fetch further links yourself.
+[earned: 2026-09-25 — tweets are 47% of Readwise captures; 17 of 42 in September reached distill
+with only t.co links, and their notes were thin or found the linked thing "by search"]
+
 ## Invariants
 
 1. **Two phases, one checkpoint.** Propose (what you learned, where it goes, what it links
