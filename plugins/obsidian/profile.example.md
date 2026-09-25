@@ -14,6 +14,7 @@ inference_model: null
 judgment_backend: jev
 judgment_base_url: https://openrouter.ai/api
 judgment_model: jev-1.13-20260917
+report_artifact_url: null
 enrichment_targets: []
 tags:
   - domain/toolkit-meta
@@ -40,6 +41,9 @@ order (env var → this note → shipped default).
   resolution. `inference_backend` is `ollama` (default, talks to a local Ollama server) or
   `openai-compatible` (any OpenAI-chat-compatible endpoint). Leave `inference_model` unset and the
   LLM-assisted checks report a clear "no model configured" skip rather than guessing one.
+- **`report_artifact_url`** — the claude.ai artifact (`https://claude.ai/artifact/…`) the cloud
+  routine republishes `00_Memory/last-run-report.html` to after every successful run; the
+  dashboard links it. Unset: the report is still written, nothing is published.
 - **`judgment_backend` / `judgment_base_url` / `judgment_model`** — the typed-judgment backend
   `scripts/distill_judge.py` asks for advisory probabilities during a distill run (is this found
   note really related, which enrichment level, which folder, does this capture add anything over

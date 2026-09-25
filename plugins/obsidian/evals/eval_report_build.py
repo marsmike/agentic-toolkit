@@ -3,9 +3,10 @@
 1. contract — a <title> first, no doctype/html/head/body tags, no script
 2. items    — the run's imported item is listed with its source link, its expanded links and the
               note it became (found by its source even when the manifest names it in prose)
-3. safe     — a title holding markup is escaped
+3. safe     — a title holding markup is escaped; a `javascript:` link in a capture never becomes a link
 4. quiet    — a run that imported nothing says so and shows the last run that did
 5. notes    — a note added in the working tree since HEAD is listed as written this run
+6. vitals   — the vault's note count and the distilled-per-day chart are on the page
 """
 from __future__ import annotations
 
@@ -37,7 +38,7 @@ def run(vault: Path) -> dict:
         arch = sandbox / "05_Archive" / "Readwise-Captures-2026-09"
         arch.mkdir(parents=True, exist_ok=True)
         (arch / "Readwise-Tweet-x--FULLCAPTURE.md").write_text(
-            "---\nsource: https://x.com/a/status/42?s=12\ncategory: tweet\nvia: clip\nlinks:\n- https://github.com/acme/widget\n"
+            "---\nsource: https://x.com/a/status/42?s=12\ncategory: tweet\nvia: clip\nlinks:\n- https://github.com/acme/widget\n- javascript:alert(1)\n"
             "media:\n- 04_Resources/Attachments/Tweets/t-1.jpg\n---\n\n# <b>Bold</b> & widgets\n", encoding="utf-8")
         (arch / "README.md").write_text("- `Readwise-Tweet-x--FULLCAPTURE.md` — new note on the widget. Distilled 2026-09-25.\n",
                                         encoding="utf-8")
@@ -59,10 +60,14 @@ def run(vault: Path) -> dict:
                 problems.append(f"items: missing {want!r}")
         if "<b>Bold</b>" in page or "&lt;b&gt;Bold&lt;/b&gt; &amp; widgets" not in page:
             problems.append("safe: title not escaped")
-        if "This run imported nothing new" not in page or "Imported on 2026-09-25 13:06" not in page:
+        if "javascript:" in page:
+            problems.append("safe: a javascript: link reached the page")
+        if "Quiet run" not in page or "What came in on 2026-09-25 13:06" not in page:
             problems.append("quiet: the empty run does not fall back to the last run that imported")
         if "Eval Report New" not in page:
             problems.append("notes: the note written this run is not listed")
+        if "notes in the vault" not in page or 'aria-label="Notes distilled per day' not in page:
+            problems.append("vitals: note count or chart missing")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
