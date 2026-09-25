@@ -283,7 +283,7 @@ def iter_captures(vault: Path, prefix: str = "Readwise-") -> list[Path]:
     capture_dir = vault / "01_Capture"
     if not capture_dir.is_dir():
         return []
-    return sorted(p for p in capture_dir.glob(f"{prefix}*.md") if p.is_file())
+    return sorted(p for p in contained(capture_dir.glob(f"{prefix}*.md"), vault) if p.is_file())
 
 
 def find_capture_by_doc_id(vault: Path, doc_id: str, prefix: str = "Readwise-") -> Path | None:

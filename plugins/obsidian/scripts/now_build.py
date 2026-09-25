@@ -27,7 +27,7 @@ from pathlib import Path
 
 from map_build import _date, _one_line
 from pipeline_run import STATE, _order
-from vault_utils import atomic_write, discover_notes, read_frontmatter, require_vault, root_active_notes
+from vault_utils import atomic_write, contained, discover_notes, read_frontmatter, require_vault, root_active_notes
 
 NOW = "Now.md"
 BOARD = "Boards/Pipeline.md"
@@ -104,7 +104,7 @@ def stuck(vault: Path) -> tuple[list[str], list[str]]:
     except json.JSONDecodeError:
         parked = []
     dlq = []
-    for p in sorted((vault / "00_Memory" / "dlq").glob("*.md")):
+    for p in contained(sorted((vault / "00_Memory" / "dlq").glob("*.md")), vault):
         fm, _ = read_frontmatter(p)
         if str(fm.get("status", "active")) == "active":
             dlq.append(p.relative_to(vault).as_posix())
@@ -112,7 +112,7 @@ def stuck(vault: Path) -> tuple[list[str], list[str]]:
 
 
 def inbox(vault: Path, parked: list[str]) -> list[str]:
-    captures = [p for p in (vault / "01_Capture").glob("*.md") if p.is_file()]
+    captures = [p for p in contained((vault / "01_Capture").glob("*.md"), vault) if p.is_file()]
     ordered = sorted(captures, key=lambda p: _order(vault, p))
     return [p.relative_to(vault).as_posix() for p in ordered if p.relative_to(vault).as_posix() not in parked]
 

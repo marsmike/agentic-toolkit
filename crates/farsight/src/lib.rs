@@ -149,14 +149,18 @@ fn shellexpand_home(value: &str) -> String {
 /// root-level files, so they're never considered here.
 pub fn discover_notes(vault: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
+    let canon = vault_canon(vault);
     for folder in ACTIVE_CONTENT_FOLDERS {
         let root = vault.join(folder);
-        if root.is_dir() {
-            walk_dir(&root, &mut found);
+        if root.is_dir() && inside_vault(&root, &canon) {
+            walk_dir(&root, &canon, &mut found);
         }
     }
     if let Ok(entries) = std::fs::read_dir(vault) {
         for entry in entries.flatten() {
+            if !admissible(&entry, &canon) {
+                continue;
+            }
             let path = entry.path();
             let name = entry.file_name();
             let name = name.to_string_lossy();
@@ -177,12 +181,38 @@ pub fn discover_notes(vault: &Path) -> Vec<PathBuf> {
     found
 }
 
-fn walk_dir(dir: &Path, found: &mut Vec<PathBuf>) {
+/// A linked `.md` file or folder that resolves outside the vault is not vault content: following
+/// it would pull an external file into the results. Linked folders are never entered (as in the
+/// Python walkers, which do not follow them, and so no link loop can recurse); a linked file counts
+/// only if it resolves inside the vault. [earned: 2026-09-25, Copilot review of #28]
+fn inside_vault(path: &Path, vault_canon: &Path) -> bool {
+    std::fs::canonicalize(path)
+        .map(|p| p.starts_with(vault_canon))
+        .unwrap_or(false)
+}
+
+fn vault_canon(vault: &Path) -> PathBuf {
+    std::fs::canonicalize(vault).unwrap_or_else(|_| vault.to_path_buf())
+}
+
+/// Plain entries are inside by construction; only a link needs resolving.
+fn admissible(entry: &std::fs::DirEntry, vault_canon: &Path) -> bool {
+    match entry.file_type() {
+        Ok(t) if t.is_symlink() => !entry.path().is_dir() && inside_vault(&entry.path(), vault_canon),
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
+fn walk_dir(dir: &Path, vault_canon: &Path, found: &mut Vec<PathBuf>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
     };
     for entry in entries.flatten() {
+        if !admissible(&entry, vault_canon) {
+            continue;
+        }
         let path = entry.path();
         let name = entry.file_name();
         let name = name.to_string_lossy();
@@ -190,7 +220,7 @@ fn walk_dir(dir: &Path, found: &mut Vec<PathBuf>) {
             if name.starts_with('.') || EXCLUDE_DIRS.contains(&name.as_ref()) {
                 continue;
             }
-            walk_dir(&path, found);
+            walk_dir(&path, vault_canon, found);
         } else if name.ends_with(".md") && !name.starts_with('.') {
             found.push(path);
         }

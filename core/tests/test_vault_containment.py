@@ -116,6 +116,31 @@ def test_radar_and_readwise_indexes_skip_symlinks_out_of_the_vault(vault, tmp_pa
     assert not any("Planted" in v for v in sources.values()), sources
 
 
+def test_generated_and_plugin_capture_lists_skip_symlinks_out_of_the_vault(vault, tmp_path):
+    # Copilot's third review of #28: Now.md's inbox (now_build), radar's clips and readwise's own
+    # capture list each globbed 01_Capture without the containment check.
+    cap = vault / "01_Capture"
+    cap.mkdir()
+    (vault / "00_Memory").mkdir()
+    (cap / "Readwise-Real.md").write_text("---\nreadwise_doc_id: 111\n---\n\n# Real\n", encoding="utf-8")
+    (tmp_path / "outside" / "clip.md").write_text("---\nreadwise_doc_id: 999\n---\n\n# Private\n", encoding="utf-8")
+    (cap / "Readwise-Planted.md").symlink_to(tmp_path / "outside" / "clip.md")
+    inbox = _module("obsidian", "now_build").inbox(vault, [])
+    assert "01_Capture/Readwise-Real.md" in inbox and not any("Planted" in p for p in inbox), inbox
+
+    def names(plugin: str, code: str) -> list[str]:
+        out = subprocess.run([sys.executable, "-c", code, str(vault)], cwd=REPO_ROOT / "plugins" / plugin / "scripts",
+                             capture_output=True, text=True, check=True).stdout
+        return json.loads(out)
+
+    clips = names("radar", "import json, sys; from pathlib import Path; import clips\n"
+                           "print(json.dumps([p.name for p in clips._candidate_paths(Path(sys.argv[1]))]))")
+    assert "Readwise-Real.md" in clips and "Readwise-Planted.md" not in clips, clips
+    caps = names("readwise", "import json, sys; from pathlib import Path; import vault_utils\n"
+                             "print(json.dumps([p.name for p in vault_utils.iter_captures(Path(sys.argv[1]))]))")
+    assert caps == ["Readwise-Real.md"], caps
+
+
 def test_a_malformed_pdf_url_is_refused_not_raised():
     pdf = _module("readwise", "pdf_extract")
     bad = "http://[::1"  # urlsplit raises ValueError on a broken IPv6 literal
