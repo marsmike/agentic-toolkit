@@ -39,6 +39,9 @@ matters reaches you.
 ## Pick your path
 
 **🌱 New here — "what does this actually do for me?"**
+
+[Watch the 1:33 explainer (MP4 download)](https://github.com/marsmike/agentic-toolkit/releases/download/explainer-1/explainer.mp4).
+
 No accounts, no API keys — three commands, then a 60-second real demo:
 
 ```bash
