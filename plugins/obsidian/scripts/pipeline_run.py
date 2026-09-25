@@ -235,7 +235,37 @@ def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
 
 
 def _git(vault: Path, *args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, check=False)
+    # A staged file git takes for text but that is not UTF-8 must not crash the run. [earned:
+    # 2026-09-25 — a 3-byte image stub with no NUL made `diff --cached` raise UnicodeDecodeError]
+    return subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, errors="replace", check=False)
+
+
+def lost_media(vault: Path, rows: list[dict]) -> dict[str, list[str]]:
+    """{"ignored": [...], "missing": [...]}: media files the run's captures name that git will not
+    carry, or that are not there. An image saved into a git-ignored path leaves a cloud container
+    with nothing, and the note that embeds it dangles everywhere else. [earned: 2026-09-25 — 111 of
+    130 recovered tweet screenshots never reached git: `*.JPG` in .gitignore also matched `.jpg` on
+    a case-insensitive checkout, and nothing said so]"""
+    paths: list[str] = []
+    for r in rows:
+        f = imports_log._capture_file(vault, str(r.get("capture") or ""))
+        if f is not None:
+            fm, _ = read_frontmatter(f)
+            paths += [m for m in (fm.get("media") or []) if isinstance(m, str)]
+    paths = list(dict.fromkeys(paths))
+    def present_in_vault(p: str) -> bool:
+        try:  # a symlink loop or an unreadable path resolves to an error: that file is not there
+            return inside(vault / p, vault) and (vault / p).is_file()
+        except (OSError, RuntimeError):
+            return False
+    missing = [p for p in paths if not present_in_vault(p)]
+    present = [p for p in paths if p not in missing]
+    ignored: list[str] = []
+    if present and (vault / ".git").exists():
+        run = subprocess.run(["git", "-C", str(vault), "check-ignore", "--stdin", "-z"], input="\0".join(present) + "\0",
+                             capture_output=True, text=True, check=False)
+        ignored = [p for p in run.stdout.split("\0") if p]
+    return {"ignored": ignored, "missing": missing}
 
 
 def _dlq_once(vault: Path, slug: str, **note: Any) -> None:
@@ -378,8 +408,24 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     # The run is still committed (it is the undo for the notes it wrote); the failure is reported
     # and gets a DLQ note. [earned: 2026-09-23, PR #20 and #24 reviews]
     # What this run imported goes in the log before the pages that show it are built.
+    lost: dict[str, list[str]] = {"ignored": [], "missing": []}
     if marks is not None:
-        imports_log.record(vault, now.strftime("%Y-%m-%d %H:%M"), _rows(vault / LEDGERS["ingested"])[marks.get("ingested", 0):])
+        rows_in = _rows(vault / LEDGERS["ingested"])[marks.get("ingested", 0):]
+        imports_log.record(vault, now.strftime("%Y-%m-%d %H:%M"), rows_in)
+        lost = lost_media(vault, rows_in)
+    if lost["ignored"] or lost["missing"]:
+        _dlq_once(vault, slug="media-not-in-git", title="Images a capture names will not leave this machine",
+                  what_happened=(f"git-ignored: {', '.join(lost['ignored'])}. " if lost["ignored"] else "")
+                               + (f"not on disk: {', '.join(lost['missing'])}." if lost["missing"] else ""),
+                  why_recorded="A capture's `media:` files are the screenshots ingest saved; ignored by git they vanish with "
+                               "this checkout, and every note that embeds them dangles elsewhere.",
+                  resolution="Un-ignore the folder in the vault's .gitignore (mind `*.JPG` on a case-insensitive checkout, "
+                             "which also matches `.jpg`), re-run ingest for the capture if the files are gone, then mark "
+                             "this note resolved.",
+                  confidence="high")
+        summary += "; " + ", ".join(x for x in (
+            f"{len(lost['ignored'])} image(s) git-ignored" if lost["ignored"] else "",
+            f"{len(lost['missing'])} image(s) missing" if lost["missing"] else "") if x)
     failed_builds = []
     for script in GENERATORS:
         before = _snapshot(vault, GENERATORS[script])
@@ -402,6 +448,8 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
                                **({"not_attempted": untouched} if untouched else {})}
     if failed_builds:
         result["build_failed"] = failed_builds
+    if lost["ignored"] or lost["missing"]:
+        result["lost_media"] = lost
     # The lock is held through commit and push (and never staged), so no other run starts its
     # pull while this one is still writing to git. [earned: 2026-09-23, PR #24 review]
     try:

@@ -307,7 +307,7 @@ hand; see its README.
 | `now_build` (R12) | In a git sandbox: New/Enriched come from `pipeline …` commits only, the radar shows this week's strong items, Stuck holds parked captures and open DLQ notes, the board parses as Kanban, every embedded view exists in `Vault.base` |
 | `imports_log` (R12) | A run's rows are recorded with their capture's title and source; distilled, dropped, duplicate, waiting, known, archived and missing are told apart; the page is one file, newest run first, missing called out on top |
 | `dashboard_build` (R12) | Only notes with a real `processed_date` in the window (not `unknown`, not `processed_date_estimated`); source type, kind and domains per note; a `pipeline …` commit's counts; a description holding `</script>` can't break out of the embedded JSON |
-| `pipeline_run` (R11, R12) | Clips first, the lock, one commit per run, parking after two failures; a staged key-shaped string refuses the commit with one DLQ note that never holds the key; with a bare upstream a second clone's commit arrives at `begin`, `end` pushes, and a conflict skips the run and keeps the local edit |
+| `pipeline_run` (R11, R12) | Clips first, the lock, one commit per run, parking after two failures; an image a capture names that git ignores or that is gone gets a DLQ note and a summary count; a staged key-shaped string refuses the commit with one DLQ note that never holds the key; with a bare upstream a second clone's commit arrives at `begin`, `end` pushes, and a conflict skips the run and keeps the local edit |
 
 Read-only evals run directly against the resolved vault; anything that writes runs
 against a throwaway copy (`evals/_sandbox.py`) so the real `./vault` is never touched.
