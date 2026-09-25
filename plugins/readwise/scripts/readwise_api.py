@@ -146,7 +146,7 @@ def reader_get(doc_id: str, token: str | None = None) -> dict:
         raise ReadwiseAPIError(f"reader_get({doc_id}) failed ({status}): {data}", status=status)
     results = (data or {}).get("results") or []
     if not results:
-        raise ReadwiseAPIError(f"reader_get({doc_id}): no document returned")
+        raise ReadwiseAPIError(f"reader_get({doc_id}): no document returned", status=404)
     return results[0]
 
 

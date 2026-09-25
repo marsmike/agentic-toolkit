@@ -10,6 +10,8 @@
 7. prefix   — a highlight whose first words are in the vault but not the whole text is captured
 8. retry    — a parent that can't be fetched records nothing, so the next run retries it
 9. same run — a parent captured in the same run is named as where the highlights go
+11. gone    — a parent Reader no longer has (404) still gets its highlights captured, marked as all
+              that is left, with the highlight's Reader link as source
 10. crash   — a highlights capture a crashed run left without ledger rows is recorded, not written twice
 """
 from __future__ import annotations
@@ -55,7 +57,7 @@ def run(vault: Path) -> dict:
         rw.reader_list_all = lambda category=None, **_: listing.get(category, [])
         def fetch(doc_id: str) -> dict:
             if doc_id not in parents:
-                raise rw.ReadwiseAPIError("unavailable", status=503)
+                raise rw.ReadwiseAPIError("gone", status=404) if doc_id == "G" else rw.ReadwiseAPIError("unavailable", status=503)
             return parents[doc_id]
         ingest.fetch_full = fetch
         ingest.GET_DELAY_S = 0
@@ -111,6 +113,16 @@ def run(vault: Path) -> dict:
         after = sorted(p.name for p in (sandbox / "01_Capture").glob("Readwise-Highlights-*.md"))
         if before != after or s3.get("recovered") != 6:
             problems.append(f"crash: files {len(before)}->{len(after)}, {s3}")
+        # --- 11. gone: the parent was deleted in Reader ---
+        listing["highlight"].append({**_hl("h8", "G", "The last trace of a deleted page"), "url": "https://read.readwise.io/read/h8"})
+        rows4, s4 = ingest.ingest_highlights(sandbox, items, {**ledger, **{r["doc_id"]: r for r in rows3}}, {}, {}, NOW)
+        g = [r for r in rows4 if r["doc_id"] == "h8" and r.get("capture")]
+        if not g or s4.get("parent_gone") != 1:
+            problems.append(f"gone: {rows4}, {s4}")
+        else:
+            fm8, body8 = read_frontmatter(sandbox / g[0]["capture"])
+            if fm8.get("source") != "https://read.readwise.io/read/h8" or "all that is left of it" not in body8:
+                problems.append(f"gone: capture {fm8.get('source')}")
     finally:
         rw.reader_list_all, ingest.fetch_full, ingest.GET_DELAY_S, rw.reader_archive, ingest._pushed_paths = saved
         teardown_sandbox(sandbox)
