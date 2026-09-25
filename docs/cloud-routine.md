@@ -91,6 +91,40 @@ FINISH with one line: end's "summary" exactly as printed (it counts what came in
 ledgers), the commit, whether it was pushed, and whether the report was published. No number the scripts did not print.
 ```
 
+## Watchdog routine
+
+A second routine, **Pipeline watchdog**, answers what the pipeline routine cannot: that a run never
+started, died, or keeps failing. It runs `plugins/obsidian/scripts/watchdog.py` between pipeline
+runs and sends one notification only when something is wrong: no `pipeline …` commit for more than
+4 h, a failure in the last run's summary, parked captures, more than a batch waiting, or a DLQ note
+less than a day old. It reads the vault and changes nothing. [earned: 2026-09-25, owner's request —
+"alert me if something is not working"; that day an OpenRouter key died between two runs]
+
+Its instruction is one line, and this file holds the prompt it points at:
+
+```text
+Follow the "Watchdog prompt" in docs/cloud-routine.md (in the agentic-toolkit checkout) exactly.
+```
+
+```text
+Check the TheVoid pipeline once, then stop. Ask no questions, run no pipeline, edit and commit
+nothing, print no environment value.
+1. cd into the agentic-toolkit checkout (the directory holding docs/cloud-routine.md) and export
+   TOOLKIT_VAULT=<the TheVoid checkout: the directory holding AGENTS.md and 00_Memory/>.
+2. Run: uv run --locked --project plugins/obsidian/scripts python3 plugins/obsidian/scripts/watchdog.py --json
+3. If "ok" is true: finish with one line, `OK <facts.last_run>: <facts.last_summary>`, and send nothing.
+   If "ok" is false: send ONE push notification whose text is the result's `notification` field,
+   exactly as printed (the script already cut it to 600 characters), then finish with that text.
+```
+
+Settings: attach both repositories as sources (the vault checkout is what it reads); schedule
+`58 2-23/3 * * *` UTC — two hours after each pipeline fire (`58 */3`: a run of a full batch has
+taken up to two hours) and an hour before the next, so with the 4-hour threshold a run that never
+committed is caught at the first check after it; model Haiku 4.5
+(`claude-haiku-4-5-20251001`: a script's verdict needs no more); tools Bash and Read; push
+notifications on. The same environment as the pipeline routine, so `uv` and the git credential
+are there; no keys are needed.
+
 ## Routine settings
 
 - **Repositories:** attach both as the routine's sources: `https://github.com/marsmike/agentic-toolkit`
