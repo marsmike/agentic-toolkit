@@ -265,6 +265,9 @@ def write_highlights_capture(vault: Path, parent: dict[str, Any], highlights: li
             if source_url else f"*Source: (none — Reader document {parent.get('id')})*", ""]
     if where:
         body += [f"*The document itself is already in the vault: `{where}`. Merge these highlights there.*", ""]
+    elif parent.get("gone"):
+        body += ["*The document itself is no longer in Reader: these highlights are all that is left of it. "
+                 "Keep them whole, and find the source by their text if it matters.*", ""]
     body += [f"## My highlights ({len(highlights)})", ""]
     for h in sorted(highlights, key=lambda h: (h.get("highlight_location") or 0, h.get("created_at") or "")):
         text = (h.get("content") or "").strip()

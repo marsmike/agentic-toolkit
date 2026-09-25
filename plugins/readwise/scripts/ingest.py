@@ -246,11 +246,18 @@ def ingest_highlights(vault: Path, items: list[dict], ledger: dict[str, dict], i
                 time.sleep(GET_DELAY_S)
             try:
                 parent = fetch_full(parent_id)
-            except rw.ReadwiseAPIError:
-                # Nothing recorded: the next run retries with the document's title and source.
-                # [Copilot review of PR #38 — a source-less capture marked them done for good]
-                summary["parent_failed"] += 1
-                continue
+            except rw.ReadwiseAPIError as e:
+                if e.status != 404:
+                    # Transient: nothing recorded, the next run retries with the document's title
+                    # and source. [Copilot review of PR #38 — a source-less capture marked them done]
+                    summary["parent_failed"] += 1
+                    continue
+                # The document is gone from Reader; its highlights are all that is left of it.
+                # [earned: 2026-09-25 correction run — 49 documents deleted, their highlights kept]
+                first = _norm_text(hls[0].get("content") or hls[0].get("notes") or "")
+                parent = {"id": parent_id, "gone": True, "source_url": hls[0].get("url") or "",
+                          "title": f"a document no longer in Reader ({first[:60]}…)"}
+                summary["parent_gone"] = summary.get("parent_gone", 0) + 1
         address = norm_url(str(parent.get("source_url") or ""))
         where = (ledger.get(parent_id) or {}).get("capture") or ids.get(parent_id) or sources.get(address) or ""
         path = bc.write_highlights_capture(vault, parent, hls, where)
