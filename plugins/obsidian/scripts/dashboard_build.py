@@ -12,7 +12,8 @@ back into Obsidian (`obsidian://open`).
              window; `processed_date_estimated: true` notes (a backfilled legacy date) are left out
     source   what the note came from, by its `source` address: tweet, article, video, paper, repo,
              podcast, or own (no address)
-    runs     the pipeline's commits in the window (`git log --grep=^pipeline`), with their counts
+    runs     the pipeline's commits in the window (`git log --grep=^pipeline`), with their counts and
+             what each imported and what became of it (imports_log.py, the data behind Imports.md)
     inbox    captures waiting in 01_Capture/
 
 Note text reaches the page only as JSON and is rendered with textContent, never as HTML: a clip's
@@ -29,6 +30,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import imports_log
 from map_build import _date, _one_line, _tags
 from vault_utils import atomic_write, contained, discover_notes, read_frontmatter, require_vault
 
@@ -82,7 +84,15 @@ def notes(vault: Path, since: str) -> list[dict]:
     return sorted(out, key=lambda n: (n["day"], n["title"].lower()), reverse=True)
 
 
-def runs(vault: Path, since: str) -> list[dict]:
+def _item(it: dict) -> dict:
+    f = it["fate"]
+    return {"title": _one_line(it.get("title") or it.get("capture") or it.get("found") or it.get("doc_id", ""), 140),
+            "source": it.get("source") or "", "type": str(it.get("category") or ""), "via": it.get("via") or "",
+            "status": f["status"], "detail": _one_line(f["detail"], 220), "notes": f["notes"][:4]}
+
+
+def runs(vault: Path, since: str, imports: list[dict]) -> list[dict]:
+    imported = {r["run"]: [_item(it) for it in r["items"]] for r in imports}
     if not (vault / ".git").exists():
         return []
     git = subprocess.run(["git", "-C", str(vault), "log", f"--since={since}", "--grep=^pipeline",
@@ -92,8 +102,10 @@ def runs(vault: Path, since: str) -> list[dict]:
         when, sha, subject = (line.split("\t", 2) + ["", ""])[:3]
         m = RUN.search(subject)
         if m:
+            key = imports_log.RUN_SUBJECT.match(subject)
             out.append({"at": when, "sha": sha, "distilled": int(m.group(1)), "dropped": int(m.group(2)),
-                        "failed": int(m.group(3)), "summary": subject.split(": ", 1)[-1][:300]})
+                        "failed": int(m.group(3)), "summary": subject.split(": ", 1)[-1][:300],
+                        "run": key.group(1) if key else "", "items": imported.get(key.group(1), []) if key else []})
     return out
 
 
@@ -103,9 +115,11 @@ def inbox(vault: Path) -> int:
 
 def build(vault: Path, today: date) -> dict:
     since = (today - timedelta(days=WINDOW_DAYS - 1)).isoformat()
+    imports = imports_log.resolved(vault)
     return {"vault": vault.name, "built": datetime.now().astimezone().isoformat(timespec="minutes"),
             "today": today.isoformat(), "window": WINDOW_DAYS, "inbox": inbox(vault),
-            "notes": notes(vault, since), "runs": runs(vault, since)}
+            "notes": notes(vault, since), "runs": runs(vault, since, imports),
+            "missing": sum(1 for r in imports for it in r["items"] if it["fate"]["status"] == "missing")}
 
 
 def render(data: dict) -> str:

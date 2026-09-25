@@ -9,6 +9,9 @@
 5. partial  — an unresolvable t.co link and a page that doesn't load make the status `partial`,
               and the short link stays in the text
 6. capture  — write_capture on a tweet writes `links`, `enrichment` and a `## Linked` section
+7. media    — the media image is stored under 04_Resources/Attachments/Tweets/, embedded by vault
+              path with its original link beside it, and listed in `media:`; the video poster
+              that can't be fetched stays a link and makes the capture `partial`
 """
 from __future__ import annotations
 
@@ -34,7 +37,7 @@ PAGES = {
 HTML = ('<p>Look <img src="https://pbs.twimg.com/profile_images/1/me.jpg"> at '
         '<a href="https://t.co/repo">github.com/acme/widget</a>, <a href="https://t.co/paper">https://t.co/paper</a> '
         'and <a href="https://t.co/blog">blog</a>. Thread: https://t.co/self Join https://t.me/promo</p>'
-        '<img src="https://pbs.twimg.com/media/shot.jpg"><video poster="https://pbs.twimg.com/poster.jpg"></video>'
+        '<img src="https://pbs.twimg.com/media/shot.jpg"><video poster="https://pbs.twimg.com/ext_tw_video_thumb/1/pu/img/p.jpg"></video>'
         '<a href="https://x.com/other/status/7"> </a>')
 
 
@@ -51,7 +54,7 @@ def run(vault: Path) -> dict:
     md = bc._html_to_md_basic(HTML, keep_media=True)
     if "profile_images" in md:
         problems.append("html: avatar kept")
-    for want in ("![](https://pbs.twimg.com/media/shot.jpg)", "![](https://pbs.twimg.com/poster.jpg)",
+    for want in ("![](https://pbs.twimg.com/media/shot.jpg)", "![](https://pbs.twimg.com/ext_tw_video_thumb/1/pu/img/p.jpg)",
                  "*(video: watch it at the source)*", "Quoted post: <https://x.com/other/status/7>"):
         if want not in md:
             problems.append(f"html: missing {want!r}")
@@ -75,18 +78,24 @@ def run(vault: Path) -> dict:
         problems.append(f"partial: status {p['status']}")
 
     saved, sandbox = os.environ.get("TOOLKIT_READWISE_ENRICH"), make_sandbox(vault)
-    orig = (te.resolve, te.get)
+    orig = (te.resolve, te.get, te.get_bytes)
     try:
         os.environ["TOOLKIT_READWISE_ENRICH"] = "1"
         te.resolve, te.get = TARGETS.get, PAGES.get
+        te.get_bytes = lambda u: b"\xff\xd8\xffjpeg" if "/media/shot" in u else None
         path, _ = bc.write_capture(sandbox, {"id": "tw-enrich", "category": "tweet", "title": "Look",
                                              "author": "acme", "source_url": "https://x.com/acme/status/1",
                                              "saved_at": "2026-09-25", "html_content": HTML})
         fm, body = read_frontmatter(path)
-        if fm.get("links") != want_links or fm.get("enrichment") != "full" or "## Linked" not in body:
-            problems.append(f"capture: links={fm.get('links')} enrichment={fm.get('enrichment')}")
+        if fm.get("links") != want_links or "## Linked" not in body:
+            problems.append(f"capture: links={fm.get('links')}")
+        img = "04_Resources/Attachments/Tweets/tweet-twenrich-1.jpg"
+        if fm.get("media") != [img] or not (sandbox / img).is_file() or f"![[{img}]] ([original](" not in body:
+            problems.append(f"media: {fm.get('media')}")
+        if fm.get("enrichment") != "partial" or "![](https://pbs.twimg.com/ext_tw_video_thumb/1/pu/img/p.jpg)" not in body:
+            problems.append(f"media: unfetchable poster should stay a link, enrichment={fm.get('enrichment')}")
     finally:
-        te.resolve, te.get = orig
+        te.resolve, te.get, te.get_bytes = orig
         if saved is None:
             os.environ.pop("TOOLKIT_READWISE_ENRICH", None)
         else:

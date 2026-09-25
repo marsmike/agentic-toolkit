@@ -4,6 +4,15 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Every clipping stays in the vault.** Nothing is deleted any more: `retire_capture.py
+  --duplicate-of` archives a duplicate whole (distill invariant 6), and a tweet's images are
+  stored under `04_Resources/Attachments/Tweets/` (1200 px) and embedded by vault path, with the
+  original link beside each. [earned: 2026-09-25, owner's request — errors lose data]
+- **`Imports.md`** (`imports_log.py`): what each run imported and what became of every item,
+  runs as date-time sections, newest first, in one file; a clipping in neither inbox nor archive
+  is called out as missing. The dashboard's runs open to the same list and link to it.
+  [earned: 2026-09-25 — its first build found four captures archived by hand with no manifest line]
+
 - **Settled clippings are archived in Reader** (`ingest.archive_settled`, run by `ingest.py`):
   once a capture is retired to `05_Archive/` in the upstream branch (so the run after the one
   that distilled it) or was found already in the vault, its Reader item and its copies move to

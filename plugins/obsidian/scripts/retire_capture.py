@@ -4,6 +4,7 @@
     retire_capture.py 01_Capture/<capture>.md --note <note> [--note <note>...] \\
         --line "<what became of it, in your own words, with [[wikilinks]] to the notes>"
     retire_capture.py 01_Capture/<capture>.md --dropped "<reason, from the dossier's triage>"
+    retire_capture.py 01_Capture/<capture>.md --duplicate-of <capture, archived capture or note>
 
 Moves the capture to `05_Archive/<Origin>-Captures-<YYYY-MM>/<stem>--FULLCAPTURE.md`
 (`Origin` is the filename's own leading token, `Readwise` or `Research`), creates that
@@ -22,7 +23,12 @@ Refuses, and moves nothing:
   - `--dropped` on a clip (`via: clip`, or no `via` at all): invariant 8, the owner's own
     clips never leave without a note
   - `--line` with no `--note`: a capture archived as distilled must name the note it became
-  - neither, or both, of `--line` / `--dropped`
+  - `--duplicate-of` a path that does not exist in the vault
+  - not exactly one of `--line` / `--dropped` / `--duplicate-of`
+
+Nothing is ever deleted: a duplicate is archived whole like any other capture, its manifest line
+naming what it duplicates. [earned: 2026-09-25, owner's request — keep every clipping in the
+vault; deleting duplicates and stubs was the one way a clipping could leave without a trace]
 
 Prints one JSON object: the result on success, `{"error": ...}` on refusal (exit 1).
 """
@@ -89,9 +95,10 @@ def _validate_notes(notes: list[str], capture: Path, vault: Path) -> list[str]:
     return resolved
 
 
-def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropped: str | None) -> dict[str, Any]:
-    if bool(line) == bool(dropped):
-        raise RetireRefused("give exactly one of --line or --dropped")
+def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropped: str | None,
+           duplicate_of: str | None = None) -> dict[str, Any]:
+    if sum(map(bool, (line, dropped, duplicate_of))) != 1:
+        raise RetireRefused("give exactly one of --line, --dropped or --duplicate-of")
     if not capture.is_file():
         raise RetireRefused(f"no such capture: {capture}")
     # Resolved, not as written: `01_Capture/../../.env` or a symlink would move a file from outside
@@ -106,6 +113,10 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
     if dropped and via in OWNER_SOURCES:
         raise RetireRefused(
             f"refusing --dropped: via={via!r} is the owner's own clip (invariant 8) — it must become a note, not be dropped")
+    if duplicate_of:
+        target = vault / duplicate_of
+        if not inside(target, vault) or not target.is_file() or target.resolve() == capture.resolve():
+            raise RetireRefused(f"--duplicate-of is not another file in the vault: {duplicate_of}")
     if line and not notes:
         raise RetireRefused("--line needs at least one --note: a distilled capture names the note it became")
 
@@ -125,7 +136,9 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         if not readme.exists():
             readme.write_text(_manifest_header(origin, yyyymm, today), encoding="utf-8")
         capture.rename(dest)
-        if dropped:
+        if duplicate_of:
+            entry = f"- `{dest.name}` — **duplicate** of `{duplicate_of}`, kept whole here. Retired {today}.\n"
+        elif dropped:
             entry = f"- `{dest.name}` — **dropped** (never distilled): {dropped} Retired {today}.\n"
         else:
             entry = f"- `{dest.name}` — {line} Distilled {today}.\n"
@@ -138,7 +151,7 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         "manifest": readme.relative_to(vault).as_posix(),
         "notes": resolved_notes,
         "via": via,
-        "mode": "dropped" if dropped else "line",
+        "mode": "duplicate" if duplicate_of else "dropped" if dropped else "line",
     }
 
 
@@ -149,12 +162,13 @@ def main() -> int:
                     help="a note the capture was distilled into or enriched (repeatable; each must pass distill_check)")
     ap.add_argument("--line", help="manifest prose: what became of the capture")
     ap.add_argument("--dropped", help="manifest prose: why it was retired without a note (never for a clip)")
+    ap.add_argument("--duplicate-of", help="vault path of the capture or note this one duplicates (any via)")
     args = ap.parse_args()
     vault = require_vault()
     capture = Path(args.capture) if Path(args.capture).is_absolute() else vault / args.capture
 
     try:
-        result = retire(capture, vault, args.notes, args.line, args.dropped)
+        result = retire(capture, vault, args.notes, args.line, args.dropped, args.duplicate_of)
     except RetireRefused as e:
         print(json.dumps({"error": str(e)}, indent=2))
         return 1

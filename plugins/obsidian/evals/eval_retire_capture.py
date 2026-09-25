@@ -19,6 +19,9 @@ and its folder's manifest together, under a lock.
                   --note (a clip archived as "distilled" with no note, 2026-09-24 review CODE-1)
 7. append         — two captures retired into the same folder end with two correct, distinct
                   manifest lines (no interleaving, nothing lost)
+8. duplicate      — a clip that repeats another is archived whole with --duplicate-of (never
+                  deleted), the line names what it duplicates; a target that isn't in the vault
+                  refuses and moves nothing
 
 Offline: judgment keys are removed so distill_check's soft findability/preservation calls (which
 need a backend) never run; retire_capture only needs the hard gates, which don't.
@@ -204,6 +207,19 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 7: expected 4 manifest entries, got {len(lines)}: {lines}")
         if len({ln.split("`")[1] for ln in lines}) != 4:
             problems.append(f"phase 7: manifest entries are not all distinct captures: {lines}")
+
+        # --- 8. duplicate: kept whole, never deleted ---
+        (sandbox / "01_Capture" / "Readwise-Retire-Dup.md").write_text(_capture("clip"), encoding="utf-8")
+        try:
+            rc.retire(cap("Readwise-Retire-Dup.md"), sandbox, [], None, None, "04_Resources/No-Such-Note.md")
+            problems.append("phase 8: --duplicate-of a missing file was not refused")
+        except rc.RetireRefused:
+            pass
+        r = rc.retire(cap("Readwise-Retire-Dup.md"), sandbox, [], None, None, "04_Resources/Retire-Eval-Good.md")
+        text = readme.read_text(encoding="utf-8")
+        if r["mode"] != "duplicate" or not (sandbox / r["archived_to"]).is_file() or \
+                "**duplicate** of `04_Resources/Retire-Eval-Good.md`, kept whole here." not in text:
+            problems.append(f"phase 8: duplicate not archived as expected: {r}")
     finally:
         for k, v in saved.items():
             if v is not None:

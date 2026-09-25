@@ -34,6 +34,10 @@ MAX_RESOLVE = 12        # t.co links resolved per capture
 MAX_FETCH = 3           # linked pages excerpted per capture
 EXCERPT_CHARS = 1500
 MAX_BYTES = 1_000_000
+MEDIA_DIR = "04_Resources/Attachments/Tweets"
+MAX_MEDIA = 4           # images saved per tweet
+MAX_MEDIA_BYTES = 2_000_000
+MEDIA = re.compile(r"!\[[^\]]*\]\((https://pbs\.twimg\.com/(?:media|ext_tw_video_thumb|amplify_video_thumb|tweet_video_thumb)/[^)\s]+)\)")
 TIMEOUT = 8
 UA = "Mozilla/5.0 (compatible; agentic-toolkit-readwise/1.0)"
 
@@ -71,6 +75,56 @@ def get(url: str) -> tuple[str, str] | None:
             return ctype, resp.read(MAX_BYTES).decode("utf-8", errors="replace")
     except (urllib.error.URLError, OSError, ValueError):
         return None
+
+
+def get_bytes(url: str) -> bytes | None:
+    """An image's bytes (at most MAX_MEDIA_BYTES); None on any failure or a non-image body."""
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            if not resp.headers.get("content-type", "").startswith("image/"):
+                return None
+            data = resp.read(MAX_MEDIA_BYTES + 1)
+            return data if len(data) <= MAX_MEDIA_BYTES else None
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+def _sized(url: str) -> str:
+    """The 1200 px rendition: readable screenshots without the original's megabytes."""
+    base, _, query = url.partition("?")
+    ext = re.search(r"\.(jpe?g|png|webp)$", base)
+    if ext:
+        base, fmt = base[:ext.start()], ext.group(1)
+    else:
+        q = re.search(r"format=(\w+)", query)
+        fmt = q.group(1) if q else "jpg"
+    return f"{base}?format={'jpg' if fmt == 'jpeg' else fmt}&name=medium"
+
+
+def save_media(text: str, vault, doc_id: str, fetch_bytes: Callable[[str], bytes | None] | None = None) -> tuple[str, list[str], int]:
+    """Store the tweet's images in the vault and embed them by vault path, keeping the original
+    link beside each; a picture that can't be fetched stays a link. Returns (text, saved paths,
+    failed count). [earned: 2026-09-25, owner's request — keep every clipping whole in the vault;
+    a tweet's point often sits in a screenshot, and pbs.twimg.com links can die]"""
+    fetch_bytes = fetch_bytes or get_bytes
+    saved: list[str] = []
+    failed = 0
+    urls = list(dict.fromkeys(m.group(1) for m in MEDIA.finditer(text)))[:MAX_MEDIA]
+    for n, url in enumerate(urls, 1):
+        data = fetch_bytes(_sized(url))
+        if not data:
+            failed += 1
+            continue
+        ext = "png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "webp" if data[8:12] == b"WEBP" else "jpg"
+        slug = re.sub(r"[^A-Za-z0-9]+", "", doc_id)[:40] or "tweet"
+        rel = f"{MEDIA_DIR}/tweet-{slug}-{n}.{ext}"
+        dest = vault / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        saved.append(rel)
+        text = re.sub(r"!\[[^\]]*\]\(" + re.escape(url) + r"\)", lambda _m, r=rel, u=url: f"![[{r}]] ([original]({u}))", text)
+    return text, saved, failed
 
 
 def _host(url: str) -> str:
