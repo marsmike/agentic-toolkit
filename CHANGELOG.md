@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Settled clippings are archived in Reader** (`ingest.archive_settled`, run by `ingest.py`):
+  once a capture is retired to `05_Archive/` in the upstream branch (so the run after the one
+  that distilled it) or was found already in the vault, its Reader item and its copies move to
+  Archive, once, logged in `00_Memory/readwise-archived.jsonl`. No upstream, no archiving; never
+  a delete. [earned: 2026-09-25, owner's request — archive the clippings once they are
+  definitely in the vault]
+
 - **Tweets are enriched at ingest** (`plugins/readwise/scripts/tweet_enrich.py`): `t.co` links are
   expanded in place and listed in `links:`, and up to three linked pages are excerpted into a
   `## Linked` section (GitHub repos through the API and README, arXiv papers through the API,

@@ -52,7 +52,8 @@ RUN, in the skill's order
 - Radar: scan --since 1d --promote --todoist --json. With `td` installed (the environment's
   setup script) and TODOIST_API_TOKEN set, --todoist comments the strong items on each epic
   task itself. Once a week (Saturday): gaps --promote and weekly ("exists" is normal).
-- Readwise ingest.
+- Readwise ingest. It also archives in Reader every clipping whose capture a previous run
+  settled on the remote (its JSON `reader_archive`); nothing to do for you.
 - pipeline_run.py queue --json exactly so (no --batch), then distill every capture in the batch
   (--auto); end reports any the run left untouched. Rebuild the
   index after each note and before distill_check.
@@ -67,7 +68,7 @@ RUN, in the skill's order
   pulls and pushes. Status "refused" = a key-shaped string; the DLQ note says where.
 
 HARD RULES
-- Never delete in Reader. Never discard a clip; only radar or newsletter captures may leave
+- Never delete in Reader (ingest archives settled clippings itself; archive nothing by hand). Never discard a clip; only radar or newsletter captures may leave
   without a note.
 - Stay within the batch.
 - Never edit generated files (Index.md, Now.md, Maps/, Boards/, Log.md).
