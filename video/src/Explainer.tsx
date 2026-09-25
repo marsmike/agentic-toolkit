@@ -105,10 +105,10 @@ const inferMid = inferredPairs.reduce(
 const KEYS: [number, Cam][] = [
   [0, { x: 0, y: 0, s: 1.06, r: -2 }],
   [9, { x: 0, y: 0, s: 1.0, r: 0 }],
-  [19, { x: 0, y: 0, s: 0.9, r: 1 }],
-  [23, { x: 0, y: 360, s: 0.25, r: 0 }],
-  [31, { x: 0, y: 330, s: 0.27, r: 0 }],
-  [35, { x: 0, y: 0, s: 0.88, r: 0 }],
+  [18, { x: 0, y: 0, s: 0.9, r: 1 }],
+  [24, { x: 0, y: 360, s: 0.25, r: 0 }],
+  [30, { x: 0, y: 330, s: 0.27, r: 0 }],
+  [36, { x: 0, y: 0, s: 0.88, r: 0 }],
   [44, { x: 0, y: 0, s: 0.92, r: 0 }],
   [48, { x: focus.gx, y: focus.gy, s: 1.9, r: 0 }],
   [56, { x: focus.gx * 0.9, y: focus.gy * 0.9, s: 1.75, r: 0 }],
@@ -505,8 +505,9 @@ const Decide: React.FC = () => {
 
 // ---------------------------------------------------------------- local: the real session, big
 
-// The commands and a few key results, as recorded (session.txt line numbers).
-const SHOWN = [1, 9, 10, 15, 17, 19, 23, 26, 31, 39, 40];
+// The commands and a few key results, as recorded (session.txt line numbers). The two
+// `installed unverified` warnings stay in: the real run printed them, so the film shows them.
+const SHOWN = [1, 9, 10, 15, 16, 17, 18, 19, 23, 26, 31, 39, 40];
 const Terminal: React.FC = () => {
   const t = useT();
   const o = presence(t, "local");
