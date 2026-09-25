@@ -207,13 +207,25 @@ def ingest_highlights(vault: Path, items: list[dict], ledger: dict[str, dict], i
             listed.update({str(i["id"]): i for i in _patient(rw.reader_list_all, category=category)})
     except rw.ReadwiseAPIError as e:  # the clippings are captured already; highlights wait for the next run
         return [], {"highlights": "failed", "detail": str(e)[:200]}
+    # A capture written by a run that died before its ledger append already holds these ids:
+    # record them against it instead of capturing them twice.
+    held: dict[str, str] = {}
+    for p in contained([*(vault / "01_Capture").glob("Readwise-Highlights-*.md"),
+                        *(vault / "05_Archive").glob("*/Readwise-Highlights-*--FULLCAPTURE.md")], vault):
+        fm, _ = read_frontmatter(p)
+        for hid in fm.get("readwise_highlight_ids") or []:
+            held[str(hid)] = p.relative_to(vault).as_posix()
     kids = [i for i in listed.values() if i.get("parent_id") and i.get("category") in ("highlight", "note")
             and str(i["id"]) not in ledger]
+    today = now.date().isoformat()
+    healed = [{"doc_id": str(k["id"]), "capture": held[str(k["id"])], "via": "clip",
+               "highlight_of": str(k["parent_id"]), "date": today} for k in kids if str(k["id"]) in held]
+    kids = [k for k in kids if str(k["id"]) not in held]
     if not kids:
-        return [], {"highlights": 0}
+        return healed, {"highlights": 0, "recovered": len(healed)}
     corpus = " ".join(_norm_text(p.read_text(encoding="utf-8", errors="replace"))
                       for p in contained(vault.rglob("*.md"), vault) if p.is_file() and "/.obsidian/" not in p.as_posix())
-    today, rows = now.date().isoformat(), []
+    rows = list(healed)
     todo: dict[str, list[dict]] = {}
     for k in kids:
         # The whole highlight must be there, not a prefix. [Copilot review of PR #38]
@@ -222,7 +234,8 @@ def ingest_highlights(vault: Path, items: list[dict], ledger: dict[str, dict], i
             rows.append({"doc_id": str(k["id"]), "highlight_of": str(k["parent_id"]), "found": "text in the vault", "date": today})
         else:
             todo.setdefault(str(k["parent_id"]), []).append(k)
-    summary = {"highlights": len(kids), "already_in_vault": len(rows), "captures": 0, "parent_failed": 0}
+    summary = {"highlights": len(kids), "already_in_vault": len(rows) - len(healed), "recovered": len(healed),
+               "captures": 0, "parent_failed": 0}
     if dry_run:
         return [], {**summary, "would_capture": sum(len(v) for v in todo.values())}
     by_id = listed

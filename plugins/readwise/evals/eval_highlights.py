@@ -10,6 +10,7 @@
 7. prefix   — a highlight whose first words are in the vault but not the whole text is captured
 8. retry    — a parent that can't be fetched records nothing, so the next run retries it
 9. same run — a parent captured in the same run is named as where the highlights go
+10. crash   — a highlights capture a crashed run left without ledger rows is recorded, not written twice
 """
 from __future__ import annotations
 
@@ -103,6 +104,13 @@ def run(vault: Path) -> dict:
         ingest.archive_settled(sandbox, NOW)
         if any(a.startswith("h") for a in archived):
             problems.append(f"archive: highlights archived {archived}")
+        # --- 10. crash: the ledger lost every highlight row, the captures are still there ---
+        fresh = {k: v for k, v in ledger.items() if "highlight_of" not in v}
+        before = sorted(p.name for p in (sandbox / "01_Capture").glob("Readwise-Highlights-*.md"))
+        rows3, s3 = ingest.ingest_highlights(sandbox, items, fresh, {}, {}, NOW)
+        after = sorted(p.name for p in (sandbox / "01_Capture").glob("Readwise-Highlights-*.md"))
+        if before != after or s3.get("recovered") != 6:
+            problems.append(f"crash: files {len(before)}->{len(after)}, {s3}")
     finally:
         rw.reader_list_all, ingest.fetch_full, ingest.GET_DELAY_S, rw.reader_archive, ingest._pushed_paths = saved
         teardown_sandbox(sandbox)

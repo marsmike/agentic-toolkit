@@ -64,9 +64,17 @@ def _request(method: str, url: str, token: str, data: dict | None = None, timeou
             raw = resp.read().decode("utf-8", errors="replace")
             return resp.status, (json.loads(raw) if raw else None)
     except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", errors="replace")
-        return e.code, (json.loads(raw) if raw else {"error": raw})
-    except urllib.error.URLError as e:
+        # The status is what callers act on (429 retries); a body that won't read or parse
+        # must not turn it into a crash. [Copilot review of PR #39]
+        try:
+            raw = e.read().decode("utf-8", errors="replace")
+            return e.code, (json.loads(raw) if raw else {"error": ""})
+        except (TimeoutError, OSError, json.JSONDecodeError):
+            return e.code, {"error": f"HTTP {e.code}, unreadable body"}
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as e:
+        # A read timeout or a dropped connection is a failed request like any other, never a crash
+        # of the whole ingest. [earned: 2026-09-25 correction run — `TimeoutError: The read
+        # operation timed out` escaped and left a capture without its ledger row]
         raise ReadwiseAPIError(f"request failed: {e}. URL: {url}") from e
 
 
