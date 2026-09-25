@@ -6,6 +6,10 @@
 3. known    — a highlight whose text is already in the vault is recorded, not captured
 4. ledger   — every highlight id is a ledger row; a rerun captures nothing twice
 5. archive  — archive_settled never archives a highlight
+6. note     — a Reader note on a document is rendered as the owner's note
+7. prefix   — a highlight whose first words are in the vault but not the whole text is captured
+8. retry    — a parent that can't be fetched records nothing, so the next run retries it
+9. same run — a parent captured in the same run is named as where the highlights go
 """
 from __future__ import annotations
 
@@ -37,15 +41,22 @@ def run(vault: Path) -> dict:
     listing = {"highlight": [_hl("h1", "P", "Sustained fifty tokens a second for code"),
                              _hl("h2", "P", "The second highlight", note="check this on the M5"),
                              _hl("h3", "Q", "A highlight on an unseen doc"),
-                             _hl("h4", "P", "Already quoted in a vault note, word for word")],
-               "note": []}
+                             _hl("h4", "P", "Already quoted in a vault note, word for word"),
+                             _hl("h5", "P", "Already quoted in a vault note, word for word, and then much more"),
+                             _hl("h6", "R", "On a document Reader can't return right now")],
+               "note": [{"id": "n7", "parent_id": "P", "category": "note", "content": "",
+                         "notes": "Try this on the M5 Max", "created_at": "2026-09-12T08:00:00+00:00"}]}
     parents = {"Q": {"id": "Q", "title": "Unseen Doc", "author": "Someone", "source_url": "https://example.org/q"}}
     saved = (rw.reader_list_all, ingest.fetch_full, ingest.GET_DELAY_S, rw.reader_archive, ingest._pushed_paths)
     archived: list[str] = []
     sandbox = make_sandbox(vault)
     try:
         rw.reader_list_all = lambda category=None, **_: listing.get(category, [])
-        ingest.fetch_full = lambda doc_id: parents[doc_id]
+        def fetch(doc_id: str) -> dict:
+            if doc_id not in parents:
+                raise rw.ReadwiseAPIError("unavailable", status=503)
+            return parents[doc_id]
+        ingest.fetch_full = fetch
         ingest.GET_DELAY_S = 0
         (sandbox / "04_Resources" / "Eval-HL-Quote.md").write_text(
             "---\nstatus: distilled\n---\n# Q\n\n> Already quoted in a vault note, word for word\n", encoding="utf-8")
@@ -58,22 +69,33 @@ def run(vault: Path) -> dict:
         p_cap = next((c for c in caps if "The-Parent" in c), None)
         if p_cap:
             fm, body = read_frontmatter(sandbox / p_cap)
-            if fm.get("via") != "clip" or fm.get("readwise_highlight_ids") != ["h1", "h2"] or \
+            if fm.get("via") != "clip" or fm.get("readwise_highlight_ids") != ["h1", "h2", "h5", "n7"] or \
                     "`01_Capture/Readwise-Tweet-p-2026-09-11.md`" not in body or \
-                    "> Sustained fifty tokens a second for code" not in body or "*my note:* check this on the M5" not in body:
-                problems.append(f"capture: content of {p_cap}")
+                    "> Sustained fifty tokens a second for code" not in body or "*my note:* check this on the M5" not in body \
+                    or "*Note (2026-09-12):* Try this on the M5 Max" not in body:
+                problems.append(f"capture/note: content of {p_cap}")
+            if "h5" not in (fm.get("readwise_highlight_ids") or []) and not any(r["doc_id"] == "h5" and r.get("capture") for r in rows):
+                problems.append("prefix: a highlight matched only by its first words was not captured")
         if not any("Unseen-Doc" in c for c in caps):
             problems.append("new doc: no capture for the unseen document")
         known = [r for r in rows if r["doc_id"] == "h4"]
         if not known or known[0].get("found") != "text in the vault" or known[0].get("capture"):
             problems.append(f"known: {known}")
-        if sorted(r["doc_id"] for r in rows) != ["h1", "h2", "h3", "h4"]:
-            problems.append(f"ledger: {[r['doc_id'] for r in rows]}")
+        if sorted(r["doc_id"] for r in rows) != ["h1", "h2", "h3", "h4", "h5", "n7"] or summary.get("parent_failed") != 1:
+            problems.append(f"ledger/retry: {[r['doc_id'] for r in rows]}, {summary}")
 
         ledger.update({r["doc_id"]: r for r in rows})
+        parents["R"] = {"id": "R", "title": "Back Again", "source_url": "https://example.org/r"}
+        ledger["R"] = {"doc_id": "R", "capture": "01_Capture/Readwise-Article-r-2026-09-25.md", "via": "clip"}  # same run
         rows2, _ = ingest.ingest_highlights(sandbox, items, ledger, {}, {}, NOW)
-        if rows2:
-            problems.append(f"rerun: captured again {rows2}")
+        if [r["doc_id"] for r in rows2] != ["h6"]:
+            problems.append(f"retry/rerun: {rows2}")
+        else:
+            _, body6 = read_frontmatter(sandbox / rows2[0]["capture"])
+            if "`01_Capture/Readwise-Article-r-2026-09-25.md`" not in body6:
+                problems.append("same run: the parent's new capture is not named")
+            ledger.update({r["doc_id"]: r for r in rows2})
+            caps += [rows2[0]["capture"]]
 
         (sandbox / ingest.LEDGER).write_text("".join(json.dumps(r) + "\n" for r in ledger.values()), encoding="utf-8")
         rw.reader_archive = lambda doc_id, token=None: archived.append(doc_id) or {}

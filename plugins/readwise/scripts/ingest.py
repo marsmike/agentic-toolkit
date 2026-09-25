@@ -216,12 +216,13 @@ def ingest_highlights(vault: Path, items: list[dict], ledger: dict[str, dict], i
     today, rows = now.date().isoformat(), []
     todo: dict[str, list[dict]] = {}
     for k in kids:
-        text = _norm_text(k.get("content") or k.get("notes") or "")[:80]
+        # The whole highlight must be there, not a prefix. [Copilot review of PR #38]
+        text = _norm_text(k.get("content") or k.get("notes") or "")
         if text and text in corpus:
             rows.append({"doc_id": str(k["id"]), "highlight_of": str(k["parent_id"]), "found": "text in the vault", "date": today})
         else:
             todo.setdefault(str(k["parent_id"]), []).append(k)
-    summary = {"highlights": len(kids), "already_in_vault": len(rows), "captures": 0}
+    summary = {"highlights": len(kids), "already_in_vault": len(rows), "captures": 0, "parent_failed": 0}
     if dry_run:
         return [], {**summary, "would_capture": sum(len(v) for v in todo.values())}
     by_id = listed
@@ -233,7 +234,10 @@ def ingest_highlights(vault: Path, items: list[dict], ledger: dict[str, dict], i
             try:
                 parent = fetch_full(parent_id)
             except rw.ReadwiseAPIError:
-                parent = {"id": parent_id}
+                # Nothing recorded: the next run retries with the document's title and source.
+                # [Copilot review of PR #38 — a source-less capture marked them done for good]
+                summary["parent_failed"] += 1
+                continue
         address = norm_url(str(parent.get("source_url") or ""))
         where = (ledger.get(parent_id) or {}).get("capture") or ids.get(parent_id) or sources.get(address) or ""
         path = bc.write_highlights_capture(vault, parent, hls, where)
@@ -369,7 +373,8 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
         for it in new_items:
             v = provenance(it, senders)["via"]
             by_via[v] = by_via.get(v, 0) + 1
-        return {**result, "status": "dry-run", "by_via": by_via}
+        _, hl_plan = ingest_highlights(vault, items, ledger, ids, sources, now, dry_run=True)
+        return {**result, "status": "dry-run", "by_via": by_via, "highlights": hl_plan}
 
     written, rows, errors, missing = [], [], [], []
     today = now.date().isoformat()
@@ -396,7 +401,8 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
         if status == "written":
             written.append({"capture": capture, "via": prov["via"]})
 
-    hl_rows, hl_summary = ingest_highlights(vault, items, ledger, ids, sources, now)
+    # This run's own captures count as "where the document went" too. [Copilot review of PR #38]
+    hl_rows, hl_summary = ingest_highlights(vault, items, {**ledger, **{r["doc_id"]: r for r in rows}}, ids, sources, now)
     append_ledger(vault, known_rows + rows + hl_rows)
     result["highlights"] = hl_summary
     missing.sort()
