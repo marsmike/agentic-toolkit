@@ -235,7 +235,9 @@ def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
 
 
 def _git(vault: Path, *args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, check=False)
+    # A staged file git takes for text but that is not UTF-8 must not crash the run. [earned:
+    # 2026-09-25 — a 3-byte image stub with no NUL made `diff --cached` raise UnicodeDecodeError]
+    return subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, errors="replace", check=False)
 
 
 def lost_media(vault: Path, rows: list[dict]) -> dict[str, list[str]]:
@@ -251,7 +253,12 @@ def lost_media(vault: Path, rows: list[dict]) -> dict[str, list[str]]:
             fm, _ = read_frontmatter(f)
             paths += [m for m in (fm.get("media") or []) if isinstance(m, str)]
     paths = list(dict.fromkeys(paths))
-    missing = [p for p in paths if not inside(vault / p, vault) or not (vault / p).is_file()]
+    def present_in_vault(p: str) -> bool:
+        try:  # a symlink loop or an unreadable path resolves to an error: that file is not there
+            return inside(vault / p, vault) and (vault / p).is_file()
+        except (OSError, RuntimeError):
+            return False
+    missing = [p for p in paths if not present_in_vault(p)]
     present = [p for p in paths if p not in missing]
     ignored: list[str] = []
     if present and (vault / ".git").exists():
@@ -408,8 +415,8 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
         lost = lost_media(vault, rows_in)
     if lost["ignored"] or lost["missing"]:
         _dlq_once(vault, slug="media-not-in-git", title="Images a capture names will not leave this machine",
-                  what_happened=(f"git-ignored: {', '.join(lost['ignored'][:10])}. " if lost["ignored"] else "")
-                               + (f"not on disk: {', '.join(lost['missing'][:10])}." if lost["missing"] else ""),
+                  what_happened=(f"git-ignored: {', '.join(lost['ignored'])}. " if lost["ignored"] else "")
+                               + (f"not on disk: {', '.join(lost['missing'])}." if lost["missing"] else ""),
                   why_recorded="A capture's `media:` files are the screenshots ingest saved; ignored by git they vanish with "
                                "this checkout, and every note that embeds them dangles elsewhere.",
                   resolution="Un-ignore the folder in the vault's .gitignore (mind `*.JPG` on a case-insensitive checkout, "

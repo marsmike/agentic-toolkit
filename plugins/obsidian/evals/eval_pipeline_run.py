@@ -270,8 +270,8 @@ def run(vault: Path) -> dict:
         _git(sandbox, "config", "core.ignorecase", "true")  # a Mac checkout: *.JPG also matches .jpg
         att = sandbox / "04_Resources" / "Attachments" / "Tweets"
         att.mkdir(parents=True, exist_ok=True)
-        (att / "eval-1.jpg").write_bytes(b"\xff\xd8\xff")
-        (att / "eval-2.png").write_bytes(b"\x89PNG")
+        (att / "eval-1.jpg").write_bytes(b"\xff\xd8\xff")  # no NUL: git diffs it as text, and it is not UTF-8
+        (att / "eval-2.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00")
         capm = sandbox / "01_Capture" / "Readwise-Tweet-Media.md"
         capm.write_text("---\nsource: https://x.com/a/status/1\nmedia:\n- 04_Resources/Attachments/Tweets/eval-1.jpg\n"
                         "- 04_Resources/Attachments/Tweets/eval-2.png\n- 04_Resources/Attachments/Tweets/eval-gone.jpg\n---\n# M\n",
