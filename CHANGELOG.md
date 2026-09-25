@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **`promote_per_day` is a radar profile key** (default 5, the old constant). The judgment
+  thresholds stay policy in code; how many strong items a day may enter Reader is the owner's
+  appetite. [earned: 2026-09-25 — 93 items rated strong in a week, the fixed cap of five let
+  ~35 through and silently discarded the rest]
+
 - **A watchdog for the pipeline** (`watchdog.py`, and a second routine documented in
   `docs/cloud-routine.md`): from the vault alone it tells a healthy pipeline from a stale, hung,
   failing, parked, backlogged one or a fresh DLQ note, and the routine notifies only then.

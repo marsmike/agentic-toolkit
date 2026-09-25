@@ -125,7 +125,8 @@ def _promote(out: Path, strong: list[dict], names: dict[str, str], now: datetime
     run_date = now.date().isoformat()
     ledger = out / "promoted.jsonl"
     done = read_jsonl(ledger)
-    budget = max(0, policy.PROMOTE_PER_DAY - sum(1 for r in done if r.get("date") == run_date))
+    per_day = int(profile_value(vault, "promote_per_day", policy.PROMOTE_PER_DAY))  # shared with scan's budget
+    budget = max(0, per_day - sum(1 for r in done if r.get("date") == run_date))
     already = {r["canonical"] for r in done}
     location = str(profile_value(vault, "promote_location", "later"))
     saved, errors = 0, []

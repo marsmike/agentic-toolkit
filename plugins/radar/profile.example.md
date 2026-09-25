@@ -7,6 +7,7 @@ interests_note: 03_Areas/Trend Radar Profile.md
 todoist_project_id: ""
 todoist_sections: Doing,Next,Waiting
 promote_location: later
+promote_per_day: 5
 kagi_weekly_budget_usd: 1.00
 judgment_backend: jev
 judgment_base_url: https://openrouter.ai/api
@@ -34,6 +35,9 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
   of the task's `What:` line as gloss. Off while the id is empty or `td` is missing.
 - **`promote_location`** — where `scan --promote` moves a strong item: `later` (default),
   `shortlist` or `new`.
+- **`promote_per_day`** — how many strong items a day `scan --promote` and `gaps --promote` together
+  may save into Reader (default 5). The 0.80 "strong" bar is policy and stays in code; this is
+  the owner's appetite. Raise it when the daily radar note shows strong items the cap discarded.
 - **`kagi_weekly_budget_usd`** — `discover` stops searching once the week's Kagi spend (measured
   from the account balance, kept in `00_Memory/radar/kagi-ledger.jsonl`) would pass this.
 - **`judgment_backend`**, **`judgment_base_url`**, **`judgment_model`** — the typed-judgment
