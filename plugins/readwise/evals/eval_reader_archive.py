@@ -9,6 +9,7 @@ pushed note), E a copy of A, F archived by an earlier run.
 3. ledger      — one row each in 00_Memory/readwise-archived.jsonl
 4. rerun       — a second pass archives nothing
 5. next run    — once B is pushed, it is archived
+6. late copy   — a copy of A recorded after A was archived still follows it
 """
 from __future__ import annotations
 
@@ -94,6 +95,13 @@ def run(vault: Path) -> dict:
         ingest.archive_settled(sandbox, NOW)
         if calls != ["B"]:
             problems.append(f"next run: {calls}")
+
+        calls.clear()
+        with (sandbox / ingest.LEDGER).open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"doc_id": "G", "duplicate_of": "A"}) + "\n")
+        ingest.archive_settled(sandbox, NOW)
+        if calls != ["G"]:
+            problems.append(f"late copy: {calls}")
     finally:
         rw.reader_archive, ingest.GET_DELAY_S = saved
         teardown_sandbox(sandbox)

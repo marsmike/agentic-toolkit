@@ -233,7 +233,10 @@ def archive_settled(vault: Path, now: datetime, dry_run: bool = False) -> dict[s
         capture, found = row.get("capture") or "", row.get("found") or ""
         if (capture and Path(capture).stem in retired) or (found and found in pushed):
             settled.append(doc_id)
-    settled += [d for d, r in ledger.items() if d not in done and r.get("duplicate_of") in settled]
+    # A copy follows its original even when the original was archived by an earlier run.
+    # [earned: 2026-09-25, Copilot review of PR #34 — past the per-run cap a copy was skipped forever]
+    roots = set(settled) | done
+    settled += [d for d, r in ledger.items() if d not in done and r.get("duplicate_of") in roots]
     todo = settled[:ARCHIVE_PER_RUN]
     if dry_run:
         return {"status": "dry-run", "would_archive": len(settled)}

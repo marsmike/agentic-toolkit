@@ -5,6 +5,8 @@
 2. fields   — source type by address (x.com → tweet, arxiv → paper, none → own), domains from
               `domain/*` tags, kind (or `unsorted`)
 3. runs     — a `pipeline …` commit's counts are parsed; a hand commit is not a run
+5. imports  — a run's imported items reach its run row with their fate and notes, and a clipping
+              in neither inbox nor archive is counted as missing
 4. safe     — a description holding `</script><script>` cannot close the data element: the page
               has exactly two script elements and the payload parses back to the same data
 """
@@ -57,7 +59,19 @@ def run(vault: Path) -> dict:
                      ("commit", "-q", "--allow-empty", "-m", "pipeline 2026-09-25 13:06: 7 distilled, 1 dropped, 2 failed; in: x")):
             _git(sandbox, *args)
 
+        import imports_log
+        (sandbox / "01_Capture").mkdir(exist_ok=True)
+        (sandbox / "01_Capture" / "Readwise-Article-wait.md").write_text("---\nsource: https://e.org/w\n---\n# Wait\n", encoding="utf-8")
+        imports_log.record(sandbox, "2026-09-25 13:06", [
+            {"doc_id": "w", "capture": "01_Capture/Readwise-Article-wait.md", "via": "clip"},
+            {"doc_id": "k", "found": "04_Resources/Eval-Dash-Paper.md"},
+            {"doc_id": "m", "capture": "01_Capture/Readwise-Article-gone.md", "via": "clip"}])
         data = dashboard_build.build(sandbox, today)
+        run = next((r for r in data["runs"] if r.get("run") == "2026-09-25 13:06"), {})
+        fates = [(i["title"], i["status"], i["notes"]) for i in run.get("items", [])]
+        if fates != [("Wait", "waiting", []), ("04_Resources/Eval-Dash-Paper.md", "known", ["04_Resources/Eval-Dash-Paper.md"]),
+                     ("01_Capture/Readwise-Article-gone.md", "missing", [])] or data.get("missing") != 1:
+            problems.append(f"imports: {fates}, missing={data.get('missing')}")
         got = {n["title"]: n for n in data["notes"] if n["title"].startswith("Eval-Dash-")}
         if set(got) != {"Eval-Dash-Tweet", "Eval-Dash-Paper"}:
             problems.append(f"notes: {sorted(got)}")
