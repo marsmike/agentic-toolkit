@@ -240,12 +240,31 @@ def expand(texts: list[str], resolver: Callable[[str], str | None]) -> tuple[lis
     return out, mapping, len(found) - len(mapping)
 
 
+# X links a bare file name like `CLAUDE.md` or `setup.py` as if it were a domain (.md is Moldova,
+# .py Paraguay, .sh Saint Helena): such a link names a file, not a page the tweet points at.
+# [earned: 2026-09-25 correction run — "CLAUDE.md" and "TASKS.md" resolved to unrelated sites]
+FILENAME_HOST = re.compile(r"^[A-Za-z0-9_-]+\.(md|py|sh|rs|js|ts|go|rb|pl|cc|ai|io)$")
+FILE_WORDS = {"claude", "agents", "readme", "tasks", "skill", "skills", "memory", "todo", "plan", "notes", "gemini",
+              "changelog", "contributing", "design", "spec", "soul", "main", "index", "app", "setup", "config", "run",
+              "install", "test", "tests", "build", "deploy", "judge", "queue", "server", "client", "utils"}
+
+
+def _file_name_link(url: str) -> bool:
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return True
+    host = parts.hostname or ""
+    return (bool(FILENAME_HOST.match(host)) and host.rsplit(".", 1)[0].lower() in FILE_WORDS
+            and parts.path in ("", "/"))
+
+
 def external_links(text: str) -> list[str]:
     """Links in the text that leave X: the things the tweet points at, in order, deduplicated."""
     links = []
     for m in URL.finditer(text):
         url = m.group(0).rstrip(".,;:!?")
-        if _host(url) and _host(url) not in OWN_HOSTS | PROMO_HOSTS:
+        if _host(url) and _host(url) not in OWN_HOSTS | PROMO_HOSTS and not _file_name_link(url):
             links.append(url)
     return list(dict.fromkeys(links))
 

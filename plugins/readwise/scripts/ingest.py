@@ -188,6 +188,62 @@ def _patient(call, *args, **kwargs):
     raise AssertionError("unreachable")
 
 
+def _norm_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def ingest_highlights(vault: Path, items: list[dict], ledger: dict[str, dict], ids: dict[str, str],
+                      sources: dict[str, str], now: datetime, dry_run: bool = False) -> tuple[list[dict], dict]:
+    """Every Reader highlight or note the owner made that the vault doesn't have yet becomes part of a
+    highlights capture, one per document, whatever its age: they are the owner's own words. A
+    highlight whose text is already in the vault is recorded, not captured again. Returns (ledger
+    rows, summary). [earned: 2026-09-25 correction run — ingest skipped every child of a document;
+    101 of 123 highlights had never reached the vault]"""
+    # All of them, not only this sync's window: an old highlight is still the owner's.
+    listed = {str(i["id"]): i for i in items}
+    try:
+        for category in ("highlight", "note"):
+            time.sleep(GET_DELAY_S)
+            listed.update({str(i["id"]): i for i in _patient(rw.reader_list_all, category=category)})
+    except rw.ReadwiseAPIError as e:  # the clippings are captured already; highlights wait for the next run
+        return [], {"highlights": "failed", "detail": str(e)[:200]}
+    kids = [i for i in listed.values() if i.get("parent_id") and i.get("category") in ("highlight", "note")
+            and str(i["id"]) not in ledger]
+    if not kids:
+        return [], {"highlights": 0}
+    corpus = " ".join(_norm_text(p.read_text(encoding="utf-8", errors="replace"))
+                      for p in contained(vault.rglob("*.md"), vault) if p.is_file() and "/.obsidian/" not in p.as_posix())
+    today, rows = now.date().isoformat(), []
+    todo: dict[str, list[dict]] = {}
+    for k in kids:
+        text = _norm_text(k.get("content") or k.get("notes") or "")[:80]
+        if text and text in corpus:
+            rows.append({"doc_id": str(k["id"]), "highlight_of": str(k["parent_id"]), "found": "text in the vault", "date": today})
+        else:
+            todo.setdefault(str(k["parent_id"]), []).append(k)
+    summary = {"highlights": len(kids), "already_in_vault": len(rows), "captures": 0}
+    if dry_run:
+        return [], {**summary, "would_capture": sum(len(v) for v in todo.values())}
+    by_id = listed
+    for n, (parent_id, hls) in enumerate(todo.items()):
+        parent = by_id.get(parent_id)
+        if parent is None:
+            if n:
+                time.sleep(GET_DELAY_S)
+            try:
+                parent = fetch_full(parent_id)
+            except rw.ReadwiseAPIError:
+                parent = {"id": parent_id}
+        address = norm_url(str(parent.get("source_url") or ""))
+        where = (ledger.get(parent_id) or {}).get("capture") or ids.get(parent_id) or sources.get(address) or ""
+        path = bc.write_highlights_capture(vault, parent, hls, where)
+        capture = path.relative_to(vault).as_posix()
+        rows += [{"doc_id": str(h["id"]), "capture": capture, "via": "clip", "highlight_of": parent_id, "date": today}
+                 for h in hls]
+        summary["captures"] += 1
+    return rows, summary
+
+
 def fetch_full(doc_id: str) -> dict:
     return _patient(rw.reader_get, doc_id)
 
@@ -228,7 +284,8 @@ def archive_settled(vault: Path, now: datetime, dry_run: bool = False) -> dict[s
     ledger = read_ledger(vault)
     settled: list[str] = []
     for doc_id, row in ledger.items():
-        if doc_id in done or "duplicate_of" in row:
+        # A highlight is the owner's mark on a document, never archived on its own.
+        if doc_id in done or "duplicate_of" in row or "highlight_of" in row:
             continue
         capture, found = row.get("capture") or "", row.get("found") or ""
         if (capture and Path(capture).stem in retired) or (found and found in pushed):
@@ -339,7 +396,9 @@ def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
         if status == "written":
             written.append({"capture": capture, "via": prov["via"]})
 
-    append_ledger(vault, known_rows + rows)
+    hl_rows, hl_summary = ingest_highlights(vault, items, ledger, ids, sources, now)
+    append_ledger(vault, known_rows + rows + hl_rows)
+    result["highlights"] = hl_summary
     missing.sort()
     result |= {"written": len(written), "by_via": {v: sum(1 for w in written if w["via"] == v) for v in ("clip", "newsletter", "radar")},
                "captures": [w["capture"] for w in written]}

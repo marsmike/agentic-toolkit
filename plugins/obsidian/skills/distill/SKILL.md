@@ -82,6 +82,12 @@ same way every run:
 [earned: 2026-09-25 — tweets are 47% of Readwise captures; 17 of 42 in September reached distill
 with only t.co links, and their notes were thin or found the linked thing "by search"]
 
+**Highlights are the owner's own marks.** A `category: highlights` capture holds the owner's
+Reader highlights and notes on one document. When it names where the document already went,
+merge them into that note (L2: quote the highlight, keep the owner's note beside it, cite the
+source); otherwise distill the document from them. Never paraphrase a highlight away.
+[earned: 2026-09-25 correction run — 101 highlights back to 2023 had never reached the vault]
+
 ## Invariants
 
 1. **Two phases, one checkpoint.** Propose (what you learned, where it goes, what it links

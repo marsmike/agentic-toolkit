@@ -240,6 +240,46 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
     return dest, "written"
 
 
+def write_highlights_capture(vault: Path, parent: dict[str, Any], highlights: list[dict[str, Any]],
+                             where: str = "") -> Path:
+    """The owner's own Reader highlights (and notes) on one document, as a capture: they are the
+    owner's words and marks, so they are always a clip. `where` names the note or capture the
+    document already became, so distill merges them there. Dedup is the caller's, by highlight id.
+    [earned: 2026-09-25 correction run — 101 of 123 Reader highlights, back to 2023, had never
+    reached the vault: ingest skipped every child of a document]"""
+    title = (parent.get("title") or "").strip() or "(untitled)"
+    author = (parent.get("author") or "").strip()
+    source_url = parent.get("source_url") or parent.get("url") or ""
+    day = max((h.get("created_at") or "")[:10] for h in highlights) or "undated"
+    capture_dir = vault / "01_Capture"
+    capture_dir.mkdir(parents=True, exist_ok=True)
+    dest = unique_path(capture_dir, f"Readwise-Highlights-{_slugify(f'{author}-{title}' if author else title)}-{day}")
+    fm = {k: v for k, v in {
+        "source": source_url or None, "origin": "readwise", "category": "highlights",
+        "readwise_parent_id": str(parent.get("id") or "") or None,
+        "readwise_highlight_ids": [str(h["id"]) for h in highlights],
+        "author": author or None, "saved_at": day, "created": day, "via": "clip",
+        "tags": ["readwise", "highlights"],
+    }.items() if v}
+    body = [f"# Highlights: {title}", "", f"*Source: [{source_url}]({source_url})*" + (f" — {author}" if author else "")
+            if source_url else f"*Source: (none — Reader document {parent.get('id')})*", ""]
+    if where:
+        body += [f"*The document itself is already in the vault: `{where}`. Merge these highlights there.*", ""]
+    body += [f"## My highlights ({len(highlights)})", ""]
+    for h in sorted(highlights, key=lambda h: (h.get("highlight_location") or 0, h.get("created_at") or "")):
+        text = (h.get("content") or "").strip()
+        if h.get("category") == "note" or not text:
+            body += [f"- *Note ({(h.get('created_at') or '')[:10]}):* {(h.get('notes') or text).strip()}", ""]
+            continue
+        body += ["> " + ln if ln.strip() else ">" for ln in text.splitlines()]
+        extra = (h.get("notes") or "").strip()
+        body += [f"— {(h.get('created_at') or '')[:10]}" + (f" · *my note:* {extra}" if extra else ""), ""]
+    body += ["## Processing Notes", "", "- Ingested via readwise plugin (the owner's Reader highlights)",
+             "- Status: awaiting distillation — see the obsidian:distill skill", ""]
+    write_frontmatter(dest, fm, "\n".join(body))
+    return dest
+
+
 def write_book_capture(vault: Path, book: dict[str, Any], highlights: list[dict[str, Any]]) -> tuple[Path | None, str]:
     """Write one Classic v2 book/source (Kindle, Apple Books, …) as a single capture note
     listing its highlights. Dedup keyed on the source's title+author, since Classic v2

@@ -4,6 +4,15 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The owner's Reader highlights reach the vault** (`ingest.ingest_highlights`): every highlight
+  and note not in the ledger, whatever its age, lands in a highlights capture per document that
+  names where the document went; text already in the vault is recorded, not captured; highlights
+  are never archived in Reader. Distill merges them as the owner's own words. [earned:
+  2026-09-25 correction run — ingest skipped every child of a document: 101 of 123 highlights,
+  back to 2023, were only in Reader]
+- **Enrichment skips file names X linked as domains** (`CLAUDE.md`, `judge.sh`). [earned:
+  2026-09-25 correction run]
+
 - **Every clipping stays in the vault.** Nothing is deleted any more: `retire_capture.py
   --duplicate-of` archives a duplicate whole (distill invariant 6), and a tweet's images are
   stored under `04_Resources/Attachments/Tweets/` (1200 px) and embedded by vault path, with the

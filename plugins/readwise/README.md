@@ -23,7 +23,9 @@ promoted them, each with its provenance (`via: clip`, `newsletter` or `radar`). 
 ledger `00_Memory/readwise-ingested.jsonl` plus the vault itself. Nothing in Reader is deleted;
 an item is **archived** in Reader once its capture is settled on the remote (retired to
 `05_Archive/` in the upstream branch, so the run after the one that distilled it), logged in
-`00_Memory/readwise-archived.jsonl`. **Every clipping the user saved ends up in `01_Capture/`**: an item fetched but not
+`00_Memory/readwise-archived.jsonl`. The owner's **highlights and notes** in Reader, whatever
+their age, become `Readwise-Highlights-…` captures (one per document, `via: clip`), each highlight
+a ledger row of its own; one whose text is already in the vault is recorded, not captured. **Every clipping the user saved ends up in `01_Capture/`**: an item fetched but not
 captured fails the run with a DLQ note, and the watermark does not move until it is captured.
 Why each step: [references/ingest-workflow.md](references/ingest-workflow.md); the API:
 [references/api.md](references/api.md).
