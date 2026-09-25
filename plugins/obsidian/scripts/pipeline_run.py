@@ -40,7 +40,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from vault_utils import inside, profile_value, read_frontmatter, require_vault, write_dlq_note
+from vault_utils import contained, inside, profile_value, read_frontmatter, require_vault, write_dlq_note
 
 LOCK = Path("00_Memory") / "pipeline.lock"
 STATE = Path("00_Memory") / "pipeline-state.json"
@@ -201,7 +201,8 @@ def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
     state = _state(vault)
     attempts: dict[str, int] = state.get("attempts", {})
     parked: list[str] = state.get("parked", [])
-    captures = sorted((p for p in (vault / "01_Capture").glob("*.md") if p.is_file()), key=lambda p: _order(vault, p))
+    captures = sorted((p for p in contained((vault / "01_Capture").glob("*.md"), vault) if p.is_file()),
+                      key=lambda p: _order(vault, p))
     newly_parked = []
     queue = []
     for p in captures:
@@ -359,7 +360,7 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed"
     if marks is not None:
         summary += f"; in: {came_in(vault, marks)}"
-    left = sum(1 for p in (vault / "01_Capture").glob("*.md") if p.is_file())
+    left = sum(1 for p in contained((vault / "01_Capture").glob("*.md"), vault) if p.is_file())
     if untouched:
         summary += f"; {len(untouched)} of the batch not attempted"
     summary += f"; {left} in the inbox" + (f"; {note}" if note else "")

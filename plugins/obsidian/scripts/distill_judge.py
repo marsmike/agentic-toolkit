@@ -42,6 +42,7 @@ from judgments.urls import _canonical
 from search import search
 from search_judge import expand
 from vault_utils import (
+    contained,
     discover_notes,
     inside,
     profile_value,
@@ -274,7 +275,7 @@ def enrichment_targets(vault: Path, exclude: list[str]) -> list[str]:
     # A profile note usually sits at the vault root; discover_notes returns it only when it
     # declares `status: active`, so every root note is looked up here.
     by_stem = {p.stem: p.relative_to(vault).as_posix() for p in discover_notes(vault, exclude=exclude)}
-    by_stem.update({p.stem: p.name for p in vault.glob("*.md")})
+    by_stem.update({p.stem: p.name for p in contained(vault.glob("*.md"), vault)})
     out = []
     for t in raw:
         name = str(t).strip().strip("[]").split("|", 1)[0].strip()

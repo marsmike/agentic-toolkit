@@ -138,6 +138,16 @@ def update_note_frontmatter(path: Path, updates: dict) -> dict:
 # --- Note listing --------------------------------------------------------------------
 
 
+def _inside_vault(note_path: Path, vault_path: Path) -> bool:
+    """A `.md` symlink resolving outside the vault is not a vault note: skipping it keeps
+    external files out of search, the engines and anything a run sends on.
+    [earned: 2026-09-24, Copilot review of #26]"""
+    try:  # strict: a symlink loop or a dangling link is not a note (and must not crash the run)
+        return note_path.resolve(strict=True).is_relative_to(vault_path.resolve())
+    except (OSError, RuntimeError):
+        return False
+
+
 def _root_active_notes(vault_path: Path) -> list[Path]:
     """Root-level *.md files whose own frontmatter declares `status: active` — the
     root-note clause in contract/VAULT_SCHEMA.md (e.g. a persona/profile note). `Index.md`
@@ -147,6 +157,8 @@ def _root_active_notes(vault_path: Path) -> list[Path]:
     """
     notes: list[Path] = []
     for note_path in sorted(vault_path.glob("*.md")):
+        if not _inside_vault(note_path, vault_path):
+            continue
         try:
             text = note_path.read_text(encoding="utf-8")
             frontmatter, _, had_frontmatter = parse_frontmatter(text)
@@ -170,7 +182,7 @@ def list_active_notes(vault_path: Path) -> list[Path]:
     for folder in ACTIVE_CONTENT_FOLDERS:
         folder_path = vault_path / folder
         if folder_path.is_dir():
-            notes.extend(sorted(folder_path.rglob("*.md")))
+            notes.extend(p for p in sorted(folder_path.rglob("*.md")) if _inside_vault(p, vault_path))
     notes.extend(_root_active_notes(vault_path))
     return notes
 

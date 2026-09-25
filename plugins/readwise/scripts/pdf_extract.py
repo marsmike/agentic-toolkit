@@ -43,7 +43,10 @@ PAGE_ANCHOR_RE = re.compile(r"^<!-- page (\d+) -->$", re.M)
 
 
 def _is_web_url(url: str) -> bool:
-    return urllib.parse.urlsplit(url).scheme.lower() in ("http", "https")
+    try:
+        return urllib.parse.urlsplit(url).scheme.lower() in ("http", "https")
+    except ValueError:  # a malformed URL (e.g. a broken IPv6 literal) is not a web URL; _download returns None
+        return False
 
 
 def _download(url: str) -> bytes | None:

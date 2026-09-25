@@ -283,7 +283,7 @@ def iter_captures(vault: Path, prefix: str = "Readwise-") -> list[Path]:
     capture_dir = vault / "01_Capture"
     if not capture_dir.is_dir():
         return []
-    return sorted(p for p in capture_dir.glob(f"{prefix}*.md") if p.is_file())
+    return sorted(p for p in contained(capture_dir.glob(f"{prefix}*.md"), vault) if p.is_file())
 
 
 def find_capture_by_doc_id(vault: Path, doc_id: str, prefix: str = "Readwise-") -> Path | None:
@@ -302,3 +302,17 @@ def find_capture_by_doc_id(vault: Path, doc_id: str, prefix: str = "Readwise-") 
         if str(fm.get("readwise_doc_id", "")) == str(doc_id):
             return path
     return None
+
+
+def contained(paths, vault: Path) -> list[Path]:
+    """Keep only paths that resolve inside the vault: a `.md` symlink to a file elsewhere must not
+    be read, indexed or sent on by an unattended run. [earned: 2026-09-24, Copilot review of #26]"""
+    root = vault.resolve()
+    kept = []
+    for p in paths:
+        try:  # strict: a symlink loop or a dangling link is not a note (and must not crash the run)
+            if p.resolve(strict=True).is_relative_to(root):
+                kept.append(p)
+        except (OSError, RuntimeError):
+            continue
+    return kept

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from vault_utils import read_frontmatter
+from vault_utils import contained, read_frontmatter
 
 _H1 = re.compile(r"^#\s+(.+)$", re.M)
 
@@ -40,7 +40,7 @@ def _title(body: str, path: Path) -> str:
 def _candidate_paths(vault: Path) -> list[Path]:
     live = sorted((vault / "01_Capture").glob("*.md")) if (vault / "01_Capture").is_dir() else []
     archived = sorted((vault / "05_Archive").glob("*/*--FULLCAPTURE.md")) if (vault / "05_Archive").is_dir() else []
-    return live + archived
+    return contained(live + archived, vault)  # a link out of the vault is not a clip (Copilot review of #28)
 
 
 def load(vault: Path, since: date) -> list[Clip]:

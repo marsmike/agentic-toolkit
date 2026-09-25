@@ -66,7 +66,7 @@ from judgments import questions as Q
 from judgments.state import in_chunks
 from judgments.urls import _canonical
 from reader import Item
-from vault_utils import atomic_write, profile_value, read_frontmatter, require_vault, write_dlq_note
+from vault_utils import atomic_write, contained, profile_value, read_frontmatter, require_vault, write_dlq_note
 
 RADAR_DIR = Path("00_Memory") / "radar"
 DEFAULT_PROMOTE_LOCATION = "later"
@@ -143,7 +143,7 @@ def vault_sources(vault: Path) -> dict[str, str]:
     """canonical source URL -> vault-relative path, for every note with a `source`, captures
     included (a clipped item is covered). Built once per run."""
     index: dict[str, str] = {}
-    for path in vault.rglob("*.md"):
+    for path in contained(vault.rglob("*.md"), vault):
         rel = path.relative_to(vault)
         if rel.parts and rel.parts[0] in NOT_CONTENT:
             continue
