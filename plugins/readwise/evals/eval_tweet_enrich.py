@@ -9,6 +9,9 @@
 5. partial  — an unresolvable t.co link and a page that doesn't load make the status `partial`,
               and the short link stays in the text
 6. capture  — write_capture on a tweet writes `links`, `enrichment` and a `## Linked` section
+8. safety   — loopback, private, link-local (cloud metadata) and non-http destinations are refused
+              before any request; a malformed URL in tweet text is ignored, not raised; a media
+              write that fails (no directory) loses the local copy, never the capture
 7. media    — the media image is stored under 04_Resources/Attachments/Tweets/, embedded by vault
               path with its original link beside it, and listed in `media:`; the video poster
               that can't be fetched stays a link and makes the capture `partial`
@@ -76,6 +79,18 @@ def run(vault: Path) -> dict:
     p = te.enrich("", "https://t.co/gone and https://t.co/blog", bc._html_to_md_basic, TARGETS.get, lambda u: None)
     if p["status"] != "partial" or "https://t.co/gone" not in p["text"]:
         problems.append(f"partial: status {p['status']}")
+
+    for bad in ("http://127.0.0.1/x", "http://169.254.169.254/latest/meta-data", "http://10.1.2.3/",
+                "http://localhost:8080/", "file:///etc/passwd", "https://[bad"):
+        if te.public(bad) or te.get(bad) is not None or te.get_bytes(bad) is not None or te.resolve(bad) is not None:
+            problems.append(f"safety: {bad} was not refused")
+    if te.external_links("see https://[not-a-host and https://github.com/acme/widget") != ["https://github.com/acme/widget"]:
+        problems.append("safety: a malformed URL was not ignored")
+    blocker = Path(__import__("tempfile").mkdtemp()) / "not-a-dir"
+    blocker.write_text("x")
+    kept, got, lost = te.save_media("![](https://pbs.twimg.com/media/shot.jpg)", blocker, "d", lambda u: b"\xff\xd8\xff")
+    if got or lost != 1 or "https://pbs.twimg.com/media/shot.jpg" not in kept:
+        problems.append(f"safety: a failed media write should keep the link, got {got}, {lost}")
 
     saved, sandbox = os.environ.get("TOOLKIT_READWISE_ENRICH"), make_sandbox(vault)
     orig = (te.resolve, te.get, te.get_bytes)

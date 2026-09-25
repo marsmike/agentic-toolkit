@@ -12,9 +12,11 @@ enrichment never blocks a capture. `TOOLKIT_READWISE_ENRICH=0` turns it off.
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import re
+import socket
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -42,9 +44,42 @@ TIMEOUT = 8
 UA = "Mozilla/5.0 (compatible; agentic-toolkit-readwise/1.0)"
 
 
+def public(url: str) -> bool:
+    """True only for an http(s) URL whose host resolves to public addresses alone: a tweet's link
+    (or a redirect it leads to) must never make ingest read localhost, a private network or cloud
+    metadata into the vault. Checked before every request and every redirect hop; a host that
+    doesn't resolve is refused. [earned: 2026-09-25, Copilot review of PR #33 — SSRF]"""
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname
+    except ValueError:
+        return False
+    if parts.scheme not in ("http", "https") or not host:
+        return False
+    try:
+        infos = socket.getaddrinfo(host, parts.port or (443 if parts.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+    except (OSError, UnicodeError):
+        return False
+    try:
+        return bool(infos) and all(ipaddress.ip_address(i[4][0].split("%")[0]).is_global for i in infos)
+    except ValueError:
+        return False
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):  # noqa: ANN002, ANN003 — urllib's signature
         return None
+
+
+class _PublicRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only to a public destination."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001 — urllib's signature
+        if not public(newurl):
+            raise urllib.error.URLError(f"redirect to a non-public address refused: {newurl}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_PublicRedirects)
 
 
 def enabled() -> bool:
@@ -53,6 +88,8 @@ def enabled() -> bool:
 
 def resolve(url: str) -> str | None:
     """Where a t.co link redirects to, from its Location header; None if it can't be read."""
+    if not public(url):
+        return None
     opener = urllib.request.build_opener(_NoRedirect)
     req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "curl/8"})
     try:
@@ -66,9 +103,11 @@ def resolve(url: str) -> str | None:
 
 def get(url: str) -> tuple[str, str] | None:
     """(content type, text) of a GET, redirects followed; None on any failure or a non-text body."""
+    if not public(url):
+        return None
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html,application/json,*/*"})
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+        with _OPENER.open(req, timeout=TIMEOUT) as resp:
             ctype = resp.headers.get("content-type", "")
             if not any(t in ctype for t in ("text", "json", "xml")):
                 return None
@@ -79,9 +118,11 @@ def get(url: str) -> tuple[str, str] | None:
 
 def get_bytes(url: str) -> bytes | None:
     """An image's bytes (at most MAX_MEDIA_BYTES); None on any failure or a non-image body."""
+    if not public(url):
+        return None
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+        with _OPENER.open(req, timeout=TIMEOUT) as resp:
             if not resp.headers.get("content-type", "").startswith("image/"):
                 return None
             data = resp.read(MAX_MEDIA_BYTES + 1)
@@ -120,15 +161,24 @@ def save_media(text: str, vault, doc_id: str, fetch_bytes: Callable[[str], bytes
         slug = re.sub(r"[^A-Za-z0-9]+", "", doc_id)[:40] or "tweet"
         rel = f"{MEDIA_DIR}/tweet-{slug}-{n}.{ext}"
         dest = vault / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(data)
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+        except OSError:  # a full disk or a permission must not cost the clipping, only the copy
+            failed += 1  # [earned: 2026-09-25, Copilot review of PR #36]
+            continue
         saved.append(rel)
         text = re.sub(r"!\[[^\]]*\]\(" + re.escape(url) + r"\)", lambda _m, r=rel, u=url: f"![[{r}]] ([original]({u}))", text)
     return text, saved, failed
 
 
 def _host(url: str) -> str:
-    host = urlsplit(url).hostname or ""
+    """The URL's host without `www.`; "" for a malformed URL, which is then ignored.
+    [earned: 2026-09-25, Copilot review of PR #33 — `https://[bad` raised and aborted ingest]"""
+    try:
+        host = urlsplit(url).hostname or ""
+    except ValueError:
+        return ""
     return host.removeprefix("www.")
 
 
