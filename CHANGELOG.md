@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Images that git will not carry are never lost silently.** `end` checks every `media:` file the
+  run's captures name: one git ignores, or one not on disk, gets a DLQ note and a count in the
+  run summary. [earned: 2026-09-25 — 111 of 130 recovered tweet screenshots never reached git:
+  `*.JPG` in the vault's .gitignore also matched `.jpg` on a case-insensitive checkout]
+
 - **The last run's ingestion report, as a Claude artifact** (`report_build.py`, a generator in
   `end`): every import with its source, expanded links and images, what it became (the note on
   GitHub and in Obsidian, found by source when the manifest names it in prose), and the notes the

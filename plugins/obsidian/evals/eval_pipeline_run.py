@@ -8,7 +8,8 @@
               captures left in the inbox and not reported failed are named as not attempted
 3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted;
               `--failed ""` or a path no longer in 01_Capture/ counts no failure
-4. secrets  — (4b: password assignments in three syntaxes are found, placeholders are not) a staged note holding a key-shaped string makes `end` refuse the commit and write one DLQ
+4. secrets  — (4b: password assignments in three syntaxes are found, placeholders are not;
+               4c: an image a capture names that git ignores or that is gone gets a DLQ note and a summary count) a staged note holding a key-shaped string makes `end` refuse the commit and write one DLQ
               note that names the file, never the key; the next clean run commits
 5. sync     — with a bare upstream: a second clone's commit arrives with `begin`, `end` pushes, and a
               conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
@@ -260,6 +261,38 @@ def run(vault: Path) -> dict:
         _begin(pr, sandbox, NOW + timedelta(hours=15))
         if _end(pr, sandbox, NOW + timedelta(hours=15), 0, 0, []).get("status") != "ok":
             problems.append("phase 4: once the key is gone the next run commits")
+
+        # 4c. an image a capture names that git ignores (or that is gone) gets a DLQ note and a
+        # summary count, so the loss is never silent
+        gi = sandbox / ".gitignore"
+        gi_before = gi.read_text(encoding="utf-8") if gi.is_file() else None
+        gi.write_text("*.JPG\n", encoding="utf-8")
+        _git(sandbox, "config", "core.ignorecase", "true")  # a Mac checkout: *.JPG also matches .jpg
+        att = sandbox / "04_Resources" / "Attachments" / "Tweets"
+        att.mkdir(parents=True, exist_ok=True)
+        (att / "eval-1.jpg").write_bytes(b"\xff\xd8\xff")
+        (att / "eval-2.png").write_bytes(b"\x89PNG")
+        capm = sandbox / "01_Capture" / "Readwise-Tweet-Media.md"
+        capm.write_text("---\nsource: https://x.com/a/status/1\nmedia:\n- 04_Resources/Attachments/Tweets/eval-1.jpg\n"
+                        "- 04_Resources/Attachments/Tweets/eval-2.png\n- 04_Resources/Attachments/Tweets/eval-gone.jpg\n---\n# M\n",
+                        encoding="utf-8")
+        _begin(pr, sandbox, NOW + timedelta(hours=16))
+        with (sandbox / pr.LEDGERS["ingested"]).open("a", encoding="utf-8") as fh:
+            fh.write('{"doc_id": "m1", "capture": "01_Capture/Readwise-Tweet-Media.md", "via": "clip"}\n')
+        r = _end(pr, sandbox, NOW + timedelta(hours=16), 0, 0, [])
+        want = {"ignored": ["04_Resources/Attachments/Tweets/eval-1.jpg"], "missing": ["04_Resources/Attachments/Tweets/eval-gone.jpg"]}
+        dlq = list((sandbox / "00_Memory" / "dlq").glob("*media-not-in-git*.md"))
+        if r.get("lost_media") != want or "1 image(s) git-ignored, 1 image(s) missing" not in r.get("summary", ""):
+            problems.append(f"phase 4c: expected {want} in the result and summary, got {r.get('lost_media')} / {r.get('summary')}")
+        if len(dlq) != 1 or "eval-1.jpg" not in dlq[0].read_text(encoding="utf-8") or "eval-gone.jpg" not in dlq[0].read_text(encoding="utf-8"):
+            problems.append(f"phase 4c: one DLQ note naming the ignored and the missing image, got {len(dlq)}")
+        capm.unlink()
+        for f in att.iterdir():
+            f.unlink()
+        if gi_before is None:
+            gi.unlink()
+        else:
+            gi.write_text(gi_before, encoding="utf-8")
 
         # 5. git sync through an upstream
         problems += _sync_phase(pr, sandbox)
