@@ -26,6 +26,10 @@ URL = re.compile(r"https?://[^\s)\]>\"'`]+")
 # The tweet itself, its author's profile and its media are not "linked content".
 OWN_HOSTS = {"x.com", "twitter.com", "mobile.twitter.com", "t.co", "pbs.twimg.com", "video.twimg.com",
              "abs.twimg.com"}
+# Promo and profile links (a Telegram channel, a link tree, a tip jar) are not what a tweet points at.
+# [earned: 2026-09-25 — a t.me channel link made a capture `partial` though its repo was excerpted]
+PROMO_HOSTS = {"t.me", "telegram.me", "linktr.ee", "discord.gg", "discord.com", "patreon.com", "buymeacoffee.com",
+               "ko-fi.com", "instagram.com", "tiktok.com", "facebook.com", "threads.net", "bsky.app", "linkedin.com"}
 MAX_RESOLVE = 12        # t.co links resolved per capture
 MAX_FETCH = 3           # linked pages excerpted per capture
 EXCERPT_CHARS = 1500
@@ -91,7 +95,7 @@ def external_links(text: str) -> list[str]:
     links = []
     for m in URL.finditer(text):
         url = m.group(0).rstrip(".,;:!?")
-        if _host(url) and _host(url) not in OWN_HOSTS:
+        if _host(url) and _host(url) not in OWN_HOSTS | PROMO_HOSTS:
             links.append(url)
     return list(dict.fromkeys(links))
 
