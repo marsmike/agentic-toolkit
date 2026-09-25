@@ -16,8 +16,9 @@ clips. Each capture records its provenance (`via`):
 
 Dedup: `00_Memory/readwise-ingested.jsonl` (every doc id ever ingested or found in the vault),
 plus existing captures in 01_Capture/ and 05_Archive/, plus any note whose `source` is the item's
-address (already distilled). Nothing in Reader is moved or deleted: Later stays the owner's
-reading queue. A coverage gap (an item fetched but neither written nor recorded) writes one DLQ
+address (already distilled). Nothing in Reader is deleted. An item is archived in Reader only
+once its capture is settled on the remote (`archive_settled`): retired to 05_Archive/ in the
+upstream branch, so the run after the one that distilled it. A coverage gap (an item fetched but neither written nor recorded) writes one DLQ
 note and exits 1; the watermark only moves on a clean run.
 """
 from __future__ import annotations
@@ -25,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 import time
 from datetime import UTC, datetime, timedelta
@@ -38,6 +40,8 @@ from vault_utils import contained, profile_value, read_frontmatter, require_vaul
 
 STATE_NOTE = Path("00_Memory") / "readwise-state.md"
 LEDGER = Path("00_Memory") / "readwise-ingested.jsonl"
+ARCHIVED = Path("00_Memory") / "readwise-archived.jsonl"
+ARCHIVE_PER_RUN = 60    # Reader's update endpoint allows 50 requests a minute; GET_DELAY_S paces them
 SWEEP_LOCATIONS = ("new", "later", "shortlist")
 WINDOW_DAYS = 28  # the owner's scope: the last four weeks [earned: 2026-09-24, owner's request]
 GET_DELAY_S = 3.1  # Reader's list endpoint (which reader_get uses) allows 20 requests a minute
@@ -188,6 +192,74 @@ def fetch_full(doc_id: str) -> dict:
     return _patient(rw.reader_get, doc_id)
 
 
+def _pushed_paths(vault: Path) -> set[str] | None:
+    """Every file in the upstream branch's tree (what is on the remote, not just committed here);
+    None without git or an upstream, since nothing then proves a file has left this machine."""
+    def git(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, check=False)
+    upstream = git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    if upstream.returncode != 0 or not upstream.stdout.strip():
+        return None
+    tree = git("ls-tree", "-r", "--name-only", upstream.stdout.strip())
+    return set(tree.stdout.splitlines()) if tree.returncode == 0 else None
+
+
+def archive_settled(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
+    """Archive in Reader every clipping whose capture is settled in the vault on the remote: retired
+    to `05_Archive/` as `<stem>--FULLCAPTURE.md` (distilled, or dropped by distill's rules), or
+    found already in the vault at ingest. Copies of a settled page go with it. Settled means in the
+    upstream branch's tree, so it happens the run after the one that distilled it, never before
+    the push. Each archive is a row in `00_Memory/readwise-archived.jsonl`; an item Reader no longer
+    has is recorded as `gone`. Never deletes. [earned: 2026-09-25, owner's request — archive the
+    clippings once they are definitely in the vault]"""
+    pushed = _pushed_paths(vault)
+    if pushed is None:
+        return {"status": "skipped", "detail": "no git upstream: nothing proves a capture reached the remote"}
+    done = set()
+    path = vault / ARCHIVED
+    if path.is_file():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                done.add(str(json.loads(line)["doc_id"]))
+            except (json.JSONDecodeError, KeyError):
+                continue
+    retired = {Path(p).name.removesuffix("--FULLCAPTURE.md"): p for p in pushed
+               if p.startswith("05_Archive/") and p.endswith("--FULLCAPTURE.md")}
+    ledger = read_ledger(vault)
+    settled: list[str] = []
+    for doc_id, row in ledger.items():
+        if doc_id in done or "duplicate_of" in row:
+            continue
+        capture, found = row.get("capture") or "", row.get("found") or ""
+        if (capture and Path(capture).stem in retired) or (found and found in pushed):
+            settled.append(doc_id)
+    settled += [d for d, r in ledger.items() if d not in done and r.get("duplicate_of") in settled]
+    todo = settled[:ARCHIVE_PER_RUN]
+    if dry_run:
+        return {"status": "dry-run", "would_archive": len(settled)}
+    rows, errors = [], []
+    for n, doc_id in enumerate(todo):
+        if n:
+            time.sleep(GET_DELAY_S)
+        try:
+            _patient(rw.reader_archive, doc_id)
+            rows.append({"doc_id": doc_id, "archived": now.date().isoformat()})
+        except rw.NoTokenConfigured:
+            return {"status": "SKIPPED", "detail": "READWISE_TOKEN is not set; nothing archived"}
+        except rw.ReadwiseAPIError as e:
+            if e.status == 404:
+                rows.append({"doc_id": doc_id, "gone": now.date().isoformat()})
+            else:
+                errors.append(f"{doc_id}: {e}"[:200])
+    if rows:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            for r in rows:
+                f.write(json.dumps(r) + "\n")
+    return {"status": "ok" if not errors else "partial", "archived": sum("archived" in r for r in rows),
+            "gone": sum("gone" in r for r in rows), "left": len(settled) - len(todo), "errors": errors[:3]}
+
+
 def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
     since = last_synced(vault, now)
     try:
@@ -286,7 +358,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="count what would be captured, write nothing")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
-    result = ingest(require_vault(), datetime.now(UTC), args.dry_run)
+    vault, now = require_vault(), datetime.now(UTC)
+    result = ingest(vault, now, args.dry_run)
+    if result["status"] != "SKIPPED":
+        result["reader_archive"] = archive_settled(vault, now, args.dry_run)
     if args.json:
         print(json.dumps(result, indent=2, ensure_ascii=False))
     else:

@@ -20,8 +20,10 @@ uv run --project scripts python3 scripts/ingest.py --dry-run   # counts only
 Every Reader library item not yet in the vault becomes a capture: a windowed sync from
 `lastSyncedAt` plus a backlog sweep of new/later/shortlist, both limited to the last four weeks, feed items only when the radar
 promoted them, each with its provenance (`via: clip`, `newsletter` or `radar`). Dedup is the
-ledger `00_Memory/readwise-ingested.jsonl` plus the vault itself. Nothing in Reader is moved or
-deleted. **Every clipping the user saved ends up in `01_Capture/`**: an item fetched but not
+ledger `00_Memory/readwise-ingested.jsonl` plus the vault itself. Nothing in Reader is deleted;
+an item is **archived** in Reader once its capture is settled on the remote (retired to
+`05_Archive/` in the upstream branch, so the run after the one that distilled it), logged in
+`00_Memory/readwise-archived.jsonl`. **Every clipping the user saved ends up in `01_Capture/`**: an item fetched but not
 captured fails the run with a DLQ note, and the watermark does not move until it is captured.
 Why each step: [references/ingest-workflow.md](references/ingest-workflow.md); the API:
 [references/api.md](references/api.md).

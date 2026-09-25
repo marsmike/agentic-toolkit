@@ -28,6 +28,7 @@ EVAL_MODULES = (
     "eval_pdf_convert",
     "eval_pdf_scheme",
     "eval_tweet_enrich",
+    "eval_reader_archive",
 )
 
 
