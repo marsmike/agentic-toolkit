@@ -91,6 +91,24 @@ def run(vault: Path) -> dict:
             problems.append(f"radar: items {rad.get('items')}")
         if rad.get("interests", {}).get("agent-memory", {}).get("name") != "Agent Memory" or rad["interests"]["agent-memory"]["strong"] != 1:
             problems.append(f"radar: interests {rad.get('interests')}")
+        import radar_ledger
+        wk = lambda d: "{}-W{:02d}".format(*d.isocalendar()[:2])  # noqa: E731
+        if wk(today) not in rad.get("weeks", {}):
+            problems.append("radar: the current week must be a column even when quiet")
+        # rising: earlier weeks [2, 4] (median 3), this week 5 → rising; this week 4 → not (needs ≥ 1.5 × 3)
+        hist = [(today - timedelta(weeks=3), 2), (today - timedelta(weeks=2), 4), (today - timedelta(weeks=1), 4)]
+        extra = [{"run": (d - timedelta(days=d.weekday())).isoformat(), "canonical": f"e/{i}-{j}", "url": "", "title": "t", "feed": "f", "kind": "paper",
+                  "p": {"agent-memory": 0.9}, "worth": ["agent-memory"], "strong": ["agent-memory"], "in_vault": None}
+                 for i, (d, n) in enumerate(hist[:2]) for j in range(n)]
+        this = [{**extra[0], "canonical": f"now/{j}", "run": today.isoformat()} for j in range(5)]
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in extra + this), encoding="utf-8")
+        r2 = radar_ledger.load(sandbox, (today - timedelta(days=83)).isoformat(), today)
+        if r2["rising"] != ["agent-memory"]:
+            problems.append(f"radar: 5 strong against a median of 3 must be rising, got {r2['rising']}")
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in extra + this[:4]), encoding="utf-8")
+        if radar_ledger.load(sandbox, (today - timedelta(days=83)).isoformat(), today)["rising"]:
+            problems.append("radar: 4 strong against a median of 3 must not be rising")
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
         run = next((r for r in data["runs"] if r.get("run") == "2026-09-25 13:06"), {})
         fates = [(i["title"], i["status"], i["notes"]) for i in run.get("items", [])]
         if fates != [("Wait", "waiting", []), ("04_Resources/Eval-Dash-Paper.md", "known", ["04_Resources/Eval-Dash-Paper.md"]),
