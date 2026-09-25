@@ -45,7 +45,8 @@ def run(vault: Path) -> dict:
                              _hl("h2", "P", "The second highlight", note="check this on the M5"),
                              _hl("h3", "Q", "A highlight on an unseen doc"),
                              _hl("h4", "P", "Already quoted in a vault note, word for word"),
-                             _hl("h5", "P", "Already quoted in a vault note, word for word, and then much more"),
+                             {**_hl("h5", "P", "Already quoted in a vault note, word for word, and then much more"),
+                              "highlight_location": "7"},  # Reader mixes numbers and strings
                              _hl("h6", "R", "On a document Reader can't return right now")],
                "note": [{"id": "n7", "parent_id": "P", "category": "note", "content": "",
                          "notes": "Try this on the M5 Max", "created_at": "2026-09-12T08:00:00+00:00"}]}
@@ -77,6 +78,10 @@ def run(vault: Path) -> dict:
                     "> Sustained fifty tokens a second for code" not in body or "*my note:* check this on the M5" not in body \
                     or "*Note (2026-09-12):* Try this on the M5 Max" not in body:
                 problems.append(f"capture/note: content of {p_cap}")
+            # Numeric order across a string "7" and ints 1, 2; the note (no location, 0) comes first.
+            marks = ["Try this on the M5 Max", "Sustained fifty tokens", "The second highlight", "and then much more"]
+            if [body.find(m) for m in marks] != sorted(body.find(m) for m in marks) or -1 in [body.find(m) for m in marks]:
+                problems.append("capture: highlights not in location order")
             if "h5" not in (fm.get("readwise_highlight_ids") or []) and not any(r["doc_id"] == "h5" and r.get("capture") for r in rows):
                 problems.append("prefix: a highlight matched only by its first words was not captured")
         if not any("Unseen-Doc" in c for c in caps):
