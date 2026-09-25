@@ -88,6 +88,13 @@ merge them into that note (L2: quote the highlight, keep the owner's note beside
 source); otherwise distill the document from them. Never paraphrase a highlight away.
 [earned: 2026-09-25 correction run — 101 highlights back to 2023 had never reached the vault]
 
+**A path in `.gitignore` is off-limits.** The vault ignores a note that holds a secret until the
+owner cleans it. Never create a note at such a path, never file one under a near-identical name
+to get round the entry, and never repoint links to a stand-in: leave the capture's material in
+the archive and name the local-only note in the manifest line. A capture that quotes a password
+or key keeps a `<redacted: …>` placeholder in its place. [earned: 2026-09-25 correction run — a
+worker renamed a note to dodge the secrets entry]
+
 ## Invariants
 
 1. **Two phases, one checkpoint.** Propose (what you learned, where it goes, what it links
