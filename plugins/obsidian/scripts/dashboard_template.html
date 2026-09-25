@@ -123,8 +123,24 @@ svg text { fill: var(--muted); font-size: 11px; }
 .empty { color: var(--muted); padding: 30px 0; text-align: center; }
 .more { margin: 16px auto 0; display: block; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 16px; cursor: pointer; }
 .runs { display: grid; gap: 2px; }
-.run { display: grid; grid-template-columns: 118px 90px minmax(0, 1fr); gap: 12px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
-.run:first-child { border-top: 0; }
+details.runbox { border-top: 1px solid var(--line); }
+details.runbox:first-child { border-top: 0; }
+details.runbox > summary { list-style: none; cursor: pointer; }
+details.runbox > summary::-webkit-details-marker { display: none; }
+details.runbox[open] > summary .when { color: var(--text); font-weight: 600; }
+.imports { margin: 0 0 12px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.imp { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; font-size: 12.5px; align-items: baseline; }
+.imp .st { font-size: 10.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2); display: inline-flex; gap: 5px; align-items: center; }
+.imp .st.missing { color: var(--critical); }
+.imp a { color: var(--text); text-decoration: none; }
+.imp a:hover { color: var(--accent); }
+.imp .d { color: var(--muted); display: block; }
+.navlink { color: var(--text-2); text-decoration: none; font-size: 13px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 12px; }
+.navlink:hover { color: var(--text); border-color: var(--muted); }
+.alert { border: 1px solid var(--critical); color: var(--text); background: var(--surface); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 13.5px; }
+.alert b { color: var(--critical); }
+.run { display: grid; grid-template-columns: 118px 90px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 7px 0; font-size: 12.5px; }
+.run .n { color: var(--muted); font-variant-numeric: tabular-nums; }
 .run .when { color: var(--text-2); font-variant-numeric: tabular-nums; }
 .run .mini { display: flex; gap: 2px; align-items: center; height: 12px; }
 .run .mini i { display: block; height: 12px; width: 5px; border-radius: 2px; background: var(--bar); }
@@ -150,7 +166,8 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
       <h1>The Void · Distilled</h1>
       <div class="sub" id="sub"></div>
     </div>
-    <div class="seg theme" role="group" aria-label="Theme">
+    <a class="navlink theme" id="importslink" href="#">Imports log</a>
+    <div class="seg" role="group" aria-label="Theme">
       <button data-theme-set="light" aria-pressed="false">Light</button>
       <button data-theme-set="auto" aria-pressed="true">Auto</button>
       <button data-theme-set="dark" aria-pressed="false">Dark</button>
@@ -162,6 +179,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
     <input class="search" id="q" type="search" placeholder="Search titles, descriptions, authors…" aria-label="Search notes">
   </div>
   <div class="chips" id="chips"></div>
+  <div id="alert"></div>
 
   <section class="grid" id="kpis" aria-label="Summary"></section>
 
@@ -190,6 +208,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
 
   <section class="card" style="margin-top:28px">
     <h2>Pipeline runs <span class="hint" id="runhint"></span></h2>
+    <p class="sub" style="margin:-6px 0 8px">Open a run to see what it imported and what became of each item.</p>
     <div class="runs" id="runs"></div>
   </section>
 
@@ -412,17 +431,34 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
         n.domains.map(d => el("button", {class: "tag", text: d, onclick: () => set("domain", d)}))));
   }
 
+  const STATUS = {distilled: "Distilled", known: "In vault", dropped: "Dropped", duplicate: "Duplicate",
+                  archived: "Archived", waiting: "Waiting", missing: "Missing"};
+  const importsUrl = run => `obsidian://open?vault=${encodeURIComponent(DATA.vault)}&file=${encodeURIComponent("Imports" + (run ? "#" + run : ""))}`;
+  function typeOf(cat) { return {tweet: "tweet", video: "video", pdf: "paper", podcast: "podcast", email: "own"}[cat] || "article"; }
+
   function renderRuns() {
-    const runs = (DATA.runs || []).slice(0, 16);
+    const runs = (DATA.runs || []).slice(0, 24);
     document.getElementById("runhint").textContent = runs.length ? `${DATA.runs.length} in 12 weeks · latest ${runs.length}` : "";
-    document.getElementById("runs").replaceChildren(...(runs.length ? runs.map(r => {
+    document.getElementById("runs").replaceChildren(...(runs.length ? runs.map((r, idx) => {
       const at = new Date(r.at);
       const when = isNaN(at) ? r.at : at.toLocaleString(undefined, {weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
-      return el("div", {class: "run"},
+      const items = r.items || [];
+      const summary = el("summary", {class: "run"},
         el("span", {class: "when", text: when}),
         el("span", {class: "mini", title: `${r.distilled} distilled`}, Array.from({length: Math.min(r.distilled, 14)}, () => el("i")),
           el("span", {style: "margin-left:6px;font-variant-numeric:tabular-nums", text: String(r.distilled)})),
-        el("span", {class: "sum"}, r.failed ? el("span", {class: "bad", text: `⚠ ${r.failed} failed · `}) : null, r.summary));
+        el("span", {class: "sum"}, r.failed ? el("span", {class: "bad", text: `⚠ ${r.failed} failed · `}) : null, r.summary),
+        el("span", {class: "n", text: items.length ? `${items.length} imported ▾` : "nothing new"}));
+      const list = el("ul", {class: "imports"}, items.map(it => {
+        const src = safeUrl(it.source), t = typeOf(it.type);
+        return el("li", {class: "imp"},
+          el("span", {class: "st" + (it.status === "missing" ? " missing" : "")}, el("span", {class: "sw", style: `background:${color(t)}`}), STATUS[it.status] || it.status),
+          el("span", {},
+            src ? el("a", {href: src, target: "_blank", rel: "noopener noreferrer", text: it.title}) : el("span", {text: it.title}),
+            it.notes.length ? el("span", {class: "d"}, "→ ", ...it.notes.flatMap((n, i) => [i ? " · " : null,
+              el("a", {href: obsidian(n), text: n.split("/").pop()})])) : el("span", {class: "d", text: it.detail})));
+      }), r.run ? el("li", {class: "imp"}, el("span"), el("a", {href: importsUrl(r.run), class: "d", text: "Open this run in Imports.md"})) : null);
+      return el("details", {class: "runbox", open: idx === 0 && items.length > 0}, summary, items.length ? list : null);
     }) : [el("div", {class: "empty", text: "No pipeline runs in the window."})]));
   }
 
@@ -438,6 +474,10 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
   // ---- chrome ----------------------------------------------------------------------------------
   const built = new Date(DATA.built);
   document.getElementById("sub").textContent = `${DATA.notes.length} notes in ${DATA.window || 84} days · built ${isNaN(built) ? DATA.built : built.toLocaleString(undefined, {weekday: "short", hour: "2-digit", minute: "2-digit"})} by the pipeline`;
+  document.getElementById("importslink").href = importsUrl("");
+  if (DATA.missing) document.getElementById("alert").replaceChildren(el("div", {class: "alert"},
+    el("b", {text: `⚠ ${DATA.missing} clipping${DATA.missing === 1 ? "" : "s"} missing`}),
+    " — imported but in neither the inbox nor the archive. ", el("a", {href: importsUrl(""), text: "See Imports.md"})));
   document.getElementById("foot").textContent = `Generated by dashboard_build.py from ${DATA.vault}. Titles open in Obsidian; the source link opens the original.`;
   let t; document.getElementById("q").addEventListener("input", e => { clearTimeout(t); t = setTimeout(() => { S.q = e.target.value.trim().toLowerCase(); S.shown = PAGE; render(); }, 120); });
   function applyTheme(v) {

@@ -42,6 +42,7 @@ EVAL_MODULES = (
     "eval_map_build",
     "eval_now_build",
     "eval_dashboard_build",
+    "eval_imports_log",
     "eval_retire_capture",
     "eval_search_heading_weight",
 )

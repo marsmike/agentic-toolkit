@@ -40,6 +40,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import imports_log
 from vault_utils import contained, inside, profile_value, read_frontmatter, require_vault, write_dlq_note
 
 LOCK = Path("00_Memory") / "pipeline.lock"
@@ -58,6 +59,7 @@ GENERATORS = {  # script → the files it writes (a trailing / = every file dire
     "index_build.py": ("Index.md",),
     "map_build.py": ("Maps/",),
     "now_build.py": ("Now.md", "Boards/Pipeline.md"),
+    "imports_log.py": ("Imports.md",),
     "dashboard_build.py": ("Dashboard.html",),
 }
 SECRET_PATTERNS = {
@@ -370,6 +372,9 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     # back to how they were before it ran: navigation is this run's or the last one's, never a mix.
     # The run is still committed (it is the undo for the notes it wrote); the failure is reported
     # and gets a DLQ note. [earned: 2026-09-23, PR #20 and #24 reviews]
+    # What this run imported goes in the log before the pages that show it are built.
+    if marks is not None:
+        imports_log.record(vault, now.strftime("%Y-%m-%d %H:%M"), _rows(vault / LEDGERS["ingested"])[marks.get("ingested", 0):])
     failed_builds = []
     for script in GENERATORS:
         before = _snapshot(vault, GENERATORS[script])

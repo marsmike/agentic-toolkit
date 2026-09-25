@@ -104,7 +104,10 @@ with only t.co links, and their notes were thin or found the linked thing "by se
    line under a lock. It refuses a `--note` that doesn't exist or fails `distill_check`, and
    refuses `--dropped` on a clip (invariant 8). Never `printf` a manifest line by hand: five
    workers doing that in parallel raced the appends and one literal `%` broke a line
-   [earned: 2026-09-24]. Deletion (`trash` if present) is only ever for duplicates and stubs.
+   [earned: 2026-09-24]. **Nothing is deleted**, ever: a duplicate is retired with
+   `--duplicate-of <the capture or note it repeats>` (kept whole in the archive), a stub is
+   distilled from its source like any capture. [earned: 2026-09-25, owner's request — every
+   clipping stays in the vault]
 7. **Ambiguity goes to the DLQ**, not a guess: `vault_utils.write_dlq_note()`, and say so.
 8. **The owner's clips never drop.** Every capture is distilled the same way whatever its
    source; `provenance.via` decides only whether it may leave without a note. A `clip` (or a

@@ -172,8 +172,14 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
     pdf_info = pdf_extract.extract_pdf(source_url) if category == "pdf" else None
     text = pdf_info["text"] if pdf_info and pdf_info["text"] else _html_to_md_basic(html, keep_media=category == "tweet")
     enriched = tweet_enrich.enrich(summary, text, _html_to_md_basic) if category == "tweet" and tweet_enrich.enabled() else None
+    media: list[str] = []
     if enriched:
         summary, text = enriched["summary"], enriched["text"]
+        text, media, lost = tweet_enrich.save_media(text, vault, doc_id)
+        if lost and enriched["status"] != "partial":
+            enriched["status"] = "partial"
+        elif media and enriched["status"] == "none":
+            enriched["status"] = "full"
     stub = is_stub(text, category)
     fm = {
         "source": source_url,
@@ -188,6 +194,7 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
         "extractor": pdf_info.get("extractor") if pdf_info else None,
         "content": "stub" if stub else None,
         "links": (enriched["links"] or None) if enriched else None,
+        "media": media or None,
         "enrichment": enriched["status"] if enriched and enriched["status"] != "none" else None,
         **(provenance or {}),
         "tags": ["readwise", category, *(["radar"] if (provenance or {}).get("via") == "radar" else [])],
