@@ -9,6 +9,7 @@ In a git sandbox with a `pipeline …` commit an hour old:
 6. backlog   — more captures waiting than one batch
 7. dlq       — an open DLQ note created today is a problem; an older open one is listed in the facts only
 8. exit      — the CLI exits 1 on a problem and 0 when ok
+9. notify    — `notification` names every kind and is cut to 600 characters however many problems there are
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from _sandbox import make_sandbox, teardown_sandbox
@@ -44,7 +45,7 @@ def run(vault: Path) -> dict:
     import watchdog
 
     problems: list[str] = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     kinds = lambda r: sorted(p["kind"] for p in r["problems"])  # noqa: E731
     sandbox, saved = make_sandbox(vault), os.environ.get("TOOLKIT_VAULT")
     try:
@@ -112,6 +113,16 @@ def run(vault: Path) -> dict:
         if kinds(r) != ["dlq"] or "Radar scan got no judgments" not in r["problems"][0]["detail"]:
             problems.append(f"dlq: {r['problems']}")
 
+        for i in range(6):
+            (dlq / f"long-{i}.md").write_text(DLQ.format(d=("a very long description of a failure " * 5)[:120], c=now.date().isoformat()), encoding="utf-8")
+        (sandbox / "00_Memory" / "pipeline-state.json").write_text(json.dumps({"attempts": {}, "parked": [f"01_Capture/{'x' * 60}-{i}.md" for i in range(5)]}), encoding="utf-8")
+        r = watchdog.check(sandbox, now)
+        n = r["notification"]
+        if not n.startswith("TheVoid pipeline:") or len(n) > watchdog.NOTIFY_CHARS or not n.endswith("…") or "[dlq]" not in n:
+            problems.append(f"notify: {len(n)} chars, starts {n[:30]!r}")
+        for i in range(6):
+            (dlq / f"long-{i}.md").unlink()
+        (sandbox / "00_Memory" / "pipeline-state.json").write_text(json.dumps({"attempts": {}, "parked": []}), encoding="utf-8")
         cli = subprocess.run([sys.executable, str(scripts_dir / "watchdog.py"), "--json"], capture_output=True, text=True, check=False,
                              env={**os.environ, "TOOLKIT_VAULT": str(sandbox)})
         if cli.returncode != 1 or not json.loads(cli.stdout)["problems"]:

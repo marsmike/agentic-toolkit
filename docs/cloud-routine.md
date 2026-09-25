@@ -113,12 +113,14 @@ nothing, print no environment value.
    TOOLKIT_VAULT=<the TheVoid checkout: the directory holding AGENTS.md and 00_Memory/>.
 2. Run: uv run --locked --project plugins/obsidian/scripts python3 plugins/obsidian/scripts/watchdog.py --json
 3. If "ok" is true: finish with one line, `OK <facts.last_run>: <facts.last_summary>`, and send nothing.
-   If "ok" is false: send ONE push notification of at most 600 characters, "TheVoid pipeline:"
-   followed by each problem's `detail`, one per line, then finish with that same text.
+   If "ok" is false: send ONE push notification whose text is the result's `notification` field,
+   exactly as printed (the script already cut it to 600 characters), then finish with that text.
 ```
 
 Settings: attach both repositories as sources (the vault checkout is what it reads); schedule
-`28 */3 * * *` UTC, thirty minutes after each pipeline run; model Haiku 4.5
+`58 2-23/3 * * *` UTC — two hours after each pipeline fire (`58 */3`: a run of a full batch has
+taken up to two hours) and an hour before the next, so with the 4-hour threshold a run that never
+committed is caught at the first check after it; model Haiku 4.5
 (`claude-haiku-4-5-20251001`: a script's verdict needs no more); tools Bash and Read; push
 notifications on. The same environment as the pipeline routine, so `uv` and the git credential
 are there; no keys are needed.

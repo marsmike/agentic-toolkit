@@ -19,7 +19,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from vault_utils import contained, read_frontmatter, require_vault
@@ -32,6 +32,7 @@ LOCK_STALE_HOURS = 6.0     # pipeline_run's own stale-lock horizon; the lock is 
                            # clone (the cloud routine) a hung run shows up as `stale`, not `hung`
 NEW_DLQ_HOURS = 24.0       # a DLQ note this recent is news; older open ones are listed, not alerted
 INBOX_LIMIT = 25           # pipeline_run.DEFAULT_BATCH: more than one batch waiting means runs are not keeping up
+NOTIFY_CHARS = 600         # a push notification's budget; the text is cut here, never by the routine
 FAIL_WORDS = ("failed", "build failed", "git-ignored", "missing", "not attempted", "refused")
 
 
@@ -67,7 +68,7 @@ def check(vault: Path, now: datetime, max_age_hours: float = MAX_AGE_HOURS) -> d
     if when is None:
         problems.append({"kind": "no-run", "detail": "no `pipeline …` commit in this checkout's history"})
     else:
-        age = (now - when.astimezone(timezone.utc)).total_seconds() / 3600
+        age = (now - when.astimezone(UTC)).total_seconds() / 3600
         facts["age_hours"] = round(age, 1)
         if age > max_age_hours:
             problems.append({"kind": "stale", "detail": f"no pipeline run committed for {age:.1f} h (last: {when.strftime('%Y-%m-%d %H:%M')} UTC)"})
@@ -79,7 +80,7 @@ def check(vault: Path, now: datetime, max_age_hours: float = MAX_AGE_HOURS) -> d
 
     lock = vault / LOCK
     if lock.is_file():
-        held = (now - datetime.fromtimestamp(lock.stat().st_mtime, tz=timezone.utc)).total_seconds() / 3600
+        held = (now - datetime.fromtimestamp(lock.stat().st_mtime, tz=UTC)).total_seconds() / 3600
         facts["lock_hours"] = round(held, 1)
         if held > LOCK_STALE_HOURS:
             problems.append({"kind": "hung", "detail": f"pipeline.lock has been held for {held:.1f} h: a run died or hangs"})
@@ -106,7 +107,7 @@ def check(vault: Path, now: datetime, max_age_hours: float = MAX_AGE_HOURS) -> d
         open_notes.append(p.name)
         created = str(fm.get("created") or "")[:10]
         try:
-            fresh = now - datetime.fromisoformat(created).replace(tzinfo=timezone.utc) <= timedelta(hours=NEW_DLQ_HOURS)
+            fresh = now - datetime.fromisoformat(created).replace(tzinfo=UTC) <= timedelta(hours=NEW_DLQ_HOURS)
         except ValueError:
             fresh = False
         if fresh:
@@ -115,7 +116,17 @@ def check(vault: Path, now: datetime, max_age_hours: float = MAX_AGE_HOURS) -> d
     if new_notes:
         problems.append({"kind": "dlq", "detail": f"{len(new_notes)} new DLQ note(s): " + "; ".join(new_notes[:5])})
 
-    return {"ok": not problems, "checked_at": now.isoformat(timespec="minutes"), "problems": problems, "facts": facts}
+    return {"ok": not problems, "checked_at": now.isoformat(timespec="minutes"), "problems": problems, "facts": facts,
+            "notification": notification(problems)}
+
+
+def notification(problems: list[dict[str, str]]) -> str:
+    """The push notification's text, ready to send: every problem, cut to NOTIFY_CHARS so the routine
+    never has to. [Copilot review of PR #45]"""
+    if not problems:
+        return ""
+    text = "TheVoid pipeline:\n" + "\n".join(f"[{p['kind']}] {p['detail']}" for p in problems)
+    return text if len(text) <= NOTIFY_CHARS else text[:NOTIFY_CHARS - 1].rstrip() + "…"
 
 
 def main() -> int:
@@ -124,7 +135,7 @@ def main() -> int:
     ap.add_argument("--max-age-hours", type=float, default=MAX_AGE_HOURS)
     ap.add_argument("--now", help="ISO time to check against (default: now, UTC)")
     args = ap.parse_args()
-    now = datetime.fromisoformat(args.now).astimezone(timezone.utc) if args.now else datetime.now(timezone.utc)
+    now = datetime.fromisoformat(args.now).astimezone(UTC) if args.now else datetime.now(UTC)
     result = check(require_vault(), now, args.max_age_hours)
     if args.json:
         print(json.dumps(result, indent=2))
