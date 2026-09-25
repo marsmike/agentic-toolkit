@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A watchdog for the pipeline** (`watchdog.py`, and a second routine documented in
+  `docs/cloud-routine.md`): from the vault alone it tells a healthy pipeline from a stale, hung,
+  failing, parked, backlogged one or a fresh DLQ note, and the routine notifies only then.
+  [earned: 2026-09-25, owner's request — the pipeline routine cannot report a run that never ran]
+
 - **Images that git will not carry are never lost silently.** `end` checks every `media:` file the
   run's captures name: one git ignores, or one not on disk, gets a DLQ note and a count in the
   run summary. [earned: 2026-09-25 — 111 of 130 recovered tweet screenshots never reached git:

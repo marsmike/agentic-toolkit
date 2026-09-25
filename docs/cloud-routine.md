@@ -91,6 +91,38 @@ FINISH with one line: end's "summary" exactly as printed (it counts what came in
 ledgers), the commit, whether it was pushed, and whether the report was published. No number the scripts did not print.
 ```
 
+## Watchdog routine
+
+A second routine, **Pipeline watchdog**, answers what the pipeline routine cannot: that a run never
+started, died, or keeps failing. It runs `plugins/obsidian/scripts/watchdog.py` between pipeline
+runs and sends one notification only when something is wrong: no `pipeline …` commit for more than
+4 h, a failure in the last run's summary, parked captures, more than a batch waiting, or a DLQ note
+less than a day old. It reads the vault and changes nothing. [earned: 2026-09-25, owner's request —
+"alert me if something is not working"; that day an OpenRouter key died between two runs]
+
+Its instruction is one line, and this file holds the prompt it points at:
+
+```text
+Follow the "Watchdog prompt" in docs/cloud-routine.md (in the agentic-toolkit checkout) exactly.
+```
+
+```text
+Check the TheVoid pipeline once, then stop. Ask no questions, run no pipeline, edit and commit
+nothing, print no environment value.
+1. cd into the agentic-toolkit checkout (the directory holding docs/cloud-routine.md) and export
+   TOOLKIT_VAULT=<the TheVoid checkout: the directory holding AGENTS.md and 00_Memory/>.
+2. Run: uv run --locked --project plugins/obsidian/scripts python3 plugins/obsidian/scripts/watchdog.py --json
+3. If "ok" is true: finish with one line, `OK <facts.last_run>: <facts.last_summary>`, and send nothing.
+   If "ok" is false: send ONE push notification of at most 600 characters, "TheVoid pipeline:"
+   followed by each problem's `detail`, one per line, then finish with that same text.
+```
+
+Settings: attach both repositories as sources (the vault checkout is what it reads); schedule
+`28 */3 * * *` UTC, thirty minutes after each pipeline run; model Haiku 4.5
+(`claude-haiku-4-5-20251001`: a script's verdict needs no more); tools Bash and Read; push
+notifications on. The same environment as the pipeline routine, so `uv` and the git credential
+are there; no keys are needed.
+
 ## Routine settings
 
 - **Repositories:** attach both as the routine's sources: `https://github.com/marsmike/agentic-toolkit`
