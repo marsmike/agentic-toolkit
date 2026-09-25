@@ -34,7 +34,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import build_captures as bc
 import readwise_api as rw
-from vault_utils import profile_value, read_frontmatter, require_vault, write_dlq_note, write_frontmatter
+from vault_utils import contained, profile_value, read_frontmatter, require_vault, write_dlq_note, write_frontmatter
 
 STATE_NOTE = Path("00_Memory") / "readwise-state.md"
 LEDGER = Path("00_Memory") / "readwise-ingested.jsonl"
@@ -122,7 +122,7 @@ def vault_index(vault: Path) -> tuple[dict[str, str], dict[str, str]]:
     """(readwise_doc_id -> path, normalised source address -> path) over the whole vault."""
     ids: dict[str, str] = {}
     sources: dict[str, str] = {}
-    for p in vault.rglob("*.md"):
+    for p in contained(vault.rglob("*.md"), vault):
         rel = p.relative_to(vault)
         if rel.parts and rel.parts[0] in NOT_CONTENT:
             continue

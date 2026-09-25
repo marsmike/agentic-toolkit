@@ -7,6 +7,8 @@ or the judgment service. Each test fails on main after #26 and passes with the c
 
 from __future__ import annotations
 
+import json
+import subprocess
 import sys
 
 import pytest
@@ -78,6 +80,40 @@ def test_a_symlink_inside_the_vault_still_counts(vault):
     (vault / "04_Resources" / "Alias.md").symlink_to(vault / "03_Areas" / "Real-Note.md")
     found = {p.name for p in _module("obsidian", "vault_utils").discover_notes(vault)}
     assert "Alias.md" in found
+
+
+def test_the_capture_queue_skips_symlinks_out_of_the_vault(vault, tmp_path):
+    # Copilot re-review of #28: pipeline_run.queue read 01_Capture/*.md before any containment check.
+    cap = vault / "01_Capture"
+    cap.mkdir()
+    (cap / "Real-Capture.md").write_text("---\nstatus: capture\n---\n\nclip\n", encoding="utf-8")
+    (cap / "Planted-Capture.md").symlink_to(tmp_path / "outside" / "private.md")
+    (vault / "00_Memory").mkdir()
+    result = repr(_module("obsidian", "pipeline_run").queue(vault))
+    assert "Real-Capture" in result and "Planted-Capture" not in result, result
+
+
+def test_radar_and_readwise_indexes_skip_symlinks_out_of_the_vault(vault, tmp_path):
+    # Copilot re-review of #28: both scripts run in the unattended pipeline with their own walkers.
+    (tmp_path / "outside" / "sourced.md").write_text(
+        "---\nsource: https://example.com/private\nreadwise_doc_id: 999\n---\n\nx\n", encoding="utf-8")
+    (vault / "03_Areas" / "Planted-Source.md").symlink_to(tmp_path / "outside" / "sourced.md")
+    (vault / "03_Areas" / "Real-Source.md").write_text(
+        "---\nsource: https://example.com/real\nreadwise_doc_id: 111\n---\n\nx\n", encoding="utf-8")
+    # Each in its own interpreter: plugins may ship same-named modules (e.g. `judgments`), and an
+    # import left over from another test would shadow them.
+    def run(plugin: str, code: str):
+        out = subprocess.run([sys.executable, "-c", code, str(vault)], cwd=REPO_ROOT / "plugins" / plugin / "scripts",
+                             capture_output=True, text=True, check=True).stdout
+        return json.loads(out)
+
+    radar = run("radar", "import json, sys; from pathlib import Path; import radar\n"
+                         "print(json.dumps(radar.vault_sources(Path(sys.argv[1]))))")
+    assert any("Real-Source" in v for v in radar.values()) and not any("Planted" in v for v in radar.values()), radar
+    ids, sources = run("readwise", "import json, sys; from pathlib import Path; import ingest\n"
+                                   "print(json.dumps(ingest.vault_index(Path(sys.argv[1]))))")
+    assert "111" in ids and "999" not in ids, ids
+    assert not any("Planted" in v for v in sources.values()), sources
 
 
 def test_a_malformed_pdf_url_is_refused_not_raised():
