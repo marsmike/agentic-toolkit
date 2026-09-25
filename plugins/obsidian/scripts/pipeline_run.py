@@ -71,6 +71,10 @@ SECRET_PATTERNS = {
     "Google API key": r"\bAIza[0-9A-Za-z_-]{35}\b",
     "Slack token": r"\bxox[abprs]-[A-Za-z0-9-]{10,}",
     "private key": r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----",
+    # A password written into pasted code, e.g. `password="…"`; a placeholder in <angle brackets>
+    # passes. [earned: 2026-09-25 correction run — a highlight quoted an article's Neo4j password
+    # and no pattern caught it]
+    "password assignment": r"""(?i)\bpass(?:word|wd)\b["']?\s*[:=]\s*(["'])(?!<)[^"'\n]*[^"'\s\n][^"'\n]*\1""",
     "assigned secret": r"(?i)\b(?:api[_-]?key|access[_-]?token|secret[_-]?key|auth[_-]?token)\s*[:=]\s*['\"]?(?=[A-Za-z_\-]*\d)[A-Za-z0-9_\-]{24,}",
 }
 _SECRETS = [(name, re.compile(rx)) for name, rx in SECRET_PATTERNS.items()]

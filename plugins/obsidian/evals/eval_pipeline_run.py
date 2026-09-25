@@ -8,7 +8,7 @@
               captures left in the inbox and not reported failed are named as not attempted
 3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted;
               `--failed ""` or a path no longer in 01_Capture/ counts no failure
-4. secrets  — a staged note holding a key-shaped string makes `end` refuse the commit and write one DLQ
+4. secrets  — (4b: password assignments in three syntaxes are found, placeholders are not) a staged note holding a key-shaped string makes `end` refuse the commit and write one DLQ
               note that names the file, never the key; the next clean run commits
 5. sync     — with a bare upstream: a second clone's commit arrives with `begin`, `end` pushes, and a
               conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
@@ -244,6 +244,19 @@ def run(vault: Path) -> dict:
         if _git(sandbox, "diff", "--cached", "--name-only").strip():
             problems.append("phase 4: a refused commit must leave nothing staged")
         leak.unlink()
+
+        # 4b. password assignments: each documented syntax is found in the staged diff by kind; a
+        # placeholder, an environment lookup and prose are not
+        hits_file = sandbox / "04_Resources" / "Eval-Password-Note.md"
+        hits_file.write_text("\n".join(['password="my pass"', "PASSWORD: 'abcdef12'", '{"password": "s3cr3tpw"}',
+                                          'password="<redacted: demo>"', 'password = os.environ["PW"]',
+                                          "passwords are hard to remember"]) + "\n", encoding="utf-8")
+        _git(sandbox, "add", "--", str(hits_file.relative_to(sandbox)))
+        found = [h for h in pr.scan_staged(sandbox) if h.get("kind") == "password assignment"]
+        if sorted(h.get("line") for h in found) != [1, 2, 3]:
+            problems.append(f"phase 4b: password assignments found on lines {[h.get('line') for h in found]}, want [1, 2, 3]")
+        _git(sandbox, "reset", "-q", "--", str(hits_file.relative_to(sandbox)))
+        hits_file.unlink()
         _begin(pr, sandbox, NOW + timedelta(hours=15))
         if _end(pr, sandbox, NOW + timedelta(hours=15), 0, 0, []).get("status") != "ok":
             problems.append("phase 4: once the key is gone the next run commits")
