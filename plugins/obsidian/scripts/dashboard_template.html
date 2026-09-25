@@ -434,7 +434,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
   const STATUS = {distilled: "Distilled", known: "In vault", dropped: "Dropped", duplicate: "Duplicate",
                   archived: "Archived", waiting: "Waiting", missing: "Missing"};
   const importsUrl = run => `obsidian://open?vault=${encodeURIComponent(DATA.vault)}&file=${encodeURIComponent("Imports" + (run ? "#" + run : ""))}`;
-  function typeOf(cat) { return {tweet: "tweet", video: "video", pdf: "paper", podcast: "podcast", email: "own"}[cat] || "article"; }
+  function typeOf(cat) { return {tweet: "tweet", video: "video", pdf: "paper", podcast: "podcast", email: "own", highlights: "own"}[cat] || "article"; }
 
   function renderRuns() {
     const runs = (DATA.runs || []).slice(0, 24);

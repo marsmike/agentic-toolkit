@@ -29,6 +29,7 @@ EVAL_MODULES = (
     "eval_pdf_scheme",
     "eval_tweet_enrich",
     "eval_reader_archive",
+    "eval_highlights",
 )
 
 

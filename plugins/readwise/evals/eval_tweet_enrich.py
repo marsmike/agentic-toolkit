@@ -96,6 +96,9 @@ def run(vault: Path) -> dict:
         pass
     finally:
         srv.server_close()
+    if te.external_links("put it in http://CLAUDE.md and http://judge.sh, see https://github.com/acme/widget, https://docs.ai/x") \
+            != ["https://github.com/acme/widget", "https://docs.ai/x"]:
+        problems.append("safety: a file name X linked as a domain was taken as linked content")
     if te.external_links("see https://[not-a-host and https://github.com/acme/widget") != ["https://github.com/acme/widget"]:
         problems.append("safety: a malformed URL was not ignored")
     blocker = Path(__import__("tempfile").mkdtemp()) / "not-a-dir"
