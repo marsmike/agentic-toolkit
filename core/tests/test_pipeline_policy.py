@@ -85,7 +85,7 @@ def test_the_agent_reads_repo_and_vault_writes_vault_fetches_listed_domains(laun
     others = {g for g in launch["allowed"] if not g.startswith("Bash")}
     fetch = {g for g in others if g.startswith("WebFetch")}
     assert fetch == {"WebFetch(domain:github.com)", "WebFetch(domain:raw.githubusercontent.com)"}, fetch
-    assert others - fetch == {f"Read(/{repo}/**)", f"Read(/{vault}/**)", f"Edit(/{vault}/**)", "Glob", "Grep", "Skill"}
+    assert others - fetch == {f"Read(/{repo}/**)", f"Read(/{vault}/**)", f"Edit(/{vault}/**)", "Skill"}
     assert set(launch["denied"]) >= {f"Read(/{keys})", f"Edit(/{keys})", f"Edit(/{vault}/.git/**)",
                                      f"Edit(/{vault}/Config/toolkit/**)", f"Edit(/{repo}/**)"}
 
@@ -102,6 +102,22 @@ def test_neither_git_tree_is_readable(launch):
     repo, vault = REPO_ROOT.resolve(), launch["vault"]
     assert set(launch["denied"]) >= {f"Read(/{vault}/.git)", f"Read(/{vault}/.git/**)",
                                      f"Read(/{repo}/.git)", f"Read(/{repo}/.git/**)"}
+
+
+def test_neither_git_path_is_writable_as_a_file(launch):
+    # Fails before #28's last round: in a worktree `.git` is a file, which `.git/**` does not match.
+    # [Copilot review of #28]
+    repo, vault = REPO_ROOT.resolve(), launch["vault"]
+    assert set(launch["denied"]) >= {f"Edit(/{vault}/.git)", f"Edit(/{vault}/.git/**)",
+                                     f"Edit(/{repo}/.git)", f"Edit(/{repo}/.git/**)"}
+
+
+def test_search_tools_have_no_tool_level_grant(launch):
+    # Fails before #28's last round: a bare Grep grant searched any directory (a headless run returned
+    # ~/.env lines); ungranted, dontAsk confines Glob and Grep to the repo and the vault.
+    # [Copilot review of #28]
+    assert not {"Grep", "Glob"} & set(launch["allowed"])
+    assert not [g for g in launch["allowed"] if g.startswith(("Grep(", "Glob("))]
 
 
 def _obsidian_module(name: str):

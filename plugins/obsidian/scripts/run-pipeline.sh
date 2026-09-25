@@ -52,13 +52,18 @@ ALLOWED+="$(script obsidian distill_judge.py)$(script obsidian distill_check.py)
 ALLOWED+="$(script obsidian retire_capture.py)$(script obsidian search.py)"
 ALLOWED+="$(script radar radar.py scan)$(script radar radar.py gaps)$(script radar radar.py weekly)"
 ALLOWED+="$(script readwise ingest.py)"
-ALLOWED+="Read(/$REPO/**),Read(/$VAULT/**),Edit(/$VAULT/**),Glob,Grep,Skill"
+# No bare Glob or Grep grant: a tool-level grant searches any directory (a run searched $HOME and
+# returned ~/.env lines), and a Read deny covers only the path it names. Without the grant dontAsk
+# still lets them search the working directories (repo and vault) and refuses everywhere else.
+# [earned: 2026-09-25, Copilot review of #28, reproduced headless]
+ALLOWED+="Read(/$REPO/**),Read(/$VAULT/**),Edit(/$VAULT/**),Skill"
 for domain in $(printf '%s' "$FETCH_DOMAINS" | tr ',' ' '); do ALLOWED+=",WebFetch(domain:$domain)"; done
 # .git is denied to the agent's file tools for reads too: history can hold old secrets, and hooks and
 # remotes are not the agent's business. (A granted script that runs git still reads it; that is the
 # script's job, and the scripts are the reviewed surface.) [earned: 2026-09-24, Copilot review of #26]
 DENIED="Read(/$KEYS_FILE),Edit(/$KEYS_FILE),Read(/$VAULT/.git),Read(/$VAULT/.git/**),Read(/$REPO/.git),Read(/$REPO/.git/**)"
-DENIED+=",Edit(/$VAULT/.git/**),Edit(/$VAULT/Config/toolkit/**),Edit(/$REPO/**)"
+# `.git` is a file in a worktree, which `.git/**` does not match: deny the exact path as well.
+DENIED+=",Edit(/$VAULT/.git),Edit(/$VAULT/.git/**),Edit(/$REPO/.git),Edit(/$REPO/.git/**),Edit(/$VAULT/Config/toolkit/**),Edit(/$REPO/**)"
 
 PROMPT="Run the obsidian:pipeline skill against the vault in TOOLKIT_VAULT ($VAULT). \
 Run every script from the working directory exactly as \
