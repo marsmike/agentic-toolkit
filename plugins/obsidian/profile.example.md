@@ -4,6 +4,8 @@ kind: profile
 status: active
 plugin: obsidian
 search_score_gate: 0.70
+graph_high_gate: null
+graph_low_gate: null
 default_capture_prefixes:
   - Readwise-
   - Research-
@@ -33,6 +35,10 @@ order (env var → this note → shipped default).
 - **`search_score_gate`** — overrides the 0.70 default for what counts as an enrichment-grade
   match in `scripts/search.py` and the distill skill. Recalibrate per embedding model if you enable
   the optional semantic layer.
+- **`graph_high_gate` / `graph_low_gate`** — the similarity gates `gaiafield infer` labels
+  INFERRED (≥ high) and AMBIGUOUS (≥ low) with, for this vault. Unset: the binary's defaults
+  (0.72 / 0.67, calibrated on the example vault). Set them from `gaiafield calibrate`'s
+  `suggested_high_gate`/`suggested_low_gate`; the next `infer --full` applies them.
 - **`default_capture_prefixes`** — the origin prefixes captures in `01_Capture/` carry
   (`Readwise-`, `Research-`, …). Read by the agent running `distill` and `retrieval-verification`
   to name and group captures; no script branches on it.

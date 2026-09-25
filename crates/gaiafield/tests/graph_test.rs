@@ -879,3 +879,14 @@ fn incremental_deletion_reflags_incoming_edges_dangling_not_corrupt() {
     let _ = std::fs::remove_dir_all(db.parent().unwrap());
     let _ = std::fs::remove_dir_all(&scratch);
 }
+
+#[test]
+fn infer_with_gates_refuses_inverted_or_out_of_range_gates_before_any_work() {
+    let db = fresh_db_path("gates");
+    let conn = gaiafield::open_db(&db).expect("open db");
+    for (high, low) in [(0.5, 0.7), (1.2, 0.5), (0.7, 0.0)] {
+        let err = gaiafield::infer_with_gates(&vault_path(), &conn, &shared_model_dir(), true, false, high, low)
+            .expect_err("bad gates must be refused");
+        assert!(err.contains("gate"), "{err}");
+    }
+}

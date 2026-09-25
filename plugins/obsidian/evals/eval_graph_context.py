@@ -36,6 +36,7 @@ asserts:
 """
 from __future__ import annotations
 
+import json
 import os
 import stat
 from pathlib import Path
@@ -55,6 +56,46 @@ EXPECTED_BACKLINK_STEMS = {
 }
 BRIDGE_NOTE = "Alex-Vega.md"
 DLQ_FRONTMATTER_KEYS = ("description", "status", "created", "tags", "confidence")
+
+
+def _run_gate_flags_phase(vault: Path, graph_mod, scripts_dir: Path) -> dict | None:
+    """With `graph_high_gate`/`graph_low_gate` set (env override), `ensure_inferred()` passes
+    `--high-gate`/`--low-gate` to the binary; a stub records what it received."""
+    sandbox_vault = make_sandbox(vault)
+    log = sandbox_vault.parent / "infer-args.txt"
+    try:
+        stub = sandbox_vault.parent / "gaiafield-stub-gates"
+        reply = sandbox_vault.parent / "infer-reply.json"
+        reply.write_text(json.dumps({"embedded": 0, "inferred_edges": 0, "ambiguous_edges": 0, "model": "stub",
+                                     "high_gate": 0.8, "low_gate": 0.7, "elapsed_ms": 1}), encoding="utf-8")
+        stub.write_text("#!/bin/sh\n"
+                        "case \"$1\" in\n"
+                        "  --help) echo 'Commands: index infer candidates surprise'; exit 0 ;;\n"
+                        f"  infer) echo \"$@\" > '{log}'; cat '{reply}'; exit 0 ;;\n"
+                        "  *) echo '{}'; exit 0 ;;\n"
+                        "esac\n", encoding="utf-8")
+        stub.chmod(stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        saved = {k: os.environ.get(k) for k in (graph_mod.GAIAFIELD_BIN_ENV, "TOOLKIT_OBSIDIAN_GRAPH_HIGH_GATE", "TOOLKIT_OBSIDIAN_GRAPH_LOW_GATE")}
+        os.environ[graph_mod.GAIAFIELD_BIN_ENV] = str(stub)
+        os.environ["TOOLKIT_OBSIDIAN_GRAPH_HIGH_GATE"] = "0.8"
+        os.environ["TOOLKIT_OBSIDIAN_GRAPH_LOW_GATE"] = "0.7"
+        try:
+            graph_mod._inference_probe_cache.clear()
+            result = graph_mod.ensure_inferred(sandbox_vault)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+            graph_mod._inference_probe_cache.clear()
+        got = log.read_text() if log.is_file() else ""
+        if isinstance(result, graph_mod.GraphUnavailable) or "--high-gate 0.8 --low-gate 0.7" not in got:
+            return {"eval": "graph_context", "pass": False,
+                    "detail": f"gate-flags phase: expected --high-gate 0.8 --low-gate 0.7 on the infer call, got {got!r} / {result!r}"}
+        return None
+    finally:
+        teardown_sandbox(sandbox_vault)
 
 
 def _run_call_failure_phase(vault: Path, graph_mod, scripts_dir: Path) -> dict | None:
@@ -120,6 +161,12 @@ def run(vault: Path) -> dict:
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
     import graph as graph_mod
+
+    gate = _run_gate_flags_phase(vault, graph_mod, scripts_dir)
+
+    if gate is not None:
+
+        return gate
 
     call_failure_problem = _run_call_failure_phase(vault, graph_mod, scripts_dir)
     if call_failure_problem is not None:

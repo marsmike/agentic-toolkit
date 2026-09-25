@@ -5,6 +5,8 @@ status: active
 created: 2026-02-03
 plugin: obsidian
 search_score_gate: 0.70
+graph_high_gate: null
+graph_low_gate: null
 default_capture_prefixes:
   - Readwise-
   - Research-

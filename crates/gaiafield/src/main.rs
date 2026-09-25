@@ -122,6 +122,14 @@ enum Command {
         #[arg(long, conflicts_with = "full")]
         reset: bool,
 
+        /// Similarity at or above which a pair is INFERRED (default 0.72; `calibrate` suggests one).
+        #[arg(long, value_name = "SCORE")]
+        high_gate: Option<f64>,
+
+        /// Similarity at or above which a pair is AMBIGUOUS (default 0.67; at most --high-gate).
+        #[arg(long, value_name = "SCORE")]
+        low_gate: Option<f64>,
+
         #[arg(long)]
         json: bool,
     },
@@ -224,8 +232,10 @@ fn main() -> ExitCode {
             db,
             full,
             reset,
+            high_gate,
+            low_gate,
             json,
-        } => run_infer(vault, db, full, reset, json),
+        } => run_infer(vault, db, full, reset, high_gate, low_gate, json),
         Command::Candidates {
             note,
             vault,
@@ -536,6 +546,8 @@ fn run_infer(
     db_flag: Option<PathBuf>,
     full: bool,
     reset: bool,
+    high_gate: Option<f64>,
+    low_gate: Option<f64>,
     json: bool,
 ) -> ExitCode {
     let vault = match require_vault_or_fail(vault_flag) {
@@ -551,7 +563,15 @@ fn run_infer(
         }
     };
     let model_dir = gaiafield::resolve_model_dir(&db_path);
-    let report = match gaiafield::infer(&vault, &conn, &model_dir, full, reset) {
+    let report = match gaiafield::infer_with_gates(
+        &vault,
+        &conn,
+        &model_dir,
+        full,
+        reset,
+        high_gate.unwrap_or(gaiafield::DEFAULT_HIGH_GATE),
+        low_gate.unwrap_or(gaiafield::DEFAULT_LOW_GATE),
+    ) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("infer failed: {e}");

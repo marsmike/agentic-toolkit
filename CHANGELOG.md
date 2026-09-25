@@ -4,6 +4,17 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **gaiafield 0.2.1** — the fixes that sat unreleased since 0.2.0: `.md` symlinks out of the vault
+  are not nodes, loops and dangling targets skipped (#28); a duplicate bare wikilink resolves to
+  the linking note's own folder, links re-resolve when the target's scope changes, nanosecond
+  mtimes, AMBIGUOUS edges kept out of `neighbors`/`path` (#26); model2vec-rs 0.3.0. New:
+  `infer --high-gate/--low-gate`, so a `calibrate` result becomes the obsidian profile's
+  `graph_high_gate`/`graph_low_gate` instead of a rebuild. Releases carry `.sha256` sidecars;
+  farsight 0.1.2 and gaiafield 0.2.0 got theirs uploaded by hand and now install verified.
+  [earned: 2026-09-25 engine check on The Void — the gates were compile-time constants, and
+  calibrate on nine of the vault's own clusters suggests 0.59/0.53 against an intra-cluster mean of
+  0.695: on this vault the English-only static model, not the gate, is the limit]
+
 - **What's moving.** The dashboard gets a "What's moving" section from the radar's ledgers (per
   interest: worth / strong / promoted for the selected range, rising markers, strong items per
   ISO week stacked by top interest, the top feed items with their fate: promoted, in vault, or

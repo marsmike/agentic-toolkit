@@ -1384,13 +1384,23 @@ pub struct InferReport {
 ///
 /// A pair that already has an `extracted` edge (either direction, non-dangling, non-boundary)
 /// never gets an inferred row — nothing to suggest where a wikilink already exists.
-pub fn infer(
+pub fn infer_with_gates(
     vault: &Path,
     conn: &Connection,
     model_dir: &Path,
     full: bool,
     reset: bool,
+    high_gate: f64,
+    low_gate: f64,
 ) -> Result<InferReport, String> {
+    // Gates are checked before any work: a vault-specific pair from `calibrate` replaces the
+    // compile-time defaults, and an inverted or out-of-range pair must never reach the loop.
+    // [earned: 2026-09-25 — the gates were constants, so a calibration meant a rebuild]
+    if !(0.0 < low_gate && low_gate <= high_gate && high_gate <= 1.0) {
+        return Err(format!(
+            "gates must satisfy 0 < low_gate <= high_gate <= 1, got low_gate={low_gate} high_gate={high_gate}"
+        ));
+    }
     let start = std::time::Instant::now();
 
     if reset {
@@ -1538,10 +1548,10 @@ pub fn infer(
                 continue;
             }
             let score = cosine_similarity(va, vb) as f64;
-            if score < DEFAULT_LOW_GATE {
+            if score < low_gate {
                 continue;
             }
-            let label = if score >= DEFAULT_HIGH_GATE {
+            let label = if score >= high_gate {
                 "INFERRED"
             } else {
                 "AMBIGUOUS"
@@ -1558,8 +1568,8 @@ pub fn infer(
     set_meta(conn, META_MODEL, MODEL_NAME).map_err(|e| e.to_string())?;
     set_meta(conn, META_DIMS, &MODEL_DIMS.to_string()).map_err(|e| e.to_string())?;
     set_meta(conn, META_REVISION, MODEL_REVISION).map_err(|e| e.to_string())?;
-    set_meta(conn, META_HIGH_GATE, &DEFAULT_HIGH_GATE.to_string()).map_err(|e| e.to_string())?;
-    set_meta(conn, META_LOW_GATE, &DEFAULT_LOW_GATE.to_string()).map_err(|e| e.to_string())?;
+    set_meta(conn, META_HIGH_GATE, &high_gate.to_string()).map_err(|e| e.to_string())?;
+    set_meta(conn, META_LOW_GATE, &low_gate.to_string()).map_err(|e| e.to_string())?;
 
     let inferred_edges = conn
         .query_row(
@@ -1581,10 +1591,22 @@ pub fn infer(
         inferred_edges,
         ambiguous_edges,
         model: MODEL_NAME.to_string(),
-        high_gate: DEFAULT_HIGH_GATE,
-        low_gate: DEFAULT_LOW_GATE,
+        high_gate,
+        low_gate,
         elapsed_ms: start.elapsed().as_millis() as u64,
     })
+}
+
+/// `infer_with_gates` at the compile-time defaults (`DEFAULT_HIGH_GATE`/`DEFAULT_LOW_GATE`):
+/// the call every pre-0.2.1 caller and test makes.
+pub fn infer(
+    vault: &Path,
+    conn: &Connection,
+    model_dir: &Path,
+    full: bool,
+    reset: bool,
+) -> Result<InferReport, String> {
+    infer_with_gates(vault, conn, model_dir, full, reset, DEFAULT_HIGH_GATE, DEFAULT_LOW_GATE)
 }
 
 /// Build an adjacency map over `extracted` edges only (undirected — mirrors `neighbors`'/

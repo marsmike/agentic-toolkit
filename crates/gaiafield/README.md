@@ -144,20 +144,7 @@ The one dependency that *is* in the same risk class as `rusqlite`'s bundled SQLi
 download the pinned model files) pulls in `rustls` + `ring`, and `ring` does compile a small amount
 of C/assembly for some targets.
 
-**Honest status, not yet verified (Fix 3):** the `aarch64-unknown-linux-musl` release build that's
-actually been proven end-to-end (`gaiafield-v0.1.0` tag, "Cross-compilation note" below) is v1 —
-`rusqlite`'s bundled SQLite only, no `ring` anywhere in that dependency tree. The mechanism this
-crate depends on for `ring` — `taiki-e/setup-cross-toolchain-action` setting `CC_<target>`/
-`CXX_<target>`/`AR_<target>` for `cc-rs` — is the *same* mechanism already proven for SQLite's C
-amalgamation, which is why it's reasonable to expect it to also cover `ring`'s C/assembly. But
-"the same mechanism, applied to a dependency verified elsewhere" is a prediction, not a
-verification: no v2 tag has actually built `aarch64-unknown-linux-musl` with `ring` in the
-dependency tree yet, and `ring`'s assembly (not straight C) is a slightly different code path than
-`libsqlite3-sys`'s C amalgamation even under the same toolchain. This gets verified, not assumed,
-the first time a `gaiafield-v0.2.0`+ (or later) tag's release workflow actually builds and ships
-the `aarch64-unknown-linux-musl` asset with `model2vec-rs`/`ureq` in the tree — check that tag's
-workflow run before trusting this target for a v2+ release the way "Cross-compilation note" already
-lets v1 be trusted.
+**Verified for v2 (2026-09-25):** the `gaiafield-v0.2.0` release workflow (run 30214767854) built and shipped `gaiafield-aarch64-unknown-linux-musl` with `model2vec-rs`/`ureq` (`ring`) in the dependency tree, so the same `taiki-e/setup-cross-toolchain-action` mechanism proven for SQLite's C amalgamation also covers `ring`'s assembly. Every release since carries a `.sha256` sidecar per binary; 0.1.x/0.2.0 got theirs uploaded by hand.
 
 **Model acquisition:** `infer` downloads three files (`config.json`, `tokenizer.json`,
 `model.safetensors`, ~29 MB total) from a *pinned* HuggingFace revision
@@ -391,10 +378,4 @@ The v2 embedding backend was chosen specifically to avoid *adding* a second C de
 same risk class — see "Embedding backend" above for the (verified) zero-C-compilation story for
 `model2vec-rs`/`tokenizers` — with one exception: `ureq`'s TLS stack (`ring`), which does compile
 C/assembly, and which the v0.1.0 verification above never exercised (v1 has no `ureq` dependency
-at all). **Not yet verified for v2 (Fix 3, honest pending item):** the expectation that the same
-`taiki-e/setup-cross-toolchain-action` mechanism proven for `libsqlite3-sys`'s C amalgamation also
-covers `ring`'s C/assembly is a reasonable prediction — same env vars, same `cc-rs` machinery — not
-a demonstrated fact. This gets marked verified only once a `gaiafield-v0.2.0`+ tag's release
-workflow run actually completes the `aarch64-unknown-linux-musl` build with `model2vec-rs`/`ureq`
-in the dependency tree; check that tag's own workflow run rather than assuming this note's v1
-verification extends to it.
+at all). Verified for v2 by the `gaiafield-v0.2.0` release run, as noted above.
