@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The last run's ingestion report, as a Claude artifact** (`report_build.py`, a generator in
+  `end`): every import with its source, expanded links and images, what it became (the note on
+  GitHub and in Obsidian, found by source when the manifest names it in prose), and the notes the
+  run wrote; a quiet run shows the last run that imported. The routine republishes it to the
+  profile's `report_artifact_url` after every successful run (REPORT step; `Artifact` joins the
+  routine's tools), and the dashboard links it. [earned: 2026-09-25, owner's request]
+
 - **The owner's Reader highlights reach the vault** (`ingest.ingest_highlights`): every highlight
   and note not in the ledger, whatever its age, lands in a highlights capture per document that
   names where the document went; text already in the vault is recorded, not captured; highlights

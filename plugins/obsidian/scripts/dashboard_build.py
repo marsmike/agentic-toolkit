@@ -32,7 +32,7 @@ from urllib.parse import urlsplit
 
 import imports_log
 from map_build import _date, _one_line, _tags
-from vault_utils import atomic_write, contained, discover_notes, read_frontmatter, require_vault
+from vault_utils import atomic_write, contained, discover_notes, profile_value, read_frontmatter, require_vault
 
 OUT = "Dashboard.html"
 TEMPLATE = Path(__file__).resolve().parent / "dashboard_template.html"
@@ -118,6 +118,7 @@ def build(vault: Path, today: date) -> dict:
     imports = imports_log.resolved(vault)
     return {"vault": vault.name, "built": datetime.now().astimezone().isoformat(timespec="minutes"),
             "today": today.isoformat(), "window": WINDOW_DAYS, "inbox": inbox(vault),
+            "report": str(profile_value(vault, "report_artifact_url") or ""),
             "notes": notes(vault, since), "runs": runs(vault, since, imports),
             "missing": sum(1 for r in imports for it in r["items"] if it["fate"]["status"] == "missing")}
 

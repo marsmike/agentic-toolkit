@@ -101,6 +101,7 @@ the notes alone and with no model call (`contract/VAULT_SCHEMA.md` → Generated
 | `map_build.py` | `Maps/<domain>.md` and `.canvas` per `domain/*` tag, `Maps/Overview.md`/`.canvas`; titles, intros and sections from `Config/toolkit/maps.md` |
 | `now_build.py` | `Now.md` (the homepage: new and enriched this week, radar, stuck, inbox, distilled per day, embedded `Vault.base` views) and `Boards/Pipeline.md` (Kanban) |
 | `imports_log.py` | `Imports.md`: every run's imports as a `## YYYY-MM-DD HH:MM` section, newest first, each item with what became of it; a missing clipping is called out at the top. `end` records the run in `00_Memory/imports.jsonl`; `backfill` seeds it from git once |
+| `report_build.py` | `00_Memory/last-run-report.html`: the last run's ingestion report (each import with its source, expanded links, images kept, the notes it became on GitHub and in Obsidian; the notes the run wrote). The cloud routine publishes it to the profile's `report_artifact_url` after every successful run |
 | `dashboard_build.py` | `Dashboard.html`: the last twelve weeks of distilled notes as one self-contained page (filters today / yesterday / 7 / 30 days, by source, domain, kind and search; notes open in Obsidian), plus the pipeline runs. Template: `dashboard_template.html` |
 | `vault_setup.py` | once, by hand: copies `obsidian/` (`Vault.base`, the `toolkit.css` snippet, Templater capture templates) into the vault and prints the settings to click |
 

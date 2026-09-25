@@ -60,6 +60,7 @@ GENERATORS = {  # script → the files it writes (a trailing / = every file dire
     "map_build.py": ("Maps/",),
     "now_build.py": ("Now.md", "Boards/Pipeline.md"),
     "imports_log.py": ("Imports.md",),
+    "report_build.py": ("00_Memory/last-run-report.html",),
     "dashboard_build.py": ("Dashboard.html",),
 }
 SECRET_PATTERNS = {
