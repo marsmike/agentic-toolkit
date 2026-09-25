@@ -58,6 +58,7 @@ GENERATORS = {  # script → the files it writes (a trailing / = every file dire
     "index_build.py": ("Index.md",),
     "map_build.py": ("Maps/",),
     "now_build.py": ("Now.md", "Boards/Pipeline.md"),
+    "dashboard_build.py": ("Dashboard.html",),
 }
 SECRET_PATTERNS = {
     "OpenRouter key": r"sk-or-v1-[0-9a-f]{32,}",

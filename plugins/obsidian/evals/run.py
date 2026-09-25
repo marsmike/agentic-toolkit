@@ -41,6 +41,7 @@ EVAL_MODULES = (
     "eval_distill_check_negative",
     "eval_map_build",
     "eval_now_build",
+    "eval_dashboard_build",
     "eval_retire_capture",
     "eval_search_heading_weight",
 )

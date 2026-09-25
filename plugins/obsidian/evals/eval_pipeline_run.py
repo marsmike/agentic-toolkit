@@ -103,7 +103,8 @@ def _build_failure_phase(pr, sandbox: Path) -> list[str]:
     stubs = Path(tempfile.mkdtemp(prefix="obsidian-plugin-eval-stubs-"))
     saved = pr.SCRIPTS
     try:
-        for name in ("index_build.py", "now_build.py", "log_vault.py", "vault_utils.py"):
+        for name in ("index_build.py", "now_build.py", "dashboard_build.py", "dashboard_template.html",
+                     "log_vault.py", "vault_utils.py"):
             shutil.copy(saved / name, stubs / name)
         for name in ("map_build.py", "pipeline_run.py"):
             shutil.copy(saved / name, stubs / name)
