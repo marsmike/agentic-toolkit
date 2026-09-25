@@ -322,10 +322,11 @@ def _apply(updates: list[dict], done_key: str) -> dict[str, Any]:
 
 
 def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], names: dict[str, str],
-           run_date: str, archive: bool, promote: bool, location: str, out: Path | None = None) -> dict[str, Any]:
+           run_date: str, archive: bool, promote: bool, location: str, out: Path | None = None,
+           per_day: int | None = None) -> dict[str, Any]:
     """Move every fetched feed item the radar has recorded (a repost shares a key with its
     original) out of the feed. With `promote`, the strongest not yet promoted, up to
-    PROMOTE_PER_DAY a day counted in `promoted.jsonl`, go to `location`; a promoted item
+    `promote_per_day` (profile; default PROMOTE_PER_DAY) a day counted in `promoted.jsonl`, go to `location`; a promoted item
     becomes a capture and a note, so the bar is deliberate. Every other recorded item is
     archived (the daily note still lists it). A failed promotion is neither recorded nor
     archived: it stays in the feed and competes again next scan. A Reader failure here never
@@ -339,7 +340,12 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
             s = reports.bands(r)[1]
             if s and r["canonical"] not in promoted_keys:
                 strong[r["canonical"]] = {i: r["p"][i] for i in s}
-    budget = max(0, policy.PROMOTE_PER_DAY - sum(1 for r in done_before if r.get("date") == run_date))
+    # The daily budget is the owner's appetite, not a judgment threshold: `promote_per_day` in the
+    # profile, passed in by scan. [earned: 2026-09-25 — the judge rated ~13 items a day strong and
+    # the fixed 5 discarded the rest]
+    if per_day is None:
+        per_day = policy.PROMOTE_PER_DAY
+    budget = max(0, per_day - sum(1 for r in done_before if r.get("date") == run_date))
     settled = [it for it in fetched if keys_of(it) & recorded]
     candidates = sorted((it for it in settled if item_key(it) in strong), key=lambda it: -max(strong[item_key(it)].values()))
     since = (date.fromisoformat(run_date) - timedelta(days=policy.RELEASE_STREAM_DAYS)).isoformat()
@@ -455,7 +461,8 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
     def archived() -> dict[str, Any]:
         names = {i.id: i.name for i in interests}
         location = str(profile_value(vault, "promote_location", DEFAULT_PROMOTE_LOCATION))
-        return settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote, location, out)
+        return settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote, location, out,
+                      per_day=int(profile_value(vault, "promote_per_day", policy.PROMOTE_PER_DAY)))
     append_jsonl(out / "seen.jsonl", [{"canonical": item_key(it), "title_key": title_key(it),
                                         "first_seen": run_date, "backlog": True} for it in backlog])
     result: dict[str, Any] = {"since": since.isoformat(), "fetched": len(fetched), "new": len(items),
