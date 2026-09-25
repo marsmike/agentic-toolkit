@@ -101,7 +101,6 @@ a renamed field would have scored every radar item 0 and reported "0 new" with n
 | judged | `00_Memory/radar/state.jsonl` | radar `radar.py`, one row per judged feed item | obsidian `pipeline_run.py` (row count), `now_build.py` (Radar) | `run`, `canonical`, `url`, `title`, `p`, `strong`, `in_vault` |
 | promoted | `00_Memory/radar/promoted.jsonl` | radar `radar.py`, one row per item promoted to Readwise | obsidian `pipeline_run.py` (row count) | `canonical`, `id`, `date` |
 | ingested | `00_Memory/readwise-ingested.jsonl` | readwise `ingest.py`, one row per Readwise document seen | obsidian `pipeline_run.py` (captures by `via`) | `doc_id`, `capture`, `via`, `date` |
-| archived | `00_Memory/readwise-archived.jsonl` | readwise `ingest.py` (`archive_settled`), one row per document archived in Reader | readwise `ingest.py` (never twice) | `doc_id`, `archived` or `gone` |
 
 - One JSON object per line, appended, never rewritten. A reader skips blank or unparseable lines
   and ignores fields it does not know.
