@@ -1,4 +1,4 @@
-// The video replays captures with src/cast.ts; the storyboard quotes the
+// The video replays captures with src/cast.ts; the transcripts are the
 // .txt transcripts written by capture/cast_text.py. Both must show the same
 // screen, or a scene would differ from the text it was approved as.
 import assert from "node:assert/strict";

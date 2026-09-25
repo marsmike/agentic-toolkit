@@ -1,7 +1,6 @@
 {
-  "file": "public/music/gymnopedie-1.ogg",
-  "url": "https://upload.wikimedia.org/wikipedia/commons/9/90/Erik_Satie_-_gymnopedies_-_la_1_ere._lent_et_douloureux.ogg",
-  "sha256": "419e37656856224227086df32d6d481a00a738961e08fca9f6147e472beea53e",
-  "startSeconds": 2.0,
-  "page": "https://commons.wikimedia.org/wiki/File:Erik_Satie_-_gymnopedies_-_la_1_ere._lent_et_douloureux.ogg"
+  "file": "public/music/explainer-bed.wav",
+  "generator": "scripts/make_music.py",
+  "timeline": "src/timeline.json",
+  "volume": 0.8
 }

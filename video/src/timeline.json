@@ -1,0 +1,99 @@
+{
+  "note": "Explainer v2 timeline, shared by src/Explainer.tsx and scripts/make_music.py. 80 BPM: one bar is 3 s, and every scene starts on a bar, so the picture and the music change together. Scenes overlap by `crossfade` seconds; nothing cuts.",
+  "bpm": 80,
+  "crossfade": 1.2,
+  "total": 93,
+  "scenes": [
+    {
+      "id": "open",
+      "start": 0,
+      "end": 9,
+      "label": "agentic-toolkit",
+      "sub": "Your notes become an operating system for AI agents.",
+      "for": "For anyone who keeps notes in markdown and works with AI agents."
+    },
+    {
+      "id": "vault",
+      "start": 9,
+      "end": 21,
+      "label": "YOUR NOTES ARE ALREADY A MAP",
+      "sub": "Plain markdown files, linked with [[wikilinks]]: your vault."
+    },
+    {
+      "id": "plugins",
+      "start": 21,
+      "end": 33,
+      "label": "ONE VAULT FOR YOUR AGENTS",
+      "sub": "Shared memory, knowledge graph and settings for a set of Claude Code plugins."
+    },
+    {
+      "id": "search",
+      "start": 33,
+      "end": 45,
+      "label": "SEARCH EVERY NOTE",
+      "sub": "Instant, on your own machine."
+    },
+    {
+      "id": "map",
+      "start": 45,
+      "end": 57,
+      "label": "FOLLOW THE LINKS",
+      "sub": "Your wikilinks become a graph your agents can walk."
+    },
+    {
+      "id": "inferred",
+      "start": 57,
+      "end": 72,
+      "label": "SUGGESTED, NEVER APPLIED",
+      "sub": "New connections are marked INFERRED. You decide."
+    },
+    {
+      "id": "local",
+      "start": 72,
+      "end": 81,
+      "label": "TRY IT ON THE EXAMPLE NOTES",
+      "sub": "The demo runs locally. No account, no API key."
+    },
+    {
+      "id": "end",
+      "start": 81,
+      "end": 93,
+      "label": "agentic-toolkit",
+      "sub": "Your vault is the platform."
+    }
+  ],
+  "cues": [
+    {
+      "at": 37.5,
+      "what": "search hit 1"
+    },
+    {
+      "at": 38.25,
+      "what": "search hit 2"
+    },
+    {
+      "at": 39.0,
+      "what": "search hit 3"
+    },
+    {
+      "at": 49.5,
+      "what": "neighbours light"
+    },
+    {
+      "at": 60.0,
+      "what": "inferred pair 1"
+    },
+    {
+      "at": 61.5,
+      "what": "inferred pair 2"
+    },
+    {
+      "at": 63.0,
+      "what": "inferred pair 3"
+    },
+    {
+      "at": 66.0,
+      "what": "you decide"
+    }
+  ]
+}
