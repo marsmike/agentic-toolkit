@@ -35,7 +35,7 @@ from typing import Any
 import judge
 from judgments import questions as Q
 from judgments.state import in_chunks, note_payload
-from vault_utils import write_dlq_note
+from vault_utils import profile_value, write_dlq_note
 
 GAIAFIELD_BIN_ENV = "TOOLKIT_GAIAFIELD_BIN"
 DEFAULT_TIMEOUT = 30
@@ -332,6 +332,11 @@ def ensure_inferred(vault: Path) -> dict | GraphUnavailable:
         return GraphUnavailable("no-inference", "gaiafield binary has no `infer` subcommand (pre-v2)")
 
     args = ["infer", "--vault", str(vault)]
+    # A vault-specific gate pair from `gaiafield calibrate` lives in the profile (`graph_high_gate`,
+    # `graph_low_gate`); absent, the binary's defaults apply. [earned: 2026-09-25 engine check]
+    high, low = profile_value(vault, "graph_high_gate"), profile_value(vault, "graph_low_gate")
+    if high not in (None, "") and low not in (None, ""):
+        args += ["--high-gate", str(float(high)), "--low-gate", str(float(low))]
     result, error = _run_json(binary, args, timeout=INDEX_TIMEOUT)
     if error is not None:
         _dlq_on_call_failure(vault, "infer", error)
