@@ -1417,6 +1417,16 @@ pub fn infer_with_gates(
     // Inference is a pass on top of the deterministic layer — keep it fresh, incrementally.
     index(vault, conn, false).map_err(|e| e.to_string())?;
 
+    // A gate pair other than the stored one relabels every pair, not only the changed notes':
+    // an incremental pass would keep stale INFERRED/AMBIGUOUS rows while the meta advertised the
+    // new gates. [earned: 2026-09-25, Copilot review of PR #49]
+    let stored_gates = (
+        get_meta(conn, META_HIGH_GATE).and_then(|v| v.parse::<f64>().ok()),
+        get_meta(conn, META_LOW_GATE).and_then(|v| v.parse::<f64>().ok()),
+    );
+    let gates_changed = matches!(stored_gates, (Some(h), Some(l)) if h != high_gate || l != low_gate);
+    let full = full || gates_changed;
+
     if full {
         conn.execute_batch("DELETE FROM inferred_edges; DELETE FROM embeddings;")
             .map_err(|e| e.to_string())?;

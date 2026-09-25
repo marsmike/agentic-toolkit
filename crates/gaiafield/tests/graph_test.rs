@@ -890,3 +890,26 @@ fn infer_with_gates_refuses_inverted_or_out_of_range_gates_before_any_work() {
         assert!(err.contains("gate"), "{err}");
     }
 }
+
+/// A new gate pair must relabel every pair, even on an incremental pass over an unchanged vault:
+/// the stored gates decide whether the last inference is still valid. [Copilot review of PR #49]
+#[test]
+fn a_new_gate_pair_relabels_every_pair_on_an_incremental_pass() {
+    let db = fresh_db_path("gates-change");
+    let conn = gaiafield::open_db(&db).expect("open db");
+    let vault = vault_path();
+    let base = gaiafield::infer(&vault, &conn, &shared_model_dir(), true, false).expect("infer at the defaults");
+    assert!(base.inferred_edges > 0, "the example vault must yield INFERRED edges at the defaults: {base:?}");
+    let strict = gaiafield::infer_with_gates(&vault, &conn, &shared_model_dir(), false, false, 0.95, 0.9)
+        .expect("incremental infer with stricter gates");
+    assert_eq!((strict.high_gate, strict.low_gate), (0.95, 0.9));
+    assert!(
+        strict.inferred_edges < base.inferred_edges,
+        "stricter gates on an incremental pass must relabel: {} INFERRED at 0.72, still {} at 0.95",
+        base.inferred_edges,
+        strict.inferred_edges
+    );
+    let same = gaiafield::infer_with_gates(&vault, &conn, &shared_model_dir(), false, false, 0.95, 0.9)
+        .expect("a second pass at the same gates");
+    assert_eq!(same.inferred_edges, strict.inferred_edges, "unchanged gates must not rescore");
+}
