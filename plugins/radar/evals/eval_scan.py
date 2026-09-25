@@ -16,7 +16,7 @@
                  radar/<interest> with a note naming each interest and p, the rest are archived;
                  a failed promotion leaves the item in the feed (not archived) and the next scan
                  promotes it from state without a judgment request; at most PROMOTE_PER_DAY a
-                 (8c: `promote_per_day` from the profile/env wins over the constant)
+                 (8d: `promote_per_day` from the profile/env wins over the constant)
                  day, counted across scans; one GitHub release stream at most once in
                  RELEASE_STREAM_DAYS (the strongest release that day; a later day skips the stream)
 9. todoist     — with --todoist and Portfolio epics as interests, one comment per epic with strong
@@ -300,15 +300,20 @@ def run(vault: Path) -> dict:
         finally:
             policy.PROMOTE_PER_DAY = saved_cap
 
-        # 8c. the profile key wins over the constant: promote_per_day=0 through the env override promotes nothing
-        os.environ["TOOLKIT_RADAR_PROMOTE_PER_DAY"] = "0"
+        # 8d. the profile key wins over the constant: promote_per_day=0 through the env override promotes
+        # nothing; the caller's own value of that variable, if any, is put back afterwards
+        env_key, env_before = "TOOLKIT_RADAR_PROMOTE_PER_DAY", os.environ.get("TOOLKIT_RADAR_PROMOTE_PER_DAY")
+        os.environ[env_key] = "0"
         try:
             promoted.clear()
             r = radar.scan(sandbox, sandbox.parent / "cap-profile", since, NOW, promote=True)
             if promoted or r.get("promoted") not in (0, None):
-                problems.append(f"phase 8c: promote_per_day=0 from the profile must promote nothing, got {r.get('promoted')}")
+                problems.append(f"phase 8d: promote_per_day=0 from the profile must promote nothing, got {r.get('promoted')}")
         finally:
-            os.environ.pop("TOOLKIT_RADAR_PROMOTE_PER_DAY", None)
+            if env_before is None:
+                os.environ.pop(env_key, None)
+            else:
+                os.environ[env_key] = env_before
 
         # 8c. release streams: three releases of one repo and one of another -> one per repo
         from reader import Item
