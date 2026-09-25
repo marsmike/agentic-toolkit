@@ -80,7 +80,27 @@ button, input { font: inherit; color: inherit; }
 .kpi .l { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
 .delta { font-size: 12.5px; color: var(--text-2); margin-left: 6px; font-weight: 500; letter-spacing: 0; }
 .span-8 { grid-column: span 8; } .span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-12 { grid-column: span 12; }
-@media (max-width: 900px) { .kpi { grid-column: span 6; } .span-8, .span-4, .span-6 { grid-column: span 12; } }
+.span-7 { grid-column: span 7; } .span-5 { grid-column: span 5; }
+@media (max-width: 900px) { .kpi { grid-column: span 6; } .span-8, .span-4, .span-6, .span-7, .span-5 { grid-column: span 12; } }
+.irows { display: grid; gap: 4px; }
+.irow { display: grid; grid-template-columns: minmax(0, 1fr) 46px 46px 56px; gap: 8px; align-items: center; border: 0; background: none; padding: 5px 0; text-align: left; cursor: pointer; border-radius: 6px; }
+.irow:hover .n, .irow[aria-pressed="true"] .n { color: var(--text); }
+.irow .n { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; gap: 6px; align-items: center; min-width: 0; }
+.irow .n span { overflow: hidden; text-overflow: ellipsis; }
+.irow .c { font: 12.5px ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }
+.irow .c.s { color: var(--text); font-weight: 600; }
+.irow.head { cursor: default; } .irow.head .c, .irow.head .n { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.rise { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--good); border: 1px solid currentColor; border-radius: 4px; padding: 1px 5px; flex: none; }
+.ritems { display: grid; gap: 0; }
+.ritem { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); align-items: start; }
+.ritem:first-child { border-top: 0; }
+.ritem .p { font: 600 13px ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; color: var(--text-2); padding-top: 2px; }
+.ritem .p.hi { color: var(--text); }
+.ritem a.t { color: var(--text); text-decoration: none; font-weight: 600; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.ritem a.t:hover { color: var(--accent); }
+.ritem .m { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px; align-items: center; }
+.st { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; border-radius: 4px; padding: 1px 5px; border: 1px solid currentColor; }
+.st.promoted { color: var(--good); } .st.vault { color: var(--accent); } .st.dropped { color: var(--muted); }
 @media (max-width: 480px) { .kpi .v { font-size: 28px; } h1 { font-size: 22px; } }
 svg text { fill: var(--muted); font-size: 11px; }
 .axis line { stroke: var(--line); }
@@ -205,6 +225,22 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
     </div>
   </section>
 
+  <section class="grid" style="margin-top:14px" id="radar" aria-label="What is moving">
+    <div class="card span-7">
+      <h2>What's moving <span class="hint" id="ihint">feed items the radar judged · click an interest</span></h2>
+      <div class="irows" id="interests"></div>
+    </div>
+    <div class="card span-5">
+      <h2>Strong per week <span class="hint">last 8 weeks · top 3 interests</span></h2>
+      <div id="weeks"></div>
+      <div class="legend" id="weeklegend"></div>
+    </div>
+    <div class="card span-12">
+      <h2>Top feed items <span class="hint" id="radarhint"></span></h2>
+      <div class="ritems" id="radaritems"></div>
+    </div>
+  </section>
+
   <section aria-label="Notes" id="feed"></section>
 
   <section class="card" style="margin-top:28px">
@@ -237,7 +273,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
   // ---- state ----------------------------------------------------------------------------------
   const store = {get: k => { try { return localStorage.getItem("void-dash:" + k); } catch { return null; } },
                  set: (k, v) => { try { localStorage.setItem("void-dash:" + k, v); } catch { /* private mode */ } }};
-  const S = {range: store.get("range") || "7", domain: null, kind: null, type: null, q: "", shown: PAGE};
+  const S = {range: store.get("range") || "7", domain: null, kind: null, type: null, interest: null, q: "", shown: PAGE, rshown: 40};
 
   function span(range) {
     if (range === "today") return [TODAY, TODAY];
@@ -287,7 +323,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
   }
   const hideTip = () => { tip.style.opacity = 0; };
 
-  function set(k, v) { S[k] = S[k] === v ? null : v; S.shown = PAGE; render(); }
+  function set(k, v) { S[k] = S[k] === v ? null : v; S.shown = PAGE; S.rshown = 40; render(); }
   function setRange(r) { S.range = r; if (!r.startsWith("day:")) store.set("range", r); S.shown = PAGE; render(); }
 
   // ---- sections -------------------------------------------------------------------------------
@@ -302,6 +338,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
     if (S.domain) chips.push(["Domain", S.domain, () => set("domain", S.domain)]);
     if (S.kind) chips.push(["Kind", S.kind, () => set("kind", S.kind)]);
     if (S.type) chips.push(["Source", TYPE_LABEL[S.type], () => set("type", S.type)]);
+    if (S.interest) chips.push(["Interest", iname(S.interest), () => set("interest", S.interest)]);
     if (S.q) chips.push(["Search", S.q, () => { S.q = ""; document.getElementById("q").value = ""; render(); }]);
     document.getElementById("chips").replaceChildren(...chips.map(([k, v, off]) =>
       el("button", {class: "chip", onclick: off, "aria-label": `Remove filter ${k}: ${v}`}, `${k}: ${v}`, el("span", {class: "x", text: "×"}))));
@@ -437,6 +474,79 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
   const importsUrl = run => `obsidian://open?vault=${encodeURIComponent(DATA.vault)}&file=${encodeURIComponent("Imports" + (run ? "#" + run : ""))}`;
   function typeOf(cat) { return {tweet: "tweet", video: "video", pdf: "paper", podcast: "podcast", email: "own", highlights: "own"}[cat] || "article"; }
 
+  // ---- what's moving: the radar's ledgers, filtered by the same range -------------------------
+  const RADAR = DATA.radar || {items: [], interests: {}, weeks: {}, rising: []};
+  const iname = id => (RADAR.interests[id] || {}).name || id.replace(/-/g, " ");
+  const PCOL = ["var(--p1, #2a78d6)", "var(--p2, #eb6834)", "var(--p3, #1baf7a)", "var(--s-own)"];
+  function radarItems(sp) {
+    return RADAR.items.filter(it => it.day >= sp[0] && it.day <= sp[1]
+      && (!S.interest || it.strong.includes(S.interest) || it.worth.includes(S.interest) || it.top === S.interest)
+      && (!S.q || S.q.split(/\s+/).every(w => (it.title + " " + it.feed + " " + it.strong.map(iname).join(" ")).toLowerCase().includes(w))));
+  }
+  function renderInterests(sp) {
+    const pool = RADAR.items.filter(it => it.day >= sp[0] && it.day <= sp[1]);
+    const agg = {};
+    for (const it of pool) {
+      for (const id of it.worth) (agg[id] = agg[id] || {w: 0, s: 0, p: 0}).w++;
+      for (const id of it.strong) { const a = agg[id] = agg[id] || {w: 0, s: 0, p: 0}; a.s++; if (it.promoted) a.p++; }
+    }
+    if (S.interest && !agg[S.interest]) agg[S.interest] = {w: 0, s: 0, p: 0};
+    const rows = Object.entries(agg).sort((a, b) => b[1].s - a[1].s || b[1].w - a[1].w || iname(a[0]).localeCompare(iname(b[0])));
+    const judged = Object.values(RADAR.interests).reduce((m, i) => Math.max(m, i.judged || 0), 0);
+    document.getElementById("ihint").textContent = judged ? `${judged} items judged in 12 weeks · click an interest` : "no radar data yet";
+    const head = el("div", {class: "irow head"}, el("span", {class: "n", text: "interest"}), el("span", {class: "c", text: "worth"}), el("span", {class: "c", text: "strong"}), el("span", {class: "c", text: "promoted"}));
+    document.getElementById("interests").replaceChildren(head, ...(rows.length ? rows.map(([id, a]) =>
+      el("button", {class: "irow", "aria-pressed": String(S.interest === id), onclick: () => set("interest", id), "aria-label": `${iname(id)}: ${a.s} strong`},
+        el("span", {class: "n"}, el("span", {text: iname(id)}), RADAR.rising.includes(id) ? el("span", {class: "rise", text: "rising"}) : null),
+        el("span", {class: "c", text: String(a.w)}), el("span", {class: "c s", text: String(a.s)}), el("span", {class: "c", text: String(a.p)}))) :
+      [el("div", {class: "empty", text: "Nothing judged in this range."})]));
+  }
+  function renderWeeks() {
+    const weeks = Object.keys(RADAR.weeks);
+    const box = document.getElementById("weeks"), lg = document.getElementById("weeklegend");
+    if (!weeks.length) { box.replaceChildren(el("div", {class: "empty", text: "No weeks yet."})); lg.replaceChildren(); return; }
+    const totals = {};
+    for (const w of weeks) for (const [id, n] of Object.entries(RADAR.weeks[w])) totals[id] = (totals[id] || 0) + n;
+    const top = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
+    const series = [...top, "other"];
+    const val = (w, s) => s === "other" ? Object.entries(RADAR.weeks[w]).filter(([id]) => !top.includes(id)).reduce((a, [, n]) => a + n, 0) : (RADAR.weeks[w][s] || 0);
+    const tot = w => series.reduce((a, s) => a + val(w, s), 0);
+    const max = Math.max(4, ...weeks.map(tot)), step = max <= 8 ? 2 : max <= 20 ? 5 : max <= 50 ? 10 : 25, topv = Math.ceil(max / step) * step;
+    const W = 360, H = 170, L = 26, B = 22, T = 8, bw = (W - L) / weeks.length;
+    const svg = sv("svg", {viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": "Strong feed items per week, stacked by interest"});
+    const g = sv("g", {class: "axis"}); svg.append(g);
+    for (let v = 0; v <= topv; v += step) { const y = T + (H - B - T) * (1 - v / topv); g.append(sv("line", {x1: L, x2: W, y1: y, y2: y, "stroke-dasharray": v ? "2 4" : ""})); const t = sv("text", {x: L - 6, y: y + 3.5, "text-anchor": "end"}); t.textContent = v; g.append(t); }
+    weeks.forEach((w, i) => {
+      const x = L + i * bw; let y = H - B; const col = sv("g", {});
+      const stack = series.filter(s => val(w, s));
+      stack.forEach((s, j) => { const h = (H - B - T) * val(w, s) / topv; y -= h; col.append(sv("rect", {x: x + bw * .2, y, width: bw * .6, height: Math.max(0, h - (j ? 2 : 0)), fill: PCOL[series.indexOf(s)], rx: j === stack.length - 1 ? 3 : 0})); });
+      col.append(sv("rect", {x, y: T, width: bw, height: H - B - T, fill: "transparent"}));
+      col.addEventListener("mousemove", ev => showTip(ev, () => [el("b", {text: `${w} · ${tot(w)} strong`}), ...series.filter(s => val(w, s)).map(s => el("div", {class: "r"}, el("span", {class: "sw", style: `background:${PCOL[series.indexOf(s)]}`}), `${s === "other" ? "Other" : iname(s)} ${val(w, s)}`))]));
+      col.addEventListener("mouseleave", hideTip);
+      const t = sv("text", {x: x + bw / 2, y: H - 6, "text-anchor": "middle"}); t.textContent = w.slice(5); svg.append(t); svg.append(col);
+    });
+    box.replaceChildren(svg);
+    lg.replaceChildren(...series.map((s, i) => el("span", {class: "lg", style: "cursor:default"}, el("span", {class: "sw", style: `background:${PCOL[i]}`}), s === "other" ? "Other" : iname(s))));
+  }
+  function renderRadarItems(sp) {
+    const list = radarItems(sp).sort((a, b) => b.p - a.p || (a.day < b.day ? 1 : -1));
+    const box = document.getElementById("radaritems");
+    document.getElementById("radarhint").textContent = list.length ? `${list.length} worth reading in this range · ${list.filter(i => i.promoted).length} promoted into Reader` : "";
+    if (!list.length) { box.replaceChildren(el("div", {class: "empty", text: "Nothing worth reading in this range."})); return; }
+    const shown = list.slice(0, S.rshown);
+    box.replaceChildren(...shown.map(it => {
+      const src = safeUrl(it.url);
+      const status = it.promoted ? ["promoted", "promoted"] : it.in_vault ? ["vault", "in vault"] : it.strong.length ? ["dropped", "strong, not promoted"] : null;
+      return el("div", {class: "ritem"},
+        el("span", {class: "p" + (it.strong.length ? " hi" : ""), text: it.p.toFixed(2)}),
+        el("div", {},
+          src ? el("a", {class: "t", href: src, target: "_blank", rel: "noopener noreferrer", text: it.title}) : el("span", {class: "t", text: it.title}),
+          el("div", {class: "m"}, el("span", {text: [it.feed, it.kind, dayName(it.day)].filter(Boolean).join(" · ")}),
+            status ? el("span", {class: "st " + status[0], text: status[1]}) : null,
+            ...it.strong.slice(0, 3).map(id => el("button", {class: "tag", text: iname(id), onclick: () => set("interest", id)})))));
+    }), list.length > S.rshown ? el("button", {class: "more", onclick: () => { S.rshown += 40; render(); }, text: `Show more (${list.length - S.rshown} left)`}) : null);
+  }
+
   function renderRuns() {
     const runs = (DATA.runs || []).slice(0, 24);
     document.getElementById("runhint").textContent = runs.length ? `${DATA.runs.length} in 12 weeks · latest ${runs.length}` : "";
@@ -469,6 +579,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
     renderRanges(); renderChips(); renderKpis(list, sp); renderActivity(sp); renderHeat(sp);
     renderBars("domains", "domhint", DATA.notes.filter(n => inSpan(n, sp) && matches(n, "domain")), "domain", "domains", 10);
     renderBars("kinds", "kindhint", DATA.notes.filter(n => inSpan(n, sp) && matches(n, "kind")), "kind", "kind", 8);
+    renderInterests(sp); renderWeeks(); renderRadarItems(sp);
     renderFeed(list); renderRuns();
   }
 

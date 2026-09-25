@@ -5,6 +5,8 @@
 2. fields   — source type by address (x.com → tweet, arxiv → paper, none → own), domains from
               `domain/*` tags, kind (or `unsorted`)
 3. runs     — a `pipeline …` commit's counts are parsed; a hand commit is not a run
+6. radar    — the radar ledgers reach the payload: worth-or-strong items with their fate, per-interest
+              counts named from the interests note, today's counts, and a javascript: url never a link
 5. imports  — a run's imported items reach its run row with their fate and notes, and a clipping
               in neither inbox nor archive is counted as missing
 4. safe     — a description holding `</script><script>` cannot close the data element: the page
@@ -66,7 +68,29 @@ def run(vault: Path) -> dict:
             {"doc_id": "w", "capture": "01_Capture/Readwise-Article-wait.md", "via": "clip"},
             {"doc_id": "k", "found": "04_Resources/Eval-Dash-Paper.md"},
             {"doc_id": "m", "capture": "01_Capture/Readwise-Article-gone.md", "via": "clip"}])
+
+        # radar ledgers: one strong item promoted today, one merely worth reading yesterday
+        rd = sandbox / "00_Memory" / "radar"
+        rd.mkdir(parents=True, exist_ok=True)
+        (sandbox / "Config" / "toolkit").mkdir(parents=True, exist_ok=True)
+        (sandbox / "Config" / "toolkit" / "radar.md").write_text("---\ninterests_note: 03_Areas/Eval-Interests.md\n---\n", encoding="utf-8")
+        (sandbox / "03_Areas" / "Eval-Interests.md").write_text("---\ninterests:\n- name: Agent Memory\n  gloss: x\n---\n", encoding="utf-8")
+        rows = [{"run": today.isoformat(), "canonical": "example.org/strong", "url": "https://example.org/strong", "title": "A strong <b>one</b>",
+                 "feed": "arXiv.org", "kind": "paper", "p": {"agent-memory": 0.9, "epic-x": 0.2}, "worth": ["agent-memory"], "strong": ["agent-memory"], "in_vault": None},
+                {"run": (today - timedelta(days=1)).isoformat(), "canonical": "example.org/worth", "url": "javascript:alert(1)", "title": "Worth",
+                 "feed": "reddit.com", "kind": "opinion", "p": {"agent-memory": 0.72}, "worth": ["agent-memory"], "strong": [], "in_vault": None},
+                {"run": today.isoformat(), "canonical": "example.org/no", "url": "https://example.org/no", "title": "No",
+                 "feed": "LWN", "kind": "news", "p": {"agent-memory": 0.1}, "worth": [], "strong": [], "in_vault": None}]
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        (rd / "promoted.jsonl").write_text(json.dumps({"canonical": "example.org/strong", "date": today.isoformat()}) + "\n", encoding="utf-8")
         data = dashboard_build.build(sandbox, today)
+        rad = data.get("radar") or {}
+        if rad.get("counts") != {"judged": 3, "worth": 2, "strong": 1, "promoted": 1} or rad.get("today") != {"judged": 2, "strong": 1, "promoted": 1}:
+            problems.append(f"radar: counts {rad.get('counts')}, today {rad.get('today')}")
+        if [(i["title"], i["promoted"], i["url"]) for i in rad.get("items", [])] != [("A strong <b>one</b>", True, "https://example.org/strong"), ("Worth", False, "javascript:alert(1)")]:
+            problems.append(f"radar: items {rad.get('items')}")
+        if rad.get("interests", {}).get("agent-memory", {}).get("name") != "Agent Memory" or rad["interests"]["agent-memory"]["strong"] != 1:
+            problems.append(f"radar: interests {rad.get('interests')}")
         run = next((r for r in data["runs"] if r.get("run") == "2026-09-25 13:06"), {})
         fates = [(i["title"], i["status"], i["notes"]) for i in run.get("items", [])]
         if fates != [("Wait", "waiting", []), ("04_Resources/Eval-Dash-Paper.md", "known", ["04_Resources/Eval-Dash-Paper.md"]),

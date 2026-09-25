@@ -7,11 +7,14 @@
 4. quiet    — a run that imported nothing says so and shows the last run that did
 5. notes    — a note added in the working tree since HEAD is listed as written this run
 6. vitals   — the vault's note count and the distilled-per-day chart are on the page
+7. radar    — today's strong feed item is listed with its link and "Promoted"; a javascript: url is text
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+from datetime import date, timedelta
 from pathlib import Path
 
 from _sandbox import make_sandbox, teardown_sandbox
@@ -51,7 +54,26 @@ def run(vault: Path) -> dict:
         imports_log.record(sandbox, "2026-09-25 16:03", [])
         (sandbox / "04_Resources" / "Eval-Report-New.md").write_text("---\nstatus: distilled\n---\n# N\n", encoding="utf-8")
 
+        today = date.today()
+
+        # radar ledgers: one strong item promoted today, one merely worth reading yesterday
+        rd = sandbox / "00_Memory" / "radar"
+        rd.mkdir(parents=True, exist_ok=True)
+        (sandbox / "Config" / "toolkit").mkdir(parents=True, exist_ok=True)
+        (sandbox / "Config" / "toolkit" / "radar.md").write_text("---\ninterests_note: 03_Areas/Eval-Interests.md\n---\n", encoding="utf-8")
+        (sandbox / "03_Areas" / "Eval-Interests.md").write_text("---\ninterests:\n- name: Agent Memory\n  gloss: x\n---\n", encoding="utf-8")
+        rows = [{"run": today.isoformat(), "canonical": "example.org/strong", "url": "https://example.org/strong", "title": "A strong <b>one</b>",
+                 "feed": "arXiv.org", "kind": "paper", "p": {"agent-memory": 0.9, "epic-x": 0.2}, "worth": ["agent-memory"], "strong": ["agent-memory"], "in_vault": None},
+                {"run": (today - timedelta(days=1)).isoformat(), "canonical": "example.org/worth", "url": "javascript:alert(1)", "title": "Worth",
+                 "feed": "reddit.com", "kind": "opinion", "p": {"agent-memory": 0.72}, "worth": ["agent-memory"], "strong": [], "in_vault": None},
+                {"run": today.isoformat(), "canonical": "example.org/no", "url": "https://example.org/no", "title": "No",
+                 "feed": "LWN", "kind": "news", "p": {"agent-memory": 0.1}, "worth": [], "strong": [], "in_vault": None}]
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        (rd / "promoted.jsonl").write_text(json.dumps({"canonical": "example.org/strong", "date": today.isoformat()}) + "\n", encoding="utf-8")
         page = report_build.render(sandbox)
+        if "What the feeds brought today" not in page or 'href="https://example.org/strong"' not in page or "Promoted" not in page \
+                or "A strong &lt;b&gt;one&lt;/b&gt;" not in page or "javascript:" in page:
+            problems.append("radar: today's strong item, its link, its status or the escaping is wrong")
         import re
         if not page.startswith("<title>") or re.search(r"<(!doctype|html|head|body|script)[\s>]", page, re.I):
             problems.append("contract: page must start with <title> and carry no document tags or script")

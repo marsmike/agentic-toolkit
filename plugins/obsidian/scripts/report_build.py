@@ -31,6 +31,7 @@ from pathlib import Path
 from urllib.parse import quote, urlsplit
 
 import imports_log
+import radar_ledger
 from vault_utils import atomic_write, contained, profile_value, read_frontmatter, require_vault
 
 OUT = Path("00_Memory") / "last-run-report.html"
@@ -335,6 +336,18 @@ def _item_html(vault: Path, it: dict, gh: str, by_source: dict[str, list[str]]) 
     return "".join(out) + "</li>"
 
 
+def _radar_item_html(it: dict, interests: dict) -> str:
+    src = _web(it.get("url"))
+    title = escape(it.get("title") or it.get("url") or "?")
+    head = f'<a class="title" href="{escape(src)}">{title}</a>' if src else f'<span class="title">{title}</span>'
+    status = ("distilled", "Promoted") if it.get("promoted") else ("known", "In vault") if it.get("in_vault") \
+        else ("waiting", "Strong, not promoted") if it.get("strong") else ("archived", "Worth reading")
+    names = ", ".join(escape(interests.get(i, {}).get("name", i)) for i in it.get("strong") or it.get("worth") or [])
+    meta = " · ".join(x for x in (escape(it.get("feed") or ""), escape(it.get("kind") or ""), f"p={it.get('p', 0):.2f}", names) if x)
+    return (f'<li class="item"><div class="row"><span class="kind">Feed</span><span class="status s-{status[0]}">{status[1]}</span></div>'
+            f'{head}<div class="meta">{meta}</div></li>')
+
+
 def changed_notes(vault: Path) -> list[tuple[str, str]]:
     """(A|M, path) for every note this run added or changed: the working tree against HEAD, which
     `end` has not committed yet when the generators run."""
@@ -401,6 +414,19 @@ def render(vault: Path, run: str | None = None, today: date | None = None) -> st
                f'<h3 style="margin-top:6px"><span>Kinds</span></h3>{_hbars(stats["kinds"], 6)}</div>')
     out.append(f'<div class="panel v-half"><h3><span>Domains</span><span>top 8</span></h3>{_hbars(stats["domains"], 8)}</div>')
     out.append("</div></section>")
+
+    radar = radar_ledger.load(vault, (today - timedelta(days=83)).isoformat(), today)
+    todays = [it for it in radar["items"] if it["day"] == today.isoformat()]
+    out.append('<section style="display:grid;gap:12px"><div><h2>What the feeds brought today</h2>'
+               f'<p class="lede">{radar["today"].get("judged", 0)} items judged, {radar["today"].get("strong", 0)} strong, '
+               f'{radar["promoted_today"]} promoted into Reader'
+               + (" · rising this week: " + ", ".join(escape(radar["interests"].get(i, {}).get("name", i)) for i in radar["rising"][:4])
+                  if radar["rising"] else "") + ".</p></div>")
+    if todays:
+        out.append('<ul class="items">' + "".join(_radar_item_html(it, radar["interests"]) for it in todays[:8]) + "</ul>")
+    else:
+        out.append('<p class="empty">Nothing worth reading came through the feeds today.</p>')
+    out.append("</section>")
 
     if items:
         title = "What came in this run" if shown is latest else f"What came in on {escape(shown['run'])} UTC"
