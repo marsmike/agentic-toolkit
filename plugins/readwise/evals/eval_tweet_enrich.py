@@ -3,7 +3,7 @@
 1. html     — tweet HTML keeps a media image and a video poster, drops the avatar, marks the video,
               names a quoted post
 2. expand   — every t.co link is replaced by its target in the summary and the text
-3. links    — `links` holds the external targets only (not x.com, not pbs.twimg.com), in order
+3. links    — `links` holds the external targets only (not x.com, pbs.twimg.com or a t.me promo), in order
 4. linked   — a GitHub repo is excerpted through its API and README, an arXiv paper through its
               API, any other page by its title and description
 5. partial  — an unresolvable t.co link and a page that doesn't load make the status `partial`,
@@ -33,7 +33,7 @@ PAGES = {
 }
 HTML = ('<p>Look <img src="https://pbs.twimg.com/profile_images/1/me.jpg"> at '
         '<a href="https://t.co/repo">github.com/acme/widget</a>, <a href="https://t.co/paper">https://t.co/paper</a> '
-        'and <a href="https://t.co/blog">blog</a>. Thread: https://t.co/self</p>'
+        'and <a href="https://t.co/blog">blog</a>. Thread: https://t.co/self Join https://t.me/promo</p>'
         '<img src="https://pbs.twimg.com/media/shot.jpg"><video poster="https://pbs.twimg.com/poster.jpg"></video>'
         '<a href="https://x.com/other/status/7"> </a>')
 
