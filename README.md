@@ -8,6 +8,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Marketplace](https://img.shields.io/badge/claude--code_marketplace-3.0.0-8A2BE2)](.claude-plugin/marketplace.json)
 
+https://github.com/user-attachments/assets/b4c4da5f-c425-45c3-96e4-20d4a199b1d3
+
+<sub>The 1:33 explainer · [download the MP4](https://github.com/marsmike/agentic-toolkit/releases/download/explainer-1/explainer.mp4)</sub>
+
 **Your notes become an operating system for AI agents.** This toolkit turns an
 Obsidian-style markdown vault into the shared memory, knowledge graph, and
 configuration source for a curated set of Claude Code plugins — with two Rust
@@ -39,8 +43,6 @@ matters reaches you.
 ## Pick your path
 
 **🌱 New here — "what does this actually do for me?"**
-
-[Watch the 1:33 explainer (MP4 download)](https://github.com/marsmike/agentic-toolkit/releases/download/explainer-1/explainer.mp4).
 
 No accounts, no API keys — three commands, then a 60-second real demo:
 
