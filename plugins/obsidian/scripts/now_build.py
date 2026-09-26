@@ -7,7 +7,7 @@ Now.md says what changed and what waits, in Markdown any agent can read:
 
     New / Enriched this week   notes the `pipeline …` commits of the last 7 days added or changed,
                                newest first; an added note is new only when it has no processed_date
-                               or a real one in the window (no git: processed_date, else created, in it)
+                               or a real, non-estimated one in the window (no git: processed_date, else created, in it)
     Radar                      this week's strong items (00_Memory/radar/state.jsonl)
     Stuck                      parked captures (pipeline-state.json) and open DLQ notes
     Inbox                      the backlog in 01_Capture/, next captures in queue order
@@ -80,8 +80,10 @@ def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
         fresh = {}
         for p in new:
             fm = read_frontmatter(vault / p)[0]
-            when = _when(fm)
-            if fm.get("processed_date_estimated") is not True and not (when and when < since.isoformat()):
+            raw = fm.get("processed_date")
+            if raw is None or str(raw).strip() == "":
+                fresh[p] = ""  # never distilled (a root or project note): new, listed last
+            elif fm.get("processed_date_estimated") is not True and (when := _date(raw)) >= since.isoformat():
                 fresh[p] = when
         return _newest_first(list(fresh), fresh), sorted(changed - new), "git"
     dated = {}
