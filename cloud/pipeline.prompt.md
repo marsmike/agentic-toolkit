@@ -5,7 +5,7 @@ SETUP
 1. Toolkit: cd into the agentic-toolkit checkout (the directory holding cloud/pipeline.prompt.md;
    if there is none, git clone https://github.com/marsmike/agentic-toolkit.git). Work from its root:
      export TOOLKIT_REPO="$PWD" CLAUDE_PLUGIN_ROOT="$PWD/plugins/obsidian"
-     export TOOLKIT_GAIAFIELD_MODEL_DIR="$HOME/.local/share/agentic-toolkit/models/potion-base-8M"
+     export TOOLKIT_GAIAFIELD_MODEL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/agentic-toolkit/models/potion-base-8M"
    If `uv` is missing: pip install uv
    Engines: uv run --locked toolkit engines install
    (farsight and gaiafield, sha256-verified, into ~/.local/share/agentic-toolkit/bin, where

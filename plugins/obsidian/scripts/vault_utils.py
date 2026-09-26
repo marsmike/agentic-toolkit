@@ -457,6 +457,23 @@ def append_capture_note(vault: Path, origin: str, title: str, content: str) -> P
 # ---------------------------------------------------------------------------
 
 
+def same_dlq_note_today(dlq_dir: Path, today: str, slug: str, what_happened: str) -> Path | None:
+    """The note that already reports this failure today (`<today>-<slug>.md` or a `-N` copy with
+    the same "What happened"), or None. One failure, one note a day: a run that hits the same
+    error twice wrote `-2`, `-3` copies and the watchdog alerted on "N new DLQ note(s)". A
+    different detail under the same slug still gets its own note. Same rule in every plugin's
+    copy of write_dlq_note. [earned: 2026-09-26, TheVoid: gaiafield-infer-failed and -2]"""
+    marker = f"**What happened:** {what_happened}\n"
+    pattern = re.compile(rf"^{re.escape(today)}-{re.escape(slug)}(-\d+)?\.md$")
+    for existing in sorted(p for p in dlq_dir.glob(f"{today}-{slug}*.md") if pattern.match(p.name)):
+        try:
+            if marker in existing.read_text(encoding="utf-8"):
+                return existing
+        except OSError:
+            continue
+    return None
+
+
 def write_dlq_note(
     vault: Path,
     slug: str,
@@ -478,19 +495,11 @@ def write_dlq_note(
     dlq_dir = vault / "00_Memory" / "dlq"
     dlq_dir.mkdir(parents=True, exist_ok=True)
     today = time.strftime("%Y-%m-%d")
+    if (existing := same_dlq_note_today(dlq_dir, today, slug, what_happened)) is not None:
+        return existing
     dest = dlq_dir / f"{today}-{slug}.md"
     n = 2
     while dest.exists():
-        # The same failure reported again today (same slug, same "What happened") is one entry,
-        # not one per call: a run that calls gaiafield twice wrote two identical notes and the
-        # watchdog alerted on "2 new DLQ note(s)". A different detail under the same slug still
-        # gets its own note. [earned: 2026-09-26, TheVoid: gaiafield-infer-failed and -2]
-        try:
-            existing = dest.read_text(encoding="utf-8")
-        except OSError:
-            existing = ""
-        if f"**What happened:** {what_happened}\n" in existing:
-            return dest
         dest = dlq_dir / f"{today}-{slug}-{n}.md"
         n += 1
 
