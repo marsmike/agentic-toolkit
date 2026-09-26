@@ -6,7 +6,8 @@ ago and a weak one; one capture is parked, one DLQ note is open and one resolved
 
 1. week      — New holds the pipeline's new note (not the hand-committed one), Enriched the changed one;
                a root `status: active` note the run added is new, the Index.md it rewrote is not
-               (2026-09-24 review IMPL-GLM-4)
+               (2026-09-24 review IMPL-GLM-4); an added note distilled before the week, or with an
+               estimated date, is not new, and New runs newest first (2026-09-26: 1,322 "new")
 2. radar     — only this week's strong item
 3. stuck     — the parked capture and the open DLQ note, not the resolved one; the inbox leaves the
                parked capture out
@@ -56,6 +57,10 @@ def run(vault: Path) -> dict:
             _git(sandbox, *args)
         res = sandbox / "04_Resources"
         (res / "Eval-Pipeline-New.md").write_text(NOTE.format(d="new", p=today.isoformat()), encoding="utf-8")
+        (res / "Eval-Pipeline-Earlier.md").write_text(NOTE.format(d="earlier", p=(today - timedelta(days=2)).isoformat()), encoding="utf-8")
+        (res / "Eval-Pipeline-Legacy.md").write_text(NOTE.format(d="legacy", p="2020-01-01"), encoding="utf-8")
+        (res / "Eval-Pipeline-Estimated.md").write_text(
+            NOTE.format(d="estimated", p=today.isoformat()).replace("status:", "processed_date_estimated: true\nstatus:"), encoding="utf-8")
         enriched = next(p for p in sorted((res / "Concepts").glob("*.md")))
         enriched.write_text(enriched.read_text(encoding="utf-8") + "\nEnriched.\n", encoding="utf-8")
         (sandbox / "Eval-Root-Profile.md").write_text("---\ndescription: root\nstatus: active\n---\n\n# R\n", encoding="utf-8")
@@ -93,6 +98,10 @@ def run(vault: Path) -> dict:
         new, enr = _callout(now, "New this week"), _callout(now, "Enriched this week")
         if "Eval-Pipeline-New" not in new or "Eval-Hand-Note" in new or enriched.stem not in enr:
             problems.append(f"phase 1: new/enriched from the pipeline commit only; new={new!r} enriched={enr!r}")
+        if "Eval-Pipeline-Legacy" in new + enr or "Eval-Pipeline-Estimated" in new + enr:
+            problems.append(f"phase 1: an added note dated before the week or estimated is not new; new={new!r}")
+        if not (0 <= new.find("Eval-Pipeline-New") < new.find("Eval-Pipeline-Earlier") < new.find("Eval-Root-Profile")):
+            problems.append(f"phase 1: New runs newest first, undated last; new={new!r}")
         if "Eval-Root-Profile" not in new or "[[Index" in new + enr:
             problems.append(f"phase 1: a root active note counts as new, Index.md never; new={new!r} enriched={enr!r}")
         # 2. radar

@@ -5,8 +5,9 @@ linked from three notes, Second from one, Fresh was distilled yesterday and Old 
 config block gives the domain a title, an intro and a "Concepts" section. After a build:
 
 1. hubs      — Start here lists Hub before Second; the unlinked notes are not in it
-2. new       — New lists Fresh and not Old
-3. grouping  — concepts sit under the config's "Concepts", guides under "Guide"; the intro is there
+2. new       — New lists Fresh and not Old, nor Legacy, whose `processed_date` (today) is estimated
+3. grouping  — concepts sit under the config's "Concepts", guides under "Guide", newest first and
+               the estimated Legacy last (2026-09-26: backfilled dates led the lists); the intro is there
 4. canvas    — every map's canvas is valid JSON Canvas, every file card points at an existing file,
                every edge joins two cards
 5. hygiene   — no map links into 00_Memory/ or 01_Capture/; a map this generator wrote for a
@@ -74,6 +75,8 @@ def run(vault: Path) -> dict:
         folder.mkdir(parents=True)
         for name, spec in NOTES.items():
             (folder / f"{name}.md").write_text(_note(*spec), encoding="utf-8")
+        legacy = _note("guide", TODAY, "Backfilled date.", "").replace("processed_date:", "processed_date_estimated: true\nprocessed_date:")
+        (folder / "Legacy.md").write_text(legacy, encoding="utf-8")
         (sandbox / "Config" / "toolkit" / "maps.md").write_text(CONFIG, encoding="utf-8")
         maps = sandbox / "Maps"
         maps.mkdir(exist_ok=True)
@@ -91,13 +94,15 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 1: Start here should open with Hub, Second; got {start}")
         # 2. new
         new = re.findall(r"\|(\w+)\]\]", _section(text, "New"))
-        if "Fresh" not in new or "Old" in new:
-            problems.append(f"phase 2: New should hold Fresh and not Old; got {new}")
+        if "Fresh" not in new or "Old" in new or "Legacy" in new:
+            problems.append(f"phase 2: New should hold Fresh, not Old nor the estimated Legacy; got {new}")
         # 3. grouping
         concepts = re.search(r"^### Concepts\n\n(.*?)(?=^### |^## |\Z)", text, re.M | re.S)
         guides = re.search(r"^### Guide\n\n(.*?)(?=^### |^## |\Z)", text, re.M | re.S)
         if not concepts or "|Hub]]" not in concepts.group(1) or not guides or "|Fresh]]" not in guides.group(1):
             problems.append("phase 3: concepts under the config's 'Concepts', guides under 'Guide'")
+        elif (order := re.findall(r"\|(\w+)\]\]", guides.group(1))) != ["Fresh", "Old", "Loner", "Legacy"]:
+            problems.append(f"phase 3: guides newest first, the estimated date last; got {order}")
         if "# Eval Hub" not in text or "The fixture domain for eval_map_build." not in text:
             problems.append("phase 3: the config's title and intro must head the map")
         # 4. canvas
