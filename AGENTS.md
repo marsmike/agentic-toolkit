@@ -11,7 +11,7 @@ R12 — a `CLAUDE.md` next to it would silently win and hide this file]
 | How plugins query knowledge | `contract/KNOWLEDGE_API.md` |
 | Which model for which work | `contract/ROUTING.md` |
 | Tuning judgments, auditing descriptions | `docs/MAINTAINING.md` |
-| Running the pipeline as a Claude cloud routine | `docs/cloud-routine.md` |
+| Running the pipeline as a Claude cloud routine | `cloud/README.md` |
 | Why anything is the way it is | `docs/PLAN.md` |
 
 ## Skills

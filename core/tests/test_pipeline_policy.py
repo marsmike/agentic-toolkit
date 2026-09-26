@@ -153,14 +153,15 @@ def test_granted_scripts_refuse_a_path_outside_the_vault(tmp_path, monkeypatch):
 
 def test_every_unattended_instruction_carries_the_untrusted_content_rule():
     for rel in ("plugins/obsidian/skills/distill/SKILL.md", "plugins/obsidian/skills/pipeline/SKILL.md",
-                "docs/cloud-routine.md"):
+                "cloud/pipeline.prompt.md"):
         text = (REPO_ROOT / rel).read_text(encoding="utf-8")
         assert UNTRUSTED_RULE in text, f"{rel} lost the rule that capture text is {UNTRUSTED_RULE}"
 
 
 def test_the_pipeline_runs_its_scripts_locked():
     for rel in ("plugins/obsidian/skills/pipeline/SKILL.md", "plugins/obsidian/skills/distill/SKILL.md",
-                "plugins/radar/skills/radar/SKILL.md", "docs/cloud-routine.md"):
+                "plugins/radar/skills/radar/SKILL.md", "cloud/pipeline.prompt.md",
+                "cloud/watchdog.prompt.md", "cloud/setup.sh"):
         text = (REPO_ROOT / rel).read_text(encoding="utf-8")
         unlocked = [line for line in text.splitlines() if re.search(r"\buv run --(?!locked)", line)]
         assert not unlocked, f"{rel}: {unlocked}"

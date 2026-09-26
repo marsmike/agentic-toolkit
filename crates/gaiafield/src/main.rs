@@ -133,6 +133,17 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Download and verify the pinned embedding model into a model directory, then stop: the
+    /// directory `TOOLKIT_GAIAFIELD_MODEL_DIR` names, or `--dir`. Pre-warms a cache that later
+    /// `infer` runs (with the same variable set) use without touching the network.
+    FetchModel {
+        /// Where the model files go (default: $TOOLKIT_GAIAFIELD_MODEL_DIR; one of the two is required).
+        #[arg(long)]
+        dir: Option<PathBuf>,
+
+        #[arg(long)]
+        json: bool,
+    },
     /// Inferred candidates for a note — same-topic notes with no extracted link to it yet.
     Candidates {
         note: String,
@@ -236,6 +247,7 @@ fn main() -> ExitCode {
             low_gate,
             json,
         } => run_infer(vault, db, full, reset, high_gate, low_gate, json),
+        Command::FetchModel { dir, json } => run_fetch_model(dir, json),
         Command::Candidates {
             note,
             vault,
@@ -595,6 +607,46 @@ fn run_infer(
         println!(
             "  high gate: {:.2}  low gate: {:.2}",
             report.high_gate, report.low_gate
+        );
+    }
+    ExitCode::SUCCESS
+}
+
+fn run_fetch_model(dir_flag: Option<PathBuf>, json: bool) -> ExitCode {
+    // `--dir` wins; otherwise the same variable `infer` reads. Nothing is guessed from a vault or
+    // db path: the setup script that pre-warms a cache has neither.
+    let model_dir = match dir_flag {
+        Some(d) => d,
+        None => match std::env::var("TOOLKIT_GAIAFIELD_MODEL_DIR") {
+            Ok(v) if !v.is_empty() => gaiafield::resolve_model_dir(std::path::Path::new("unused.db")),
+            _ => {
+                eprintln!("fetch-model: give --dir or set TOOLKIT_GAIAFIELD_MODEL_DIR");
+                return ExitCode::FAILURE;
+            }
+        },
+    };
+    let started = std::time::Instant::now();
+    if let Err(e) = gaiafield::ensure_model(&model_dir) {
+        eprintln!("fetch-model failed: {e}");
+        return ExitCode::FAILURE;
+    }
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "model": gaiafield::MODEL_NAME,
+                "revision": gaiafield::MODEL_REVISION,
+                "dir": model_dir.display().to_string(),
+                "elapsed_ms": started.elapsed().as_millis() as u64,
+            })
+        );
+    } else {
+        println!(
+            "{} ({}) verified in {} ({}ms)",
+            gaiafield::MODEL_NAME,
+            &gaiafield::MODEL_REVISION[..12],
+            model_dir.display(),
+            started.elapsed().as_millis()
         );
     }
     ExitCode::SUCCESS

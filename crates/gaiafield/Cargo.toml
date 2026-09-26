@@ -1,6 +1,6 @@
 [package]
 name = "gaiafield"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "Deterministic knowledge-graph extraction over an agentic-toolkit vault's wikilinks."
 license = "MIT"
@@ -29,4 +29,9 @@ sha2 = "0.10"
 # ureq pulls in rustls+ring (verified: no openssl/native-tls in the dependency tree), the same
 # C/assembly risk class already proven on this workflow's aarch64-unknown-linux-musl target by
 # rusqlite's bundled SQLite (README, "Cross-compilation note").
-ureq = "2"
+# `native-certs`: trust the OS certificate store (rustls-native-certs; SSL_CERT_FILE/SSL_CERT_DIR
+# honoured on Linux) instead of only the bundled webpki roots, so the model download also works
+# behind a TLS-inspecting proxy whose CA the machine trusts. [earned: 2026-09-26 — in the Claude
+# cloud environment `infer` failed with "invalid peer certificate: UnknownIssuer" while curl, git
+# and Python on the same machine reached huggingface.co fine]
+ureq = { version = "2", features = ["native-certs"] }

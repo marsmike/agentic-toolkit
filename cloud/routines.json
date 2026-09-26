@@ -1,0 +1,34 @@
+{
+  "_": "The two Claude cloud routines that run TheVoid, as configured on claude.ai (routines API, no secrets). A snapshot to rebuild them from; the API, not this file, is the live state.",
+  "environment": {
+    "id": "env_01CEReACXDJQvpdKSUUbSEQf",
+    "setup_script": "cloud/setup.sh",
+    "network": "full",
+    "variables": ["TOOLKIT_VAULT_REMOTE", "OPENROUTER_API_KEY", "READWISE_TOKEN", "KAGI_API_KEY", "TODOIST_API_TOKEN"]
+  },
+  "routines": [
+    {
+      "id": "trig_01UhEejyjK6c1qg2u9q6ii5A",
+      "name": "Daily ReadWise Ingest+Distill",
+      "cron_expression": "58 */3 * * *",
+      "prompt": "Follow cloud/pipeline.prompt.md (in the agentic-toolkit checkout) exactly: run the TheVoid pipeline once, unattended.",
+      "prompt_file": "cloud/pipeline.prompt.md",
+      "model": "claude-opus-5-5",
+      "allowed_tools": ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch", "Artifact"],
+      "sources": ["https://github.com/marsmike/agentic-toolkit", "https://github.com/marsmike/TheVoid"],
+      "notifications": {"email": true, "push": true},
+      "connectors": ["Todoist (fallback when td is missing)"]
+    },
+    {
+      "id": "trig_01Grkn9K6Y6iBTyc7nUM5CD3",
+      "name": "Pipeline watchdog",
+      "cron_expression": "58 2-23/3 * * *",
+      "prompt": "Follow cloud/watchdog.prompt.md (in the agentic-toolkit checkout) exactly.",
+      "prompt_file": "cloud/watchdog.prompt.md",
+      "model": "claude-haiku-4-5-20251001",
+      "allowed_tools": ["Bash", "Read"],
+      "sources": ["https://github.com/marsmike/agentic-toolkit", "https://github.com/marsmike/TheVoid"],
+      "notifications": {"email": false, "push": false, "_": "the prompt sends one push only when the check fails, and the Sunday digest"}
+    }
+  ]
+}

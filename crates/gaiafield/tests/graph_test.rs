@@ -913,3 +913,50 @@ fn a_new_gate_pair_relabels_every_pair_on_an_incremental_pass() {
         .expect("a second pass at the same gates");
     assert_eq!(same.inferred_edges, strict.inferred_edges, "unchanged gates must not rescore");
 }
+
+/// `fetch-model` pre-warms a model directory without a vault: the three pinned files land there,
+/// verified, and a second call is a no-op that still succeeds. `--dir` wins over the environment
+/// variable; with neither, the command refuses instead of guessing a path.
+#[test]
+fn fetch_model_fills_a_directory_without_a_vault() {
+    let dir = std::env::temp_dir().join(format!("gaiafield-fetch-model-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    // The shared cache seeds the target: copying keeps this test offline once any test ran.
+    let seed = shared_model_dir();
+    if seed.is_dir() {
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in ["config.json", "tokenizer.json", "model.safetensors"] {
+            let _ = std::fs::copy(seed.join(name), dir.join(name));
+        }
+    }
+    let out = Command::new(env!("CARGO_BIN_EXE_gaiafield"))
+        .args(["fetch-model", "--dir"])
+        .arg(&dir)
+        .arg("--json")
+        .env("TOOLKIT_GAIAFIELD_MODEL_DIR", "/nonexistent/should-not-be-used")
+        .output()
+        .expect("run fetch-model");
+    assert!(out.status.success(), "fetch-model: {}", String::from_utf8_lossy(&out.stderr));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["model"], gaiafield::MODEL_NAME);
+    assert_eq!(report["dir"], dir.to_string_lossy().as_ref());
+    for name in ["config.json", "tokenizer.json", "model.safetensors"] {
+        assert!(dir.join(name).is_file(), "{name} missing after fetch-model");
+    }
+    let again = Command::new(env!("CARGO_BIN_EXE_gaiafield"))
+        .args(["fetch-model", "--dir"])
+        .arg(&dir)
+        .output()
+        .expect("run fetch-model again");
+    assert!(again.status.success());
+    assert!(String::from_utf8_lossy(&again.stdout).contains("verified in"));
+
+    let refused = Command::new(env!("CARGO_BIN_EXE_gaiafield"))
+        .arg("fetch-model")
+        .env_remove("TOOLKIT_GAIAFIELD_MODEL_DIR")
+        .output()
+        .expect("run fetch-model without a dir");
+    assert!(!refused.status.success());
+    assert!(String::from_utf8_lossy(&refused.stderr).contains("give --dir or set TOOLKIT_GAIAFIELD_MODEL_DIR"));
+    let _ = std::fs::remove_dir_all(&dir);
+}

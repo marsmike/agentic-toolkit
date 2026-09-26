@@ -144,6 +144,15 @@ The one dependency that *is* in the same risk class as `rusqlite`'s bundled SQLi
 download the pinned model files) pulls in `rustls` + `ring`, and `ring` does compile a small amount
 of C/assembly for some targets.
 
+**Trust store (0.2.2):** `ureq`'s `native-certs` feature makes the download trust the OS
+certificate store (`rustls-native-certs`: `SSL_CERT_FILE`/`SSL_CERT_DIR` or the system bundle on
+Linux, the keychain on macOS, the Windows store) rather than only the bundled webpki roots. Behind
+a TLS-inspecting proxy whose CA the machine trusts, the bundled roots alone fail with
+`invalid peer certificate: UnknownIssuer` while curl, git and Python on the same machine succeed
+[earned: 2026-09-26, the Claude cloud environment]. `gaiafield fetch-model --dir <dir>` (or with
+`TOOLKIT_GAIAFIELD_MODEL_DIR` set) downloads and verifies the model without a vault, so a setup
+script can pre-warm a cache that later `infer` runs use offline.
+
 **Verified for v2 (2026-09-25):** the `gaiafield-v0.2.0` release workflow (run 30214767854) built and shipped `gaiafield-aarch64-unknown-linux-musl` with `model2vec-rs`/`ureq` (`ring`) in the dependency tree, so the same `taiki-e/setup-cross-toolchain-action` mechanism proven for SQLite's C amalgamation also covers `ring`'s assembly. Every release since carries a `.sha256` sidecar per binary; 0.1.x/0.2.0 got theirs uploaded by hand.
 
 **Model acquisition:** `infer` downloads three files (`config.json`, `tokenizer.json`,
