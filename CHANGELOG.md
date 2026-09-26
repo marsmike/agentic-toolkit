@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The cloud routine installs the engines.** SETUP runs `toolkit engines install` after the
+  checkout, so search.py uses farsight and the distill dossier has gaiafield's graph context and
+  inferred candidates in the cloud too; FINISH names the versions. [earned: 2026-09-26 — every
+  cloud run so far had searched with the BM25 fallback and distilled without a graph]
+
 - **gaiafield 0.2.1** — the fixes that sat unreleased since 0.2.0: `.md` symlinks out of the vault
   are not nodes, loops and dangling targets skipped (#28); a duplicate bare wikilink resolves to
   the linking note's own folder, links re-resolve when the target's scope changes, nanosecond
