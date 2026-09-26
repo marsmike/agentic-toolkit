@@ -45,6 +45,8 @@ RUN, in the skill's order
 - Radar: scan --since 1d --promote --todoist --json. With `td` installed (the environment's
   setup script) and TODOIST_API_TOKEN set, --todoist comments the strong items on each epic
   task itself. Once a week (Saturday): gaps --promote and weekly ("exists" is normal).
+  Then sensors --json (a source reported blocked, skipped or failed is fine) and
+  signal --kagi --json, which writes 00_Memory/radar/Signal-Radar.html, .md and signal.json.
 - Readwise ingest. It also archives in Reader every clipping whose capture a previous run
   settled on the remote (its JSON `reader_archive`); nothing to do for you.
 - pipeline_run.py queue --json exactly so (no --batch), then distill every capture in the batch
@@ -79,8 +81,11 @@ REPORT (only after `end` returned status "ok" with no `build_failed`): if $TOOLK
 creates a second artifact) and never publish a failed or refused run, or one whose generators failed (`build_failed`: the
 report would be the previous run's). If the Artifact tool is not
 available, skip it and say so.
+Likewise, if $TOOLKIT_VAULT/Config/toolkit/radar.md sets `signal_artifact_url` and `signal`
+returned status "ok" this run, publish $TOOLKIT_VAULT/00_Memory/radar/Signal-Radar.html there
+the same way (`read` first, then `publish` with that `url`; never without it).
 
 FINISH with one line: end's "summary" exactly as printed (it counts what came in from the
-ledgers), the commit, whether it was pushed, whether the report was published, and the engines
+ledgers), the commit, whether it was pushed, whether the report and the Signal Radar were published, and the engines
 (`farsight <version>, gaiafield <version>` from `uv run --locked toolkit engines status`, or
 "engines missing"). No number the scripts did not print.

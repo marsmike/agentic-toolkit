@@ -51,6 +51,7 @@ ALLOWED+="$(script obsidian pipeline_run.py end)$(script obsidian index_build.py
 ALLOWED+="$(script obsidian distill_judge.py)$(script obsidian distill_check.py)"
 ALLOWED+="$(script obsidian retire_capture.py)$(script obsidian search.py)"
 ALLOWED+="$(script radar radar.py scan)$(script radar radar.py gaps)$(script radar radar.py weekly)"
+ALLOWED+="$(script radar radar.py sensors)$(script radar radar.py signal)"
 ALLOWED+="$(script readwise ingest.py)"
 # No bare Glob or Grep grant: a tool-level grant searches any directory (a run searched $HOME and
 # returned ~/.env lines), and a Read deny covers only the path it names. Without the grant dontAsk

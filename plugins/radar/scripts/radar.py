@@ -6,6 +6,7 @@
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py discover [--interest ID ...]
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py feeds|trend|weekly
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py scout [--dry-run]
+    uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py sensors | signal [--kagi]
 
 `scan` fetches feed items saved since `--since`, drops those already seen (canonical URL, or the
 same title from the same feed: a repost under a new address) and a new feed's back catalogue
@@ -31,7 +32,11 @@ interests, and the weekly capture `01_Capture/Radar-Week-YYYY-WW.md`. `gaps` (ga
 weekly search for what the feeds missed; `scout` (scout.py) is the weekly search for what the
 owner does not know exists yet — new feeds, APIs, services, tools, datasets — from what he already
 reads and clips plus a few Kagi launch queries, written to `01_Capture/Radar-Scout-YYYY-WW.md`.
-`kagi search|news|answer|summarize` is the kagi skill's entry point.
+`kagi search|news|answer|summarize` is the kagi skill's entry point. `sensors` (sensors.py) pulls
+momentum sources Reader does not carry — Hacker News, Hugging Face trending, new GitHub repos,
+Reddit with scores, plain RSS — and judges what is new; `signal` (signal_radar.py) joins them with
+the feed and the owner's own vault into named things with a signal strength, and writes the Signal
+Radar page and note.
 
 What leaves the machine: item titles, summaries and site names, and interest names and glosses,
 to the judgment backend (OpenRouter by default).
@@ -60,6 +65,8 @@ import reader
 import replay
 import reports
 import scout as scout_mod
+import sensors as sensors_mod
+import signal_radar
 from interests import Interest
 from judgments import policy
 from judgments import questions as Q
@@ -527,6 +534,24 @@ def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, fo
     return {"status": "ok", "week": wk, "capture": path.relative_to(vault).as_posix()}
 
 
+def sensors_cmd(vault: Path, out: Path, now: datetime, only: list[str] | None) -> dict[str, Any]:
+    """Sensors, with new items judged like feed items when a backend is there."""
+    run = RunUsage()
+    judge_fn = None
+    interests = interests_mod.load(vault)
+    if interests and judge.unavailable_reason(vault) is None:
+        def judge_fn(rows: list[dict]) -> dict[int, dict]:
+            items = [Item(id=str(r.get("id") or r["url"]), url=r["url"], canonical=_canonical(r["url"]), title=r["title"],
+                          summary=str(r.get("summary") or "")[:500], site=str(r.get("origin") or ""),
+                          feed=str(r.get("origin") or ""), published=str(r.get("published") or ""),
+                          category=str(r.get("source") or ""), saved_at="") for r in rows]
+            return judge_items(vault, items, interests, run)
+    result = sensors_mod.collect(vault, out, now, judge_fn, only)
+    if judge_fn is None:
+        return result
+    return {**result, "judge": {**run.as_dict(), "errors": run.errors[:3]}}
+
+
 def kagi_cmd(vault: Path, out: Path, mode: str, text: str) -> dict[str, Any]:
     """The kagi skill's entry point: one call, under the same ledger and weekly budget as discovery."""
     ledger = kagi.Ledger(out / "kagi-ledger.jsonl",
@@ -595,15 +620,27 @@ def main(argv: list[str] | None = None) -> int:
     kp.add_argument("text", help="the query, or for summarize the URL")
     kp.add_argument("--out", type=Path, default=None)
     kp.add_argument("--json", action="store_true")
+    snp = sub.add_parser("sensors", help="pull momentum sources (HN, Hugging Face, GitHub, Reddit, RSS) and judge what is new")
+    snp.add_argument("--only", action="append", default=None, help="one source (hn, hf, github, reddit, rss); repeat")
+    snp.add_argument("--out", type=Path, default=None)
+    snp.add_argument("--json", action="store_true")
+    sgp = sub.add_parser("signal", help="named things with a signal strength; writes the Signal Radar page and note")
+    sgp.add_argument("--kagi", action="store_true", help="corroborate the newest names with Kagi news (a few a day)")
+    sgp.add_argument("--out", type=Path, default=None)
+    sgp.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     vault = require_vault()
     now = datetime.now(UTC)
     # The unattended pipeline may run these three: their state stays in the vault, never where an
     # agent points it. [earned: 2026-09-24, impl-02 review IMPL02-CODE-1]
-    if args.cmd in ("scan", "gaps", "weekly") and args.out and not args.out.resolve().is_relative_to(vault.resolve()):
+    if args.cmd in ("scan", "gaps", "weekly", "sensors", "signal") and args.out and not args.out.resolve().is_relative_to(vault.resolve()):
         raise SystemExit(f"--out must be inside the vault for {args.cmd}: {args.out}")
-    if args.cmd == "kagi":
+    if args.cmd == "sensors":
+        result = sensors_cmd(vault, args.out or vault / RADAR_DIR, now, args.only)
+    elif args.cmd == "signal":
+        result = signal_radar.write(vault, args.out or vault / RADAR_DIR, now, args.kagi)
+    elif args.cmd == "kagi":
         result = kagi_cmd(vault, args.out or vault / RADAR_DIR, args.mode, args.text)
     elif args.cmd == "gaps":
         result = gaps_mod.gaps(vault, args.out or vault / RADAR_DIR, now, args.promote)

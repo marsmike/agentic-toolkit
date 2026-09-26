@@ -4,6 +4,23 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Signal Radar: what is taking off, not only what is relevant** (radar 3.1.0). `radar.py
+  sensors` pulls sources that carry engagement and that Reader does not have — Hacker News
+  (Algolia), Hugging Face trending models and spaces, new GitHub repos by stars, Reddit with
+  upvotes, plain RSS (audio plugins and model news by default) — and judges what is new like a
+  feed item. `radar.py signal` joins them with the judged feed, the owner's own notes and clips
+  (`vault_pulse.py`) and his knowledge graph (`vault_graph.py`, gaiafield: the notes of any date a
+  thing is anchored in, their linked neighbourhood, the hubs it connects to, and the hubs this
+  week's notes are thickening) into named things (`entities.py`: `Qwen 3.8`, `Qwen3.8-27B` and
+  `unsloth/Qwen3.8-GGUF` are one) with a 0–100 strength from breadth, velocity, engagement,
+  relevance, volume and graph anchoring; `--kagi` corroborates at most six new names a day with
+  Kagi news. It writes `00_Memory/radar/Signal-Radar.html` (a radar scope, early warnings, blind
+  spots, the vault's rising tags and growing hubs, every note an `obsidian://` link),
+  `Signal-Radar.md` (wikilinks) and `signal.json`; the cloud run republishes the page to
+  `signal_artifact_url`. [earned: 2026-09-26, owner's request — "one thing I can check and see
+  early what is trending, be it a new local LLM, a new Claude Code feature or a new VST plugin";
+  the scan scored relevance only, 45 % of its items were arXiv and nothing carried engagement]
+
 - **`cloud/` holds the whole cloud routine**: the two prompts as files the routines point at
   (`pipeline.prompt.md`, `watchdog.prompt.md`), the environment's setup script as a script
   (`setup.sh`, pasted into the environment), the routines' settings (`routines.json`) and the

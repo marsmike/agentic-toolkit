@@ -9,6 +9,10 @@ todoist_sections: Doing,Next,Waiting
 promote_location: later
 promote_per_day: 5
 kagi_weekly_budget_usd: 1.00
+sensors: hn,hf,github,reddit,rss
+sensor_subreddits: LocalLLaMA,ClaudeAI,ClaudeCode,singularity,MachineLearning,synthesizers,WeAreTheMusicMakers,audioengineering
+sensor_github_topics: llm,ai-agents,claude-code,mcp,local-llm,audio-plugin,vst
+signal_artifact_url: ""
 judgment_backend: jev
 judgment_base_url: https://openrouter.ai/api
 judgment_model: jev-1.13-20260917
@@ -40,6 +44,11 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
   the owner's appetite. Raise it when the daily radar note shows strong items the cap discarded.
 - **`kagi_weekly_budget_usd`** — `discover` stops searching once the week's Kagi spend (measured
   from the account balance, kept in `00_Memory/radar/kagi-ledger.jsonl`) would pass this.
+- **`sensors`** — which momentum sources `sensors` pulls (default all five: `hn`, `hf`, `github`,
+  `reddit`, `rss`). **`sensor_subreddits`**, **`sensor_github_topics`** — comma lists;
+  **`sensor_feeds`** — a YAML list of RSS/Atom URLs (the default covers audio plugins and model news).
+- **`signal_artifact_url`** — a claude.ai artifact the cloud run republishes the Signal Radar page to;
+  empty = the page stays in the vault only.
 - **`judgment_backend`**, **`judgment_base_url`**, **`judgment_model`** — the typed-judgment
   backend, as in the obsidian plugin. Thresholds are never profile keys; they live in
   `scripts/judgments/policy.py`.
@@ -49,7 +58,10 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
 - To the judgment backend (OpenRouter by default): item titles, summaries and site names; feed
   titles, descriptions and recent item titles; interest names and glosses. Never your queries,
   never vault content.
-- To Kagi (`discover` only): the interests' queries.
+- To Kagi (`discover`, `gaps`): the interests' queries; (`signal --kagi`): up to six entity
+  names a day, each at most once a week.
+- To Hacker News (Algolia), Hugging Face, GitHub, Reddit and the `sensor_feeds` hosts (`sensors`):
+  plain GETs of public listings; the GitHub topics and subreddit names are in the URLs.
 - To Reader: the location, tags and note of items the radar has recorded (archive, or Later with
   `--promote`). Nothing is ever deleted.
 - To arbitrary sites (`discover` only): plain GETs of search-result pages and feed URLs.

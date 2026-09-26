@@ -77,7 +77,10 @@ pipeline routine, so `uv` and the git credential are there; no keys are needed.
   needed once TheVoid is attached. Never in a file in a repo.
 - **Setup script:** `setup.sh`, pasted into the environment; it assumes no repository exists yet.
 - **Network access:** the run calls `openrouter.ai`, `readwise.io`, `kagi.com`, `api.todoist.com`,
-  `huggingface.co` (gaiafield's model, once), GitHub, PyPI and npm. If the environment's network
+  `huggingface.co` (gaiafield's model, once, and the radar's trending models), GitHub (`api.github.com`
+  for the radar's new-repo search), `hn.algolia.com`, `www.reddit.com`/`old.reddit.com` (often refused
+  from cloud addresses: the source then reports `blocked`), the hosts of the radar's `sensor_feeds`,
+  PyPI and npm. If the environment's network
   level is restricted, allow those hosts or use full access; otherwise each source just prints
   `SKIPPED`.
 - **Connectors:** Todoist, only as the fallback when `td` is missing.
