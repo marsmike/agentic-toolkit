@@ -28,6 +28,11 @@ SETUP
    if there is none, git clone https://github.com/marsmike/agentic-toolkit.git). Work from its root:
      export TOOLKIT_REPO="$PWD" CLAUDE_PLUGIN_ROOT="$PWD/plugins/obsidian"
    If `uv` is missing: pip install uv
+   Engines: uv run --locked toolkit engines install
+   (farsight and gaiafield, sha256-verified, into ~/.local/share/agentic-toolkit/bin, where
+   search.py and graph.py look; about 15 s. They are the vault's interface: without them search
+   falls back to BM25 and the dossier has no graph. If the install fails, go on and say so in
+   FINISH.)
 2. Vault: use the session's TheVoid checkout (the directory holding AGENTS.md and 00_Memory/;
    the routine attaches the repository, so this checkout is the one git may push from):
      export TOOLKIT_VAULT=<that path>
@@ -88,7 +93,9 @@ report would be the previous run's). If the Artifact tool is not
 available, skip it and say so.
 
 FINISH with one line: end's "summary" exactly as printed (it counts what came in from the
-ledgers), the commit, whether it was pushed, and whether the report was published. No number the scripts did not print.
+ledgers), the commit, whether it was pushed, whether the report was published, and the engines
+(`farsight <version>, gaiafield <version>` from `uv run --locked toolkit engines status`, or
+"engines missing"). No number the scripts did not print.
 ```
 
 ## Watchdog routine
@@ -187,6 +194,18 @@ python3 -c "import os; print('vars set:', {k: bool(os.environ.get(k)) for k in (
 Every step degrades instead of failing: without `uv` the routine installs it, without `td`
 the prompt's Todoist fallback uses the connector, and without `GH_TOKEN` git uses whatever access
 the environment provides (the run reports "TheVoid not reachable" if that is none).
+
+The engines (farsight, gaiafield) are installed by the routine prompt's SETUP step, after the
+checkout, because `toolkit engines install` lives in this repo. To have them cached across runs
+instead (the environment caches this script's result), add at the end, after the git credential:
+
+```bash
+tmp=$(mktemp -d) && git clone -q --depth 1 https://github.com/marsmike/agentic-toolkit "$tmp/toolkit" \
+  && (cd "$tmp/toolkit" && uv run --locked toolkit engines install); rm -rf "$tmp"
+```
+
+[earned: 2026-09-26 — every cloud run so far searched with the BM25 fallback and distilled
+without graph context; the engines were on the Mac only]
 
 ## On the Mac, once the first cloud run has pushed
 
