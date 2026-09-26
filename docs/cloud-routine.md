@@ -37,9 +37,14 @@ SETUP
    the routine attaches the repository, so this checkout is the one git may push from):
      export TOOLKIT_VAULT=<that path>
    The checkout usually arrives on a detached HEAD at origin/main; put it on a tracking `main`
-   before anything else, with exactly this (it is the one git command allowed here besides begin/end):
-     git -C "$TOOLKIT_VAULT" fetch -q origin main && git -C "$TOOLKIT_VAULT" checkout -q -B main origin/main
-   If that says local commits would be lost, stop and report it instead. Only if there is no TheVoid checkout: scripts/cloud-vault.sh open
+   before anything else, with exactly this sequence (the one git allowed here besides begin/end).
+   It resets only when nothing would be lost: HEAD and any existing `main` must already be on
+   origin/main and the tree clean; otherwise it prints VAULT-NOT-RESET, and you stop and report that.
+     cd "$TOOLKIT_VAULT" && git fetch -q origin main \
+       && git diff --quiet && git diff --cached --quiet \
+       && git merge-base --is-ancestor HEAD origin/main \
+       && { ! git show-ref -q --verify refs/heads/main || git merge-base --is-ancestor main origin/main; } \
+       && git checkout -q -B main origin/main && git status -sb | head -1 || echo VAULT-NOT-RESET Only if there is no TheVoid checkout: scripts/cloud-vault.sh open
    and export TOOLKIT_VAULT="$PWD/.vault-live". Never commit the vault into agentic-toolkit.
    If the final push is refused with "not in this session's authorized repository set", report
    exactly that: TheVoid must be attached to the routine as a source.
