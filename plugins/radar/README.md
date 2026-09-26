@@ -57,10 +57,10 @@ flowchart LR
 - **Entities** (`entities.py`): spans of name-like words in a title (a digit, an inner capital, a
   dot between letters), with the address winning where it names the thing exactly (a GitHub repo,
   a Hugging Face model family). `Qwen 3.8`, `Qwen3.8-27B` and `unsloth/Qwen3.8-GGUF` join as `qwen38`.
-- **Strength** (`signal_radar.py`): 25 % breadth (independent source families in the last week),
-  20 % velocity (the last three days against the fourteen before), 20 % engagement (the best
-  percentile within its source and day), 15 % relevance (the judge's best p), 15 % volume, 5 % the
-  vault. Stages: `new` (first seen in the last three days), `hot` (≥ 70), `rising` (twice the
+- **Strength** (`signal_radar.py`, `WEIGHTS`): 25 % breadth (independent source families in the last
+  week), 20 % velocity (the last three days against the fourteen before), 20 % engagement (the best
+  percentile within its source and day), 10 % relevance (the judge's best p), 15 % volume, 10 %
+  graph anchoring (the notes that name it and their linked neighbourhood). Stages: `new` (first seen in the last three days), `hot` (≥ 70), `rising` (twice the
   baseline rate), `fading` (nothing in three days), `steady`.
 - **Early warning**: first seen in the last 72 h and already in two families, or top-decile
   engagement. **Blind spots**: strength ≥ 55 and nothing in the vault.

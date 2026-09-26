@@ -56,7 +56,8 @@ _HF_SKIP = {"datasets", "spaces", "papers", "blog", "docs", "models", "collectio
 
 
 def key(name: str) -> str:
-    """The join key: 'Qwen3.8-27B-Instruct' and 'qwen 3.8' both give 'qwen38'."""
+    """What mentions are joined by. Different spellings of one model (Qwen 3.8, Qwen3.8 with a size
+    and an Instruct suffix) come out the same: qwen38."""
     s = name.casefold().strip()
     for _ in range(4):
         t = _SUFFIX.sub("", s).strip(" -_.")

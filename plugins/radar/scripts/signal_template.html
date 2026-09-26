@@ -761,6 +761,7 @@ footer .srclist { margin-top: 6px; }
 
   function renderTags(tags) {
     const box = document.getElementById("vaulttags");
+    tags = tags.filter(t => t.rising || t.new);
     if (!tags.length) { box.replaceChildren(el("div", {class: "empty", text: "Nothing rising in your own notes this week."})); return; }
     box.replaceChildren(...tags.slice(0, 10).map(t => el("div", {class: "tagrow"},
       el("span", {class: "name", text: t.tag}),
