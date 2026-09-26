@@ -36,8 +36,15 @@ SETUP
 2. Vault: use the session's TheVoid checkout (the directory holding AGENTS.md and 00_Memory/;
    the routine attaches the repository, so this checkout is the one git may push from):
      export TOOLKIT_VAULT=<that path>
-   Make sure its branch tracks origin: git -C "$TOOLKIT_VAULT" branch --set-upstream-to=origin/main
-   (harmless if already set). Only if there is no TheVoid checkout: scripts/cloud-vault.sh open
+   The checkout usually arrives on a detached HEAD at origin/main; put it on a tracking `main`
+   before anything else, with exactly this sequence (the one git allowed here besides begin/end).
+   It resets only when nothing would be lost: HEAD and any existing `main` must already be on
+   origin/main and the tree clean; otherwise it prints VAULT-NOT-RESET, and you stop and report that.
+     cd "$TOOLKIT_VAULT" && git fetch -q origin main \
+       && git diff --quiet && git diff --cached --quiet \
+       && git merge-base --is-ancestor HEAD origin/main \
+       && { ! git show-ref -q --verify refs/heads/main || git merge-base --is-ancestor main origin/main; } \
+       && git checkout -q -B main origin/main && git status -sb | head -1 || echo VAULT-NOT-RESET Only if there is no TheVoid checkout: scripts/cloud-vault.sh open
    and export TOOLKIT_VAULT="$PWD/.vault-live". Never commit the vault into agentic-toolkit.
    If the final push is refused with "not in this session's authorized repository set", report
    exactly that: TheVoid must be attached to the routine as a source.
