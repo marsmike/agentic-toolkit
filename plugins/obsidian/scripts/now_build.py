@@ -5,8 +5,9 @@
 
 Now.md says what changed and what waits, in Markdown any agent can read:
 
-    New / Enriched this week   notes the `pipeline …` commits of the last 7 days added or changed
-                               (no git: notes whose processed_date is in the last 7 days are new)
+    New / Enriched this week   notes the `pipeline …` commits of the last 7 days added or changed,
+                               newest first; an added note is new only when it has no processed_date
+                               or a real, non-estimated one in the window (no git: processed_date, else created, in it)
     Radar                      this week's strong items (00_Memory/radar/state.jsonl)
     Stuck                      parked captures (pipeline-state.json) and open DLQ notes
     Inbox                      the backlog in 01_Capture/, next captures in queue order
@@ -25,7 +26,7 @@ from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 
-from map_build import _date, _one_line
+from map_build import _date, _one_line, _when
 from pipeline_run import STATE, _order
 from vault_utils import atomic_write, contained, discover_notes, read_frontmatter, require_vault, root_active_notes
 
@@ -51,6 +52,10 @@ def _capped(lines: list[str], limit: int = SHOW) -> list[str]:
     return lines[:limit] + ([f"- … and {len(lines) - limit} more"] if len(lines) > limit else [])
 
 
+def _newest_first(paths: list[str], dated: dict[str, str]) -> list[str]:
+    return sorted(sorted(paths), key=lambda p: dated.get(p, ""), reverse=True)
+
+
 def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
     """(new, enriched, source): note paths from the pipeline's commits since `since`."""
     folders = ("02_Projects", "03_Areas", "04_Resources")
@@ -69,13 +74,24 @@ def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
             if "/" not in path and path not in root_notes:
                 continue
             (new if status.startswith("A") else changed).add(path)
-        return sorted(new), sorted(changed - new), "git"
-    new = []
+        # A commit adds a file the first time git sees it, not only when it is distilled: the run
+        # that put the vault into git "added" 1,322 notes, backfilled legacy dates among them.
+        # [earned: 2026-09-26, Now.md "New this week (1322)"]
+        fresh = {}
+        for p in new:
+            fm = read_frontmatter(vault / p)[0]
+            raw = fm.get("processed_date")
+            if raw is None or str(raw).strip() == "":
+                fresh[p] = ""  # never distilled (a root or project note): new, listed last
+            elif fm.get("processed_date_estimated") is not True and (when := _date(raw)) >= since.isoformat():
+                fresh[p] = when
+        return _newest_first(list(fresh), fresh), sorted(changed - new), "git"
+    dated = {}
     for p in discover_notes(vault):
-        fm, _ = read_frontmatter(p)
-        if _date(fm.get("processed_date")) >= since.isoformat():
-            new.append(p.relative_to(vault).as_posix())
-    return sorted(new), [], "processed_date"
+        when = _when(read_frontmatter(p)[0])
+        if when >= since.isoformat():
+            dated[p.relative_to(vault).as_posix()] = when
+    return _newest_first(list(dated), dated), [], "processed_date"
 
 
 def radar(vault: Path, since: date) -> list[dict]:

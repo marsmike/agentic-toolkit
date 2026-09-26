@@ -8,7 +8,7 @@ One pass over the active notes (02_Projects, 03_Areas, 04_Resources) writes, und
     <domain>.md       one per `domain/*` tag on at least MIN_NOTES (3) notes or with a block in
                       maps.md (a tag on one or two notes is usually a typo, and a map of two is
                       noise): Start here (the 10 most-linked notes), New (last 30 days), every
-                      note grouped by `kind`, Neighbouring domains (co-tag counts)
+                      note grouped by `kind` and newest first, Neighbouring domains (co-tag counts)
     <domain>.canvas   the Start-here and New notes as cards, one group per kind, their links as edges
     Overview.md       every domain with its note count and newest note
     Overview.canvas   the same as cards, edges between domains that share the most notes
@@ -17,6 +17,11 @@ Intro, title and sections per domain come from `Config/toolkit/maps.md` (distill
 hand-made MOCs); without it a map groups by `kind`. A file is written only when its text changes,
 so an unchanged vault makes no commit. Maps are never hand-edited: the vault's rule is "no
 hand-maintained MOCs" — 80 of them had gone stale. [earned: 2026-09-23, R12]
+
+A note's date is its `processed_date`, else `created`. A `processed_date_estimated: true` note has
+no date here: the backfilled guess put 311 legacy notes under New and ahead of real ones, so they
+sort last and are never new, as on the dashboard. [earned: 2026-09-26, "Wohnwagen-Winter-Preparation"
+led Caravaning's New list]
 """
 from __future__ import annotations
 
@@ -54,7 +59,7 @@ class Note:
     kind: str
     description: str
     domains: list[str]
-    when: str  # processed_date, else created, else ""
+    when: str  # processed_date, else created, else ""; always "" for an estimated processed_date
     links: set[str] = field(default_factory=set)
 
 
@@ -74,6 +79,17 @@ def _one_line(text: object, limit: int = MAX_DESC) -> str:
 def _date(value: object) -> str:
     m = re.match(r"\d{4}-\d{2}-\d{2}", str(value or ""))
     return m.group(0) if m else ""
+
+
+def _when(fm: dict) -> str:
+    if fm.get("processed_date_estimated") is True:
+        return ""
+    return _date(fm.get("processed_date")) or _date(fm.get("created"))
+
+
+def newest_first(notes: list[Note]) -> list[Note]:
+    """By date, newest first; undated notes last; ties by name."""
+    return sorted(sorted(notes, key=lambda n: n.name.casefold()), key=lambda n: n.when, reverse=True)
 
 
 def _tags(fm: dict) -> list[str]:
@@ -129,7 +145,7 @@ def collect(vault: Path) -> list[Note]:
             rel=path.relative_to(vault).with_suffix("").as_posix(), name=path.stem,
             kind=str(kind).strip().casefold() if isinstance(kind, str) and kind.strip() else "",
             description=_one_line(fm.get("description")), domains=domains,
-            when=_date(fm.get("processed_date")) or _date(fm.get("created")),
+            when=_when(fm),
             links={t.strip() for t in WIKILINK.findall(body)},
         ))
     return notes
@@ -230,7 +246,7 @@ def build(vault: Path, today: date) -> tuple[dict[str, str], dict]:
         out += ["## Start here", ""] + ([_entry(n) for n in start] or ["- (no note in this domain is linked yet)"]) + [""]
         out += [f"## New (last {NEW_DAYS} days)", ""] + ([_entry(n) for n in new] or ["- (nothing new)"]) + [""]
         out += ["## All notes", ""]
-        for heading, notes_in in group_notes(group, cfg):
+        for heading, notes_in in group_notes(newest_first(group), cfg):
             out += [f"### {heading}", ""] + [_entry(n) for n in notes_in] + [""]
         if cotags:
             out += ["## Neighbouring domains", ""]
