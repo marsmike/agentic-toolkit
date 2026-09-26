@@ -167,8 +167,8 @@ are there; no keys are needed.
 The environment's setup script runs at the start of every session, before Claude Code starts and
 before any repository exists, so it prepares the machine only: `uv` for the scripts (their
 dependencies install on first `uv run`), `td`, Doist's Todoist CLI (`@doist/todoist-cli`, reads
-`TODOIST_API_TOKEN`, lets radar's `--todoist` comment on the epics directly), and a git
-credential that answers github.com with `GH_TOKEN`. The token is read when git asks, never
+`TODOIST_API_TOKEN`, lets radar's `--todoist` comment on the epics directly), a git
+credential that answers github.com with `GH_TOKEN`, and the engine binaries. The token is read when git asks, never
 written into a URL or a remote, so `cloud-vault.sh`'s remote check still sees the plain URL.
 
 ```bash
@@ -187,6 +187,22 @@ git config --global credential.https://github.com.helper \
   '!f() { test "$1" = get && test -n "${GH_TOKEN:-}" && echo username=x-access-token && echo "password=$GH_TOKEN"; }; f'
 git config --global user.name >/dev/null || git config --global user.name "Claude (pipeline routine)"
 git config --global user.email >/dev/null || git config --global user.email "noreply@anthropic.com"
+# The engines (farsight, gaiafield): the vault's search and graph. `toolkit engines install` lives in
+# the toolkit repo, which does not exist yet at this point, so a shallow clone runs it; the binaries
+# land in ~/.local/share/agentic-toolkit/bin (sha256-verified) and the environment's cache keeps
+# them across runs. The routine's SETUP runs the same command again: a no-op when they are present.
+if command -v uv >/dev/null 2>&1; then
+  tmp=$(mktemp -d)
+  if git clone -q --depth 1 https://github.com/marsmike/agentic-toolkit "$tmp/toolkit" \
+     && (cd "$tmp/toolkit" && uv run --locked toolkit engines install); then
+    echo "engines: $(cd "$tmp/toolkit" && uv run --locked toolkit engines status 2>/dev/null | tr -s ' ' | tr '\n' ';')"
+  else
+    echo "engines not installed here; the routine's SETUP installs them"
+  fi
+  rm -rf "$tmp"
+else
+  echo "uv missing: engines not installed here; the routine's SETUP installs them"
+fi
 echo "uv: $(uv --version 2>/dev/null || echo missing) · td: $(td --version 2>/dev/null || echo missing)"
 python3 -c "import os; print('vars set:', {k: bool(os.environ.get(k)) for k in ('TOOLKIT_VAULT_REMOTE','GH_TOKEN','OPENROUTER_API_KEY','READWISE_TOKEN','KAGI_API_KEY','TODOIST_API_TOKEN')})"
 ```
@@ -195,17 +211,11 @@ Every step degrades instead of failing: without `uv` the routine installs it, wi
 the prompt's Todoist fallback uses the connector, and without `GH_TOKEN` git uses whatever access
 the environment provides (the run reports "TheVoid not reachable" if that is none).
 
-The engines (farsight, gaiafield) are installed by the routine prompt's SETUP step, after the
-checkout, because `toolkit engines install` lives in this repo. To have them cached across runs
-instead (the environment caches this script's result), add at the end, after the git credential:
-
-```bash
-tmp=$(mktemp -d) && git clone -q --depth 1 https://github.com/marsmike/agentic-toolkit "$tmp/toolkit" \
-  && (cd "$tmp/toolkit" && uv run --locked toolkit engines install); rm -rf "$tmp"
-```
-
-[earned: 2026-09-26 — every cloud run so far searched with the BM25 fallback and distilled
-without graph context; the engines were on the Mac only]
+The engines are installed twice on purpose: here, cached across runs by the environment, and
+again in the routine prompt's SETUP after the checkout, which is a no-op when they are present
+and the safety net when this script's clone fails. [earned: 2026-09-26 — every cloud run so far
+searched with the BM25 fallback and distilled without graph context; the engines were on the
+Mac only]
 
 ## On the Mac, once the first cloud run has pushed
 
