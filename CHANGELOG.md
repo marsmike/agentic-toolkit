@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Cloud routine SETUP puts the vault checkout on `main` deterministically** (`checkout -B main
+  origin/main` after a fetch). Every run so far arrived on a detached HEAD and the model repaired
+  it by hand, judging each time whether commits would be lost. [earned: 2026-09-26 — the run's
+  own report called it "more git than the rules allow"]
+
 - **The cloud routine installs the engines.** SETUP runs `toolkit engines install` after the
   checkout, so search.py uses farsight and the distill dossier has gaiafield's graph context and
   inferred candidates in the cloud too; FINISH names the versions. [earned: 2026-09-26 — every
