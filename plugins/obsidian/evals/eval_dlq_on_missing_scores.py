@@ -54,8 +54,19 @@ def run(vault: Path) -> dict:
             if not body.strip():
                 problems.append(f"{dlq_note.name} has an empty body")
 
+        # The same failure reported twice in a day is one note; a different detail under the same
+        # slug is a second one (2026-09-26: two identical gaiafield-infer-failed notes from one run).
+        from vault_utils import write_dlq_note
+        first = write_dlq_note(sandbox_vault, slug="eval-same-failure", title="eval", what_happened="infer failed: x", why_recorded="eval")
+        second = write_dlq_note(sandbox_vault, slug="eval-same-failure", title="eval", what_happened="infer failed: x", why_recorded="eval")
+        third = write_dlq_note(sandbox_vault, slug="eval-same-failure", title="eval", what_happened="infer failed: y", why_recorded="eval")
+        if first != second:
+            problems.append(f"dedupe: the same failure got two notes: {first.name}, {second.name}")
+        if third == first or not third.name.endswith("-2.md"):
+            problems.append(f"dedupe: a different detail under the same slug must get its own note, got {third.name}")
+
         if problems:
             return {"eval": "dlq_on_missing_scores", "pass": False, "detail": "; ".join(problems)}
-        return {"eval": "dlq_on_missing_scores", "pass": True, "detail": f"DLQ note written: {max(new_entries).name}"}
+        return {"eval": "dlq_on_missing_scores", "pass": True, "detail": f"DLQ note written: {max(new_entries).name}; same failure twice is one note"}
     finally:
         teardown_sandbox(sandbox_vault)

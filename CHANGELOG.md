@@ -4,6 +4,24 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **`cloud/` holds the whole cloud routine**: the two prompts as files the routines point at
+  (`pipeline.prompt.md`, `watchdog.prompt.md`), the environment's setup script as a script
+  (`setup.sh`, pasted into the environment), the routines' settings (`routines.json`) and the
+  README; `docs/cloud-routine.md` is a stub that points there. The setup script now also fetches
+  gaiafield's model into the cached data directory and the prompt's SETUP exports
+  `TOOLKIT_GAIAFIELD_MODEL_DIR` to it. [earned: 2026-09-26, owner's request — the script lived
+  only inside a Markdown code block and on claude.ai]
+
+- **gaiafield 0.2.2** trusts the OS certificate store for the model download (`ureq`
+  `native-certs`), and `fetch-model --dir` downloads and verifies the model without a vault.
+  [earned: 2026-09-26 — in the cloud environment `infer` failed with "invalid peer certificate:
+  UnknownIssuer" behind the proxy CA the machine trusts; the dossier lost its graph and the
+  watchdog pushed]
+
+- **One DLQ note per failure and day.** `write_dlq_note` returns the existing note when the same
+  slug already reports the same "What happened" today, instead of `-2`, `-3` copies. [earned:
+  2026-09-26 — two identical `gaiafield-infer-failed` notes from one run]
+
 - **Cloud routine SETUP puts the vault checkout on `main` deterministically** (`checkout -B main
   origin/main` after a fetch). Every run so far arrived on a detached HEAD and the model repaired
   it by hand, judging each time whether commits would be lost. [earned: 2026-09-26 — the run's

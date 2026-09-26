@@ -481,6 +481,16 @@ def write_dlq_note(
     dest = dlq_dir / f"{today}-{slug}.md"
     n = 2
     while dest.exists():
+        # The same failure reported again today (same slug, same "What happened") is one entry,
+        # not one per call: a run that calls gaiafield twice wrote two identical notes and the
+        # watchdog alerted on "2 new DLQ note(s)". A different detail under the same slug still
+        # gets its own note. [earned: 2026-09-26, TheVoid: gaiafield-infer-failed and -2]
+        try:
+            existing = dest.read_text(encoding="utf-8")
+        except OSError:
+            existing = ""
+        if f"**What happened:** {what_happened}\n" in existing:
+            return dest
         dest = dlq_dir / f"{today}-{slug}-{n}.md"
         n += 1
 
