@@ -43,6 +43,7 @@ not a note's inbound link.
 | `Boards/Pipeline.md` | `now_build.py` | The same state as Now.md as a Kanban board; drags are overwritten |
 | `Imports.md` | `imports_log.py` | What every run imported and what became of each item (note, dropped, duplicate, waiting, missing), runs newest first; data in `00_Memory/imports.jsonl` |
 | `00_Memory/last-run-report.html` | `report_build.py` | The last run's ingestion report as an Artifact page (every import with its links, what it became, the notes written); the routine publishes it to `report_artifact_url` |
+| `00_Memory/radar/Signal-Radar.html`, `.md`, `signal.json` | radar `radar.py signal` | What is taking off: named things across feeds, sensors, the vault and its graph, each with a signal strength; the routine publishes the page to `signal_artifact_url` |
 | `Dashboard.html` | `dashboard_build.py` | Twelve weeks of distilling for a browser: per day, by source, domain and kind, with the notes and the runs |
 | `Log.md` | `log_vault.py` | One line per run |
 

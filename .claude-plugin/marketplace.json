@@ -36,7 +36,7 @@
     {
       "name": "radar",
       "source": "./plugins/radar",
-      "version": "3.0.0",
+      "version": "3.1.0",
       "description": "Active research radar: judges every Reader feed item against your interests with typed judgments, reports which feeds earn their place, proposes new feeds, and asks Kagi (search, news, answers, summaries)."
     }
   ]

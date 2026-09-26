@@ -20,6 +20,9 @@ EVAL_MODULES = (
     "eval_reports",
     "eval_gaps",
     "eval_scout",
+    "eval_sensors",
+    "eval_pulse",
+    "eval_signal",
 )
 
 
