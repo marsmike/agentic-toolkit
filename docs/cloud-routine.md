@@ -94,7 +94,8 @@ available, skip it and say so.
 
 FINISH with one line: end's "summary" exactly as printed (it counts what came in from the
 ledgers), the commit, whether it was pushed, whether the report was published, and the engines
-(`farsight <version>, gaiafield <version>` from `toolkit engines list`, or "engines missing"). No number the scripts did not print.
+(`farsight <version>, gaiafield <version>` from `uv run --locked toolkit engines status`, or
+"engines missing"). No number the scripts did not print.
 ```
 
 ## Watchdog routine
