@@ -7,7 +7,8 @@
  2. hf          — models + spaces merged, trendingScore falling back to likes, entities =
                   [hf_family(id)] (imported from entities.py, not redefined here)
  3. github      — new-repo + topic queries merged, entities = [repo name]; a token GitHub refuses
-                 falls back to anonymous once and keeps GitHub's reason; a 403/429 stops
+                 falls back to anonymous once and keeps GitHub's reason; the cloud proxy's refusal
+                 switches to GitHub Trending (ranked, plain-text summaries); a 403/429 stops
                   further queries this run, status "partial"
  4. reddit ok   — stickied posts skipped, score = ups, origin f"r/{sub}"
  5. reddit blk  — blocked on both hosts for one sub -> status "blocked", no further subs tried
@@ -63,6 +64,13 @@ ATOM_GOOD = b"""<?xml version="1.0"?>
 
 RSS_BAD = b"not a feed at all"
 
+TRENDING_RSS = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>GitHub Daily Trending</title>
+<item><title>acme/first-place</title><link>https://github.com/acme/first-place</link>
+<description>&lt;p&gt;The top repo &amp;amp; more&lt;/p&gt;&lt;p&gt;&lt;img src="x.png"&gt;README&lt;/p&gt;</description></item>
+<item><title>acme/second-place</title><link>https://github.com/acme/second-place</link>
+<description>&lt;p&gt;The runner-up&lt;/p&gt;</description></item>
+</channel></rss>"""
+
 
 def run(vault: Path) -> dict:
     import sensors
@@ -88,6 +96,8 @@ def run(vault: Path) -> dict:
             return 200, {}, _json(state["hf_spaces"])
         if "api.github.com/search/repositories" in url:
             state["github_calls"] += 1
+            if state.get("github_proxy"):
+                return 403, {}, b'{"message": "This GitHub API path is not available: sessions are bound to their configured repositories"}'
             if state.get("github_refuse_token") and "Authorization" in (headers or {}):
                 return 403, {}, b'{"message": "Resource not accessible by integration"}'
             if "topic:" in url:
@@ -95,6 +105,8 @@ def run(vault: Path) -> dict:
                     return 403, {}, b'{"message": "rate limited"}'
                 return 200, {}, _json(state["github_topic"])
             return 200, {}, _json(state["github_new"])
+        if "GitHubTrendingRSS" in url:
+            return 200, {"content-type": "application/xml"}, TRENDING_RSS
         if "reddit.com/r/" in url:
             if state["reddit_block"]:
                 return 403, {"content-type": "text/html"}, b"blocked"
@@ -188,6 +200,19 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 3b: a refused token must fall back to anonymous and say why, got {gh}")
         state["github_refuse_token"] = False
         os.environ.pop("GH_TOKEN", None)
+
+        # 3c. the cloud proxy refuses api.github.com: no anonymous retry, GitHub Trending instead
+        state["github_proxy"], state["github_calls"] = True, 0
+        r = sensors.collect(sandbox, sandbox.parent / "radar-github-proxy", NOW, only=["github"])
+        gh = r["sources"]["github"]
+        rows3c = json.loads(Path(r["file"]).read_text())["items"]
+        first, second = rows3c.get("github:acme/first-place", {}), rows3c.get("github:acme/second-place", {})
+        if state["github_calls"] != 1 or gh["status"] != "partial" or "session proxy" not in gh["detail"] \
+                or first.get("origin") != "GitHub Trending" or not (first.get("score") or 0) > (second.get("score") or 0) \
+                or first.get("summary") != "The top repo & more" or first.get("entities") != ["first-place"]:
+            problems.append(f"phase 3c: a proxy refusal must switch to GitHub Trending once, ranked, plain text; "
+                            f"got {state['github_calls']} API calls, {gh}, {first}")
+        state["github_proxy"] = False
 
         # 4. reddit ok: stickied skipped, score = ups
         state["reddit"] = {"LocalLLaMA": {"data": {"children": [

@@ -56,9 +56,9 @@ Settings: the same environment and both repositories as sources (the vault is wh
 to); schedule `28 2-23/3 * * *` UTC, half an hour before each watchdog check and an hour and a half
 after each pipeline fire, so it reads the feed state the last run pushed and never waits on a
 distill; model Sonnet 5 (`claude-sonnet-5`: the scripts do the work); tools Bash, Read and Artifact;
-no connectors; no per-run notifications. Optional variable `GITHUB_TOKEN` (a fine-grained token
-with public-repository read only): without it the GitHub search is rate-limited from the cloud's
-shared addresses and reports `partial`.
+no connectors; no per-run notifications. GitHub's search API is out of reach from a cloud session
+(the session proxy binds api.github.com to the attached repositories, token or not), so there the
+GitHub source reads GitHub Trending instead and reports `partial`.
 
 ## Watchdog routine
 
@@ -98,14 +98,14 @@ pipeline routine, so `uv` and the git credential are there; no keys are needed.
 - **Environment variables** (the environment's `.env` field; visible to everyone who uses the
   environment, so keep it yours alone): `TOOLKIT_VAULT_REMOTE=https://github.com/marsmike/TheVoid.git`
   (used only by the `cloud-vault.sh` fallback), `OPENROUTER_API_KEY`, `READWISE_TOKEN`,
-  `KAGI_API_KEY`, `TODOIST_API_TOKEN` (read by `td`); optional `GITHUB_TOKEN` (the Signal Radar's
-  GitHub source, public-repository read only) and
+  `KAGI_API_KEY`, `TODOIST_API_TOKEN` (read by `td`); optional
   `TOOLKIT_OBSIDIAN_PIPELINE_BATCH` (leave it unset for the default of 25). `GH_TOKEN` is not
   needed once TheVoid is attached. Never in a file in a repo.
 - **Setup script:** `setup.sh`, pasted into the environment; it assumes no repository exists yet.
 - **Network access:** the run calls `openrouter.ai`, `readwise.io`, `kagi.com`, `api.todoist.com`,
   `huggingface.co` (gaiafield's model, once, and the radar's trending models), GitHub (`api.github.com`
-  for the radar's new-repo search), `hn.algolia.com`, `www.reddit.com`/`old.reddit.com` (often refused
+  for the radar's new-repo search, refused by the session proxy in the cloud, and
+  `mshibanami.github.io` for the GitHub Trending feed it falls back to), `hn.algolia.com`, `www.reddit.com`/`old.reddit.com` (often refused
   from cloud addresses: the source then reports `blocked`), the hosts of the radar's `sensor_feeds`,
   PyPI and npm. If the environment's network
   level is restricted, allow those hosts or use full access; otherwise each source just prints

@@ -4,6 +4,12 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **GitHub Trending when the cloud proxy refuses api.github.com.** In a Claude cloud session every
+  `api.github.com` path outside the attached repositories answers 403 "sessions are bound to their
+  configured repositories", token or not, so no `GITHUB_TOKEN` can help there. The sensor now
+  recognises that refusal, skips the anonymous retry and reads GitHub Trending (daily, all
+  languages and Python) from an RSS mirror on github.io, scored by rank. [earned: 2026-09-27, the
+  Signal Radar routine's 11:28 run after #57 named the proxy]
 - **The GitHub sensor survives a token GitHub refuses.** A 401/403 with a token on the first query
   is retried once anonymously, and every refusal keeps GitHub's own message in the detail instead
   of a bare "rate limited". [earned: 2026-09-27, the Signal Radar routine's first run — the cloud

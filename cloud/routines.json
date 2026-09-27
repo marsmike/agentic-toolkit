@@ -10,9 +10,6 @@
       "READWISE_TOKEN",
       "KAGI_API_KEY",
       "TODOIST_API_TOKEN"
-    ],
-    "optional_variables": [
-      "GITHUB_TOKEN"
     ]
   },
   "routines": [

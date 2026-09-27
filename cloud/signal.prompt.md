@@ -21,10 +21,10 @@ SETUP
        && git checkout -q -B main origin/main && git status -sb | head -1 || echo VAULT-NOT-RESET
    Then cd back to the agentic-toolkit checkout.
 3. Keys: check by name only, never print a value:
-     python3 -c "import os; print({k: bool(os.environ.get(k)) for k in ('OPENROUTER_API_KEY','KAGI_API_KEY','GITHUB_TOKEN','GH_TOKEN')})"
-   Without OPENROUTER_API_KEY new items stay unjudged; without KAGI_API_KEY there is no Kagi check;
-   without GITHUB_TOKEN or GH_TOKEN the GitHub source is often rate-limited ("partial"). None of
-   these stops the run.
+     python3 -c "import os; print({k: bool(os.environ.get(k)) for k in ('OPENROUTER_API_KEY','KAGI_API_KEY')})"
+   Without OPENROUTER_API_KEY new items stay unjudged; without KAGI_API_KEY there is no Kagi check.
+   Neither stops the run. GitHub's search API is blocked by this session's proxy; the GitHub source
+   then reads GitHub Trending and reports "partial", which is normal.
 
 RUN
 1. uv run --locked --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py sensors --json
