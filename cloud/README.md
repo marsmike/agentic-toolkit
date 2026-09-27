@@ -65,7 +65,7 @@ GitHub source reads GitHub Trending instead and reports `partial`.
 A second routine, **Pipeline watchdog**, answers what the pipeline routine cannot: that a run never
 started, died, or keeps failing. It runs `plugins/obsidian/scripts/watchdog.py` between pipeline
 runs and sends one notification only when something is wrong: no `pipeline …` commit for more than
-4 h, a failure in the last run's summary, parked captures, more than a batch waiting, or a DLQ note
+4 h, no `signal radar …` commit for more than 4 h (once the Signal Radar routine has committed), a failure in the last run's summary, parked captures, more than a batch waiting, or a DLQ note
 less than a day old. It reads the vault and changes nothing. Its `facts.week` carries the last
 seven days as numbers (runs, distilled, imported, what the radar judged, rated strong and
 promoted, rising interests), and the Sunday 20:58 UTC check sends them as a digest, once.

@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The watchdog also guards the Signal Radar routine.** Once the vault has a `signal radar …`
+  commit, one older than four hours is a `signal-stale` problem (one push, like the pipeline's
+  `stale`); `facts` carry its last summary and age. A vault without the routine is never alarmed.
+  [earned: 2026-09-27, health check after the routine went live — nothing would have noticed it stop]
+
 - **Kagi News as a Signal Radar source** (`sensors`: `kagi_news`). Kagi's news product clusters
   each day's stories by event and counts the independent domains carrying each: that count is the
   cluster's score, so breadth arrives measured. Free JSON at news.kagi.com (no key, nothing against
@@ -11,6 +16,7 @@ Every release entry links the change to the research or the dated failure that m
   Linux & OSS, Music Technology, Science); one row per story across categories. First real run: 36
   stories; TypeSafe's Jev gained a fourth family, AutoTune Advanced its second. [earned:
   2026-09-27, owner — "Kagi can also provide information about trending things"]
+||||||| parent of 5a5a841 (Watchdog: signal-stale when the Signal Radar routine stops committing)
 - **GitHub Trending when the cloud proxy refuses api.github.com.** In a Claude cloud session every
   `api.github.com` path outside the attached repositories answers 403 "sessions are bound to their
   configured repositories", token or not, so no `GITHUB_TOKEN` can help there. The sensor now
