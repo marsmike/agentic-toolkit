@@ -30,12 +30,14 @@ BRANDS = set("""
 ai llm llms gpt gpu gpus cpu api apis cli sdk mcp ui ux os ide ml rl rag nlp tts stt asr vlm vlms moe agi asi
 sota oss foss usa eu uk us io claude anthropic openai google meta microsoft apple nvidia amd intel github
 reddit youtube twitter hn huggingface hf arxiv linux windows macos ios android mac iphone pc chatgpt copilot
+china usa america europe japan germany india russia korea taiwan france britain canada australia
 gemini vst vst3 au aax daw synth python rust audio image video speech voice vision music code coder
 beginners awesome java
 """.split())
 # The words headlines are built from: cut from either end of a span.
 FILLER = set("""
 new update updated release released releases introducing announcing announced show ask tell launch launches
+save sale deal deals off discount bundle black friday ni
 today yesterday week weekly daily part the a an i my we our you your this that it its here there what why how
 made one two first last best just now finally official free open pull request requests psa wtf tps tl dr faq
 qa eli5 imo fyi diy vs version edition max pro mini beta alpha preview guide tutorial review benchmark

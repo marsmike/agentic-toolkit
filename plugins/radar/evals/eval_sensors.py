@@ -222,13 +222,14 @@ def run(vault: Path) -> dict:
                             f"got {state['github_calls']} API calls, {gh}, {first}")
         state["github_proxy"] = False
 
-        # 3d. kagi news: one row per story across categories, score = domains, a missing category named
+        # 3d. kagi news: one row per story across categories, score = domains; a category absent from
+        #     today's index is a quiet day (named, status still ok)
         os.environ["TOOLKIT_RADAR_SENSOR_KAGI_NEWS"] = "AI, Technology, Knitting"
         r = sensors.collect(sandbox, sandbox.parent / "radar-kagi-news", NOW, only=["kagi_news"])
         kn = r["sources"]["kagi_news"]
         rows3d = json.loads(Path(r["file"]).read_text())["items"]
         jev = [v for v in rows3d.values() if v["title"] == "Jev 2 ships"]
-        if kn["status"] != "partial" or "Knitting" not in kn["detail"] or len(rows3d) != 2 or len(jev) != 1 \
+        if kn["status"] != "ok" or "no stories today: Knitting" not in kn["detail"] or len(rows3d) != 2 or len(jev) != 1 \
                 or jev[0]["score"] != 12.0 or jev[0]["origin"] != "Kagi News · AI" or jev[0]["published"] != "2026-09-25":
             problems.append(f"phase 3d: kagi news rows wrong: {kn}, {rows3d}")
         os.environ.pop("TOOLKIT_RADAR_SENSOR_KAGI_NEWS")

@@ -470,7 +470,11 @@ def _fetch_rss(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
             if pub is not None and pub < cutoff:
                 continue
             key = _canonical(it["url"])
-            rows[key] = _row("rss", origin, key, it["title"], it["url"], it["summary"],
+            title = it["title"]
+            if host == "news.google.com":
+                # "Headline - Outlet": the outlet is not what the story is about
+                title = re.sub(r"\s+[-–—]\s+[^-–—]{2,60}$", "", title)
+            rows[key] = _row("rss", origin, key, title, it["url"], it["summary"],
                              pub.date().isoformat() if pub else "", None, [])
     if not ok_feeds:
         return "failed", "; ".join(problems), []
@@ -492,7 +496,10 @@ def _fetch_kagi_news(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
     if not files:
         return "failed", f"category index: HTTP {status}", []
     rows: dict[str, dict] = {}
-    problems = [f"{n}: no such category" for n in wanted if n not in files]
+    # Kagi News lists only the categories that have stories in today's batch: one missing is a quiet
+    # day, not a fault. [earned: 2026-09-27, Music Technology absent from the midday batch]
+    quiet = [n for n in wanted if n not in files]
+    problems: list[str] = []
     for name in (n for n in wanted if n in files):
         _polite(KAGI_NEWS)
         status, _, body = _request(f"{KAGI_NEWS}/{files[name]}")
@@ -518,9 +525,10 @@ def _fetch_kagi_news(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
                              str(c.get("short_summary") or "")[:300],
                              str((articles[0].get("date") if articles else "") or now.date().isoformat())[:10],
                              float(domains) if str(domains or "").isdigit() or isinstance(domains, int) else None, [])
+    note = "; ".join(problems + ([f"no stories today: {', '.join(quiet)}"] if quiet else []))
     if not rows and problems:
-        return "failed", "; ".join(problems), []
-    return ("partial" if problems else "ok"), "; ".join(problems), list(rows.values())
+        return "failed", note, []
+    return ("partial" if problems else "ok"), note, list(rows.values())
 
 
 FETCHERS = {"hn": _fetch_hn, "hf": _fetch_hf, "github": _fetch_github, "reddit": _fetch_reddit, "rss": _fetch_rss,
