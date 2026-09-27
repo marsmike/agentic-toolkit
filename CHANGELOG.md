@@ -4,6 +4,16 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Signal Radar runs as a routine of its own** (`cloud/signal.prompt.md`, every three hours
+  at :28, Sonnet 5): sensors, signal with the Kagi check, a commit of `00_Memory/radar/` only, the
+  page republished, and one morning push with the early warnings, hot signals and blind spots. The
+  pipeline routine no longer runs `sensors` and `signal`. New `pipeline_run.py commit --path P
+  --message M`: commits only the named vault paths with `end`'s secret scan, rebases over what the
+  pipeline pushed meanwhile (`--autostash`, never sweeping other changes in) and retries the push;
+  eval phase 7. [earned: 2026-09-27, owner's request — a dedicated routine in the GenAI News
+  environment; the first cloud runs showed GitHub rate-limited from the shared address, hence the
+  optional `GITHUB_TOKEN`]
+
 - **Signal Radar: what is taking off, not only what is relevant** (radar 3.1.0). `radar.py
   sensors` pulls sources that carry engagement and that Reader does not have — Hacker News
   (Algolia), Hugging Face trending models and spaces, new GitHub repos by stars, Reddit with

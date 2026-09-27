@@ -68,8 +68,9 @@ flowchart LR
   four before, and the tags that are rising or new in the owner's own writing. A note's tags count
   toward an outside entity of the same name, so "you already have it" shows on the blip.
 - **Where it lands**: `00_Memory/radar/Signal-Radar.html` (one self-contained page, no network),
-  `Signal-Radar.md` for reading in Obsidian, `signal.json`. The cloud run republishes the page to
-  the artifact the profile's `signal_artifact_url` names.
+  `Signal-Radar.md` for reading in Obsidian, `signal.json`. The Signal Radar routine
+  (`cloud/signal.prompt.md`, every three hours) republishes the page to the artifact the profile's
+  `signal_artifact_url` names and sends one morning brief.
 
 ## What it measured before shipping
 

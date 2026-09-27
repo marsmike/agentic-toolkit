@@ -4,6 +4,7 @@
     uv run scripts/pipeline_run.py begin                  # take the lock (or: busy, stop)
     uv run scripts/pipeline_run.py queue [--batch N]      # after the sources ran: this run's captures
     uv run scripts/pipeline_run.py end --distilled N --dropped N [--failed CAPTURE ...]
+    uv run scripts/pipeline_run.py commit --path 00_Memory/radar --message MSG   # a routine's own files only
 
 `begin` takes the run lock (`00_Memory/pipeline.lock`, created atomically; a lock younger than
 LOCK_STALE_HOURS means another run is still going: status `busy`, do nothing). The lock is local
@@ -44,6 +45,7 @@ import imports_log
 from vault_utils import contained, inside, profile_value, read_frontmatter, require_vault, write_dlq_note
 
 LOCK = Path("00_Memory") / "pipeline.lock"
+PUSH_ATTEMPTS = 3
 STATE = Path("00_Memory") / "pipeline-state.json"
 # What came in is counted from the sources' own ledgers (rows appended between begin and end), so
 # the run's summary is a record, not a recollection. [earned: 2026-09-24 — a cloud run reported
@@ -333,16 +335,19 @@ def _rebase_in_progress(vault: Path) -> bool:
                for d in ("rebase-merge", "rebase-apply"))
 
 
-def _pull(vault: Path, now: datetime) -> dict[str, Any]:
+def _pull(vault: Path, now: datetime, sweep: bool = True) -> dict[str, Any]:
     """Bring the upstream's commits in under the vault's own; hand edits are committed first, so
-    nothing sits in a stash. A conflict is aborted and recorded, never resolved by guessing."""
+    nothing sits in a stash. A conflict is aborted and recorded, never resolved by guessing.
+    `sweep=False` (`commit`) commits nothing else: what it did not name is stashed around the pull."""
     if not _is_repo(vault) or not _has_upstream(vault):
         return {"pulled": False, "detail": "no git upstream"}
-    local = _commit(vault, f"vault: hand edits before pipeline {now.strftime('%Y-%m-%d %H:%M')}", exclude=(LOCK.as_posix(),))
+    local = {"commit": None, "secrets": []}
+    if sweep:
+        local = _commit(vault, f"vault: hand edits before pipeline {now.strftime('%Y-%m-%d %H:%M')}", exclude=(LOCK.as_posix(),))
     if local["secrets"]:
         return {"pulled": False, "secrets": local["secrets"], "detail": "hand edits hold a key-shaped string; see the DLQ"}
     before = _git(vault, "rev-parse", "HEAD").stdout.strip()
-    pull = _git(vault, "pull", "--rebase", "--no-edit")
+    pull = _git(vault, "pull", "--rebase", "--no-edit", *(() if sweep else ("--autostash",)))
     if pull.returncode != 0:
         if _rebase_in_progress(vault):
             _git(vault, "rebase", "--abort")
@@ -359,10 +364,10 @@ def _pull(vault: Path, now: datetime) -> dict[str, Any]:
     return {"pulled": True, "hand_edits": local["commit"], "new_commits": int(count) if count.isdigit() else 0}
 
 
-def _push(vault: Path, now: datetime) -> dict[str, Any]:
+def _push(vault: Path, now: datetime, sweep: bool = True) -> dict[str, Any]:
     if not _has_upstream(vault):
         return {"pushed": False, "detail": "no git upstream"}
-    sync = _pull(vault, now)
+    sync = _pull(vault, now, sweep)
     if not sync.get("pulled"):
         return {"pushed": False, "detail": sync["detail"]}
     # Push explicitly to the upstream (the remote `begin` pulled from), never where pushRemote or
@@ -467,6 +472,42 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     return result
 
 
+def commit_paths(vault: Path, now: datetime, paths: list[str], message: str) -> dict[str, Any]:
+    """Commit only `paths` and push, for a routine that writes its own generated files while the
+    pipeline owns every other change (the Signal Radar: `00_Memory/radar/`). Same secret scan as
+    `end`; a push the pipeline beat is pulled and retried. [earned: 2026-09-27, the Signal Radar
+    moved to a routine of its own and must never commit what the pipeline is writing]"""
+    outside = [p for p in paths if not inside(vault / p, vault)]
+    if outside or not paths:
+        return {"status": "refused", "detail": f"paths must be inside the vault: {outside or 'none given'}"}
+    if not _is_repo(vault):
+        return {"status": "failed", "detail": "the vault is not a git repository"}
+    added = _git(vault, "add", "-A", "--", *paths)
+    if added.returncode != 0:
+        return {"status": "failed", "detail": "git add: " + (added.stderr.strip().splitlines() or ["?"])[-1][:200]}
+    if _git(vault, "diff", "--cached", "--quiet").returncode == 0:
+        return {"status": "ok", "commit": None, "detail": "nothing changed"}
+    hits = scan_staged(vault)
+    if hits:
+        _git(vault, "reset", "-q")
+        where = "; ".join(f"{h['file']}:{h['line']} ({h['kind']})" for h in hits[:10])
+        _dlq_once(vault, slug="commit-secret-refused", title="A routine refused to commit a key-shaped string",
+                  what_happened=f"The staged diff holds {len(hits)} key-shaped string(s): {where}. Nothing was committed.",
+                  why_recorded="A key in git is a key on GitHub; the routine commits and pushes unattended.",
+                  resolution="Find where the string came from (a fetched title or summary), then run the routine again.",
+                  confidence="high")
+        return {"status": "refused", "secrets": hits}
+    done = _git(vault, "commit", "-q", "-m", message)
+    if done.returncode != 0:
+        return {"status": "failed", "detail": (done.stderr.strip().splitlines() or ["?"])[-1][:200]}
+    result: dict[str, Any] = {"status": "ok", "commit": _git(vault, "rev-parse", "--short", "HEAD").stdout.strip()}
+    for _ in range(PUSH_ATTEMPTS):
+        result["sync"] = _push(vault, now, sweep=False)
+        if result["sync"].get("pushed") or result["sync"].get("conflict"):
+            break
+    return result
+
+
 def _owned(vault: Path, paths: tuple[str, ...]) -> list[Path]:
     """The files a generator may touch: a named file, or every file directly in a named folder."""
     out = []
@@ -512,12 +553,18 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--note", default="")
     e.add_argument("--token", default=None, help="the token `begin` returned; the lock is released only if it is still this run's")
     e.add_argument("--json", action="store_true")
+    c = sub.add_parser("commit", help="commit only the named vault paths and push (a routine's own files)")
+    c.add_argument("--path", action="append", required=True, help="vault-relative; repeat")
+    c.add_argument("--message", required=True)
+    c.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     vault, now = require_vault(), datetime.now(UTC)
     if args.cmd == "begin":
         result = begin(vault, now)
     elif args.cmd == "queue":
         result = queue(vault, args.batch)
+    elif args.cmd == "commit":
+        result = commit_paths(vault, now, args.path, args.message)
     else:
         result = end(vault, now, args.distilled, args.dropped, args.failed, args.note, args.token)
     print(json.dumps(result, indent=2 if args.json else None))
