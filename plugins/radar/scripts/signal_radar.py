@@ -38,6 +38,7 @@ import reports
 import signal_render
 import vault_graph
 import vault_pulse
+from judgments.urls import _canonical
 from vault_utils import atomic_write, profile_value
 
 RECENT_DAYS = 3          # "now": today and the two days before
@@ -127,6 +128,30 @@ def sensor_mentions(out: Path, since: str) -> tuple[list[dict], list[dict]]:
         if data.get("status"):
             status = [{"family": n, **s} for n, s in data["status"].items()]
     return list(items.values()), status
+
+
+# Sensors that fetch the same publisher feeds Reader subscribes to: one article through both pipes is
+# one source. HN, Hugging Face and Kagi News linking it are attention of their own and stay separate.
+# Reader's family for an item -> the sensor that fetches the same kind of feed.
+SAME_PIPE = {"feed": "rss", "github": "github", "reddit": "reddit"}
+
+
+def one_per_pipe(feed: list[dict], sensed: list[dict]) -> list[dict]:
+    """Reader's items and the sensors', with an article that arrived both ways counted once: the
+    sensor's row (it carries a score), the judge's relevance from Reader's when the sensor has
+    none, the earlier day. [earned: 2026-09-27, the owner imported the radar's music feeds into
+    Reader, so every music article would have counted as two families]"""
+    by_pipe = {(m["family"], _canonical(m["url"])): m for m in sensed if m["family"] in SAME_PIPE.values() and m.get("url")}
+    out = list(sensed)
+    for m in feed:
+        pipe = SAME_PIPE.get(m["family"])
+        twin = by_pipe.get((pipe, _canonical(m["url"]))) if pipe and m.get("url") else None
+        if twin is None:
+            out.append(m)
+            continue
+        twin["p"] = twin.get("p") or m.get("p")
+        twin["at"] = min(twin["at"], m["at"])
+    return out
 
 
 def add_eng_pct(mentions: list[dict]) -> None:
@@ -377,9 +402,8 @@ def build(vault: Path, out: Path, now: datetime, use_kagi: bool = False) -> dict
     today = now.date()
     since = (today - timedelta(days=RECENT_DAYS + BASELINE_DAYS)).isoformat()
     state = reports_rows(out)
-    mentions = feed_mentions(state, since)
     sensed, sensor_status = sensor_mentions(out, since)
-    mentions += sensed
+    mentions = one_per_pipe(feed_mentions(state, since), sensed)
     pulse = vault_pulse.pulse(vault, now)
     vault_ms = [m for m in pulse.get("mentions", []) if (m.get("at") or "") >= since]
     add_eng_pct(mentions)
