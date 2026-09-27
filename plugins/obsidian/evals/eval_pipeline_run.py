@@ -15,8 +15,9 @@
               conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
 7. commit   — `commit --path 00_Memory/radar` (a routine's own files) commits only that path, keeps
               an unrelated untracked note out of it, rebases over a commit another clone pushed in
-              between and pushes; a key-shaped string, a path outside the vault, "nothing changed" and
-              something staged beforehand commit nothing (the staged file stays staged)
+              between and pushes; a key-shaped string commits only its DLQ note (never the value); a path
+              outside the vault, "nothing changed" and something staged beforehand commit nothing
+              (the staged file stays staged); a named file not written yet is skipped
 6. build    — a generator that fails is reported in `build_failed` and gets one DLQ note across
               runs; its files go back exactly as before it ran (changed, added, deleted; a hand-made
               canvas beside a map untouched); the run still commits
@@ -88,16 +89,21 @@ def _commit_phase(pr, sandbox: Path) -> list[str]:
         problems.append("phase 7: commit must rebase over the other clone's push and reach the upstream")
     if not (mine / "04_Resources" / "Eval-Untracked.md").is_file() or "Eval-Untracked" in _git(remote, "log", "--name-only", "--format="):
         problems.append("phase 7: an unnamed file must stay untouched and uncommitted")
-    head = _git(mine, "rev-parse", "HEAD")
     (radar / "signal.json").write_text(f'{{"title": "{FAKE_KEY}"}}\n', encoding="utf-8")
     r = pr.commit_paths(mine, NOW, ["00_Memory/radar"], "signal radar: eval key")
-    if r.get("status") != "refused" or _git(mine, "rev-parse", "HEAD") != head or _git(mine, "diff", "--cached", "--name-only"):
-        problems.append(f"phase 7: a key-shaped string must be refused and unstaged, got {r}")
+    files = _git(mine, "show", "--name-only", "--format=", "HEAD").split()
+    if r.get("status") != "refused" or not r.get("dlq_commit") or len(files) != 1 or "commit-secret-refused" not in files[0] \
+            or FAKE_KEY in _git(mine, "log", "-p", "-1") or _git(mine, "diff", "--cached", "--name-only") \
+            or _git(mine, "rev-parse", "HEAD") != _git(remote, "rev-parse", "HEAD"):
+        problems.append(f"phase 7: a key-shaped string must be refused, only its DLQ note committed and pushed, got {r} {files}")
     (radar / "signal.json").write_text('{"blips": []}\n', encoding="utf-8")
     if pr.commit_paths(mine, NOW, ["../elsewhere"], "x").get("status") != "refused":
         problems.append("phase 7: a path outside the vault must be refused")
     if pr.commit_paths(mine, NOW, ["00_Memory/radar"], "x").get("commit") is not None:
         problems.append("phase 7: nothing changed must commit nothing")
+    r = pr.commit_paths(mine, NOW, ["00_Memory/radar/signal.json", "00_Memory/radar/not-written-yet.jsonl"], "x")
+    if r.get("status") != "ok":
+        problems.append(f"phase 7: a named file not written yet must be skipped, not fail the commit, got {r}")
     _git(mine, "add", "04_Resources/Eval-Untracked.md")
     (radar / "signal.json").write_text('{"blips": [1]}\n', encoding="utf-8")
     r = pr.commit_paths(mine, NOW, ["00_Memory/radar"], "x")

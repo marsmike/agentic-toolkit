@@ -12,7 +12,8 @@ graph — offline (gaiafield and Kagi stubbed).
                every day until five days ago and not since is "fading"
 5. sources   — the sensors' "blocked" Reddit status reaches the page; the graph reports ok
 6. kagi      — with a key, at most KAGI_CHECKS_PER_DAY names are asked, a second run the same day
-               asks none again, and a hit joins the blip as family "kagi"
+               asks none again, and a hit joins the blip as family "kagi"; its calls go to its own
+               ledger file, and the pipeline's spend in the other one counts against the same budget
 7. writes    — signal.json, Signal-Radar.html and Signal-Radar.md in the radar dir, the page
                carries its data and the note wikilinks the anchor note; nothing else in the vault
                changes but the radar dir
@@ -228,6 +229,18 @@ def run(vault: Path) -> dict:
         z = next((b for b in data["blips"] if b["key"] == "zither"), None)
         if not z or "kagi" not in z["families"]:
             problems.append(f"kagi: a hit should join zither as family kagi, got {z and z['families']}")
+
+        # 6b: its own ledger file, one budget with the pipeline's
+        if not (out / "kagi-ledger-signal.jsonl").is_file() or (out / "kagi-ledger.jsonl").is_file():
+            problems.append("kagi: the Signal Radar must write kagi-ledger-signal.jsonl and never kagi-ledger.jsonl")
+        (out / "kagi-ledger.jsonl").write_text(json.dumps({"at": (NOW + timedelta(days=1)).isoformat(), "kind": "news",
+                                                           "query": "gaps", "usd": 0.999, "balance": 5.0}) + "\n", encoding="utf-8")
+        (out / "signal-kagi.jsonl").unlink()  # nothing asked yet: the next check would ask again
+        calls = len(kagi_calls)
+        data = signal_radar.build(sandbox, out, NOW + timedelta(days=1, hours=1), use_kagi=True)
+        ks = next((x for x in data["sources"] if x["family"] == "kagi"), {})
+        if len(kagi_calls) != calls or ks.get("status") != "skipped" or "budget" not in ks.get("detail", ""):
+            problems.append(f"kagi: the pipeline's spend must count against the Signal Radar's budget, got {ks}")
 
         # 8: no graph
         def no_graph(args, timeout=None):

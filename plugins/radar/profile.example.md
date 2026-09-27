@@ -44,7 +44,8 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
   may save into Reader (default 5). The 0.80 "strong" bar is policy and stays in code; this is
   the owner's appetite. Raise it when the daily radar note shows strong items the cap discarded.
 - **`kagi_weekly_budget_usd`** — `discover` stops searching once the week's Kagi spend (measured
-  from the account balance, kept in `00_Memory/radar/kagi-ledger.jsonl`) would pass this.
+  from the account balance, kept in `00_Memory/radar/kagi-ledger.jsonl` and, for the Signal Radar,
+  `kagi-ledger-signal.jsonl`; one budget over both) would pass this.
 - **`sensors`** — which momentum sources `sensors` pulls (default all six: `hn`, `hf`, `github`,
   `reddit`, `rss`, `kagi_news`). **`sensor_kagi_news`** — Kagi News categories by name, as its
   index at news.kagi.com/kite.json lists them (AI, Technology, Music Technology, Apple, …). **`sensor_subreddits`**, **`sensor_github_topics`** — comma lists;

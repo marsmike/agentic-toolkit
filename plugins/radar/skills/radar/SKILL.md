@@ -88,7 +88,8 @@ API: the human imports it (or subscribes feed by feed), after reading the list.
 
 The same client serves one-off questions ("search Kagi", "what's new on X", "summarize this
 link"), under the radar's spend ledger and weekly budget (`kagi_weekly_budget_usd`, default
-$1.00; every call is recorded in `00_Memory/radar/kagi-ledger.jsonl` with its real cost).
+$1.00; every call is recorded in `00_Memory/radar/kagi-ledger.jsonl` with its real cost; the Signal Radar's
+checks go to `kagi-ledger-signal.jsonl`, under the same budget).
 
 ```bash
 R kagi search "query" --json          # web results                        ~$0.025

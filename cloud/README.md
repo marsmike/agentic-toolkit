@@ -60,6 +60,23 @@ no connectors; no per-run notifications. GitHub's search API is out of reach fro
 (the session proxy binds api.github.com to the attached repositories, token or not), so there the
 GitHub source reads GitHub Trending instead and reports `partial`.
 
+## Two routines, one vault
+
+The pipeline and the Signal Radar run in separate sessions and both push TheVoid; each rebases over
+the other at commit time, which is conflict-free only while no file has two writers:
+
+| Files in `00_Memory/radar/` | Written by |
+|---|---|
+| `state.jsonl`, `seen.jsonl`, `promoted.jsonl`, `todoist.jsonl`, `YYYY-MM-DD.md`, `weekly.jsonl`, `gaps-*.json`, `feeds-discovered-*`, `kagi-ledger.jsonl` | pipeline (scan, gaps, weekly; discover and scout by hand) |
+| `sensors/`, `signal.json`, `Signal-Radar.html`, `Signal-Radar.md`, `signal-kagi.jsonl`, `kagi-ledger-signal.jsonl` | Signal Radar |
+
+The Kagi budget is one weekly budget over both ledger files. DLQ notes are new files with
+per-day, per-kind names, so both may add them. The Signal Radar reads the pipeline's `state.jsonl`
+as last pushed: it lags by at most one pipeline run and never waits for one. A new file either
+routine writes goes into this table, or the two will one day conflict and a pipeline run's notes
+are lost with its session. [earned: 2026-09-27, routine-dependency review — both appended to
+`kagi-ledger.jsonl`]
+
 ## Watchdog routine
 
 A second routine, **Pipeline watchdog**, answers what the pipeline routine cannot: that a run never

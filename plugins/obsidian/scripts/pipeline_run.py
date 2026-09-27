@@ -486,6 +486,11 @@ def commit_paths(vault: Path, now: datetime, paths: list[str], message: str) -> 
     # it): this command commits the named paths or nothing. [earned: 2026-09-27, Copilot on #56]
     if _git(vault, "diff", "--cached", "--quiet").returncode != 0:
         return {"status": "refused", "detail": "the index already holds staged changes; commit or unstage them first"}
+    # A file this run did not write yet (a ledger before its first call) is no error; a tracked one
+    # it deleted still counts. [earned: 2026-09-27, Copilot on #61]
+    paths = [p for p in paths if (vault / p).exists() or _git(vault, "ls-files", "--error-unmatch", "--", p).returncode == 0]
+    if not paths:
+        return {"status": "ok", "commit": None, "detail": "nothing changed"}
     added = _git(vault, "add", "-A", "--", *paths)
     if added.returncode != 0:
         return {"status": "failed", "detail": "git add: " + (added.stderr.strip().splitlines() or ["?"])[-1][:200]}
@@ -496,11 +501,21 @@ def commit_paths(vault: Path, now: datetime, paths: list[str], message: str) -> 
         _git(vault, "reset", "-q")
         where = "; ".join(f"{h['file']}:{h['line']} ({h['kind']})" for h in hits[:10])
         _dlq_once(vault, slug="commit-secret-refused", title="A routine refused to commit a key-shaped string",
-                  what_happened=f"The staged diff holds {len(hits)} key-shaped string(s): {where}. Nothing was committed.",
+                  what_happened=f"The staged diff holds {len(hits)} key-shaped string(s): {where}. Nothing else was committed.",
                   why_recorded="A key in git is a key on GitHub; the routine commits and pushes unattended.",
                   resolution="Find where the string came from (a fetched title or summary), then run the routine again.",
                   confidence="high")
-        return {"status": "refused", "secrets": hits}
+        # The note names file and line, never the value: it alone is committed, or it is lost with
+        # the session's checkout. [earned: 2026-09-27, Copilot on #61]
+        note = [q.relative_to(vault).as_posix() for q in (vault / "00_Memory" / "dlq").glob("*-commit-secret-refused*.md")]
+        result: dict[str, Any] = {"status": "refused", "secrets": hits}
+        if note and _git(vault, "add", "--", *note).returncode == 0 and not scan_staged(vault) \
+                and _git(vault, "commit", "-q", "-m", f"dlq: {message} refused (key-shaped string)").returncode == 0:
+            result["dlq_commit"] = _git(vault, "rev-parse", "--short", "HEAD").stdout.strip()
+            result["sync"] = _push(vault, now, sweep=False)
+        else:
+            _git(vault, "reset", "-q")
+        return result
     done = _git(vault, "commit", "-q", "-m", message)
     if done.returncode != 0:
         return {"status": "failed", "detail": (done.stderr.strip().splitlines() or ["?"])[-1][:200]}
