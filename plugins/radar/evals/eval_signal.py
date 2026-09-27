@@ -7,7 +7,8 @@ graph — offline (gaiafield and Kagi stubbed).
                vault note tagged `qwen` with the graph hub it links to; its older note means it is
                not "new" although the feed saw it only this week
 3. early     — Zither, first seen today on Hacker News (top engagement) and in an RSS feed, both of
-               which ran days before, is new, in the early list and a blind spot (no note has it)
+               which ran days before, is new, in the early list and a blind spot (no note has it);
+               the same RSS article also arriving through Reader is one mention, not a third family
 4. filters   — an item the judge found irrelevant for every interest is no blip; a thing seen
                every day until five days ago and not since is "fading"
 5. sources   — the sensors' "blocked" Reddit status reaches the page; the graph reports ok
@@ -71,6 +72,10 @@ def _rows(local: str, audio: str) -> list[dict]:
     for n in (0, 1):
         rows.append({"run": _day(n), "feed": "arXiv.org", "title": "BoringBench: a study of tables",
                      "url": f"https://arxiv.org/abs/2609.{n}", "kind": "paper", "p": {local: 0.1, audio: 0.05}, "backend": "jev"})
+    # the same KVR article through Reader and through the RSS sensor: one source, not two
+    rows.append({"run": _day(1), "feed": "KVR Audio", "title": "Zither 1.0 granular synth released",
+                 "url": "https://www.kvraudio.com/news/zither?utm_source=reader", "kind": "news",
+                 "p": {local: 0.02, audio: 0.88}, "backend": "jev"})
     for n in range(5, 17):
         rows.append({"run": _day(n), "feed": "reddit.com", "title": f"Progress on Grimoire 2 build {n}",
                      "url": f"https://www.reddit.com/r/LocalLLaMA/comments/g{n}/x/", "kind": "news",
@@ -195,7 +200,7 @@ def run(vault: Path) -> dict:
                 problems.append(f"join: qwen38 belongs to {local}, got {q['sector']}")
         z = blips.get("zither")
         if not z or z["stage"] != "new" or "zither" not in data["early"] or "zither" not in data["blind_spots"] \
-                or not {"hn", "rss"} <= set(z["families"]):
+                or set(z["families"]) != {"hn", "rss"} or z["mentions"] != 2:
             problems.append(f"early: zither should be new, early and a blind spot from hn+rss, got {z and (z['stage'], z['families'])} "
                             f"early={data['early']} blind={data['blind_spots']}")
         if any(k.startswith("boringbench") for k in blips):

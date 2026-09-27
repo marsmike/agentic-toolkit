@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Signal Radar: one article through two pipes is one source.** An item that arrives through Reader
+  and through the RSS, GitHub or Reddit sensor (the same publisher feed, twice) is one mention: the
+  sensor's row with its score, the judge's relevance from Reader's. Hacker News, Hugging Face and
+  Kagi News linking the same article still count as their own attention. [earned: 2026-09-27, the
+  owner imported the radar's music feeds into Reader — each music article would have scored two
+  families of breadth]
+
 - **Signal Radar: less noise from the music feeds.** Google News titles lose their "- Outlet" suffix
   (outlets had become signals: "Gearnews.com", "MusicRadar"); deal words ("Save 50%") and country
   names never make a name on their own; "NI Maschine 3.7" is Maschine. A Kagi News category missing
