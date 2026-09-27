@@ -4,6 +4,12 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Signal Radar: less noise from the music feeds.** Google News titles lose their "- Outlet" suffix
+  (outlets had become signals: "Gearnews.com", "MusicRadar"); deal words ("Save 50%") and country
+  names never make a name on their own; "NI Maschine 3.7" is Maschine. A Kagi News category missing
+  from the day's index is a quiet day, not a partial source. [earned: 2026-09-27, the first run with
+  the owner's music feeds]
+
 - **Signal Radar: clicking a blip opens its details.** The SVG helper set `onclick` with
   `setAttribute`, which turns a function into inline code that only evaluates the arrow function
   (and which the artifact's CSP blocks anyway): blips did nothing on click or Enter, in the vault

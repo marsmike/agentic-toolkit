@@ -30,12 +30,14 @@ BRANDS = set("""
 ai llm llms gpt gpu gpus cpu api apis cli sdk mcp ui ux os ide ml rl rag nlp tts stt asr vlm vlms moe agi asi
 sota oss foss usa eu uk us io claude anthropic openai google meta microsoft apple nvidia amd intel github
 reddit youtube twitter hn huggingface hf arxiv linux windows macos ios android mac iphone pc chatgpt copilot
+china usa america europe japan germany india russia korea taiwan france britain canada australia
 gemini vst vst3 au aax daw synth python rust audio image video speech voice vision music code coder
 beginners awesome java
 """.split())
 # The words headlines are built from: cut from either end of a span.
 FILLER = set("""
 new update updated release released releases introducing announcing announced show ask tell launch launches
+save sale deal deals off discount bundle black friday ni
 today yesterday week weekly daily part the a an i my we our you your this that it its here there what why how
 made one two first last best just now finally official free open pull request requests psa wtf tps tl dr faq
 qa eli5 imo fyi diy vs version edition max pro mini beta alpha preview guide tutorial review benchmark
@@ -45,6 +47,10 @@ monday tuesday wednesday thursday friday saturday sunday january february march 
 september october november december
 """.split())
 GENERIC = BRANDS | FILLER
+# Places are the setting of a story, never its subject, in one word or several. [earned:
+# 2026-09-27, "China" became a signal; Copilot on #63: "South Korea", "United States"]
+PLACES = {"southkorea", "northkorea", "unitedstates", "unitedkingdom", "newzealand", "hongkong", "saudiarabia",
+          "southafrica", "middleeast", "europeanunion", "latinamerica", "siliconvalley", "sanfrancisco", "newyork"}
 _CLAUSE = re.compile(r"\s*(?:[:|·!?]|\s[-–—]\s|\.\s)\s*")
 
 _PREFIXES = {"show", "launch", "ask", "tell"}
@@ -89,7 +95,7 @@ def _usable(words: list[str]) -> str | None:
         return None
     name = " ".join(words)
     k = key(name)
-    if len(k) < 3 or k in GENERIC or _VERSION_ONLY.match(name) or k.isdigit() or _UNIT.match(k):
+    if len(k) < 3 or k in GENERIC or k in PLACES or _VERSION_ONLY.match(name) or k.isdigit() or _UNIT.match(k):
         return None
     if len(words) == 1 and words[0].isupper() and len(words[0]) <= 3:
         return None  # a bare short acronym (RAG, TTS, PSA) is vocabulary, not a thing
