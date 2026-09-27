@@ -4,6 +4,14 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Signal Radar: clicking a blip opens its details.** The SVG helper set `onclick` with
+  `setAttribute`, which turns a function into inline code that only evaluates the arrow function
+  (and which the artifact's CSP blocks anyway): blips did nothing on click or Enter, in the vault
+  and in the artifact. Handlers are now listeners, as in the HTML helper; checked in headless
+  Chrome (click and keyboard). The detail panel no longer overflows with long titles, and "new"
+  counts only anchored notes created this week. [earned: 2026-09-27, owner — "clicking on the radar
+  blips does nothing"]
+
 - **No file with two writers across the two routines.** The pipeline (`gaps`, and `discover`/`scout`
   by hand) and the Signal Radar (its Kagi check) both appended to `kagi-ledger.jsonl`, and both push
   TheVoid: two appends conflict in `pull --rebase`, and a pipeline run whose push fails loses its

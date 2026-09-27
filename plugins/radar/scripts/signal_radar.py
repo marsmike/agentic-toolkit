@@ -257,7 +257,7 @@ def score(e: Entity, today: date, anchor_of=None, horizons: dict[str, str] | Non
         "key": e.key, "name": display_name(e), "stage": stage, "strength": strength,
         "parts": {k: round(v, 3) for k, v in parts.items()}, "families": families, "mentions": len(week),
         "recent": recent, "velocity": round(velocity, 2), "first_seen": first_seen, "in_vault": anchored["total"],
-        "new_in_vault": len(in_window),
+        "new_in_vault": sum(1 for c in anchored.get("created", []) if c and c >= window_from),
         "spark": [spark.get((today - timedelta(days=d)).isoformat(), 0) for d in range(13, -1, -1)],
         "items": [{"title": m["title"], "url": m["url"], "family": m["family"], "origin": m["origin"], "at": m["at"],
                    "score": m.get("score")} for m in items[:6]],
