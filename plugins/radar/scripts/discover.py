@@ -287,7 +287,7 @@ def discover(vault: Path, out: Path, now: datetime, only: list[str] | None = Non
     reason = judge.unavailable_reason(vault)
     if reason:
         return {"status": "SKIPPED", "detail": f"judgment backend unavailable ({reason}); nothing sent"}
-    ledger = kagi.Ledger(out / "kagi-ledger.jsonl",
+    ledger = kagi.ledger(out,
                          float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
     try:
         known = subscribed_sites(now - timedelta(days=60))

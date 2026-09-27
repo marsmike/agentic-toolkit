@@ -61,29 +61,50 @@ def _request(url: str, body: dict | None = None) -> dict:
         raise KagiError(f"request failed: {e}") from e
 
 
-class Ledger:
-    """`kagi-ledger.jsonl` in the radar dir: one row per call, {at, kind, query, usd, balance}."""
+# One ledger file per writer, one budget over all of them: the pipeline routine and the Signal Radar
+# routine both call Kagi and both push the vault, and two appends to one file make git's rebase
+# conflict, which loses a whole pipeline run. [earned: 2026-09-27, routine-dependency review]
+LEDGER = "kagi-ledger.jsonl"                # scan-side commands: gaps, discover, scout, the kagi skill
+SIGNAL_LEDGER = "kagi-ledger-signal.jsonl"  # the Signal Radar's corroboration check
 
-    def __init__(self, path: Path, weekly_budget: float):
-        self.path, self.weekly_budget = path, weekly_budget
+
+class Ledger:
+    """A ledger file in the radar dir: one row per call, {at, kind, query, usd, balance}. Writes only
+    `path`; the week's spend and the last balance also read `shared`, the other writers' files."""
+
+    def __init__(self, path: Path, weekly_budget: float, shared: tuple[Path, ...] = ()):
+        self.path, self.weekly_budget, self.shared = path, weekly_budget, shared
+
+    @staticmethod
+    def _read(path: Path) -> list[dict]:
+        if not path.is_file():
+            return []
+        return [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
 
     def rows(self) -> list[dict]:
-        if not self.path.is_file():
-            return []
-        return [json.loads(ln) for ln in self.path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        return self._read(self.path)
+
+    def all_rows(self) -> list[dict]:
+        return sorted((r for p in (self.path, *self.shared) for r in self._read(p)), key=lambda r: r["at"])
 
     def spent_this_week(self, now: datetime) -> float:
         since = now - timedelta(days=7)
-        return sum(r["usd"] for r in self.rows() if datetime.fromisoformat(r["at"]) >= since)
+        return sum(r["usd"] for r in self.all_rows() if datetime.fromisoformat(r["at"]) >= since)
 
     def last_balance(self) -> float | None:
-        rows = [r for r in self.rows() if r.get("balance") is not None]
+        rows = [r for r in self.all_rows() if r.get("balance") is not None]
         return rows[-1]["balance"] if rows else None
 
     def record(self, row: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row) + "\n")
+
+
+def ledger(out: Path, weekly_budget: float, signal: bool = False) -> Ledger:
+    """This writer's ledger in the radar dir `out`, budgeted together with the other one."""
+    own, other = (SIGNAL_LEDGER, LEDGER) if signal else (LEDGER, SIGNAL_LEDGER)
+    return Ledger(out / own, weekly_budget, shared=(out / other,))
 
 
 def _paid(kind: str, url: str, ledger: Ledger, label: str, now: datetime | None = None, body: dict | None = None) -> dict:

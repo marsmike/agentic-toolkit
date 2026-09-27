@@ -347,7 +347,7 @@ def scout(vault: Path, out: Path, now: datetime, week: str | None = None, force:
     _from_state(cands, rows, since)
     _from_clips(cands, the_clips)
 
-    ledger = kagi.Ledger(out / "kagi-ledger.jsonl",
+    ledger = kagi.ledger(out,
                          float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
     spent_before = ledger.spent_this_week(now)
     strong_count: dict[str, int] = {}

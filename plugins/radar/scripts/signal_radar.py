@@ -335,8 +335,8 @@ def kagi_check(vault: Path, out: Path, candidates: list[dict], now: datetime) ->
     week_ago = (now.date() - timedelta(days=7)).isoformat()
     asked_today = sum(1 for r in rows if r["day"] == today)
     recent_keys = {r["key"] for r in rows if r["day"] >= week_ago}
-    ledger = kagi.Ledger(out / "kagi-ledger.jsonl",
-                         float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
+    ledger = kagi.ledger(out, float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)),
+                         signal=True)
     status = {"family": "kagi", "label": FAMILY_LABELS["kagi"], "status": "ok", "items": 0, "detail": ""}
     for b in sorted(candidates, key=lambda b: (len(b["families"]), -b["strength"])):
         if asked_today >= KAGI_CHECKS_PER_DAY:

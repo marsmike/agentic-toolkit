@@ -59,7 +59,7 @@ def gaps(vault: Path, out: Path, now: datetime, promote: bool = False) -> dict[s
     reason = judge.unavailable_reason(vault)
     if reason:
         return {"status": "SKIPPED", "detail": f"judgment backend unavailable ({reason}); nothing sent"}
-    ledger = kagi.Ledger(out / "kagi-ledger.jsonl",
+    ledger = kagi.ledger(out,
                          float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
 
     spent_before = ledger.spent_this_week(now)
