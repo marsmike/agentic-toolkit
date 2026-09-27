@@ -132,7 +132,8 @@ def sensor_mentions(out: Path, since: str) -> tuple[list[dict], list[dict]]:
 
 # Sensors that fetch the same publisher feeds Reader subscribes to: one article through both pipes is
 # one source. HN, Hugging Face and Kagi News linking it are attention of their own and stay separate.
-SAME_PIPE = ("rss", "github", "reddit")
+# Reader's family for an item -> the sensor that fetches the same kind of feed.
+SAME_PIPE = {"feed": "rss", "github": "github", "reddit": "reddit"}
 
 
 def one_per_pipe(feed: list[dict], sensed: list[dict]) -> list[dict]:
@@ -140,10 +141,11 @@ def one_per_pipe(feed: list[dict], sensed: list[dict]) -> list[dict]:
     sensor's row (it carries a score), the judge's relevance from Reader's when the sensor has
     none, the earlier day. [earned: 2026-09-27, the owner imported the radar's music feeds into
     Reader, so every music article would have counted as two families]"""
-    by_url = {_canonical(m["url"]): m for m in sensed if m["family"] in SAME_PIPE and m.get("url")}
+    by_pipe = {(m["family"], _canonical(m["url"])): m for m in sensed if m["family"] in SAME_PIPE.values() and m.get("url")}
     out = list(sensed)
     for m in feed:
-        twin = by_url.get(_canonical(m["url"])) if m.get("url") else None
+        pipe = SAME_PIPE.get(m["family"])
+        twin = by_pipe.get((pipe, _canonical(m["url"]))) if pipe and m.get("url") else None
         if twin is None:
             out.append(m)
             continue
