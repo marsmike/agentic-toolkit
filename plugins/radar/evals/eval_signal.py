@@ -131,7 +131,8 @@ def _entity_checks(problems: list[str]) -> None:
                                   ("I've tried Qwen 3.8 with 128GB", "Qwen 3.8", "128GB"),
                                   ("v2.1.283", None, "v2.1.283"),
                                   ("NI Maschine 3.7: three new sequencing tools", "Maschine 3.7", "NI Maschine 3.7"),
-                                  ("Save 50% on synths this weekend", None, "Save 50")):
+                                  ("Save 50% on synths this weekend", None, "Save 50"),
+                                  ("South Korea and the United States sign a chip pact", None, "South Korea")):
         got = E.from_title(title)
         if want and want not in got:
             problems.append(f"entities: {title!r} should name {want!r}, got {got}")

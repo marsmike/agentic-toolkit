@@ -47,6 +47,10 @@ monday tuesday wednesday thursday friday saturday sunday january february march 
 september october november december
 """.split())
 GENERIC = BRANDS | FILLER
+# Places are the setting of a story, never its subject, in one word or several. [earned:
+# 2026-09-27, "China" became a signal; Copilot on #63: "South Korea", "United States"]
+PLACES = {"southkorea", "northkorea", "unitedstates", "unitedkingdom", "newzealand", "hongkong", "saudiarabia",
+          "southafrica", "middleeast", "europeanunion", "latinamerica", "siliconvalley", "sanfrancisco", "newyork"}
 _CLAUSE = re.compile(r"\s*(?:[:|·!?]|\s[-–—]\s|\.\s)\s*")
 
 _PREFIXES = {"show", "launch", "ask", "tell"}
@@ -91,7 +95,7 @@ def _usable(words: list[str]) -> str | None:
         return None
     name = " ".join(words)
     k = key(name)
-    if len(k) < 3 or k in GENERIC or _VERSION_ONLY.match(name) or k.isdigit() or _UNIT.match(k):
+    if len(k) < 3 or k in GENERIC or k in PLACES or _VERSION_ONLY.match(name) or k.isdigit() or _UNIT.match(k):
         return None
     if len(words) == 1 and words[0].isupper() and len(words[0]) <= 3:
         return None  # a bare short acronym (RAG, TTS, PSA) is vocabulary, not a thing

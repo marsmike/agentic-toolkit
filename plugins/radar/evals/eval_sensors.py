@@ -55,6 +55,12 @@ RSS_GOOD = b"""<?xml version="1.0"?>
 <pubDate>Mon, 01 Jun 2026 10:00:00 +0000</pubDate><description>old</description></item>
 </channel></rss>"""
 
+GNEWS = b"""<?xml version="1.0"?>
+<rss version="2.0"><channel><title>Google News</title>
+<item><title>Maschine 3.7 adds a new sequencer - Gearnews.com</title><link>https://news.google.com/rss/articles/abc</link>
+<pubDate>Thu, 24 Sep 2026 10:00:00 +0000</pubDate><description>x</description></item>
+</channel></rss>"""
+
 ATOM_GOOD = b"""<?xml version="1.0"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 <title>Atom Feed</title>
@@ -259,16 +265,19 @@ def run(vault: Path) -> dict:
 
         # 6. rss + atom, 7-day window, a non-feed is a per-feed failure
         os.environ["TOOLKIT_RADAR_SENSOR_FEEDS"] = ("https://synthsite.example.org/feed,"
-                                                     "https://atomsite.example.org/atom,https://badsite.example.org/feed")
+                                                     "https://atomsite.example.org/atom,https://badsite.example.org/feed,"
+                                                     "https://news.google.com/rss/search?q=maschine")
         state["feeds"] = {"https://synthsite.example.org/feed": (200, "application/rss+xml", RSS_GOOD),
                           "https://atomsite.example.org/atom": (200, "application/atom+xml", ATOM_GOOD),
-                          "https://badsite.example.org/feed": (200, "text/html", RSS_BAD)}
+                          "https://badsite.example.org/feed": (200, "text/html", RSS_BAD),
+                          "https://news.google.com/rss/search?q=maschine": (200, "application/rss+xml", GNEWS)}
         out6 = sandbox.parent / "radar-rss"
         r = sensors.collect(sandbox, out6, NOW, only=["rss"])
         items = json.loads(Path(r["file"]).read_text())["items"]
         titles = sorted(v["title"] for v in items.values())
-        if titles != ["Atom entry", "New plugin released"]:
-            problems.append(f"phase 6: expected the two in-window RSS+Atom items (ancient post dropped), got {titles}")
+        if titles != ["Atom entry", "Maschine 3.7 adds a new sequencer", "New plugin released"]:
+            problems.append(f"phase 6: expected the in-window RSS+Atom items (ancient post dropped, Google News "
+                            f"title without its '- Outlet'), got {titles}")
         if r["sources"]["rss"]["status"] != "partial" or "badsite" not in r["sources"]["rss"]["detail"]:
             problems.append(f"phase 6: one bad feed among good ones must be status partial, got {r['sources']['rss']}")
         os.environ.pop("TOOLKIT_RADAR_SENSOR_FEEDS")
