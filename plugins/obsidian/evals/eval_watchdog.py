@@ -10,6 +10,8 @@ In a git sandbox with a `pipeline …` commit an hour old:
 7. dlq       — an open DLQ note created today is a problem; an older open one is listed in the facts only
 8. exit      — the CLI exits 1 on a problem and 0 when ok
 9. notify    — `notification` names every kind and is cut to 600 characters however many problems there are
+11. signal   — no check before the vault has a `signal radar …` commit; with one, its age is a fact and
+              more than --max-age-hours is `signal-stale`
 10. stats    — `facts.week` counts the window's runs and what they distilled; the Sunday-evening check carries a
               `weekly_digest` (≤ 600 chars) and any other time it is empty
 """
@@ -148,10 +150,21 @@ def run(vault: Path) -> dict:
                              env={**os.environ, "TOOLKIT_VAULT": str(sandbox)})
         if cli.returncode != 0 or not cli.stdout.startswith("OK"):
             problems.append(f"exit: expected 0 and OK, got {cli.returncode}: {cli.stdout[:80]}")
+
+        # 11. the Signal Radar routine: silent until it has committed once, then held to the same age
+        _commit(sandbox, "signal radar 2026-09-27 11:31: 53 signals, 5 early, 13 blind spots", now - timedelta(minutes=30))
+        _commit(sandbox, "pipeline 2026-09-25 17:06: 1 distilled, 0 dropped, 0 failed; 0 in the inbox", now - timedelta(minutes=10))
+        r = watchdog.check(sandbox, now)
+        if not r["ok"] or r["facts"].get("signal_age_hours") != 0.5 or "53 signals" not in r["facts"].get("signal_last", ""):
+            problems.append(f"signal: a fresh signal commit is a fact, not a problem: {r}")
+        _commit(sandbox, "pipeline 2026-09-25 22:06: 1 distilled, 0 dropped, 0 failed; 0 in the inbox", now + timedelta(hours=4))
+        r = watchdog.check(sandbox, now + timedelta(hours=4, minutes=40))
+        if kinds(r) != ["signal-stale"]:
+            problems.append(f"signal: a signal commit older than the limit must be signal-stale alone, got {kinds(r)}")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
         else:
             os.environ["TOOLKIT_VAULT"] = saved
         teardown_sandbox(sandbox)
-    return {"eval": NAME, "pass": not problems, "detail": "; ".join(problems) or "ok, stale, failed, hung, parked, backlog, dlq, exit codes"}
+    return {"eval": NAME, "pass": not problems, "detail": "; ".join(problems) or "ok, stale, failed, hung, parked, backlog, dlq, exit codes, signal"}

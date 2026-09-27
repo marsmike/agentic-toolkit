@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The watchdog also guards the Signal Radar routine.** Once the vault has a `signal radar …`
+  commit, one older than four hours is a `signal-stale` problem (one push, like the pipeline's
+  `stale`); `facts` carry its last summary and age. A vault without the routine is never alarmed.
+  [earned: 2026-09-27, health check after the routine went live — nothing would have noticed it stop]
+
 - **Kagi News as a Signal Radar source** (`sensors`: `kagi_news`). Kagi's news product clusters
   each day's stories by event and counts the independent domains carrying each: that count is the
   cluster's score, so breadth arrives measured. Free JSON at news.kagi.com (no key, nothing against

@@ -47,9 +47,10 @@ def _git(vault: Path, *args: str) -> str:
     return run.stdout if run.returncode == 0 else ""
 
 
-def last_pipeline_commit(vault: Path) -> tuple[datetime | None, str]:
-    """(commit time, subject) of the newest `pipeline …` commit, or (None, "")."""
-    out = _git(vault, "log", "-1", "--grep=^pipeline", "--format=%cI%x09%s").strip()
+def last_pipeline_commit(vault: Path, grep: str = "^pipeline") -> tuple[datetime | None, str]:
+    """(commit time, subject) of the newest commit whose subject matches `grep` (`pipeline …` by
+    default), or (None, "")."""
+    out = _git(vault, "log", "-1", f"--grep={grep}", "--format=%cI%x09%s").strip()
     if not out:
         return None, ""
     when, _, subject = out.partition("\t")
@@ -83,6 +84,18 @@ def check(vault: Path, now: datetime, max_age_hours: float = MAX_AGE_HOURS) -> d
         flagged = [w for w in FAIL_WORDS if w in summary and not (w == "failed" and counts.get("failed", 1) == 0)]
         if flagged:
             problems.append({"kind": "failed", "detail": f"last run reported: {summary}"})
+
+    # The Signal Radar routine commits `signal radar …` every 3 h; checked only once this vault has
+    # one, so a vault without the routine is not alarmed. [earned: 2026-09-27, the routine went live
+    # and nothing would have noticed it stop]
+    sig_when, sig_subject = last_pipeline_commit(vault, "^signal radar")
+    if sig_when is not None:
+        sig_age = (now - sig_when.astimezone(UTC)).total_seconds() / 3600
+        facts["signal_last"] = sig_subject.split(": ", 1)[-1]
+        facts["signal_age_hours"] = round(sig_age, 1)
+        if sig_age > max_age_hours:
+            problems.append({"kind": "signal-stale", "detail": f"no Signal Radar run committed for {sig_age:.1f} h "
+                                                               f"(last: {sig_when.strftime('%Y-%m-%d %H:%M')} UTC)"})
 
     lock = vault / LOCK
     if lock.is_file():
