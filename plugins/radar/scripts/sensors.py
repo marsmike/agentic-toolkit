@@ -204,6 +204,14 @@ def _github_headers() -> dict[str, str]:
     return headers
 
 
+def _gh_message(body: bytes) -> str:
+    """GitHub's own reason for a refusal, short."""
+    try:
+        return str(json.loads(body).get("message") or "")[:80]
+    except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
+        return ""
+
+
 def _fetch_github(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
     headers = _github_headers()
     since = (now - timedelta(days=GITHUB_WINDOW_DAYS)).date().isoformat()
@@ -217,8 +225,15 @@ def _fetch_github(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
     for url in queries:
         _polite(url)
         status, _, body = _request(url, headers)
+        if status in (401, 403) and "Authorization" in headers and not rows:
+            # A token GitHub will not take for the REST API (a git-only credential): say so and
+            # go on anonymously. [earned: 2026-09-27, the cloud's GH_TOKEN answered 403 on search]
+            problems.append(f"token refused (HTTP {status}: {_gh_message(body)}); anonymous")
+            headers = {k: v for k, v in headers.items() if k != "Authorization"}
+            _polite(url)
+            status, _, body = _request(url, headers)
         if status in (403, 429):
-            problems.append(f"rate limited (HTTP {status})")
+            problems.append(f"rate limited (HTTP {status}: {_gh_message(body)})")
             rate_limited = True
             break
         if status != 200:

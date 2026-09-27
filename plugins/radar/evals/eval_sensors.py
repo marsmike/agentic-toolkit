@@ -6,7 +6,8 @@
                   {day, updated, status, items}; disabled sources report "skipped"
  2. hf          — models + spaces merged, trendingScore falling back to likes, entities =
                   [hf_family(id)] (imported from entities.py, not redefined here)
- 3. github      — new-repo + topic queries merged, entities = [repo name]; a 403/429 stops
+ 3. github      — new-repo + topic queries merged, entities = [repo name]; a token GitHub refuses
+                 falls back to anonymous once and keeps GitHub's reason; a 403/429 stops
                   further queries this run, status "partial"
  4. reddit ok   — stickied posts skipped, score = ups, origin f"r/{sub}"
  5. reddit blk  — blocked on both hosts for one sub -> status "blocked", no further subs tried
@@ -87,6 +88,8 @@ def run(vault: Path) -> dict:
             return 200, {}, _json(state["hf_spaces"])
         if "api.github.com/search/repositories" in url:
             state["github_calls"] += 1
+            if state.get("github_refuse_token") and "Authorization" in (headers or {}):
+                return 403, {}, b'{"message": "Resource not accessible by integration"}'
             if "topic:" in url:
                 if state["github_block_topic"]:
                     return 403, {}, b'{"message": "rate limited"}'
@@ -174,6 +177,17 @@ def run(vault: Path) -> dict:
         if items.get("github:acme/agent-tool", {}).get("entities") != ["agent-tool"]:
             problems.append(f"phase 3: entities must be [repo name], got {items.get('github:acme/agent-tool')}")
         state["github_block_topic"] = False
+
+        # 3b. a token GitHub refuses (a git-only credential): one anonymous retry, reason kept
+        os.environ["GH_TOKEN"] = "stub-git-only-not-a-secret"
+        state["github_refuse_token"], state["github_calls"] = True, 0
+        r = sensors.collect(sandbox, sandbox.parent / "radar-github-token", NOW, only=["github"])
+        gh = r["sources"]["github"]
+        if gh["status"] != "partial" or "token refused" not in gh["detail"] or "not accessible" not in gh["detail"] \
+                or not gh["items"]:
+            problems.append(f"phase 3b: a refused token must fall back to anonymous and say why, got {gh}")
+        state["github_refuse_token"] = False
+        os.environ.pop("GH_TOKEN", None)
 
         # 4. reddit ok: stickied skipped, score = ups
         state["reddit"] = {"LocalLLaMA": {"data": {"children": [
