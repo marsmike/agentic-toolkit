@@ -19,6 +19,7 @@ module never talks to a judgment backend itself.
 """
 from __future__ import annotations
 
+import html
 import json
 import re
 import time
@@ -48,6 +49,10 @@ REDDIT_LIMIT = 40
 
 ALL_SOURCES = ("hn", "hf", "github", "reddit", "rss")
 
+# GitHub Trending as RSS (a mirror on github.io): the fallback when api.github.com is out of reach.
+GITHUB_TRENDING_FEEDS = ["https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml",
+                         "https://mshibanami.github.io/GitHubTrendingRSS/daily/python.xml"]
+PROXY_BLOCK = "sessions are bound"  # the Claude cloud proxy's refusal, token or not
 DEFAULT_GITHUB_TOPICS = ["llm", "ai-agents", "claude-code", "mcp", "local-llm", "audio-plugin", "vst"]
 DEFAULT_SUBREDDITS = ["LocalLLaMA", "ClaudeAI", "ClaudeCode", "singularity", "MachineLearning",
                        "synthesizers", "WeAreTheMusicMakers", "audioengineering"]
@@ -212,6 +217,39 @@ def _gh_message(body: bytes) -> str:
         return ""
 
 
+def _plain(markup: str) -> str:
+    """The feed's description is the README's HTML; its first sentence as text is the summary."""
+    first = re.search(r"<p>(.*?)</p>", markup, re.S)
+    text = re.sub(r"<[^>]*(>|$)", " ", first.group(1) if first else markup)  # an unclosed tag at the cut too
+    return " ".join(html.unescape(text).split())
+
+
+def _fetch_github_trending(now: datetime) -> tuple[list[dict], str]:
+    """Today's GitHub Trending repositories: no star counts there, so the score is the rank
+    (first place highest), which is all the engagement percentile needs."""
+    rows: dict[str, dict] = {}
+    problems = []
+    for url in GITHUB_TRENDING_FEEDS:
+        _polite(url)
+        status, _, body = _request(url)
+        if status != 200:
+            problems.append(f"{url.rsplit('/', 1)[-1]}: HTTP {status}")
+            continue
+        try:
+            _, items = parse_feed_items(body)
+        except ValueError:
+            problems.append(f"{url.rsplit('/', 1)[-1]}: not a feed")
+            continue
+        for rank, it in enumerate(items):
+            full_name = it["title"].strip()
+            if "/" not in full_name or full_name in rows:
+                continue
+            rows[full_name] = _row("github", "GitHub Trending", full_name, full_name,
+                                   it["url"] or f"https://github.com/{full_name}", _plain(it["summary"])[:300],
+                                   now.date().isoformat(), float(len(items) - rank), [full_name.split("/", 1)[-1]])
+    return list(rows.values()), "; ".join(problems)
+
+
 def _fetch_github(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
     headers = _github_headers()
     since = (now - timedelta(days=GITHUB_WINDOW_DAYS)).date().isoformat()
@@ -225,6 +263,14 @@ def _fetch_github(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
     for url in queries:
         _polite(url)
         status, _, body = _request(url, headers)
+        if status == 403 and PROXY_BLOCK in _gh_message(body):
+            # The cloud session's proxy refuses api.github.com outside the attached repositories,
+            # with a token or without: GitHub Trending instead. [earned: 2026-09-27, the Signal
+            # Radar routine's runs — "This GitHub API path is not available: sessions are bound
+            # to their configured repositories"]
+            trending, detail = _fetch_github_trending(now)
+            note = "api.github.com blocked by the session proxy; GitHub Trending instead" + (f" ({detail})" if detail else "")
+            return ("partial" if trending else "blocked"), note, trending
         if status in (401, 403) and "Authorization" in headers and not rows:
             # A token GitHub will not take for the REST API (a git-only credential): say so and
             # go on anonymously. [earned: 2026-09-27, the cloud's GH_TOKEN answered 403 on search]
