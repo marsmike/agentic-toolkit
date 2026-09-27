@@ -16,7 +16,6 @@ Every release entry links the change to the research or the dated failure that m
   Linux & OSS, Music Technology, Science); one row per story across categories. First real run: 36
   stories; TypeSafe's Jev gained a fourth family, AutoTune Advanced its second. [earned:
   2026-09-27, owner — "Kagi can also provide information about trending things"]
-||||||| parent of 5a5a841 (Watchdog: signal-stale when the Signal Radar routine stops committing)
 - **GitHub Trending when the cloud proxy refuses api.github.com.** In a Claude cloud session every
   `api.github.com` path outside the attached repositories answers 403 "sessions are bound to their
   configured repositories", token or not, so no `GITHUB_TOKEN` can help there. The sensor now
