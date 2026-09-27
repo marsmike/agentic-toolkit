@@ -8,9 +8,10 @@ Every release entry links the change to the research or the dated failure that m
   by hand) and the Signal Radar (its Kagi check) both appended to `kagi-ledger.jsonl`, and both push
   TheVoid: two appends conflict in `pull --rebase`, and a pipeline run whose push fails loses its
   notes with the session. The Signal Radar now writes `kagi-ledger-signal.jsonl`; `kagi.ledger()`
-  budgets over both files, so the weekly cap still covers every call. The routine also commits
-  `00_Memory/dlq/`, so a DLQ note it writes reaches the vault. `cloud/README.md` lists which routine
-  writes which file. [earned: 2026-09-27, owner's question about the routines' dependencies]
+  budgets over both files, so the weekly cap still covers every call (a soft cap: at most one
+  run's calls over). The routine commits an explicit list of its own files; `commit` skips a named
+  file not written yet, and on a key-shaped string commits the DLQ note alone so the diagnostic is
+  not lost with the session. `cloud/README.md` lists which routine writes which file. [earned: 2026-09-27, owner's question about the routines' dependencies]
 
 - **The watchdog also guards the Signal Radar routine.** Once the vault has a `signal radar …`
   commit, one older than four hours is a `signal-stale` problem (one push, like the pipeline's

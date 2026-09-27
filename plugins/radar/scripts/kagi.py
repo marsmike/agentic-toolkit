@@ -88,6 +88,8 @@ class Ledger:
         return sorted((r for p in (self.path, *self.shared) for r in self._read(p)), key=lambda r: r["at"])
 
     def spent_this_week(self, now: datetime) -> float:
+        """A soft cap: the other routine's calls count once its ledger is pushed, and two routines
+        checking at the same moment can both pass; the overshoot is at most one run's calls."""
         since = now - timedelta(days=7)
         return sum(r["usd"] for r in self.all_rows() if datetime.fromisoformat(r["at"]) >= since)
 
