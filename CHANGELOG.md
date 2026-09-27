@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The GitHub sensor survives a token GitHub refuses.** A 401/403 with a token on the first query
+  is retried once anonymously, and every refusal keeps GitHub's own message in the detail instead
+  of a bare "rate limited". [earned: 2026-09-27, the Signal Radar routine's first run — the cloud
+  session's `GH_TOKEN` is set, yet search answered 403; a real `GITHUB_TOKEN` takes precedence]
+
 - **The Signal Radar runs as a routine of its own** (`cloud/signal.prompt.md`, every three hours
   at :28, Sonnet 5): sensors, signal with the Kagi check, a commit of `00_Memory/radar/` only, the
   page republished, and one morning push with the early warnings, hot signals and blind spots. The
