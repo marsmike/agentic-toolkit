@@ -47,7 +47,7 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
 - **`sensors`** — which momentum sources `sensors` pulls (default all five: `hn`, `hf`, `github`,
   `reddit`, `rss`). **`sensor_subreddits`**, **`sensor_github_topics`** — comma lists;
   **`sensor_feeds`** — a YAML list of RSS/Atom URLs (the default covers audio plugins and model news).
-- **`signal_artifact_url`** — a claude.ai artifact the cloud run republishes the Signal Radar page to;
+- **`signal_artifact_url`** — a claude.ai artifact the Signal Radar routine republishes the page to;
   empty = the page stays in the vault only.
 - **`judgment_backend`**, **`judgment_base_url`**, **`judgment_model`** — the typed-judgment
   backend, as in the obsidian plugin. Thresholds are never profile keys; they live in

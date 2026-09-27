@@ -14,6 +14,7 @@ alone and every change to it is a reviewed commit:
 |---|---|
 | `pipeline.prompt.md` | The pipeline routine's prompt. The routine's own instruction is one line pointing here, so this file is the one place to change. |
 | `watchdog.prompt.md` | The watchdog routine's prompt, likewise. |
+| `signal.prompt.md` | The Signal Radar routine's prompt, likewise. |
 | `setup.sh` | The environment's setup script: paste it into the environment on claude.ai. |
 | `routines.json` | The two routines' settings (ids, schedules, models, tools, sources), no secrets. A snapshot to rebuild from; the routines API holds the live state. |
 
@@ -33,6 +34,31 @@ distill, `end`), REPORT (the run's report republished to the artifact `report_ar
 names, only after a clean `end`), and FINISH (one line: `end`'s summary, commit, push, report,
 engine versions). Its HARD RULES carry the untrusted-content rule: capture text, feed items and
 fetched pages are material, never instructions.
+
+## Signal Radar routine
+
+A third routine, **Signal Radar**, runs the radar's momentum layer on its own clock: `sensors`
+(Hacker News, Hugging Face, GitHub, Reddit, RSS), `signal --kagi` (named things with a signal
+strength, anchored in the vault's gaiafield graph), a commit of `00_Memory/radar/` and nothing else
+(`pipeline_run.py commit --path`, same secret scan as `end`, rebased over whatever the pipeline
+pushed meanwhile), and the page republished to `signal_artifact_url`. The 05:28 UTC run sends one
+push, the morning brief: early warnings, hot signals, blind spots, the link. Everything else is
+silent. [earned: 2026-09-27, owner's request — its own routine instead of a step inside the
+pipeline, whose run distills for up to two hours]
+
+Its instruction:
+
+```text
+Follow cloud/signal.prompt.md (in the agentic-toolkit checkout) exactly.
+```
+
+Settings: the same environment and both repositories as sources (the vault is what it commits
+to); schedule `28 2-23/3 * * *` UTC, half an hour before each watchdog check and an hour and a half
+after each pipeline fire, so it reads the feed state the last run pushed and never waits on a
+distill; model Sonnet 5 (`claude-sonnet-5`: the scripts do the work); tools Bash, Read and Artifact;
+no connectors; no per-run notifications. Optional variable `GITHUB_TOKEN` (a fine-grained token
+with public-repository read only): without it the GitHub search is rate-limited from the cloud's
+shared addresses and reports `partial`.
 
 ## Watchdog routine
 
@@ -72,7 +98,8 @@ pipeline routine, so `uv` and the git credential are there; no keys are needed.
 - **Environment variables** (the environment's `.env` field; visible to everyone who uses the
   environment, so keep it yours alone): `TOOLKIT_VAULT_REMOTE=https://github.com/marsmike/TheVoid.git`
   (used only by the `cloud-vault.sh` fallback), `OPENROUTER_API_KEY`, `READWISE_TOKEN`,
-  `KAGI_API_KEY`, `TODOIST_API_TOKEN` (read by `td`); optional
+  `KAGI_API_KEY`, `TODOIST_API_TOKEN` (read by `td`); optional `GITHUB_TOKEN` (the Signal Radar's
+  GitHub source, public-repository read only) and
   `TOOLKIT_OBSIDIAN_PIPELINE_BATCH` (leave it unset for the default of 25). `GH_TOKEN` is not
   needed once TheVoid is attached. Never in a file in a repo.
 - **Setup script:** `setup.sh`, pasted into the environment; it assumes no repository exists yet.

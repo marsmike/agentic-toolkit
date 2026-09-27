@@ -13,6 +13,10 @@
               note that names the file, never the key; the next clean run commits
 5. sync     — with a bare upstream: a second clone's commit arrives with `begin`, `end` pushes, and a
               conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
+7. commit   — `commit --path 00_Memory/radar` (a routine's own files) commits only that path, keeps
+              an unrelated untracked note out of it, rebases over a commit another clone pushed in
+              between and pushes; a key-shaped string, a path outside the vault, "nothing changed" and
+              something staged beforehand commit nothing (the staged file stays staged)
 6. build    — a generator that fails is reported in `build_failed` and gets one DLQ note across
               runs; its files go back exactly as before it ran (changed, added, deleted; a hand-made
               canvas beside a map untouched); the run still commits
@@ -56,6 +60,50 @@ def _end(pr, vault: Path, now: datetime, *args, **kwargs) -> dict:
 
 def _git(root: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=False).stdout
+
+
+def _commit_phase(pr, sandbox: Path) -> list[str]:
+    """A fresh clone of phase 5's upstream stands in for the Signal Radar routine's checkout."""
+    problems = []
+    remote, other, mine = sandbox.parent / "remote.git", sandbox.parent / "other", sandbox.parent / "signal"
+    subprocess.run(["git", "clone", "-q", str(remote), str(mine)], check=False)
+    for root in (mine, other):
+        for args in (("config", "user.email", "cloud@example.org"), ("config", "user.name", "cloud")):
+            _git(root, *args)
+    radar = mine / "00_Memory" / "radar"
+    radar.mkdir(parents=True, exist_ok=True)
+    (radar / "signal.json").write_text('{"blips": []}\n', encoding="utf-8")
+    (mine / "04_Resources" / "Eval-Untracked.md").write_text("# not the routine's\n", encoding="utf-8")
+    _git(other, "pull", "-q")
+    (other / "04_Resources" / "Eval-Meanwhile.md").write_text("# pushed meanwhile\n", encoding="utf-8")
+    _git(other, "add", "-A")
+    _git(other, "commit", "-q", "-m", "pipeline: meanwhile")
+    _git(other, "push", "-q")
+
+    r = pr.commit_paths(mine, NOW, ["00_Memory/radar"], "signal radar: eval")
+    files = _git(mine, "show", "--name-only", "--format=", "HEAD").split()
+    if r.get("status") != "ok" or not r.get("sync", {}).get("pushed") or files != ["00_Memory/radar/signal.json"]:
+        problems.append(f"phase 7: commit must push only the named path, got {r} with {files}")
+    if _git(mine, "rev-parse", "HEAD") != _git(remote, "rev-parse", "HEAD") or not (mine / "04_Resources" / "Eval-Meanwhile.md").is_file():
+        problems.append("phase 7: commit must rebase over the other clone's push and reach the upstream")
+    if not (mine / "04_Resources" / "Eval-Untracked.md").is_file() or "Eval-Untracked" in _git(remote, "log", "--name-only", "--format="):
+        problems.append("phase 7: an unnamed file must stay untouched and uncommitted")
+    head = _git(mine, "rev-parse", "HEAD")
+    (radar / "signal.json").write_text(f'{{"title": "{FAKE_KEY}"}}\n', encoding="utf-8")
+    r = pr.commit_paths(mine, NOW, ["00_Memory/radar"], "signal radar: eval key")
+    if r.get("status") != "refused" or _git(mine, "rev-parse", "HEAD") != head or _git(mine, "diff", "--cached", "--name-only"):
+        problems.append(f"phase 7: a key-shaped string must be refused and unstaged, got {r}")
+    (radar / "signal.json").write_text('{"blips": []}\n', encoding="utf-8")
+    if pr.commit_paths(mine, NOW, ["../elsewhere"], "x").get("status") != "refused":
+        problems.append("phase 7: a path outside the vault must be refused")
+    if pr.commit_paths(mine, NOW, ["00_Memory/radar"], "x").get("commit") is not None:
+        problems.append("phase 7: nothing changed must commit nothing")
+    _git(mine, "add", "04_Resources/Eval-Untracked.md")
+    (radar / "signal.json").write_text('{"blips": [1]}\n', encoding="utf-8")
+    r = pr.commit_paths(mine, NOW, ["00_Memory/radar"], "x")
+    if r.get("status") != "refused" or _git(mine, "diff", "--cached", "--name-only").split() != ["04_Resources/Eval-Untracked.md"]:
+        problems.append(f"phase 7: something staged beforehand must refuse the commit and stay staged, got {r}")
+    return problems
 
 
 def _sync_phase(pr, sandbox: Path) -> list[str]:
@@ -299,6 +347,9 @@ def run(vault: Path) -> dict:
 
         # 6. a failing generator: reported, one DLQ note however often it fails, the run committed
         problems += _build_failure_phase(pr, sandbox)
+
+        # 7. a routine's own files: commit only the named paths
+        problems += _commit_phase(pr, sandbox)
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
