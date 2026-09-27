@@ -78,7 +78,7 @@ def run(vault: Path) -> dict:
     problems: list[str] = []
     saved_env = {k: os.environ.pop(k, None) for k in (
         "TOOLKIT_RADAR_SENSORS", "TOOLKIT_RADAR_SENSOR_FEEDS", "TOOLKIT_RADAR_SENSOR_GITHUB_TOPICS",
-        "TOOLKIT_RADAR_SENSOR_SUBREDDITS", "GITHUB_TOKEN", "GH_TOKEN")}
+        "TOOLKIT_RADAR_SENSOR_SUBREDDITS", "TOOLKIT_RADAR_SENSOR_KAGI_NEWS", "GITHUB_TOKEN", "GH_TOKEN")}
     real_request, real_max_judge = sensors._request, sensors.MAX_JUDGE_PER_RUN
     state: dict = {"calls": [], "github_calls": 0, "github_block_topic": False, "reddit_block": False,
                    "reddit": {}, "hn_front": {"hits": []}, "hn_bydate": {"hits": []},
@@ -105,6 +105,14 @@ def run(vault: Path) -> dict:
                     return 403, {}, b'{"message": "rate limited"}'
                 return 200, {}, _json(state["github_topic"])
             return 200, {}, _json(state["github_new"])
+        if url == "https://news.kagi.com/kite.json":
+            return 200, {}, _json({"categories": [{"name": "AI", "file": "ai.json"}, {"name": "Technology", "file": "tech.json"}]})
+        if url.startswith("https://news.kagi.com/"):
+            story = {"title": "Jev 2 ships", "unique_domains": 12, "short_summary": "A decision model.",
+                     "articles": [{"title": "Jev 2", "link": "https://example.org/jev-2", "date": "2026-09-25T06:00:00+00:00"}]}
+            other = {"title": "A small AI story", "unique_domains": "3", "short_summary": "",
+                     "articles": [{"title": "s", "link": "https://example.org/small", "date": "2026-09-26T06:00:00+00:00"}]}
+            return 200, {}, _json({"clusters": [story, other] if url.endswith("ai.json") else [story]})
         if "GitHubTrendingRSS" in url:
             return 200, {"content-type": "application/xml"}, TRENDING_RSS
         if "reddit.com/r/" in url:
@@ -213,6 +221,17 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 3c: a proxy refusal must switch to GitHub Trending once, ranked, plain text; "
                             f"got {state['github_calls']} API calls, {gh}, {first}")
         state["github_proxy"] = False
+
+        # 3d. kagi news: one row per story across categories, score = domains, a missing category named
+        os.environ["TOOLKIT_RADAR_SENSOR_KAGI_NEWS"] = "AI, Technology, Knitting"
+        r = sensors.collect(sandbox, sandbox.parent / "radar-kagi-news", NOW, only=["kagi_news"])
+        kn = r["sources"]["kagi_news"]
+        rows3d = json.loads(Path(r["file"]).read_text())["items"]
+        jev = [v for v in rows3d.values() if v["title"] == "Jev 2 ships"]
+        if kn["status"] != "partial" or "Knitting" not in kn["detail"] or len(rows3d) != 2 or len(jev) != 1 \
+                or jev[0]["score"] != 12.0 or jev[0]["origin"] != "Kagi News · AI" or jev[0]["published"] != "2026-09-25":
+            problems.append(f"phase 3d: kagi news rows wrong: {kn}, {rows3d}")
+        os.environ.pop("TOOLKIT_RADAR_SENSOR_KAGI_NEWS")
 
         # 4. reddit ok: stickied skipped, score = ups
         state["reddit"] = {"LocalLLaMA": {"data": {"children": [

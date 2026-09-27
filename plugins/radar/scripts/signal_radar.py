@@ -53,7 +53,8 @@ KAGI_CHECKS_PER_DAY = 6
 WEIGHTS = {"breadth": 0.25, "velocity": 0.20, "engagement": 0.20, "relevance": 0.10, "volume": 0.15, "vault": 0.10}
 STAGE_HOT = 70
 FAMILY_LABELS = {"hn": "Hacker News", "hf": "Hugging Face", "github": "GitHub", "reddit": "Reddit", "rss": "Blogs & news",
-                 "arxiv": "arXiv", "feed": "Reader feeds", "kagi": "Kagi news", "vault": "Your vault"}
+                 "arxiv": "arXiv", "feed": "Reader feeds", "kagi": "Kagi news", "kagi_news": "Kagi News",
+                 "vault": "Your vault"}
 
 
 @dataclass
