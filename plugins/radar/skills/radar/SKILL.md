@@ -53,7 +53,8 @@ it — use it to preview without committing to the week.
 **Signal Radar** ("what's trending", "what is taking off", "anything new in local LLMs / Claude
 Code / VST plugins"). The scan says what is *relevant*; `signal` says what is *moving*. `sensors`
 pulls sources that carry engagement (Hacker News points, Hugging Face trending, new GitHub repos by
-stars, Reddit upvotes, audio and model RSS) and judges what is new; `signal` turns every stream,
+stars, Reddit upvotes, audio and model RSS, Kagi News story clusters with the number of sites
+carrying each) and judges what is new; `signal` turns every stream,
 the owner's own vault included, into named things (`Qwen3.8`, `llama.cpp`, `Opus 5.5`) and scores
 each 0–100 from breadth (independent sources), velocity (last three days against the fourteen
 before), engagement (percentile within its source), relevance (the judge) and volume, plus a

@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Kagi News as a Signal Radar source** (`sensors`: `kagi_news`). Kagi's news product clusters
+  each day's stories by event and counts the independent domains carrying each: that count is the
+  cluster's score, so breadth arrives measured. Free JSON at news.kagi.com (no key, nothing against
+  the Kagi API budget); categories by name, profile `sensor_kagi_news` (default AI, Technology,
+  Linux & OSS, Music Technology, Science); one row per story across categories. First real run: 36
+  stories; TypeSafe's Jev gained a fourth family, AutoTune Advanced its second. [earned:
+  2026-09-27, owner — "Kagi can also provide information about trending things"]
 - **GitHub Trending when the cloud proxy refuses api.github.com.** In a Claude cloud session every
   `api.github.com` path outside the attached repositories answers 403 "sessions are bound to their
   configured repositories", token or not, so no `GITHUB_TOKEN` can help there. The sensor now

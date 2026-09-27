@@ -32,7 +32,7 @@ flowchart LR
 | `discover [--interest ID] [--seed URL] [--queries N]` | candidate feeds from Kagi, URL shapes, autodiscovery and hnrss, validated and judged, as an OPML | Kagi, Reader (read), the candidate sites, judgment backend |
 | `gaps [--promote]` | once a week: recent posts per interest the feeds missed (Kagi news), judged; strong ones in the digest, optionally saved to Later | Kagi, judgment backend, Reader (save) |
 | `kagi search\|news\|answer\|summarize TEXT` | the kagi skill: one Kagi call under the ledger and weekly budget | Kagi |
-| `sensors [--only SOURCE]` | pull momentum sources Reader does not carry — Hacker News, Hugging Face trending, new GitHub repos, Reddit with scores, RSS — into `00_Memory/radar/sensors/`, new items judged | HN Algolia, Hugging Face, GitHub, Reddit, feed hosts, judgment backend |
+| `sensors [--only SOURCE]` | pull momentum sources Reader does not carry — Hacker News, Hugging Face trending, new GitHub repos, Reddit with scores, RSS, Kagi News clusters — into `00_Memory/radar/sensors/`, new items judged | HN Algolia, Hugging Face, GitHub, Reddit, feed hosts, news.kagi.com, judgment backend |
 | `signal [--kagi]` | the Signal Radar: named things across feed, sensors and the vault, each with a signal strength; writes `Signal-Radar.html`, `.md` and `signal.json` | Kagi news with `--kagi` (≤ 6 names a day) |
 | `replay --since 30d --out DIR` | acceptance: own clips vs. feed items, Jev vs. BM25 vs. recency | Reader (read), judgment backend |
 
@@ -46,7 +46,7 @@ The scan answers "is this worth reading for me"; the Signal Radar answers "what 
 ```mermaid
 flowchart LR
   F[feed items<br/>state.jsonl] --> E
-  S[sensors<br/>HN · HF · GitHub · Reddit · RSS] --> E
+  S[sensors<br/>HN · HF · GitHub · Reddit · RSS · Kagi News] --> E
   V[the vault<br/>notes, clips, tags] --> E
   E[entities<br/>Qwen3.8 · llama.cpp · Opus 5.5] --> SC[strength 0–100]
   K[Kagi news<br/>≤ 6 new names a day] -.-> SC

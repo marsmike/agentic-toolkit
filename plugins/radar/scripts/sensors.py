@@ -1,5 +1,5 @@
-"""Direct momentum sensors for the signal radar: Hacker News, Hugging Face, GitHub, Reddit and a
-handful of RSS/Atom feeds — pulled every ~3h by the cloud run, NOT through Reader.
+"""Direct momentum sensors for the signal radar: Hacker News, Hugging Face, GitHub, Reddit, a
+handful of RSS/Atom feeds and Kagi News — pulled every ~3h by the cloud run, NOT through Reader.
 
     collect(vault, out, now, judge_fn=None, only=None)
 
@@ -12,7 +12,7 @@ the last 45 day files carries its `p`/`kind` forward instead of being judged aga
 handed to `judge_fn` (radar.py's wrapper around the shared judgment backend), highest score first,
 capped at `MAX_JUDGE_PER_RUN`. Day files older than 45 days are pruned.
 
-What leaves the machine: plain GETs to public HN/HF/GitHub/Reddit APIs and the RSS feeds below —
+What leaves the machine: plain GETs to public HN/HF/GitHub/Reddit/Kagi News APIs and the RSS feeds below —
 no key, ever (an optional `GITHUB_TOKEN`/`GH_TOKEN` only raises GitHub's own rate limit and is
 never logged). If `judge_fn` is given, mention titles/summaries go wherever it sends them; this
 module never talks to a judgment backend itself.
@@ -47,7 +47,10 @@ GITHUB_WINDOW_DAYS = 14
 RSS_WINDOW_DAYS = 7
 REDDIT_LIMIT = 40
 
-ALL_SOURCES = ("hn", "hf", "github", "reddit", "rss")
+ALL_SOURCES = ("hn", "hf", "github", "reddit", "rss", "kagi_news")
+KAGI_NEWS = "https://news.kagi.com"
+# Kagi News categories by name (its index maps them to files); profile `sensor_kagi_news`.
+DEFAULT_KAGI_NEWS = ["AI", "Technology", "Linux & OSS", "Music Technology", "Science"]
 
 # GitHub Trending as RSS (a mirror on github.io): the fallback when api.github.com is out of reach.
 GITHUB_TRENDING_FEEDS = ["https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml",
@@ -474,7 +477,54 @@ def _fetch_rss(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
     return ("partial" if problems else "ok"), "; ".join(problems), list(rows.values())
 
 
-FETCHERS = {"hn": _fetch_hn, "hf": _fetch_hf, "github": _fetch_github, "reddit": _fetch_reddit, "rss": _fetch_rss}
+def _fetch_kagi_news(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
+    """Kagi News: the day's stories clustered by event, per category. A cluster is one row; its
+    score is how many independent domains carry the story, which is breadth measured for us. Free,
+    no key, no Kagi API budget. [earned: 2026-09-27, owner — "Kagi can also tell us what is
+    trending"; its AI category that day carried TypeSafe's Jev, Music Technology AutoTune Advanced]"""
+    wanted = _profile_list(vault, "sensor_kagi_news", DEFAULT_KAGI_NEWS)
+    _polite(KAGI_NEWS)
+    status, _, body = _request(f"{KAGI_NEWS}/kite.json")
+    try:
+        files = {c["name"]: c["file"] for c in json.loads(body)["categories"]} if status == 200 else {}
+    except (json.JSONDecodeError, KeyError, TypeError):
+        files = {}
+    if not files:
+        return "failed", f"category index: HTTP {status}", []
+    rows: dict[str, dict] = {}
+    problems = [f"{n}: no such category" for n in wanted if n not in files]
+    for name in (n for n in wanted if n in files):
+        _polite(KAGI_NEWS)
+        status, _, body = _request(f"{KAGI_NEWS}/{files[name]}")
+        try:
+            clusters = json.loads(body)["clusters"] if status == 200 else None
+        except (json.JSONDecodeError, KeyError, TypeError):
+            clusters = None
+        if clusters is None:
+            problems.append(f"{name}: HTTP {status}")
+            continue
+        for c in clusters:
+            title = str(c.get("title") or "").strip()
+            articles = [a for a in c.get("articles") or [] if isinstance(a, dict) and a.get("link")]
+            if not title:
+                continue
+            # by lead article: one story filed under AI and Technology is one row
+            key = _canonical(articles[0]["link"]) if articles else f"{files[name]}:{title}"
+            if key in rows:
+                continue
+            domains = c.get("unique_domains")
+            rows[key] = _row("kagi_news", f"Kagi News · {name}", key, title,
+                             articles[0]["link"] if articles else KAGI_NEWS,
+                             str(c.get("short_summary") or "")[:300],
+                             str((articles[0].get("date") if articles else "") or now.date().isoformat())[:10],
+                             float(domains) if str(domains or "").isdigit() or isinstance(domains, int) else None, [])
+    if not rows and problems:
+        return "failed", "; ".join(problems), []
+    return ("partial" if problems else "ok"), "; ".join(problems), list(rows.values())
+
+
+FETCHERS = {"hn": _fetch_hn, "hf": _fetch_hf, "github": _fetch_github, "reddit": _fetch_reddit, "rss": _fetch_rss,
+            "kagi_news": _fetch_kagi_news}
 
 
 # ---------------------------------------------------------------------------
