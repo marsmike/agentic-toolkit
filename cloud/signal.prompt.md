@@ -33,11 +33,12 @@ RUN
    If it fails or its status is not "ok", stop here: commit nothing, publish nothing, report it.
 3. Commit only the radar's files (the one git allowed here besides SETUP 2):
      uv run --locked --project plugins/obsidian/scripts python3 plugins/obsidian/scripts/pipeline_run.py commit --path 00_Memory/radar --message "signal radar <UTC YYYY-MM-DD HH:MM>: <blips> signals, <early> early, <blind_spots> blind spots" --json
-   Fill the message from step 2's numbers. Status "refused" means a key-shaped string in a fetched
-   title; a DLQ note says where. Then publish nothing and report it. A push that failed ("sync"
-   without "pushed") is reported, the publish still goes ahead.
+   Fill the message from step 2's numbers. Its status must be "ok" (a commit, or "nothing
+   changed"); "refused" (a key-shaped string in a fetched title, a DLQ note says where; or something
+   already staged) and "failed" mean the page is not in the vault: publish nothing and report it. A
+   push that failed ("sync" without "pushed") is reported; the committed page is still published.
 
-PUBLISH (only after step 2 returned "ok" and step 3 did not refuse)
+PUBLISH (only after step 2 and step 3 both returned "ok")
 If $TOOLKIT_VAULT/Config/toolkit/radar.md sets `signal_artifact_url`, publish the page there with
 the Artifact tool: first `action: "read"` on that URL, then `action: "publish"` with `url` = that
 URL and `file_path` = $TOOLKIT_VAULT/00_Memory/radar/Signal-Radar.html. If the publish is refused
@@ -47,11 +48,13 @@ Never publish without `url` (that creates a second artifact). If the Artifact to
 available, skip it and say so.
 
 MORNING BRIEF (only when `date -u +%H` prints 05, the 05:28 UTC run)
-Read $TOOLKIT_VAULT/00_Memory/radar/signal.json and send ONE push notification, at most 600
-characters, built from its fields only:
-  "Signal Radar: " + for each key in `early` (at most 5): the blip's `name` and its `families`
-  joined with "+"; then "Hot: " + the names of up to 3 blips with stage "hot" not already listed;
-  then "Not in your vault: " + up to 3 names from `blind_spots`; then the `signal_artifact_url`.
+Read $TOOLKIT_VAULT/00_Memory/radar/signal.json. `early` and `blind_spots` hold keys: resolve each
+against the entry of `blips` with that `key`. Send ONE push notification, cut to 600 characters,
+built from those fields only:
+  "Signal Radar: " + for each key in `early` (at most 5): that blip's `name` and its `families`
+  joined with "+"; then "Hot: " + the `name` of up to 3 blips with `stage` "hot" not already listed;
+  then "Not in your vault: " + the `name` of up to 3 blips from `blind_spots`; then the
+  `signal_artifact_url` from $TOOLKIT_VAULT/Config/toolkit/radar.md, if it is set.
 If `early`, the hot blips and `blind_spots` are all empty, send nothing. At any other hour send no
 notification at all.
 

@@ -9,8 +9,10 @@
       "OPENROUTER_API_KEY",
       "READWISE_TOKEN",
       "KAGI_API_KEY",
-      "TODOIST_API_TOKEN",
-      "GITHUB_TOKEN (optional)"
+      "TODOIST_API_TOKEN"
+    ],
+    "optional_variables": [
+      "GITHUB_TOKEN"
     ]
   },
   "routines": [

@@ -15,8 +15,8 @@
               conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
 7. commit   — `commit --path 00_Memory/radar` (a routine's own files) commits only that path, keeps
               an unrelated untracked note out of it, rebases over a commit another clone pushed in
-              between and pushes; a key-shaped string, a path outside the vault and "nothing changed"
-              commit nothing
+              between and pushes; a key-shaped string, a path outside the vault, "nothing changed" and
+              something staged beforehand commit nothing (the staged file stays staged)
 6. build    — a generator that fails is reported in `build_failed` and gets one DLQ note across
               runs; its files go back exactly as before it ran (changed, added, deleted; a hand-made
               canvas beside a map untouched); the run still commits
@@ -98,6 +98,11 @@ def _commit_phase(pr, sandbox: Path) -> list[str]:
         problems.append("phase 7: a path outside the vault must be refused")
     if pr.commit_paths(mine, NOW, ["00_Memory/radar"], "x").get("commit") is not None:
         problems.append("phase 7: nothing changed must commit nothing")
+    _git(mine, "add", "04_Resources/Eval-Untracked.md")
+    (radar / "signal.json").write_text('{"blips": [1]}\n', encoding="utf-8")
+    r = pr.commit_paths(mine, NOW, ["00_Memory/radar"], "x")
+    if r.get("status") != "refused" or _git(mine, "diff", "--cached", "--name-only").split() != ["04_Resources/Eval-Untracked.md"]:
+        problems.append(f"phase 7: something staged beforehand must refuse the commit and stay staged, got {r}")
     return problems
 
 

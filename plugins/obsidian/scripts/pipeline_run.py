@@ -482,6 +482,10 @@ def commit_paths(vault: Path, now: datetime, paths: list[str], message: str) -> 
         return {"status": "refused", "detail": f"paths must be inside the vault: {outside or 'none given'}"}
     if not _is_repo(vault):
         return {"status": "failed", "detail": "the vault is not a git repository"}
+    # Whatever is staged already would ride along in the commit (and a refusal's reset would drop
+    # it): this command commits the named paths or nothing. [earned: 2026-09-27, Copilot on #56]
+    if _git(vault, "diff", "--cached", "--quiet").returncode != 0:
+        return {"status": "refused", "detail": "the index already holds staged changes; commit or unstage them first"}
     added = _git(vault, "add", "-A", "--", *paths)
     if added.returncode != 0:
         return {"status": "failed", "detail": "git add: " + (added.stderr.strip().splitlines() or ["?"])[-1][:200]}
