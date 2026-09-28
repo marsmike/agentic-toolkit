@@ -13,13 +13,15 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import difflib
+import importlib.metadata
 import json
 import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from toolkit_core import demo, engines, knowledge, profile, status, ui, vault
+from toolkit_core import demo, engines, knowledge, profile, status, term, ui, vault
 from toolkit_core import link as linker
 
 
@@ -316,20 +318,28 @@ def _render_status(result: dict) -> str:
             rows.append(f"{st.mark('warn')} checkout: {note}")
     out += ui.section(st, "VAULT", rows)
 
+    # U-SHADOWS: the cloud routines that run TheVoid's pipeline unattended (cloud/routines.json),
+    # alongside the local watchdog check that runs for a vault that has one.
     p = result["pipeline"]
-    if p.get("present"):
-        if not p.get("checked"):
-            rows = [f"{st.mark('warn')} {p['note']}"]
-        else:
-            f = p.get("facts", {})
-            rows = []
-            if f.get("last_run"):
-                rows.append(f"{st.mark('ok' if p.get('ok') else 'warn')} last run {f['last_run'][:16].replace('T', ' ')} UTC"
-                            + st.dim(f" ({f.get('age_hours')} h ago) — {f.get('last_summary', '')}"))
-            if f.get("signal_last"):
-                rows.append(f"{st.mark('info')} radar {f['signal_last']}" + st.dim(f" ({f.get('signal_age_hours')} h ago)"))
+    routines = p.get("routines") or []
+    if p.get("present") or routines:
+        rows = []
+        if p.get("present") and not p.get("checked"):
+            rows.append(f"{st.mark('warn')} {p['note']}")
+        elif p.get("present"):
             rows += [f"{st.mark('bad')} {item.get('detail')}" for item in p.get("problems", [])]
-        out += ui.section(st, "PIPELINE", rows)
+        for r in routines:
+            if r.get("last"):
+                when = r["last"][:16].replace("T", " ")
+                age = st.dim(f" ({r['age_hours']} h ago)") if r.get("age_hours") is not None else ""
+                rows.append(f"{st.mark('ok' if p.get('ok', True) else 'warn')} {r['name']}: last {when} UTC{age}"
+                            + (st.dim(f" — {r['note']}") if r.get("note") else ""))
+            elif r.get("note"):
+                rows.append(f"{st.mark('info')} {r['name']}: {r['note']}"
+                            + (st.dim(f" ({r['age_hours']} h ago)") if r.get("age_hours") is not None else ""))
+            else:
+                rows.append(f"{st.mark('info')} {r['name']}: {st.dim('no local run recorded')}")
+        out += ui.section(st, "U-SHADOWS", rows)
 
     rows = []
     for c in result["companions"]:
@@ -546,87 +556,313 @@ def cmd_link(args: argparse.Namespace) -> int:
 
 # --- commands: the catalogue ------------------------------------------------------------
 
-# What each command returns, for the catalogue. Every leaf command must have an entry
-# (core/tests/test_cli_interface.py enforces it), so the catalogue cannot drift from the parser.
+# What each command is, does and returns — the one declarative table behind both `--help` and
+# `unisphere commands --json` (item 7: a new command with no entry here can't ship — see
+# test_every_command_is_in_the_catalogue and test_every_command_has_real_help below). Every leaf
+# command must have an entry; "group" only appears on the ones shown as their own row in the
+# top-level COMMANDS listing (TOP_LEVEL, below) — a subcommand of `graph`/`engines` is reached
+# through its parent's row instead, so it carries no group of its own.
 CATALOG = {
     "status": {
         "summary": "Is everything current and healthy? Engines, plugins, vault, pipeline, companion CLIs.",
+        "description": "One read-only sweep: the toolkit checkout, the engines (installed vs. latest release), "
+                        "the Claude Code plugins installed from this marketplace, the vault (notes, DLQ, graph), "
+                        "the obsidian pipeline's watchdog verdict when the vault runs one, and the companion "
+                        "CLIs agents use next to unisphere. Touches the network only to check for newer engine "
+                        "releases (skip with --offline); writes nothing.",
         "json": "{ok, problems[{section, detail}], toolkit, engines{engines[], cloud_pin}, plugins{plugins[{plugin, latest, "
                 "state, installs[]}]}, vault{notes, inbox, dlq, graph}, pipeline{ok, problems, facts}, companions[]}",
+        "examples": [
+            ("unisphere status", "the full read for a person: what to look at, if anything"),
+            ("unisphere status --offline", "skip the GitHub release check — no network"),
+            ("unisphere status --json", "the same sweep as one object, for an agent"),
+        ],
         "example": "unisphere status --json",
         "exit": "1 when problems is non-empty",
+        "group": "Start here",
+        "see_also": ["doctor", "engines status"],
     },
     "search": {
         "summary": "Ranked full-text (BM25) search over the vault's active notes (farsight).",
+        "description": "Runs the farsight engine's BM25 ranking over the vault's active PARA folders "
+                        "(02_Projects, 03_Areas, 04_Resources) and prints the best matches with their score. "
+                        "Read-only, no network, needs `unisphere engines install` to have put farsight in place.",
         "json": "{ok, query, vault, results[{path, score, title, description}]}",
+        "examples": [
+            ("unisphere search agent memory", "the best-matching notes for those words"),
+            ("unisphere search dead letter queue --limit 5", "fewer, tighter results"),
+            ("unisphere search gaiafield --json", "the same search as parseable JSON"),
+        ],
         "example": "unisphere search agent memory --limit 5 --json",
+        "group": "Find things",
+        "see_also": ["graph candidates"],
     },
     "graph stats": {
         "summary": "Graph size, dangling links, boundary violations and the most-linked notes (gaiafield).",
+        "description": "Reports the shape of the vault's link graph after indexing it: node and edge counts, "
+                        "dangling wikilinks, PARA boundary violations, and the most-linked notes. Read-only "
+                        "against the graph; indexing itself only writes the local .gaiafield/graph.db cache.",
         "json": "{ok, op, vault, result{nodes, edges, dangling_edges, boundary_violations, top_linked[]}}",
+        "examples": [
+            ("unisphere graph stats", "a health check of the graph, for a person"),
+            ("unisphere graph stats --json", "the same numbers as JSON, for an agent"),
+        ],
         "example": "unisphere graph stats --json",
     },
     "graph neighbors": {
         "summary": "Notes linked to or from a note, out to a depth (gaiafield). NOTE is a path or a bare note name.",
+        "description": "Walks the link graph from one note out to --depth hops, in the --direction given. NOTE "
+                        "may be a vault-relative path or a bare note name (e.g. Gaiafield); an unresolved name "
+                        "prints search suggestions instead of failing silently.",
         "json": "{ok, op, vault, note, result[{path, title, description, depth}]}",
+        "examples": [
+            ("unisphere graph neighbors Gaiafield", "one hop out, both directions"),
+            ("unisphere graph neighbors Gaiafield --depth 2 --direction out", "two hops, outgoing links only"),
+            ("unisphere graph neighbors Gaiafield --include-inferred --json", "also inferred edges, as JSON"),
+        ],
         "example": "unisphere graph neighbors Gaiafield --depth 2 --json",
     },
     "graph path": {
         "summary": "Shortest link path between two notes (gaiafield).",
+        "description": "Finds the shortest chain of links between two notes and prints it hop by hop, or reports "
+                        "them unconnected. --include-inferred also traverses embedding-similarity edges, not "
+                        "just explicit wikilinks.",
         "json": "{ok, op, vault, result{from, to, connected, path[]}}",
+        "examples": [
+            ("unisphere graph path Alex-Vega Gaiafield", "the shortest chain of explicit links"),
+            ("unisphere graph path Alex-Vega Gaiafield --include-inferred", "also allow inferred edges"),
+        ],
         "example": "unisphere graph path Alex-Vega Gaiafield --json",
     },
     "graph candidates": {
         "summary": "Same-topic notes with no link to this one yet — link suggestions (gaiafield infer must have run).",
+        "description": "Surfaces notes that look like the same topic (by embedding similarity) but carry no link "
+                        "to this one yet — the suggestions `obsidian:distill` turns into real links. Needs "
+                        "`gaiafield infer` to have populated the graph first; an empty result usually means it hasn't.",
         "json": "{ok, op, vault, note, result[{path, score, label, kind, det_distance, surprise}]}",
+        "examples": [
+            ("unisphere graph candidates Gaiafield", "link suggestions for one note"),
+            ("unisphere graph candidates Gaiafield --include-ambiguous", "also the lower-confidence band"),
+            ("unisphere graph candidates Gaiafield --limit 5 --json", "fewer results, machine-readable"),
+        ],
         "example": "unisphere graph candidates Gaiafield --json",
     },
     "doctor": {
         "summary": "The vault's structure: PARA folders, note counts, frontmatter errors, profiles, DLQ, graph.",
+        "description": "A structural read of the active vault: which PARA folders exist and how many notes each "
+                        "holds, any frontmatter that fails to parse, which plugins have a profile note, the DLQ "
+                        "(dead-letter queue) and the graph's own health. Read-only; writes nothing.",
         "json": "{ok, vault_path, para_folders, note_counts, frontmatter_parse_errors[], profiles, dlq, graph}",
+        "examples": [
+            ("unisphere doctor", "a structural read of the active vault"),
+            ("unisphere doctor --json", "the same read as JSON"),
+        ],
         "example": "unisphere doctor --json",
+        "group": "Start here",
+        "see_also": ["status", "vault init"],
     },
     "profile": {
         "summary": "A plugin's resolved profile (defaults merged with the vault's Config/toolkit/<plugin>.md). Always JSON.",
+        "description": "Resolves one plugin's configuration per contract/PROFILE.md: TOOLKIT_<PLUGIN>_<KEY> env "
+                        "vars override the vault's Config/toolkit/<plugin>.md frontmatter, which overrides the "
+                        "plugin's own defaults. Always prints JSON — this is a data command, not a status report.",
         "json": "{ok, plugin, vault_path, profile}",
+        "examples": [
+            ("unisphere profile obsidian", "the obsidian plugin's resolved settings"),
+            ("unisphere profile radar", "the radar plugin's resolved settings"),
+        ],
         "example": "unisphere profile obsidian",
+        "group": "Set up",
     },
     "engines status": {
         "summary": "Installed vs. latest release of each engine (farsight, gaiafield).",
+        "description": "Reads the local install manifest and, unless network access fails, GitHub's release "
+                        "list, and reports each engine's installed tag against the latest one. Never downloads "
+                        "anything — that's `engines install`/`engines update`.",
         "json": "{ok, engines[{engine, installed_tag, latest_tag, up_to_date, installed_path}]}",
+        "examples": [
+            ("unisphere engines status", "installed vs. latest, for a person"),
+            ("unisphere engines status --json", "the same, for an agent"),
+        ],
         "example": "unisphere engines status --json",
     },
     "engines install": {
         "summary": "Download, verify (sha256) and install the latest engine releases.",
+        "description": "Downloads the latest farsight and gaiafield release for this platform from GitHub "
+                        "Releases, checks each against its published sha256 (when the release carries one), and "
+                        "installs it to the well-known engines dir. --force re-downloads even if already current.",
         "json": "{ok, results[{engine, ok, action, tag, path}]}",
+        "examples": [
+            ("unisphere engines install", "install whatever engines are missing or outdated"),
+            ("unisphere engines install --force", "re-download and reverify even if already current"),
+        ],
         "example": "unisphere engines install",
     },
     "engines update": {
         "summary": "Same as engines install: bring every engine to its latest release.",
+        "description": "An alias for `engines install` — bring every engine to its latest release, "
+                        "sha256-verified. Kept as its own subcommand since `update` reads better once "
+                        "something is already installed.",
         "json": "{ok, results[{engine, ok, action, tag, path}]}",
+        "examples": [
+            ("unisphere engines update", "bring every engine to its latest release"),
+            ("unisphere engines update --json", "the same, machine-readable"),
+        ],
         "example": "unisphere engines update --json",
     },
     "vault init": {
         "summary": "Scaffold a new vault (PARA folders and AGENTS.md) at PATH.",
+        "description": "Creates the PARA folder skeleton (00_Memory .. Templates) and an AGENTS.md at PATH, from "
+                        "contract/templates/VAULT_AGENTS.md — the same scaffold a plugin then fills in. Refuses "
+                        "a non-empty directory unless --force is given. Writes only under PATH.",
         "json": "{ok, path}",
+        "examples": [
+            ("unisphere vault init ~/Notes", "scaffold a new personal vault"),
+            ("unisphere vault init ~/Notes --force", "scaffold into a directory that already has files"),
+        ],
         "example": "unisphere vault init ~/Notes",
+        "group": "Set up",
+        "see_also": ["doctor", "link"],
     },
     "demo": {
         "summary": "Sixty seconds of first-hand value on the example vault: scan, search, graph, candidates.",
+        "description": "Runs a real filesystem scan, then (once `unisphere engines install` has put binaries "
+                        "in place) a real farsight search and gaiafield graph query against a real vault — the "
+                        "bundled ./vault inside a checkout, or a tiny scaffolded one otherwise. No canned output.",
         "json": "{ok, steps[]}",
+        "examples": [
+            ("unisphere demo", "watch it work against a real vault"),
+            ("unisphere demo --json", "the same steps as JSON"),
+        ],
         "example": "unisphere demo",
+        "group": "Start here",
+        "see_also": ["status", "vault init"],
     },
     "link": {
         "summary": "Put unisphere, the engines and Obsidian's CLI on PATH (~/.local/bin); --vault sets its default vault.",
+        "description": "Writes small shims in --bin-dir (default ~/.local/bin) for unisphere itself, the "
+                        "installed engines, and Obsidian's bundled CLI when present, so they all run without "
+                        "`uv run` or a PATH edit. --vault bakes a default TOOLKIT_VAULT into the unisphere shim; "
+                        "an exported TOOLKIT_VAULT still overrides it. Never overwrites a file it didn't write "
+                        "itself unless --force is given.",
         "json": "{ok, bin_dir, on_path, vault, links[{name, path, action, target}]}",
-        "example": "unisphere link --vault ~/Documents/TheVoid",
+        "examples": [
+            ("unisphere link --vault ~/Notes", "put everything on PATH, default to this vault"),
+            ("unisphere link --bin-dir ~/bin", "link into a different bin directory"),
+        ],
+        "example": "unisphere link --vault ~/Notes",
+        "group": "Set up",
     },
     "commands": {
         "summary": "This catalogue: every command, its arguments, its JSON, and the companion CLIs.",
-        "json": "{ok, conventions, commands[{name, summary, arguments[], json, example}], companions[]}",
+        "description": "Prints the same declarative table that drives `--help` everywhere in this CLI: every "
+                        "command's summary, arguments, JSON shape and examples, plus the companion CLIs "
+                        "(tvly, obsidian, td) next to it. The starting point for an agent that hasn't used "
+                        "unisphere before.",
+        "json": "{ok, conventions, commands[{name, summary, group, arguments[], json, example, examples[]}], companions[]}",
+        "examples": [
+            ("unisphere commands --json", "the full catalogue, for an agent"),
+            ("unisphere commands", "the same catalogue, for a person skimming it"),
+        ],
         "example": "unisphere commands --json",
+        "group": "For agents",
+    },
+    "version": {
+        "summary": "unisphere's own version, plus each installed engine's (no network).",
+        "description": "Prints the installed toolkit-core package version and, from the local install manifest "
+                        "only (no network call), each engine's installed release tag. Use `engines status` "
+                        "instead to also check what's newest upstream.",
+        "json": "{ok, unisphere, engines[{engine, installed_tag}]}",
+        "examples": [
+            ("unisphere --version", "the short form"),
+            ("unisphere version --json", "the same, machine-readable"),
+        ],
+        "example": "unisphere --version",
+        "group": "Start here",
+        "see_also": ["engines status"],
     },
 }
+
+# Parent commands with their own subcommands (graph, engines, vault) aren't in CATALOG — that
+# dict is leaf-only (test_every_command_is_in_the_catalogue depends on it) — but their own
+# `--help` page still needs a description, a group and a couple of examples spanning their
+# subcommands. Their subcommand rows come straight out of CATALOG at render time, so there is
+# nothing here for those to drift against.
+GROUP_HELP = {
+    "graph": {
+        "summary": "The vault's link graph: stats, neighbors, shortest path, link candidates (gaiafield).",
+        "description": "Wraps the gaiafield engine's read side. Indexes the vault first — incremental and "
+                        "cheap, skip with --no-index — so every answer reflects the notes on disk, not "
+                        "yesterday's graph, then runs one of: stats, neighbors, path or candidates.",
+        "group": "Find things",
+        "examples": [
+            ("unisphere graph stats", "size, dangling links, most-linked notes"),
+            ("unisphere graph neighbors Gaiafield --depth 2", "notes linked to/from Gaiafield, two hops out"),
+            ("unisphere graph path Alex-Vega Gaiafield", "the shortest chain of links between two notes"),
+        ],
+        "see_also": ["search", "doctor"],
+    },
+    "engines": {
+        "summary": "Install, update and check the Rust engines that power search and graph (farsight, gaiafield).",
+        "description": "Downloads sha256-verified engine binaries from GitHub Releases into the well-known "
+                        "install dir (unisphere link puts them on PATH too), and reports installed vs. latest "
+                        "so `unisphere status` and this command never disagree.",
+        "group": "Set up",
+        "examples": [
+            ("unisphere engines status", "installed vs. latest release of each engine"),
+            ("unisphere engines install", "fetch and verify the latest release of each engine"),
+        ],
+        "see_also": ["status", "link"],
+    },
+    "vault": {
+        "summary": "Scaffold a new vault (PARA folders and AGENTS.md).",
+        "description": "The one vault-creation command; everything else (search, graph, doctor, profile) reads "
+                        "an existing vault, found via TOOLKIT_VAULT or the repo's own ./vault.",
+        "group": "Set up",
+        "examples": [
+            ("unisphere vault init ~/Notes", "scaffold a new personal vault"),
+        ],
+        "see_also": ["doctor", "link"],
+    },
+}
+
+# The bare `unisphere` COMMANDS listing, grouped by task and in display order. Each row is
+# either a CATALOG leaf key (a command with no subcommands of its own, or "vault init" — vault's
+# one subcommand, shown directly since a bare "vault" row would say nothing "graph"/"engines"
+# don't already say better with "…") or a GROUP_HELP parent key ("graph", "engines").
+TOP_LEVEL: list[tuple[str, str]] = [
+    ("status", "Start here"),
+    ("demo", "Start here"),
+    ("doctor", "Start here"),
+    ("version", "Start here"),
+    ("search", "Find things"),
+    ("graph", "Find things"),
+    ("vault init", "Set up"),
+    ("link", "Set up"),
+    ("engines", "Set up"),
+    ("profile", "Set up"),
+    ("commands", "For agents"),
+]
+
+GLOBAL_FLAGS = [
+    ("--json", "Print machine-readable JSON instead of text (every command)"),
+    ("-h, --help", "Show this help, or a command's — same as `unisphere help [command]`"),
+    ("--version", "Print unisphere's version and exit — same as `unisphere version`"),
+]
+
+# Env vars the CLI (or a module it calls directly) actually reads — grepped, not guessed.
+ENVIRONMENT = [
+    ("TOOLKIT_VAULT", "The active vault. Unset: the repo's own ./vault."),
+    ("TOOLKIT_GAIAFIELD_BIN", "Path to the gaiafield binary. Unset: PATH, then the engines install dir."),
+    ("TOOLKIT_FARSIGHT_BIN", "Path to the farsight binary. Unset: PATH, then the engines install dir."),
+    ("TOOLKIT_<PLUGIN>_<KEY>", "Overrides one profile field for a plugin, e.g. TOOLKIT_OBSIDIAN_MODEL."),
+    ("XDG_DATA_HOME", "Where `engines install` puts binaries. Unset: ~/.local/share."),
+    ("CLAUDE_CONFIG_DIR", "Where Claude Code's plugin registry lives, for `status`'s PLUGINS section."),
+    ("NO_COLOR", "Any value disables colour, even on a TTY (https://no-color.org)."),
+    ("FORCE_COLOR", "Forces colour on even off a TTY, e.g. for a captured sample. NO_COLOR still wins."),
+    ("UNISPHERE_ASCII", "Forces plain ASCII glyphs (*, x, !) even on a terminal that looks emoji-capable."),
+    ("FORCE_HYPERLINK", "Forces clickable OSC 8 links in `help`/`--help` even off a detected terminal."),
+]
 
 COMPANIONS = [
     {
@@ -692,8 +928,10 @@ def catalog(parser: argparse.ArgumentParser) -> dict:
     commands = []
     for name, sub in _leaf_commands(parser):
         entry = CATALOG[name]
-        commands.append({"name": name, "summary": entry["summary"], "arguments": _arguments(sub),
-                         "json": entry["json"], "example": entry["example"],
+        commands.append({"name": name, "summary": entry["summary"], "description": entry["description"],
+                         "arguments": _arguments(sub), "json": entry["json"], "example": entry["example"],
+                         "examples": [f"{cmd}  # {note}" for cmd, note in entry["examples"]],
+                         **({"group": entry["group"]} if "group" in entry else {}),
                          **({"exit": entry["exit"]} if "exit" in entry else {})})
     return {
         "ok": True,
@@ -734,76 +972,431 @@ def cmd_commands(args: argparse.Namespace) -> int:
 # --- argument parsing ------------------------------------------------------------------
 
 
+class _UsageError(Exception):
+    """Raised by `_Parser.error()` instead of argparse's own print-usage-and-exit(2), so `main()`
+    can render one consistent gh-style error (a one-liner, the USAGE line, a hint) for every
+    parser and subparser alike — bad flag values and missing required arguments included, not
+    just the unknown-command case `main()` already catches earlier by walking the command tree."""
+
+    def __init__(self, parser: argparse.ArgumentParser, message: str):
+        super().__init__(message)
+        self.parser = parser
+        self.message = message
+
+
+class _Parser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs):
+        # Python 3.13+ colorizes argparse's own format_usage()/format_help() the same way we
+        # do (it honours FORCE_COLOR/NO_COLOR too), which would double-colour every usage line
+        # `_colorize_usage_line` builds from it. `color=False` is a 3.13+-only kwarg; older
+        # Python's argparse never colourized anything, so a TypeError there just means it's
+        # already off. [earned: 2026-09-28 — a real FORCE_COLOR capture showed nested escapes
+        # and a literal stray "usage:" inside the coloured USAGE line]
+        kwargs.setdefault("color", False)
+        try:
+            super().__init__(*args, **kwargs)
+        except TypeError:
+            kwargs.pop("color", None)
+            super().__init__(*args, **kwargs)
+
+    def error(self, message: str) -> None:  # type: ignore[override]
+        raise _UsageError(self, message)
+
+
+def _sub(parser: argparse.ArgumentParser):
+    return parser.add_subparsers(dest="command", required=True)
+
+
 def _build_parser() -> argparse.ArgumentParser:
-    common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--json", action="store_true", help="emit JSON output")
+    # add_help=False everywhere: `main()` walks argv for "-h"/"--help" itself (see `_walk_command`)
+    # so every level renders the same styled help — argparse's own [-h] auto-action never fires.
+    common = _Parser(add_help=False)
+    common.add_argument("--json", action="store_true", help="Print machine-readable JSON instead of text")
 
-    parser = argparse.ArgumentParser(
-        prog="unisphere", parents=[common],
-        description="unisphere: the agentic-toolkit CLI. People read the text; agents add --json and "
-                    "start from `unisphere commands --json`.",
+    parser = _Parser(
+        prog="unisphere", parents=[common], add_help=False,
+        description="unisphere — the network your notes, agents and engines connect through.",
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=True, parser_class=_Parser)
 
-    vault_parser = subparsers.add_parser("vault", parents=[common], help="create a vault")
-    vault_subparsers = vault_parser.add_subparsers(dest="vault_command", required=True)
-    init_parser = vault_subparsers.add_parser("init", parents=[common], help=CATALOG["vault init"]["summary"])
-    init_parser.add_argument("path", help="where to create the vault")
-    init_parser.add_argument("--force", action="store_true", help="init into a non-empty directory")
+    vault_parser = subparsers.add_parser("vault", parents=[common], add_help=False, help=GROUP_HELP["vault"]["summary"])
+    vault_subparsers = vault_parser.add_subparsers(dest="vault_command", required=True, parser_class=_Parser)
+    init_parser = vault_subparsers.add_parser("init", parents=[common], add_help=False, help=CATALOG["vault init"]["summary"])
+    init_parser.add_argument("path", help="Directory to scaffold the vault into")
+    init_parser.add_argument("--force", action="store_true", help="Scaffold even if the directory already has files")
 
-    subparsers.add_parser("doctor", parents=[common], help=CATALOG["doctor"]["summary"])
+    subparsers.add_parser("doctor", parents=[common], add_help=False, help=CATALOG["doctor"]["summary"])
 
-    profile_parser = subparsers.add_parser("profile", parents=[common], help=CATALOG["profile"]["summary"])
-    profile_parser.add_argument("plugin", help="a plugin name, e.g. obsidian")
+    profile_parser = subparsers.add_parser("profile", parents=[common], add_help=False, help=CATALOG["profile"]["summary"])
+    profile_parser.add_argument("plugin", help="Plugin name to resolve a profile for, e.g. obsidian")
 
-    engines_parser = subparsers.add_parser("engines", parents=[common], help="the Rust engines (farsight, gaiafield)")
-    engines_subparsers = engines_parser.add_subparsers(dest="engines_command", required=True)
+    engines_parser = subparsers.add_parser("engines", parents=[common], add_help=False, help=GROUP_HELP["engines"]["summary"])
+    engines_subparsers = engines_parser.add_subparsers(dest="engines_command", required=True, parser_class=_Parser)
     for name in ("install", "update"):
-        sub = engines_subparsers.add_parser(name, parents=[common], help=CATALOG[f"engines {name}"]["summary"])
-        sub.add_argument("--force", action="store_true", help="re-download even if already at the latest release")
-    engines_subparsers.add_parser("status", parents=[common], help=CATALOG["engines status"]["summary"])
+        sub = engines_subparsers.add_parser(name, parents=[common], add_help=False, help=CATALOG[f"engines {name}"]["summary"])
+        sub.add_argument("--force", action="store_true",
+                          help="Re-download even if the installed release is already the latest")
+    engines_subparsers.add_parser("status", parents=[common], add_help=False, help=CATALOG["engines status"]["summary"])
 
-    subparsers.add_parser("demo", parents=[common], help=CATALOG["demo"]["summary"])
+    subparsers.add_parser("demo", parents=[common], add_help=False, help=CATALOG["demo"]["summary"])
 
-    status_parser = subparsers.add_parser("status", parents=[common], help=CATALOG["status"]["summary"])
-    status_parser.add_argument("--offline", action="store_true", help="skip the GitHub check for newer engine releases")
+    subparsers.add_parser("version", parents=[common], add_help=False, help=CATALOG["version"]["summary"])
 
-    search_parser = subparsers.add_parser("search", parents=[common], help=CATALOG["search"]["summary"])
-    search_parser.add_argument("terms", nargs="+", help="query words")
-    search_parser.add_argument("--limit", type=int, default=10, help="max results")
+    status_parser = subparsers.add_parser("status", parents=[common], add_help=False, help=CATALOG["status"]["summary"])
+    status_parser.add_argument("--offline", action="store_true",
+                                help="Skip the GitHub check for newer engine releases (no network)")
 
-    graph_parser = subparsers.add_parser("graph", parents=[common], help="the vault's link graph (gaiafield)")
-    graph_subparsers = graph_parser.add_subparsers(dest="graph_command", required=True)
-    graph_common = argparse.ArgumentParser(add_help=False, parents=[common])
-    graph_common.add_argument("--no-index", action="store_true", help="query the graph as stored, without refreshing it")
-    graph_subparsers.add_parser("stats", parents=[graph_common], help=CATALOG["graph stats"]["summary"])
-    sub = graph_subparsers.add_parser("neighbors", parents=[graph_common], help=CATALOG["graph neighbors"]["summary"])
-    sub.add_argument("note", help="a vault-relative path or a bare note name")
-    sub.add_argument("--depth", type=int, default=1, help="how many links out")
-    sub.add_argument("--direction", choices=("in", "out", "both"), default="both", help="links to it, from it, or both")
-    sub.add_argument("--include-inferred", action="store_true", help="also inferred (similarity) edges")
-    sub = graph_subparsers.add_parser("path", parents=[graph_common], help=CATALOG["graph path"]["summary"])
-    sub.add_argument("source", help="the note to start from")
-    sub.add_argument("target", help="the note to reach")
-    sub.add_argument("--include-inferred", action="store_true", help="also traverse inferred edges")
-    sub = graph_subparsers.add_parser("candidates", parents=[graph_common], help=CATALOG["graph candidates"]["summary"])
-    sub.add_argument("note", help="a vault-relative path or a bare note name")
-    sub.add_argument("--limit", type=int, default=10, help="max candidates")
-    sub.add_argument("--include-ambiguous", action="store_true", help="also the AMBIGUOUS band")
+    search_parser = subparsers.add_parser("search", parents=[common], add_help=False, help=CATALOG["search"]["summary"])
+    search_parser.add_argument("terms", nargs="+", help="One or more query words")
+    search_parser.add_argument("--limit", type=int, default=10, help="Maximum number of results to show (default: 10)")
 
-    link_parser = subparsers.add_parser("link", parents=[common], help=CATALOG["link"]["summary"])
-    link_parser.add_argument("--vault", help="default TOOLKIT_VAULT for the unisphere shim (an exported value wins)")
-    link_parser.add_argument("--bin-dir", help="where to link (default ~/.local/bin)")
-    link_parser.add_argument("--force", action="store_true", help="replace files there that unisphere did not write")
+    graph_parser = subparsers.add_parser("graph", parents=[common], add_help=False, help=GROUP_HELP["graph"]["summary"])
+    graph_subparsers = graph_parser.add_subparsers(dest="graph_command", required=True, parser_class=_Parser)
+    graph_common = _Parser(add_help=False, parents=[common])
+    graph_common.add_argument("--no-index", action="store_true",
+                               help="Query the graph as currently indexed, without refreshing it first")
+    graph_subparsers.add_parser("stats", parents=[graph_common], add_help=False, help=CATALOG["graph stats"]["summary"])
+    sub = graph_subparsers.add_parser("neighbors", parents=[graph_common], add_help=False,
+                                       help=CATALOG["graph neighbors"]["summary"])
+    sub.add_argument("note", help="A vault-relative note path or a bare note name (e.g. Gaiafield)")
+    sub.add_argument("--depth", type=int, default=1, help="How many hops out to follow (default: 1)")
+    sub.add_argument("--direction", choices=("in", "out", "both"), default="both",
+                      help="Follow links into the note, out of it, or both (default: both)")
+    sub.add_argument("--include-inferred", action="store_true",
+                      help="Also include inferred (embedding-similarity) edges, not just explicit links")
+    sub = graph_subparsers.add_parser("path", parents=[graph_common], add_help=False, help=CATALOG["graph path"]["summary"])
+    sub.add_argument("source", help="The note to start from")
+    sub.add_argument("target", help="The note to reach")
+    sub.add_argument("--include-inferred", action="store_true",
+                      help="Also traverse inferred edges, not just explicit links")
+    sub = graph_subparsers.add_parser("candidates", parents=[graph_common], add_help=False,
+                                       help=CATALOG["graph candidates"]["summary"])
+    sub.add_argument("note", help="A vault-relative note path or a bare note name (e.g. Gaiafield)")
+    sub.add_argument("--limit", type=int, default=10, help="Maximum number of candidates to show (default: 10)")
+    sub.add_argument("--include-ambiguous", action="store_true", help="Also include the lower-confidence AMBIGUOUS band")
 
-    subparsers.add_parser("commands", parents=[common], help=CATALOG["commands"]["summary"])
+    link_parser = subparsers.add_parser("link", parents=[common], add_help=False, help=CATALOG["link"]["summary"])
+    link_parser.add_argument("--vault", help="Vault the unisphere shim defaults to (an exported TOOLKIT_VAULT still wins)")
+    link_parser.add_argument("--bin-dir", help="Where to write the shims (default: ~/.local/bin)")
+    link_parser.add_argument("--force", action="store_true", help="Replace files already there that unisphere did not write")
+
+    subparsers.add_parser("commands", parents=[common], add_help=False, help=CATALOG["commands"]["summary"])
 
     return parser
 
 
+# --- help, usage and version -------------------------------------------------------------
+#
+# Every level (bare `unisphere`, `unisphere <command>`, `unisphere <command> <subcommand>`)
+# renders through the same handful of functions below, built from CATALOG/GROUP_HELP — never
+# argparse's own `-h`/`--help` action (every parser above is `add_help=False`; `main()` scans
+# argv for "-h"/"--help" itself via `_walk_command`, so a typo'd subcommand plus `--help` still
+# gets a "did you mean" rather than a help page for a command that doesn't exist).
+
+
+def _prog(path: list[str]) -> str:
+    return "unisphere" if not path else "unisphere " + " ".join(path)
+
+
+def _walk_command(parser: argparse.ArgumentParser, tokens: list[str]):
+    """Consume leading `tokens` that name a subcommand, as far as they go — one step per
+    nested subparsers level (graph -> neighbors, vault -> init, ...). Returns
+    `(path, deepest_parser_reached, its_subparsers_action_or_None, remaining_tokens)`."""
+    path: list[str] = []
+    node = parser
+    remaining = list(tokens)
+    while True:
+        sub = next((a for a in node._actions if isinstance(a, argparse._SubParsersAction)), None)
+        if sub is None or not remaining or remaining[0] not in sub.choices:
+            return path, node, sub, remaining
+        name = remaining[0]
+        path.append(name)
+        node = sub.choices[name]
+        remaining = remaining[1:]
+
+
+def _colorize_usage_line(st: ui.Style, parser: argparse.ArgumentParser) -> str:
+    """argparse already knows how to lay out a usage line correctly (bracket nesting, wrapping
+    choice); this just re-colours its tokens — flags in the flag colour, placeholders
+    underlined — rather than hand-building one and risking it drifting from the real parser."""
+    raw = re.sub(r"\s+", " ", parser.format_usage().removeprefix("usage: ").strip())
+    prog = parser.prog
+    rest = raw[len(prog) :].strip() if raw.startswith(prog) else raw
+    toks = []
+    for tok in (rest.split(" ") if rest else []):
+        lead = ""
+        while tok and tok[0] in "[{":
+            lead, tok = lead + tok[0], tok[1:]
+        trail = ""
+        while tok and tok[-1] in "]}":
+            trail, tok = tok[-1] + trail, tok[:-1]
+        if tok.startswith("-"):
+            tok = st.flag(tok)
+        elif tok:
+            tok = st.metavar(tok)
+        toks.append(lead + tok + trail)
+    return (st.command(prog) + " " + " ".join(toks)).rstrip()
+
+
+def _flag_label(arg: dict) -> str:
+    if arg.get("flag"):
+        return arg["name"]
+    meta = "|".join(arg["choices"]) if arg.get("choices") else arg["name"].lstrip("-").upper().replace("-", "_")
+    return f"{arg['name']} {meta}"
+
+
+_EXAMPLE_COMMENT_CAP = 48  # brew/kubectl-style: align comments to one column, but not past this
+
+
+def _example_lines(examples: list[tuple[str, str]], st: ui.Style | None = None) -> list[str]:
+    """EXAMPLES rows, comments aligned to one column the way brew/kubectl do it: the pad is the
+    longest command in *this* block plus 2, capped at `_EXAMPLE_COMMENT_CAP`. A command past the
+    cap gets its comment dimmed on the next line instead of pushing the whole column out."""
+    st = st or ui.Style()
+    short = [len(cmd) for cmd, _ in examples if len(cmd) <= _EXAMPLE_COMMENT_CAP]
+    pad = min(max(short, default=_EXAMPLE_COMMENT_CAP) + 2, _EXAMPLE_COMMENT_CAP)
+    out = []
+    for cmd, note in examples:
+        comment = st.dim(f"# {note}")
+        if len(cmd) > _EXAMPLE_COMMENT_CAP:
+            out.append(f"  {cmd}")
+            out.append(f"      {comment}")
+        else:
+            out.append(f"  {cmd.ljust(pad)}  {comment}")
+    return out
+
+
+def _see_also_lines(st: ui.Style, entry: dict) -> list[str]:
+    if not entry.get("see_also"):
+        return []
+    return ["", st.heading("SEE ALSO"), "  " + ", ".join(f"unisphere {s}" for s in entry["see_also"])]
+
+
+_GROUP_GLYPH = {"Start here": "start", "Find things": "find", "Set up": "setup", "For agents": "agents"}
+_TOP_EXAMPLE_KEYS = ["status", "search", "graph neighbors", "vault init", "link", "commands"]
+
+
+def _top_level_help_text(st: ui.Style) -> str:
+    out = [st.bold("unisphere") + " — the network your notes, agents and engines connect through."]
+    out += ui.wrap(
+        "The agentic-toolkit's front door for people and agents: the vault, its search and graph, "
+        "the engines, plugins and pipeline health.", 0)
+    out += ["", st.heading("USAGE"),
+            f"  {st.command('unisphere')} {st.metavar('<command>')} {st.metavar('[subcommand]')} {st.dim('[flags]')}",
+            "", st.heading("COMMANDS")]
+
+    groups: list[str] = []
+    for _, group in TOP_LEVEL:
+        if group not in groups:
+            groups.append(group)
+    wide = max(len(name) for name, _ in TOP_LEVEL)
+    for group in groups:
+        gl = term.glyph(_GROUP_GLYPH[group])
+        out.append(f"  {st.dim((gl + ' ' + group) if gl else group)}")
+        for name, row_group in TOP_LEVEL:
+            if row_group != group:
+                continue
+            summary = CATALOG[name]["summary"] if name in CATALOG else GROUP_HELP[name]["summary"]
+            out += ui.wrap_field(f"    {st.command(name.ljust(wide))}  ", summary)
+        out.append("")
+
+    out.append(st.heading("GLOBAL FLAGS"))
+    fw = max(len(f) for f, _ in GLOBAL_FLAGS)
+    for f, desc in GLOBAL_FLAGS:
+        out += ui.wrap_field(f"  {st.flag(f.ljust(fw))}  ", desc)
+
+    out += ["", st.heading("EXAMPLES")]
+    out += _example_lines([CATALOG[key]["examples"][0] for key in _TOP_EXAMPLE_KEYS], st)
+
+    out += ["", st.heading("ENVIRONMENT")]
+    ew = max(len(n) for n, _ in ENVIRONMENT)
+    for n, desc in ENVIRONMENT:
+        out += ui.wrap_field(f"  {st.flag(n.ljust(ew))}  ", desc)
+
+    docs_url = "https://marsmike.github.io/agentic-toolkit/"
+    book = term.glyph("book")
+    out += ["", st.heading("LEARN MORE"),
+            "  unisphere help <command>       more about any command, same as `<command> --help`",
+            "  unisphere commands --json      the full catalogue — arguments, JSON, examples — for an agent",
+            f"  {(book + ' ') if book else ''}{term.link(docs_url)}"]
+    return "\n".join(out)
+
+
+def _leaf_help_text(path: list[str], parser: argparse.ArgumentParser, st: ui.Style) -> str:
+    name = " ".join(path)
+    entry = CATALOG[name]
+    out = [st.bold(f"unisphere {name}") + " — " + entry["summary"], ""]
+    out += ui.wrap(entry["description"], 0)
+    out += ["", st.heading("USAGE"), "  " + _colorize_usage_line(st, parser)]
+
+    args = _arguments(parser)
+    positionals = [a for a in args if a["positional"]]
+    flags = [a for a in args if not a["positional"]]
+    if positionals:
+        out += ["", st.heading("ARGUMENTS")]
+        w = max(len(a["name"]) for a in positionals)
+        for a in positionals:
+            out += ui.wrap_field(f"  {st.metavar(a['name'].upper().ljust(w))}  ", a["help"])
+    if flags:
+        out += ["", st.heading("FLAGS")]
+        labelled = [(a, _flag_label(a)) for a in flags]
+        w = max(len(lbl) for _, lbl in labelled)
+        for a, lbl in labelled:
+            out += ui.wrap_field(f"  {st.flag(lbl.ljust(w))}  ", a["help"])
+
+    out += ["", st.heading("EXAMPLES")]
+    out += _example_lines(entry["examples"], st)
+    out += ["", st.dim("JSON: --json prints ") + entry["json"]]
+    out += _see_also_lines(st, entry)
+    return "\n".join(out)
+
+
+def _parent_help_text(path: list[str], sub: argparse._SubParsersAction, st: ui.Style) -> str:
+    name = " ".join(path)
+    entry = GROUP_HELP[name]
+    out = [st.bold(f"unisphere {name}") + " — " + entry["summary"], ""]
+    out += ui.wrap(entry["description"], 0)
+    out += ["", st.heading("USAGE"), f"  {st.command('unisphere ' + name)} {st.metavar('<command>')} {st.dim('[flags]')}"]
+
+    out += ["", st.heading("COMMANDS")]
+    wide = max(len(c) for c in sub.choices)
+    for sub_name in sub.choices:
+        out += ui.wrap_field(f"  {st.command(sub_name.ljust(wide))}  ", CATALOG[f"{name} {sub_name}"]["summary"])
+
+    out += ["", st.heading("EXAMPLES")]
+    out += _example_lines(entry["examples"], st)
+    out += _see_also_lines(st, entry)
+    return "\n".join(out)
+
+
+def _print_command_help(path: list[str], node: argparse.ArgumentParser, st: ui.Style) -> None:
+    if not path:
+        print(_top_level_help_text(st))
+        return
+    sub = next((a for a in node._actions if isinstance(a, argparse._SubParsersAction)), None)
+    print(_parent_help_text(path, sub, st) if sub is not None else _leaf_help_text(path, node, st))
+
+
+def _unknown_command_error(path: list[str], bad: str, choices, st: ui.Style) -> int:
+    prog = _prog(path)
+    print(st.err(f'unknown command "{bad}" for "{prog}"'), file=sys.stderr)
+    close = difflib.get_close_matches(bad, list(choices), n=1)
+    if close:
+        tip = term.glyph("tip")
+        print(st.good(f"{(tip + ' ') if tip else ''}Did you mean this?"), file=sys.stderr)
+        print(f"  {st.command(close[0])}", file=sys.stderr)
+    print(st.dim(f"Run '{prog} --help' for usage."), file=sys.stderr)
+    return 2
+
+
+def _usage_error(exc: _UsageError, st: ui.Style) -> int:
+    """Every other parser failure (a missing required argument, an invalid --flag value, an
+    unrecognized flag): one line, that command's USAGE, a pointer to its --help — not argparse's
+    own multi-line usage-plus-message dump."""
+    print(st.err(f"error: {exc.message}"), file=sys.stderr)
+    print("  " + _colorize_usage_line(st, exc.parser), file=sys.stderr)
+    print(st.dim(f"Run '{exc.parser.prog} --help' for more."), file=sys.stderr)
+    return 2
+
+
+def cmd_help(rest: list[str], st: ui.Style) -> int:
+    path, node, sub, leftover = _walk_command(_build_parser(), rest)
+    if leftover:
+        return _unknown_command_error(path, leftover[0], sub.choices if sub is not None else {}, st)
+    _print_command_help(path, node, st)
+    return 0
+
+
+def _unisphere_version() -> str:
+    try:
+        return importlib.metadata.version("toolkit-core")
+    except importlib.metadata.PackageNotFoundError:
+        try:
+            import tomllib
+
+            pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+            return tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+        except (OSError, KeyError, ValueError):
+            return "unknown"
+
+
+def _render_version(result: dict) -> str:
+    st = ui.Style()
+    lines = [f"{st.bold('unisphere')} {st.good(result['unisphere'])}"]
+    for row in result["engines"]:
+        tag = row["installed_tag"]
+        lines.append(f"  {row['engine']:<10} {tag if tag else st.dim('not installed')}")
+    return "\n".join(lines)
+
+
+def cmd_version(as_json: bool) -> int:
+    """Installed versions only — no network. `engines status` also checks what's newest upstream."""
+    rows = [{"engine": r["engine"], "installed_tag": r["installed_tag"]} for r in engines.status_all(fetch=False)]
+    _emit({"ok": True, "unisphere": _unisphere_version(), "engines": rows}, as_json, _render_version)
+    return 0
+
+
+def _startup_line(st: ui.Style) -> None:
+    """One line on a bare `unisphere`, TTY only: what vault is linked, its size, and how many
+    cloud routines ("u-shadows") watch over it — every part read straight from disk/local db,
+    nothing over the network, and any part that can't be read is dropped rather than failing
+    the whole line."""
+    if not term.is_tty():
+        return
+    try:
+        parts = [st.bold(f"{term.glyph('node')} UNISPHERE".strip())]
+        resolution = vault.resolve_vault()
+        repo_root = resolution.repo_root or vault.find_repo_root(Path(__file__).resolve().parent)
+        if resolution.path and resolution.path.is_dir():
+            parts.append(f"linked to {resolution.path.name}")
+            total = sum(vault.note_counts(resolution.path).values())
+            if total:
+                parts.append(f"{total:,} worlds")
+            graph = knowledge.graph_status(resolution.path)
+            if graph.get("present") and graph.get("edges") is not None:
+                parts.append(f"{graph['edges']:,} wormholes")
+        routines_file = repo_root / "cloud" / "routines.json" if repo_root else None
+        if routines_file and routines_file.is_file():
+            n = len(json.loads(routines_file.read_text(encoding="utf-8")).get("routines") or [])
+            if n:
+                parts.append(f"{n} u-shadow{'' if n == 1 else 's'}")
+        print(st.dim(" · ").join(parts))
+        print()
+    except Exception:  # noqa: BLE001 - a startup banner must never be the reason unisphere fails
+        pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    st = ui.Style()
+
+    if not argv:
+        _startup_line(st)
+        print(_top_level_help_text(st))
+        return 0
+    if argv[0] in ("-h", "--help"):
+        print(_top_level_help_text(st))
+        return 0
+    if argv[0] == "help":
+        return cmd_help(argv[1:], st)
+    if argv[0] == "--version":
+        return cmd_version("--json" in argv[1:])
+
     parser = _build_parser()
-    args = parser.parse_args(argv)
+    path, node, sub, rest = _walk_command(parser, argv)
+
+    help_requested = (rest and rest[0] in ("-h", "--help")) or bool(path) and any(t in ("-h", "--help") for t in rest)
+    if help_requested:
+        _print_command_help(path, node, st)
+        return 0
+
+    if rest and sub is not None and not rest[0].startswith("-") and rest[0] not in sub.choices:
+        return _unknown_command_error(path, rest[0], sub.choices, st)
+
+    try:
+        args = parser.parse_args(argv)
+    except _UsageError as exc:
+        return _usage_error(exc, st)
 
     if args.command == "vault" and args.vault_command == "init":
         return cmd_vault_init(args)
@@ -818,11 +1411,13 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_engines_status(args)
     if args.command == "demo":
         return cmd_demo(args)
+    if args.command == "version":
+        return cmd_version(args.json)
     handlers = {"status": cmd_status, "search": cmd_search, "graph": cmd_graph, "link": cmd_link, "commands": cmd_commands}
     if args.command in handlers:
         return handlers[args.command](args)
 
-    parser.print_help()
+    print(_top_level_help_text(st))  # unreached in practice: every parser choice is handled above
     return 1
 
 

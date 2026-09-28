@@ -152,14 +152,57 @@ def vault_section(resolution: vault.VaultResolution) -> dict:
     }
 
 
+# The cloud routines that actually run TheVoid's pipeline (a snapshot of claude.ai's routines
+# API — see cloud/routines.json's own "_" note). The watchdog below only ever sees what a
+# routine leaves behind in the vault itself (a `pipeline …` commit, a `signal radar …` one); it
+# has no way to ask claude.ai for a routine's own last run, and `unisphere status` never should
+# either — so a routine with no vault-side trace (Pipeline watchdog itself: it IS the check) is
+# still named, just without a "last run". [earned: 2026-09-28, owner's request — name the
+# routines ("u-shadows") status already runs alongside, not just what their vault trace says]
+ROUTINES_FILE = Path("cloud") / "routines.json"
+
+
+def _routine_names(repo_root: Path | None) -> list[str]:
+    path = repo_root / ROUTINES_FILE if repo_root else None
+    if not path or not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return [r["name"] for r in data.get("routines", []) if r.get("name")]
+
+
+def _routine_rows(names: list[str], facts: dict) -> list[dict]:
+    rows = []
+    for name in names:
+        row = {"name": name}
+        if name == "Daily ReadWise Ingest+Distill" and facts.get("last_run"):
+            row.update(last=facts["last_run"], age_hours=facts.get("age_hours"), note=facts.get("last_summary"))
+        elif name == "Signal Radar" and facts.get("signal_last"):
+            row.update(age_hours=facts.get("signal_age_hours"), note=facts["signal_last"])
+        rows.append(row)
+    return rows
+
+
 def pipeline_section(repo_root: Path | None, vault_path: Path | None) -> dict:
-    """The obsidian plugin's watchdog, run as the pipeline's own routine runs it. Only for a vault
-    that has a pipeline (00_Memory/pipeline-state.json); the example vault has none."""
+    """The obsidian plugin's watchdog, run as the pipeline's own routine runs it, plus the named
+    cloud routines ("u-shadows", `routines`) from cloud/routines.json — present whenever this
+    checkout has that file, independent of whether the active vault runs a pipeline at all. The
+    watchdog check itself still only runs for a vault that has one (00_Memory/pipeline-state.json);
+    the example vault has none."""
+    names = _routine_names(repo_root)
     if vault_path is None or not (vault_path / "00_Memory" / "pipeline-state.json").is_file():
-        return {"present": False, "note": "this vault runs no pipeline"}
+        result = {"present": False, "note": "this vault runs no pipeline"}
+        if names:
+            result["routines"] = _routine_rows(names, {})
+        return result
     scripts = repo_root / "plugins" / "obsidian" / "scripts" if repo_root else None
     if not scripts or not (scripts / "watchdog.py").is_file() or not shutil.which("uv"):
-        return {"present": True, "checked": False, "note": "watchdog unavailable (needs the repo checkout and uv)"}
+        result = {"present": True, "checked": False, "note": "watchdog unavailable (needs the repo checkout and uv)"}
+        if names:
+            result["routines"] = _routine_rows(names, {})
+        return result
     proc = _run(
         ["uv", "run", "--quiet", "--locked", "--project", str(scripts), "python3", str(scripts / "watchdog.py"), "--json"],
         timeout=WATCHDOG_TIMEOUT, env={**os.environ, "TOOLKIT_VAULT": str(vault_path)},
@@ -170,9 +213,16 @@ def pipeline_section(repo_root: Path | None, vault_path: Path | None) -> dict:
         verdict = None
     if not isinstance(verdict, dict):
         detail = (proc.stderr.strip().splitlines() or ["no output"])[-1] if proc else "did not run"
-        return {"present": True, "checked": False, "note": f"watchdog failed: {detail}"}
-    return {"present": True, "checked": True, "ok": verdict.get("ok"), "problems": verdict.get("problems", []),
-            "facts": verdict.get("facts", {})}
+        result = {"present": True, "checked": False, "note": f"watchdog failed: {detail}"}
+        if names:
+            result["routines"] = _routine_rows(names, {})
+        return result
+    facts = verdict.get("facts", {})
+    result = {"present": True, "checked": True, "ok": verdict.get("ok"), "problems": verdict.get("problems", []),
+              "facts": facts}
+    if names:
+        result["routines"] = _routine_rows(names, facts)
+    return result
 
 
 def _first_line(proc: subprocess.CompletedProcess | None) -> str:

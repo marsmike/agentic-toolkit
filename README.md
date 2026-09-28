@@ -3,6 +3,8 @@
   <img alt="agentic-toolkit — your vault is the platform" src="assets/banner-light.svg" width="720">
 </picture>
 
+*Every note a world. Every link a wormhole — unisphere keeps them all in contact.*
+
 [![CI](https://github.com/marsmike/agentic-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/marsmike/agentic-toolkit/actions/workflows/ci.yml)
 [![Docs](https://github.com/marsmike/agentic-toolkit/actions/workflows/docs.yml/badge.svg)](https://marsmike.github.io/agentic-toolkit/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -18,17 +20,29 @@ configuration source for a curated set of Claude Code plugins — with two Rust
 engines underneath and one rule above everything: *the repo ships behavior;
 your vault ships identity.* Nothing personal lives here.
 
+## The Commonwealth
+
+Each plugin and engine below is a world; every arrow is a wormhole — the same idea the
+`unisphere` CLI is named for (the Commonwealth's network everything connects through), applied
+to the map of this repo. No lore needed to read it: a solid arrow is data flowing, a dashed one
+is advice.
+
 ```mermaid
 flowchart LR
-    R[readwise<br/><i>capture what you read</i>] --> V
-    V[(the vault<br/><b>your markdown notes</b>)] <--> O[obsidian<br/><i>distill &amp; connect</i>]
-    M[memory<br/><i>what the agent learns</i>] --> V
-    V --> F[farsight ⚙<br/><i>BM25 search, Rust</i>]
-    V --> G[gaiafield ⚙<br/><i>knowledge graph, Rust</i>]
+    classDef vault fill:#141a33,stroke:#9b87ff,color:#eef1ff,stroke-width:2px
+    classDef engine fill:#0a2e2b,stroke:#2fd4c0,color:#eef1ff,stroke-width:2px
+    classDef plugin fill:#0a0e1c,stroke:#6d78b8,color:#eef1ff
+    classDef advisor fill:#2a230a,stroke:#ffcf5c,color:#eef1ff,stroke-dasharray:4 3
+
+    R[readwise<br/><i>capture what you read</i>]:::plugin --> V
+    V[(the vault<br/><b>your markdown notes</b>)]:::vault <--> O[obsidian<br/><i>distill &amp; connect</i>]:::plugin
+    M[memory<br/><i>what the agent learns</i>]:::plugin --> V
+    V --> F[farsight ⚙<br/><i>BM25 search, Rust</i>]:::engine
+    V --> G[gaiafield ⚙<br/><i>knowledge graph, Rust</i>]:::engine
     F --> O
     G --> O
-    J[jev ⚖<br/><i>typed judgments, hosted</i>] -. advice .-> O
-    RD[radar<br/><i>judge every feed item</i>] --> V
+    J[jev ⚖<br/><i>typed judgments, hosted</i>]:::advisor -. advice .-> O
+    RD[radar<br/><i>judge every feed item</i>]:::plugin --> V
     J -. judgments .-> RD
 ```
 
@@ -39,6 +53,27 @@ plugins turn those numbers into advice at the checkpoint. Optional, off without 
 replaceable by a local model behind one seam. R10 adds the radar: the same judgments applied
 *before* the clip, to every item Reader aggregates, so the feed is read in full and only what
 matters reaches you.
+
+**A short glossary** — the full brand voice, palette and word list live in
+[docs/BRAND.md](docs/BRAND.md):
+
+| In the Commonwealth | Here |
+|---|---|
+| the unisphere | `unisphere` — the CLI and the network every plugin and engine goes through |
+| the gaiafield | `gaiafield` — the knowledge graph engine |
+| farsight | `farsight` — the BM25 search engine |
+| u-shadows | the cloud routines: pipeline, Signal Radar, watchdog |
+| the Void | the vault: the one place everything flows into |
+
+...and the shape of the graph itself, in the same terms (visuals and flavor text only — a
+command's own output always stays plain, e.g. `graph stats`):
+
+| In the graph | As space |
+|---|---|
+| a note | a world |
+| a link | a wormhole |
+| a cluster of related notes | a star system |
+| a hub note | a core world |
 
 ## Pick your path
 
@@ -195,3 +230,9 @@ Every rule traces to a dated failure. Every plugin declares where its failures
 go. Capability evals graduate into regression gates. If a component's behavior
 can't be named, it gets removed. The long version, with receipts:
 [docs/PLAN.md](docs/PLAN.md) and the [CHANGELOG](CHANGELOG.md).
+
+## Credits
+
+Names are a nod to Peter F. Hamilton's Commonwealth novels; this project is not affiliated with
+him or his publishers. The brand voice, palette and glossary behind `unisphere`, `gaiafield`,
+`farsight` and the rest: [docs/BRAND.md](docs/BRAND.md).

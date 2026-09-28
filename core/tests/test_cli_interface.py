@@ -47,7 +47,8 @@ def test_every_command_is_in_the_catalogue(capsys):
 def test_catalogue_lists_positional_arguments_first(capsys):
     _, data = run_json(capsys, "commands")
     neighbors = next(c for c in data["commands"] if c["name"] == "graph neighbors")
-    assert neighbors["arguments"][0] == {"name": "note", "positional": True, "help": "a vault-relative path or a bare note name"}
+    assert neighbors["arguments"][0] == {
+        "name": "note", "positional": True, "help": "A vault-relative note path or a bare note name (e.g. Gaiafield)"}
     direction = next(a for a in neighbors["arguments"] if a["name"] == "--direction")
     assert direction["choices"] == ["in", "out", "both"] and direction["default"] == "both"
 
@@ -124,7 +125,12 @@ def test_status_json_on_the_example_vault(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("TOOLKIT_VAULT", str(EXAMPLE_VAULT))
     code, data = run_json(capsys, "status", "--offline")
     assert set(data) >= {"ok", "problems", "toolkit", "engines", "plugins", "vault", "pipeline", "companions"}
-    assert data["pipeline"] == {"present": False, "note": "this vault runs no pipeline"}
+    assert data["pipeline"]["present"] is False and data["pipeline"]["note"] == "this vault runs no pipeline"
+    # The example vault runs no pipeline of its own, but this checkout's cloud/routines.json still
+    # names the "u-shadows" that run TheVoid's — with no vault-side trace to report for any of them.
+    assert {r["name"] for r in data["pipeline"]["routines"]} == {
+        "Daily ReadWise Ingest+Distill", "Pipeline watchdog", "Signal Radar"}
+    assert all("last" not in r for r in data["pipeline"]["routines"])
     assert data["engines"]["checked_latest"] is False
     assert data["engines"]["cloud_pin"].startswith("gaiafield-v")
     assert any(p["section"] == "plugins" and "imagine" in p["detail"] for p in data["problems"])
