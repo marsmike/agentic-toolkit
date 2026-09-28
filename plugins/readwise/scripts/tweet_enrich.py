@@ -243,7 +243,17 @@ def expand(texts: list[str], resolver: Callable[[str], str | None]) -> tuple[lis
 # X links a bare file name like `CLAUDE.md` or `setup.py` as if it were a domain (.md is Moldova,
 # .py Paraguay, .sh Saint Helena): such a link names a file, not a page the tweet points at.
 # [earned: 2026-09-25 correction run — "CLAUDE.md" and "TASKS.md" resolved to unrelated sites]
-FILENAME_HOST = re.compile(r"^[A-Za-z0-9_-]+\.(md|py|sh|rs|js|ts|go|rb|pl|cc|ai|io)$")
+#
+# .ai/.io are real gTLD-like ccTLDs plenty of products use as their whole bare domain (docs.ai,
+# cursor.sh), so those two stay gated by FILE_WORDS below. The rest (.md/.py/.sh/.rs/.js/.ts/.go/
+# .rb/.pl/.cc) are essentially never a real product's bare domain, so any word paired with one of
+# them is a filename regardless of what the word is — no allowlist can keep up with every source
+# filename a tweet happens to mention. [earned: 2026-09-28 battle test — a real tweet linkified
+# "program.md", "train.py" and "prepare.py"; none of those three stems were in FILE_WORDS, so an
+# allowlist-only check let all three through as if they were linked content]
+CODE_ONLY_EXTS = {"md", "py", "sh", "rs", "js", "ts", "go", "rb", "pl", "cc"}
+AMBIGUOUS_EXTS = {"ai", "io"}
+FILENAME_HOST = re.compile(r"^[A-Za-z0-9_-]+\.(" + "|".join(CODE_ONLY_EXTS | AMBIGUOUS_EXTS) + r")$")
 FILE_WORDS = {"claude", "agents", "readme", "tasks", "skill", "skills", "memory", "todo", "plan", "notes", "gemini",
               "changelog", "contributing", "design", "spec", "soul", "main", "index", "app", "setup", "config", "run",
               "install", "test", "tests", "build", "deploy", "judge", "queue", "server", "client", "utils"}
@@ -255,8 +265,13 @@ def _file_name_link(url: str) -> bool:
     except ValueError:
         return True
     host = parts.hostname or ""
-    return (bool(FILENAME_HOST.match(host)) and host.rsplit(".", 1)[0].lower() in FILE_WORDS
-            and parts.path in ("", "/"))
+    if parts.path not in ("", "/"):
+        return False
+    m = FILENAME_HOST.match(host)
+    if not m:
+        return False
+    ext, stem = m.group(1), host.rsplit(".", 1)[0].lower()
+    return ext in CODE_ONLY_EXTS or stem in FILE_WORDS
 
 
 def external_links(text: str) -> list[str]:

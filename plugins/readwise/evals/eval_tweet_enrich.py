@@ -99,6 +99,13 @@ def run(vault: Path) -> dict:
     if te.external_links("put it in http://CLAUDE.md and http://judge.sh, see https://github.com/acme/widget, https://docs.ai/x") \
             != ["https://github.com/acme/widget", "https://docs.ai/x"]:
         problems.append("safety: a file name X linked as a domain was taken as linked content")
+    # [earned: 2026-09-28 battle test, real capture — a Karpathy autoresearch tweet linkified
+    # "program.md", "train.py" and "prepare.py" as bare domains; none of those stems were in
+    # FILE_WORDS, so all three leaked into `links:` frontmatter alongside the tweet's real link.
+    if te.external_links("You are programming the http://program.md files. The human never touches "
+                          "http://train.py. Run http://prepare.py first. See "
+                          "https://github.com/karpathy/autoresearch") != ["https://github.com/karpathy/autoresearch"]:
+        problems.append("safety: an unlisted code-extension filename linked as a domain was taken as linked content")
     if te.external_links("see https://[not-a-host and https://github.com/acme/widget") != ["https://github.com/acme/widget"]:
         problems.append("safety: a malformed URL was not ignored")
     blocker = Path(__import__("tempfile").mkdtemp()) / "not-a-dir"
