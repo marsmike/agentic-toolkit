@@ -45,14 +45,18 @@ def run(vault: Path) -> dict:
             'media:\n- 04_Resources/Attachments/Tweets/t-1.jpg\ningested_at: "2026-09-24T09:15:00Z"\n---\n\n# <b>Bold</b> & widgets\n', encoding="utf-8")
         (arch / "README.md").write_text("- `Readwise-Tweet-x--FULLCAPTURE.md` — new note on the widget. Distilled 2026-09-25.\n",
                                         encoding="utf-8")
+        # title: a real title's dots and colons don't survive the filename slug ("5.5" -> "5-5");
+        # the report must read it from the H1, not derive "Eval Report Widget" from the path.
         (sandbox / "04_Resources" / "Eval-Report-Widget.md").write_text(
-            '---\nstatus: distilled\nsource: https://twitter.com/a/status/42\ndistilled_at: "2026-09-25T13:00:00Z"\n---\n# W\n', encoding="utf-8")
+            '---\nstatus: distilled\nsource: https://twitter.com/a/status/42\ndistilled_at: "2026-09-25T13:00:00Z"\n---\n'
+            "# Widget 5.5: pricing & punctuation\n", encoding="utf-8")
         for args in (("init", "-q"), ("config", "user.email", "e@x.org"), ("config", "user.name", "e"), ("add", "-A"),
                      ("commit", "-q", "-m", "base")):
             _git(sandbox, *args)
         imports_log.record(sandbox, "2026-09-25 13:06", [{"doc_id": "d", "capture": "01_Capture/Readwise-Tweet-x.md", "via": "clip"}])
         imports_log.record(sandbox, "2026-09-25 16:03", [])
-        (sandbox / "04_Resources" / "Eval-Report-New.md").write_text("---\nstatus: distilled\n---\n# N\n", encoding="utf-8")
+        (sandbox / "04_Resources" / "Eval-Report-New.md").write_text(
+            "---\nstatus: distilled\n---\n# Eval report new note, fresh this run\n", encoding="utf-8")
 
         today = date.today()
 
@@ -82,7 +86,8 @@ def run(vault: Path) -> dict:
         dashboard = (Path(report_build.__file__).parent / "dashboard_template.html").read_text(encoding="utf-8")
         if '<base target="_blank">' not in page.split("<style", 1)[0] or '<base target="_blank">' not in dashboard.split("</head>", 1)[0]:
             problems.append("links: report and dashboard need <base target=\"_blank\"> in their head")
-        for want in ('href="https://x.com/a/status/42?s=12"', 'href="https://github.com/acme/widget"', "Eval Report Widget", "1 image kept"):
+        for want in ('href="https://x.com/a/status/42?s=12"', 'href="https://github.com/acme/widget"',
+                    "Widget 5.5: pricing &amp; punctuation", "1 image kept"):
             if want not in page:
                 problems.append(f"items: missing {want!r}")
         if "<b>Bold</b>" in page or "&lt;b&gt;Bold&lt;/b&gt; &amp; widgets" not in page:
@@ -91,7 +96,7 @@ def run(vault: Path) -> dict:
             problems.append("safe: a javascript: link reached the page")
         if "Quiet run" not in page or "What came in on 2026-09-25 13:06" not in page:
             problems.append("quiet: the empty run does not fall back to the last run that imported")
-        if "Eval Report New" not in page:
+        if "Eval report new note, fresh this run" not in page:
             problems.append("notes: the note written this run is not listed")
         if "notes in the vault" not in page or 'aria-label="Notes distilled per day' not in page:
             problems.append("vitals: note count or chart missing")

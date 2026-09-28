@@ -294,6 +294,36 @@ def read_frontmatter(path: Path, strict: bool = False) -> tuple[dict, str]:
     return dict(data), text[match.end():]
 
 
+_H1_RE = re.compile(r"^#\s+(.+?)\s*$", re.M)
+
+
+def title_of(fm: dict, body: str, stem: str) -> str:
+    """A note's own title from its already-parsed frontmatter and body, in order: frontmatter
+    `title`, its first `# H1`, and only then `stem` (hyphens turned to spaces) — the fallback a
+    slug-only note (no title field, no H1 yet) still needs. A filename never carries a real
+    title's dots, colons or other punctuation (`5.5` becomes `5-5` on disk), so falling back to it
+    loses them; every other generated view should read a note's title this way, not the raw stem.
+    [earned: 2026-09-28 battle test — the run report showed "Opus 5 5 API Migration…" for a note
+    titled "Opus 5.5 API migration…"]"""
+    title = fm.get("title")
+    if isinstance(title, str) and title.strip():
+        return title.strip()
+    if (m := _H1_RE.search(body)) and m.group(1).strip():
+        return m.group(1).strip()
+    return stem.replace("-", " ")
+
+
+def resolve_title(vault: Path, rel: str) -> str:
+    """`title_of`, reading the note itself (vault-relative `rel`, with or without `.md`)."""
+    rel = rel if rel.endswith(".md") else rel + ".md"
+    path = vault / rel
+    try:
+        fm, body = read_frontmatter(path)
+    except OSError:
+        return Path(rel).stem.replace("-", " ")
+    return title_of(fm, body, Path(rel).stem)
+
+
 def one_line(text: object, limit: int) -> str:
     """Collapsed whitespace, truncated to `limit` with a trailing "…" — a generated page's
     description/summary cell, never mid-word-wrapped or carrying a stray newline. Shared by the

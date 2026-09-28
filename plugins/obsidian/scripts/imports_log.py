@@ -37,6 +37,7 @@ from vault_utils import (
     read_frontmatter,
     read_jsonl,
     require_vault,
+    resolve_title,
     utc_timestamp,
 )
 
@@ -129,13 +130,22 @@ def fate(vault: Path, item: dict, manifests: dict[str, str], attempts: dict[str,
     detail = re.sub(r"\[\[([^\]|\\]+)\\?\|([^\]]+)\]\]", r"\2", line)
     detail = re.sub(r"\[\[([^\]]+)\]\]", lambda m: m.group(1).rsplit("/", 1)[-1], detail)
     distilled_at = None
+    distilled_at_estimated = False
     if status == "distilled" and notes:
         note_path = vault / f"{notes[0]}.md"
         if note_path.is_file():
             nfm, _ = read_frontmatter(note_path)
             distilled_at = nfm.get("distilled_at") if isinstance(nfm.get("distilled_at"), str) else None
+            distilled_at_estimated = bool(nfm.get("distilled_at_estimated"))
+    if status == "distilled":
+        # `retire_capture.py` always appends "Distilled <today>." to a `--line` summary as its own
+        # provenance marker; every consumer shows the note's own `distilled_at` explicitly instead
+        # (below, and in report_build.py's per-item meta line), so this trailing sentence only ever
+        # repeated it. [earned: 2026-09-28 battle test — the run report showed "...Ona Distilled
+        # 2026-09-28. (distilled 2026-09-28)"]
+        detail = re.sub(r"\s*Distilled \d{4}-\d{2}-\d{2}\.\s*$", "", detail)
     return {"status": status, "notes": notes, "detail": re.sub(r"\s+", " ", detail)[:300],
-            **({"distilled_at": distilled_at} if distilled_at else {})}
+            **({"distilled_at": distilled_at, "distilled_at_estimated": distilled_at_estimated} if distilled_at else {})}
 
 
 def resolved(vault: Path) -> list[dict]:
@@ -149,22 +159,24 @@ def resolved(vault: Path) -> list[dict]:
             for r in load(vault)]
 
 
-def _bullet(it: dict) -> str:
+def _bullet(vault: Path, it: dict) -> str:
     f = it["fate"]
     kind = LABEL.get(str(it.get("category") or ""), str(it.get("category") or "Item").capitalize())
     title = it.get("title") or it.get("capture") or it.get("found") or it.get("doc_id", "?")
     title = title.replace("[", "(").replace("]", ")")
     head = f"[{title}]({it['source']})" if str(it.get("source") or "").startswith("http") else title
+    ingested_at = str(it.get("ingested_at") or "")
     extras = [x for x in (it.get("author"), it.get("via"),
                           f"enrichment {it['enrichment']}" if it.get("enrichment") else None,
                           f"{it['media']} image(s)" if it.get("media") else None,
-                          f"ingested {format_ts(it['ingested_at'])}" if it.get("ingested_at") else None) if x]
-    notes = " · ".join(f"[[{n}|{n.rsplit('/', 1)[-1]}]]" for n in f["notes"])
+                          f"ingested {format_ts(ingested_at, estimated=len(ingested_at) < 16)}" if ingested_at else None) if x]
+    notes = " · ".join(f"[[{n}|{resolve_title(vault, n)}]]" for n in f["notes"])
     where = {"distilled": f"→ {notes}" if notes else f"→ {f['detail']}", "known": f"→ already in the vault: {notes}",
              "dropped": f"→ dropped: {f['detail']}", "duplicate": f"→ duplicate ({f['detail']})",
              "waiting": f"→ waiting ({f['detail']})", "archived": f"→ archived ({f['detail']})", "missing": f"→ ⚠ **missing**: {f['detail']}"}[f["status"]]
     if f["status"] == "distilled" and f.get("distilled_at"):
-        where += f" (distilled {format_ts(f['distilled_at'])})"
+        da = str(f["distilled_at"])
+        where += f" (distilled {format_ts(da, estimated=bool(f.get('distilled_at_estimated')) or len(da) < 16)})"
     return f"- **{kind}** {head}" + (f" — {', '.join(extras)}" if extras else "") + f" {where}"
 
 
@@ -180,7 +192,7 @@ def render(vault: Path) -> str:
     missing = [(r["run"], it) for r in runs for it in r["items"] if it["fate"]["status"] == "missing"]
     if missing:
         out += ["", "> [!danger] Missing clippings", "> Imported, but in neither the inbox nor the archive:"]
-        out += [f"> - {run}: " + _bullet(it)[2:] for run, it in missing]
+        out += [f"> - {run}: " + _bullet(vault, it)[2:] for run, it in missing]
     quiet: list[str] = []
     for r in runs:
         if not r["items"]:
@@ -189,7 +201,7 @@ def render(vault: Path) -> str:
         if quiet:
             out += ["", f"*Nothing new in {len(quiet)} run(s) from {quiet[-1]} to {quiet[0]}.*"]
             quiet = []
-        out += ["", f"## {r['run']}", "", f"{len(r['items'])} imported.", ""] + [_bullet(it) for it in r["items"]]
+        out += ["", f"## {r['run']}", "", f"{len(r['items'])} imported.", ""] + [_bullet(vault, it) for it in r["items"]]
     if quiet:
         out += ["", f"*Nothing new in {len(quiet)} run(s) from {quiet[-1]} to {quiet[0]}.*"]
     return "\n".join(out) + "\n"

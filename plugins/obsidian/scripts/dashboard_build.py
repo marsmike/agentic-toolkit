@@ -43,6 +43,7 @@ from vault_utils import (
     profile_value,
     read_frontmatter,
     require_vault,
+    title_of,
     utc_timestamp,
 )
 
@@ -74,7 +75,7 @@ def source_type(source: object) -> str:
 def notes(vault: Path, since: str) -> list[dict]:
     out = []
     for p in discover_notes(vault):
-        fm, _ = read_frontmatter(p)
+        fm, body = read_frontmatter(p)
         day = _date(fm.get("processed_date"))
         if not day or day < since or fm.get("processed_date_estimated") is True:
             continue
@@ -82,7 +83,7 @@ def notes(vault: Path, since: str) -> list[dict]:
         tags = _tags(fm)
         source = fm.get("source") if isinstance(fm.get("source"), str) else ""
         out.append({
-            "title": p.stem,
+            "title": title_of(fm, body, p.stem),
             "path": rel,
             "day": day,
             "desc": one_line(fm.get("description") or "", DESC_CHARS),
