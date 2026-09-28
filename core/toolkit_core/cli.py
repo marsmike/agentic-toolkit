@@ -1014,6 +1014,18 @@ class _Parser(argparse.ArgumentParser):
         raise _UsageError(self, message)
 
 
+def _non_negative_int(value: str) -> int:
+    """argparse `type=` for `--limit`/`--depth`: these are forwarded straight into an engine's
+    (farsight's/gaiafield's) own argv, and a negative value used to sail through unisphere's own
+    `int()` parsing fine, only to be rejected downstream by the Rust engine's clap parser — whose
+    error text and usage line then leaked through verbatim, wildly inconsistent with this CLI's
+    own careful one-line errors everywhere else. [battle-test 2026-09-28]"""
+    n = int(value)
+    if n < 0:
+        raise argparse.ArgumentTypeError(f"must not be negative, got {n}")
+    return n
+
+
 def _build_parser() -> argparse.ArgumentParser:
     # add_help=False everywhere: `main()` walks argv for "-h"/"--help" itself (see `_walk_command`)
     # so every level renders the same styled help — argparse's own [-h] auto-action never fires.
@@ -1055,7 +1067,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     search_parser = subparsers.add_parser("search", parents=[common], add_help=False, help=CATALOG["search"]["summary"])
     search_parser.add_argument("terms", nargs="+", help="One or more query words")
-    search_parser.add_argument("--limit", type=int, default=10, help="Maximum number of results to show (default: 10)")
+    search_parser.add_argument("--limit", type=_non_negative_int, default=10, help="Maximum number of results to show (default: 10)")
 
     graph_parser = subparsers.add_parser("graph", parents=[common], add_help=False, help=GROUP_HELP["graph"]["summary"])
     graph_subparsers = graph_parser.add_subparsers(dest="graph_command", required=True, parser_class=_Parser)
@@ -1066,7 +1078,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = graph_subparsers.add_parser("neighbors", parents=[graph_common], add_help=False,
                                        help=CATALOG["graph neighbors"]["summary"])
     sub.add_argument("note", help="A vault-relative note path or a bare note name (e.g. Gaiafield)")
-    sub.add_argument("--depth", type=int, default=1, help="How many hops out to follow (default: 1)")
+    sub.add_argument("--depth", type=_non_negative_int, default=1, help="How many hops out to follow (default: 1)")
     sub.add_argument("--direction", choices=("in", "out", "both"), default="both",
                       help="Follow links into the note, out of it, or both (default: both)")
     sub.add_argument("--include-inferred", action="store_true",
@@ -1079,7 +1091,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = graph_subparsers.add_parser("candidates", parents=[graph_common], add_help=False,
                                        help=CATALOG["graph candidates"]["summary"])
     sub.add_argument("note", help="A vault-relative note path or a bare note name (e.g. Gaiafield)")
-    sub.add_argument("--limit", type=int, default=10, help="Maximum number of candidates to show (default: 10)")
+    sub.add_argument("--limit", type=_non_negative_int, default=10, help="Maximum number of candidates to show (default: 10)")
     sub.add_argument("--include-ambiguous", action="store_true", help="Also include the lower-confidence AMBIGUOUS band")
 
     link_parser = subparsers.add_parser("link", parents=[common], add_help=False, help=CATALOG["link"]["summary"])

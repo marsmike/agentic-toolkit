@@ -123,6 +123,27 @@ def test_missing_subcommand_names_no_internal_dest(capsys, group, choices):
     assert choices in err  # the real choices still show, in the USAGE line
 
 
+@pytest.mark.parametrize(
+    ("argv", "flag"),
+    [
+        (["search", "foo", "--limit", "-5"], "--limit"),
+        (["graph", "neighbors", "X", "--depth", "-1"], "--depth"),
+        (["graph", "candidates", "X", "--limit", "-3"], "--limit"),
+    ],
+)
+def test_negative_limit_or_depth_is_a_clean_one_liner(capsys, argv, flag):
+    """`--limit`/`--depth` are forwarded straight into an engine's (farsight's/gaiafield's) own
+    argv; a negative value used to sail through unisphere's own int() parsing and only get
+    rejected downstream by the Rust engine's clap parser, whose own error text/usage then leaked
+    through verbatim — e.g. "farsight: error: unexpected argument '-5' found" plus clap's usage
+    line, nothing like this CLI's own one-line errors. [battle-test 2026-09-28]"""
+    code, err = run_err(capsys, *argv)
+    assert code == 2
+    assert err.startswith(f"error: argument {flag}: must not be negative")
+    assert "clap" not in err.lower()
+    assert "unexpected argument" not in err
+
+
 def test_unrecognized_flag_blames_the_subcommand_not_the_top_level(capsys):
     """`argparse.ArgumentParser.parse_args()` only checks for leftover ("unrecognized
     arguments") tokens on the OUTERMOST parser it was called on — so a bad flag on a subcommand
