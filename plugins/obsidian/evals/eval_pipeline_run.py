@@ -9,8 +9,8 @@
 3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted;
               `--failed ""` or a path no longer in 01_Capture/ counts no failure
 4. secrets  — (4b: password assignments — quoted, bare, underscore/camelCase-prefixed, unquoted —
-               and a credential in a URL are found, placeholders/env lookups/empty values/prose
-               are not; 4c: an image a capture names that git ignores or that is gone gets a DLQ
+               and a URL carrying a login are found; stand-ins, env lookups, empty values and
+               prose are not; 4c: an image a capture names that git ignores or that is gone gets a DLQ
                note and a summary count) a staged note holding a key-shaped string makes `end`
               refuse the commit and write one DLQ note that names the file, never the key; the
               next clean run commits
