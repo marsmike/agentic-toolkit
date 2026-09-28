@@ -100,6 +100,7 @@ def run(vault: Path) -> dict:
         return {"results": [
             {"url": f"https://www.reddit.com/r/{sub}/comments/tv{len(tavily_calls)}/a_thread/", "title": f"A thread : r/{sub}"},
             {"url": "https://www.reddit.com/r/SomewhereElse/comments/zz9/off_topic/", "title": "Elsewhere"},
+            {"url": f"https://evilreddit.com/r/{sub}/comments/ev1/lookalike/", "title": "Lookalike host"},
             {"url": "https://example.com/not-reddit", "title": "Not reddit"}]}
     tavily._run = tavily_stub
     state: dict = {"calls": [], "github_calls": 0, "github_block_topic": False, "reddit_block": False,

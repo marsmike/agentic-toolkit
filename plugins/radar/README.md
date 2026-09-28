@@ -33,7 +33,7 @@ flowchart LR
 | `gaps [--promote]` | once a week: recent posts per interest the feeds missed (Kagi news), judged; strong ones in the digest, optionally saved to Later | Kagi, judgment backend, Reader (save) |
 | `kagi search\|news\|answer\|summarize TEXT` | the kagi skill: one Kagi call under the ledger and weekly budget | Kagi |
 | `sensors [--only SOURCE]` | pull momentum sources Reader does not carry — Hacker News, Hugging Face trending, new GitHub repos, Reddit with scores, RSS, Kagi News clusters — into `00_Memory/radar/sensors/`, new items judged | HN Algolia, Hugging Face, GitHub, Reddit, feed hosts, news.kagi.com, judgment backend |
-| `signal [--check]` | the Signal Radar: named things across feed, sensors and the vault, each with a signal strength; writes `Signal-Radar.html`, `.md` and `signal.json` | Kagi news with `--kagi` (≤ 6 names a day) |
+| `signal [--check]` | the Signal Radar: named things across feed, sensors and the vault, each with a signal strength; writes `Signal-Radar.html`, `.md` and `signal.json` | Tavily through the `tvly` CLI with `--check` (≤ 6 names a day), Kagi news when Tavily cannot run |
 | `replay --since 30d --out DIR` | acceptance: own clips vs. feed items, Jev vs. BM25 vs. recency | Reader (read), judgment backend |
 
 The skill (`skills/radar/`) turns the daily and weekly runs into a short briefing;

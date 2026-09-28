@@ -374,7 +374,7 @@ def _fetch_reddit(vault: Path, now: datetime, out: Path | None = None) -> tuple[
 # [earned: 2026-09-28 — measured: 15 threads a query, 11 of 14 new to the radar]
 REDDIT_TAVILY_EVERY_HOURS = 12
 REDDIT_TAVILY_RESULTS = 15
-_REDDIT_ID_RE = re.compile(r"reddit\.com/r/([^/]+)/comments/([a-z0-9]+)", re.I)
+_REDDIT_ID_RE = re.compile(r"^/r/([^/]+)/comments/([a-z0-9]+)", re.I)
 
 
 def _reddit_via_tavily(vault: Path, out: Path, subs: list[str], now: datetime) -> tuple[str, str, list[dict]]:
@@ -397,8 +397,10 @@ def _reddit_via_tavily(vault: Path, out: Path, subs: list[str], now: datetime) -
             return ("partial" if rows else "blocked"), f"Tavily: {str(e)[:120]}", list(rows.values())
         asked += 1
         for hit in found:
-            m = _REDDIT_ID_RE.search(hit["url"])
-            if not m or m.group(1).lower() != sub.lower():
+            # The host itself must be Reddit's: `evilreddit.com/r/…` is not. [earned: PR #75 review]
+            host = hit["host"].lower()
+            m = _REDDIT_ID_RE.match(urllib.parse.urlparse(hit["url"]).path)
+            if host != "reddit.com" and not host.endswith(".reddit.com") or not m or m.group(1).lower() != sub.lower():
                 continue
             rows[m.group(2)] = _row("reddit", f"r/{sub}", m.group(2), hit["title"].removesuffix(f" : r/{sub}"),
                                     hit["url"], "via Tavily, no score", "", None, [])

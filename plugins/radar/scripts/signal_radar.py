@@ -409,6 +409,8 @@ def _tavily_ask(vault: Path, out: Path, now: datetime) -> Any:
             found = tavily.search(f'"{name}"', ledger, max_results=5, time_range="week", now=now)
         except (tavily.NoKey, tavily.NoCli, tavily.OverBudget) as e:
             raise _Skip(str(e)) from e
+        except tavily.TavilyError as e:  # rate limit, HTTP, a bad answer: Kagi still gets its turn [PR #75 review]
+            raise _Skip(f"failed: {e}") from e
         # time_range=week filters on Tavily's side; its results carry no date, so they count today.
         return [{"title": f["title"], "url": f["url"], "published": ""} for f in found]
     return ask

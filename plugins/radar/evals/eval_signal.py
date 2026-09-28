@@ -162,6 +162,8 @@ def run(vault: Path) -> dict:
     tavily_state = {"available": False}
 
     def tavily_stub(args):
+        if tavily_state.get("error"):
+            raise tavily.TavilyError("HTTP 429: rate limited")
         if not tavily_state["available"]:
             raise tavily.NoKey("TAVILY_API_KEY is not set")
         tavily_calls.append(args)
@@ -265,6 +267,16 @@ def run(vault: Path) -> dict:
         ks = next((x for x in data["sources"] if x["family"] == "kagi"), {})
         if len(kagi_calls) != calls or ks.get("status") != "skipped" or "budget" not in ks.get("detail", ""):
             problems.append(f"kagi: the pipeline's spend must count against the Signal Radar's budget, got {ks}")
+
+        # 6b2: Tavily installed but failing (rate limit): the check still falls back to Kagi
+        tavily_state["error"] = True
+        (out / "kagi-ledger.jsonl").unlink()
+        calls = len(kagi_calls)
+        data = signal_radar.build(sandbox, out, NOW + timedelta(days=1, hours=2), check=True)
+        ks = next((x for x in data["sources"] if x["family"] == "kagi"), {})
+        if len(kagi_calls) == calls or "failed" not in ks.get("detail", ""):
+            problems.append(f"check: a failing Tavily must hand the check to Kagi and say why, got {ks}")
+        tavily_state["error"] = False
 
         # 6c: Tavily available: it asks (through tvly), Kagi is not called, its own ledger and log
         tavily_state["available"] = True
