@@ -36,6 +36,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import yaml
 from vault_utils import contained, discover_notes, read_frontmatter, read_jsonl, require_vault, write_frontmatter
 
 CAPTURE_GLOBS = ("01_Capture/*.md", "05_Archive/*/*--FULLCAPTURE.md")
@@ -143,16 +144,28 @@ def apply(vault: Path, rows: list[dict]) -> list[str]:
     for rel, fields in by_path.items():
         path = vault / rel
         fm, body = read_frontmatter(path)
-        changed = False
+        new: dict = {}
         for r in fields:
             if not fm.get(r["field"]):
-                fm[r["field"]] = r["value"]
+                new[r["field"]] = r["value"]
                 if r.get("estimated", True):
-                    fm[f"{r['field']}_estimated"] = True
-                changed = True
-        if changed:
-            write_frontmatter(path, fm, body)
-            written.append(rel)
+                    new[f"{r['field']}_estimated"] = True
+        if not new:
+            continue
+        text = path.read_text(encoding="utf-8")
+        lines = text.split("\n")
+        # The new keys go in just above the closing `---`, and nothing else in the file changes: a
+        # full re-serialisation re-flows every note's lists and long lines, a diff of 1,363 notes
+        # for two keys each. A file with no frontmatter block gets one the usual way.
+        # [earned: 2026-09-28 — the first --apply on the owner's vault rewrote 6,141 lines]
+        close = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None) \
+            if lines and lines[0].strip() == "---" else None
+        if close is None:
+            write_frontmatter(path, {**fm, **new}, body)
+        else:
+            added = yaml.safe_dump(new, sort_keys=False, allow_unicode=True, width=10_000).rstrip("\n").split("\n")
+            path.write_text("\n".join(lines[:close] + added + lines[close:]), encoding="utf-8")
+        written.append(rel)
     return written
 
 

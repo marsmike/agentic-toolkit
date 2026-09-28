@@ -7,7 +7,8 @@ never guesses a time, writes nothing without --apply, and is idempotent.
               estimated flag); a field the file already carries is left alone; a file the repo's
               first commit added, with nothing else to go on, gets nothing
 2. dry run  — propose() alone (no --apply) writes nothing to disk
-3. apply    — --apply writes the proposed fields, with `*_estimated: true` on every inferred one
+3. apply    — --apply writes the proposed fields, with `*_estimated: true` on every inferred one,
+              and adds lines only: every existing frontmatter line stays as it was
 4. idempotent — a second propose() after apply() finds nothing left to propose; a second apply()
               changes nothing further
 """
@@ -24,7 +25,8 @@ NAME = "backfill_timestamps"
 
 CAPTURE = "---\nsource: https://example.org/backfill-capture\ncategory: article\nvia: clip\n---\n\n# Backfill capture\n"
 NOTE_MISSING_BOTH = ("---\ndescription: missing both timestamps\nstatus: distilled\n"
-                     "source: https://example.org/backfill-note\nprocessed_date: 2026-09-10\n---\n\n# N\n")
+                     "source: https://example.org/backfill-note\nprocessed_date: 2026-09-10\n"
+                     "topics: [alpha, beta,\n    gamma]\n---\n\n# N\n")
 NOTE_HAS_INGESTED = ("---\ndescription: already has ingested_at\nstatus: distilled\n"
                      "source: https://example.org/backfill-note-2\nprocessed_date: 2026-09-10\n"
                      'ingested_at: "2026-09-01T00:00:00Z"\n---\n\n# N2\n')
@@ -111,6 +113,10 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 3: note-1's distilled_at must be the bare date, estimated, got {note1_fm}")
         if note1_fm.get("ingested_at") != "2026-09-05T07:30:00Z" or "ingested_at_estimated" in note1_fm:
             problems.append(f"phase 3: note-1's recorded ingested_at must carry no estimated flag, got {note1_fm}")
+        before = NOTE_MISSING_BOTH.split("\n")
+        after = note1.read_text(encoding="utf-8").split("\n")
+        if [ln for ln in after if ln in before] != before or len(after) != len(before) + 3:
+            problems.append("phase 3: --apply must only add lines, leaving every existing line as it was")
         note2_fm, _ = read_frontmatter(note2)
         if note2_fm.get("ingested_at") != "2026-09-01T00:00:00Z" or note2_fm.get("ingested_at_estimated") is True:
             problems.append(f"phase 3: note-2's real ingested_at must survive untouched, got {note2_fm}")
