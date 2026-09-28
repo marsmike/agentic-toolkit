@@ -120,7 +120,8 @@ svg text { fill: var(--muted); }
 .wedge { cursor: default; }
 .wedge-line { stroke: var(--line); stroke-width: 1; }
 .ring { fill: none; stroke: var(--line); stroke-width: 1; }
-.ring-label { font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; fill: var(--muted); }
+.ring-label { font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; fill: var(--muted);
+  paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
 .sector-label { font-size: 11px; font-weight: 650; fill: var(--text-2); }
 .sweep-g { transform-origin: center; animation: sweep 7s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .sweep-g { animation: none; opacity: .18; } }
@@ -150,8 +151,9 @@ svg text { fill: var(--muted); }
 .partrow .track > i { display: block; height: 100%; background: var(--accent); }
 .partrow .val { text-align: right; font-variant-numeric: tabular-nums; }
 .dspark { margin: 6px 0 10px; }
-.ditems { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.ditems a { text-decoration: none; font-size: 12.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ditems { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; min-width: 0; }
+.ditems li { min-width: 0; }
+.ditems a { text-decoration: none; font-size: 12.5px; display: block; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .ditems a:hover { color: var(--accent); }
 .ditems .src { color: var(--muted); font-size: 11px; }
 .graphbox { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
@@ -381,10 +383,22 @@ footer .srclist { margin-top: 6px; }
     for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
     return (h >>> 0) / 4294967295;
   }
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function fmtDate(iso) {
+    // Calendar-date-only label (chart axis): parsed from the ISO string directly, no Date/timezone
+    // conversion and no browser locale, so it reads the same everywhere. [earned: 2026-09-28,
+    // German-locale "28. Sept." on an English page]
     if (!iso) return "";
-    const d = new Date(iso + "T12:00:00");
-    return isNaN(d) ? iso : d.toLocaleDateString(undefined, {day: "numeric", month: "short"});
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    if (!m) return iso;
+    return `${parseInt(m[3], 10)} ${MONTHS[parseInt(m[2], 10) - 1] || ""}`;
+  }
+  function fmtUTC(d) {
+    // Absolute timestamps are always UTC, always this shape, regardless of the viewer's locale or
+    // timezone — every other radar report already reads "YYYY-MM-DD HH:MM UTC". [earned: 2026-09-28,
+    // "Mo., 28. Sept., 22:01" — browser-local German formatting on an English page]
+    const pad = n => String(n).padStart(2, "0");
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
   }
   function relTime(iso) {
     if (!iso) return "";
@@ -423,7 +437,7 @@ footer .srclist { margin-top: 6px; }
   // ---- header: generated time, source chips --------------------------------------------------
   function renderHeader() {
     const gen = DATA.generated ? new Date(DATA.generated) : null;
-    const abs = gen && !isNaN(gen) ? gen.toLocaleString(undefined, {weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}) : DATA.generated;
+    const abs = gen && !isNaN(gen) ? fmtUTC(gen) : DATA.generated;
     document.getElementById("sub").textContent = `${BLIPS.length} signals over the last ${DATA.window_days || 7} days · generated ${gen ? relTime(DATA.generated) + " · " : ""}${abs || ""}`;
     const box = document.getElementById("sources");
     const rows = DATA.sources || [];
@@ -478,16 +492,53 @@ footer .srclist { margin-top: 6px; }
       const mid = -90 + i * span + span / 2;
       const list = (bySector.get(s.id) || []).slice().sort((a, c) => c.strength - a.strength);
       const usable = span * 0.78;
-      list.forEach((b, j) => {
+      const pts = list.map((b, j) => {
         const frac = list.length > 1 ? j / (list.length - 1) - 0.5 : 0;
         const jitter = (fnv(b.key) - 0.5) * span * 0.12;
         const angle = mid + frac * usable + jitter;
         const rJitter = (fnv(b.key + "r") - 0.5) * 6;
         const r = radiusFor(b.strength) + rJitter;
-        positions.set(b.key, {angle, r, sectorMid: mid});
+        const [x, y] = polar(CX, CY, r, angle);
+        return {key: b.key, x, y, rad: dotRadius(b.mentions)};
+      });
+      spreadDots(pts);
+      pts.forEach(p => {
+        const dx = p.x - CX, dy = p.y - CY;
+        positions.set(p.key, {angle: (Math.atan2(dy, dx) * 180) / Math.PI, r: Math.hypot(dx, dy), sectorMid: mid});
       });
     });
     return positions;
+  }
+
+  // Same-strength items in a narrow sector (e.g. a wall of "Faint" items in Other) land almost on
+  // top of one another: the angle/radius spacing above is even, but arc length near the middle of
+  // a crowded band can still be smaller than two dots' combined radius. A short, deterministic
+  // pairwise relaxation in x/y (same idea as placeLabels' overlap loop, keyed off fnv so it never
+  // depends on iteration order or Math.random) spreads a tight cluster apart without disturbing
+  // sectors that already have room. [earned: 2026-09-28, ~10 overlapping dots in Other]
+  function spreadDots(pts) {
+    const GAP = 1.5;
+    for (let iter = 0; iter < 40; iter++) {
+      let moved = false;
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const a = pts[i], b = pts[j];
+          const minDist = a.rad + b.rad + GAP;
+          let dx = a.x - b.x, dy = a.y - b.y;
+          let dist = Math.hypot(dx, dy);
+          if (dist >= minDist) continue;
+          moved = true;
+          if (dist < 0.01) {
+            const ang = fnv(a.key + b.key) * Math.PI * 2;
+            dx = Math.cos(ang); dy = Math.sin(ang); dist = 1;
+          }
+          const push = (minDist - dist) / 2;
+          a.x += (dx / dist) * push; a.y += (dy / dist) * push;
+          b.x -= (dx / dist) * push; b.y -= (dy / dist) * push;
+        }
+      }
+      if (!moved) break;
+    }
   }
 
   function renderScope() {
@@ -501,19 +552,28 @@ footer .srclist { margin-top: 6px; }
     const positions = buildScopeLayout();
     const svg = sv("svg", {viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Radar scope: sectors around the edge, strength toward the center, dot size by mention count, color by stage"});
 
-    // rings + band labels (placed on the seam at the top so they clear sector labels)
+    // rings (behind everything) + band labels (painted last, below, so they stay on top and
+    // readable no matter what sits under them; also fed to placeLabels as fixed obstacles so
+    // blip labels are nudged clear of them instead of drawn over them) [earned: 2026-09-28,
+    // "Qwen"'s label sat on top of the "Hot" ring label]
     const ringsG = sv("g");
-    BANDS.forEach(([thresh, label]) => {
+    BANDS.forEach(([thresh]) => {
       const r = radiusFor(thresh) - (thresh === 0 ? 0 : 0);
       ringsG.append(sv("circle", {class: "ring", cx: CX, cy: CY, r}));
     });
+    svg.append(ringsG);
+    const RING_CHARW = 6.4, RING_LH = 12;
+    const ringLabelsG = sv("g");
+    const ringObstacles = [];
     BANDS.forEach(([thresh, label], i) => {
       const rOuter = i === 0 ? R_MIN : radiusFor(BANDS[i - 1][0]);
       const rInner = radiusFor(thresh);
       const rMid = (rOuter + rInner) / 2 || R_MIN / 2;
-      ringsG.append(sv("text", {class: "ring-label", x: CX - 4, y: CY - rMid, "text-anchor": "end"}, label));
+      const ly = CY - rMid;
+      const w = label.length * RING_CHARW;
+      ringLabelsG.append(sv("text", {class: "ring-label", x: CX - 4, y: ly, "text-anchor": "end"}, label));
+      ringObstacles.push({left: CX - 4 - w - 4, top: ly - RING_LH / 2, w: w + 8, h: RING_LH});
     });
-    svg.append(ringsG);
 
     // sweep (decorative, respects reduced motion via CSS)
     const sweep = sv("g", {class: "sweep-g", style: `transform-origin:${CX}px ${CY}px`});
@@ -561,9 +621,9 @@ footer .srclist { margin-top: 6px; }
       labelCandidates.push({key: b.key, x, y, r, angle: pos.angle, text: b.name, strength: b.strength});
     });
 
-    // label the top ~12 without (much) overlap
+    // label the top ~12 without (much) overlap — with each other and with the ring labels
     const top = labelCandidates.slice().sort((a, c) => c.strength - a.strength).slice(0, 12);
-    placeLabels(top);
+    placeLabels(top, ringObstacles);
     const labelsG = sv("g");
     top.forEach(l => {
       if (l.dx !== undefined) labelsG.append(sv("line", {class: "leader", x1: l.x, y1: l.y, x2: l.lx, y2: l.ly}));
@@ -572,12 +632,15 @@ footer .srclist { margin-top: 6px; }
       labelsG.append(sv("text", {class: "blip-label", x: l.lx, y: l.ly, "text-anchor": anchor}, l.text));
     });
     svg.append(labelsG);
+    svg.append(ringLabelsG);
 
     box.replaceChildren(svg);
     renderScopeLegend();
   }
 
-  function placeLabels(items) {
+  function placeLabels(items, obstacles = []) {
+    // Deterministic: every tie-break comes from fnv(key), never Math.random(), so two runs on the
+    // same data lay out the same way. [earned: 2026-09-28, review asked for deterministic placement]
     const GAP = 9, CHARW = 5.6, LH = 11;
     items.forEach(l => {
       const cosA = Math.cos((l.angle * Math.PI) / 180), sinA = Math.sin((l.angle * Math.PI) / 180);
@@ -587,22 +650,41 @@ footer .srclist { margin-top: 6px; }
       l.h = LH;
     });
     const box = (l) => ({left: l.lx - (Math.cos((l.angle * Math.PI) / 180) > 0.15 ? 0 : l.w), top: l.ly - l.h / 2, w: l.w, h: l.h});
+    const overlap = (a, b) => {
+      const ox = Math.min(a.left + a.w, b.left + b.w) - Math.max(a.left, b.left);
+      const oy = Math.min(a.top + a.h, b.top + b.h) - Math.max(a.top, b.top);
+      return ox > 0 && oy > 0 ? {ox, oy} : null;
+    };
     for (let iter = 0; iter < 50; iter++) {
       let moved = false;
       for (let i = 0; i < items.length; i++) {
         for (let j = i + 1; j < items.length; j++) {
           const a = box(items[i]), b = box(items[j]);
-          const ox = Math.min(a.left + a.w, b.left + b.w) - Math.max(a.left, b.left);
-          const oy = Math.min(a.top + a.h, b.top + b.h) - Math.max(a.top, b.top);
-          if (ox > 0 && oy > 0) {
+          const hit = overlap(a, b);
+          if (hit) {
             moved = true;
-            const dx = (items[i].lx - items[j].lx) || (Math.random() - 0.5);
-            const dy = (items[i].ly - items[j].ly) || (Math.random() - 0.5);
+            const dx = (items[i].lx - items[j].lx) || (fnv(items[i].key + "x") - 0.5);
+            const dy = (items[i].ly - items[j].ly) || (fnv(items[i].key + "y") - 0.5);
             const len = Math.hypot(dx, dy) || 1;
-            const push = Math.min(oy, 8) / 2;
+            const push = Math.min(hit.oy, 8) / 2;
             items[i].ly += (dy / len) * push; items[j].ly -= (dy / len) * push;
             items[i].lx += (dx / len) * push * 0.4; items[j].lx -= (dx / len) * push * 0.4;
           }
+        }
+        // fixed obstacles (the ring labels): the item moves, the obstacle never does
+        for (const ob of obstacles) {
+          const a = box(items[i]);
+          const hit = overlap(a, ob);
+          if (!hit) continue;
+          moved = true;
+          const cx = a.left + a.w / 2, cy = a.top + a.h / 2;
+          const ocx = ob.left + ob.w / 2, ocy = ob.top + ob.h / 2;
+          const dx = (cx - ocx) || (fnv(items[i].key + "ox") - 0.5);
+          const dy = (cy - ocy) || (fnv(items[i].key + "oy") - 0.5);
+          const len = Math.hypot(dx, dy) || 1;
+          const push = Math.max(hit.ox, hit.oy) + 2;
+          items[i].lx += (dx / len) * push;
+          items[i].ly += (dy / len) * push;
         }
       }
       items.forEach(l => { l.lx = Math.max(30, Math.min(W - 30, l.lx)); l.ly = Math.max(14, Math.min(H - 6, l.ly)); });
@@ -644,7 +726,7 @@ footer .srclist { margin-top: 6px; }
       el("div", {class: "famrow", style: "margin-bottom:8px"}, (b.families || []).map(f => el("span", {class: "fam", text: FAMILY_LABEL[f] || f}))),
       items.length ? el("ul", {class: "ditems"}, items.map(it => {
         const u = safeUrl(it.url);
-        return el("li", {}, u ? el("a", {href: u, target: "_blank", rel: "noopener noreferrer", text: it.title}) : el("span", {text: it.title}),
+        return el("li", {}, u ? el("a", {href: u, target: "_blank", rel: "noopener noreferrer", title: it.title, text: it.title}) : el("span", {title: it.title, text: it.title}),
           el("span", {class: "src", text: [it.origin, it.at ? relDay(it.at) : ""].filter(Boolean).join(" · ")}));
       })) : null,
       el("div", {class: "graphbox"},
