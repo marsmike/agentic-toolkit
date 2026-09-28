@@ -252,6 +252,22 @@ def test_search_json(example_vault_copy, capsys):
 
 
 @needs_engines
+def test_search_limit_zero_is_not_misreported_as_no_matches(example_vault_copy, capsys):
+    """`--limit 0` legitimately asks for zero results back — the text render used to say "no
+    notes match", indistinguishable from a genuine no-match query, even for a term with real
+    hits. [battle-test 2026-09-28]"""
+    code, data = run_json(capsys, "search", "dead", "letter", "queue", "--limit", "0")
+    assert code == 0 and data["results"] == []  # sanity: the query does have real matches (see above)
+
+    _, out = run(capsys, "search", "dead", "letter", "queue", "--limit", "0")
+    assert "no notes match" not in out
+    assert "--limit 0" in out
+
+    _, out = run(capsys, "search", "zzyzxqqqnonexistentterm123nomatch")
+    assert "no notes match" in out  # a genuine no-match query is unaffected
+
+
+@needs_engines
 def test_graph_neighbors_path_and_suggestions(example_vault_copy, capsys):
     code, data = run_json(capsys, "graph", "neighbors", "Alex-Vega")
     assert code == 0 and data["op"] == "neighbors" and data["result"]

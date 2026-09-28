@@ -417,10 +417,14 @@ def _note_lines(st: ui.Style, rank: str, note: dict, extra: str = "") -> list[st
     return lines
 
 
-def _render_search(result: dict) -> str:
+def _render_search(result: dict, limit: int | None = None) -> str:
     st = ui.Style()
     hits = result["results"]
     if not hits:
+        if limit == 0:
+            # "no notes match" is the wrong message here — the query may well have matches;
+            # --limit 0 is what actually produced an empty result. [battle-test 2026-09-28]
+            return f"--limit 0: nothing to show (not necessarily no matches) for {result['query']!r}"
         return f"no notes match {result['query']!r}"
     out = [st.dim(f"{len(hits)} note(s) for {result['query']!r} in {result['vault']}"), ""]
     for i, hit in enumerate(hits, 1):
@@ -440,7 +444,8 @@ def cmd_search(args: argparse.Namespace) -> int:
     if error:
         _error(args, error)
         return 1
-    _emit({"ok": True, "query": query, "vault": str(vault_path), "results": hits}, args.json, _render_search)
+    _emit({"ok": True, "query": query, "vault": str(vault_path), "results": hits}, args.json,
+          lambda r: _render_search(r, args.limit))
     return 0
 
 
