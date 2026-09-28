@@ -1,7 +1,10 @@
-"""The `toolkit` CLI: one front door to the vault, its engines and the plugins, for people and agents.
+"""`unisphere` (alias `toolkit`): one front door to the vault, its engines and the plugins, for people
+and agents. Named for the Commonwealth's unisphere, the network everything connects through, next to
+the engines' own Hamilton names (farsight, gaiafield). `toolkit` stays as an alias, so every existing
+script, skill and routine that calls it keeps working.
 
 People get readable, coloured text (colour only on a TTY; NO_COLOR is honoured). Agents pass
-`--json` to any command for a stable object, and start from `toolkit commands --json`: every
+`--json` to any command for a stable object, and start from `unisphere commands --json`: every
 command, its arguments, what its JSON carries, and the companion CLIs next to it. Exit codes:
 0 ok, 1 a problem or an error (the JSON says which), 2 a usage error.
 """
@@ -264,14 +267,14 @@ def _render_status(result: dict) -> str:
     for r in eng["engines"]:
         installed = (r["installed_tag"] or "").split("-v", 1)[-1] or "not installed"
         if not r["installed_tag"]:
-            level, tail = "bad", "toolkit engines install"
+            level, tail = "bad", "unisphere engines install"
         elif r["up_to_date"]:
             level, tail = "ok", "latest"
         elif r["latest_tag"]:
-            level, tail = "warn", f"{r['latest_tag'].split('-v', 1)[-1]} available — toolkit engines update"
+            level, tail = "warn", f"{r['latest_tag'].split('-v', 1)[-1]} available — unisphere engines update"
         else:
             level, tail = "info", "latest not checked"
-        where = "" if r.get("on_path") else st.dim("  (not on PATH — toolkit link)")
+        where = "" if r.get("on_path") else st.dim("  (not on PATH — unisphere link)")
         rows.append(f"{st.mark(level)} {r['engine']:<10} {installed:<8} {st.level(tail, level)}{where}")
     if eng.get("cloud_pin"):
         rows.append(f"{st.mark('info')} {st.dim('cloud setup clones ' + eng['cloud_pin'])}")
@@ -338,7 +341,7 @@ def _render_status(result: dict) -> str:
             detail += f" · logged in ({c['auth_mode']})"
         if c.get("note"):
             detail = (detail + " · " if detail else "") + c["note"]
-        where = "" if c.get("on_path") or not c.get("path") else st.dim("  (not on PATH — toolkit link)")
+        where = "" if c.get("on_path") or not c.get("path") else st.dim("  (not on PATH — unisphere link)")
         rows.append(f"{st.mark(level)} {c['cli']:<10} {detail}{where}")
     out += ui.section(st, "COMPANIONS", rows)
 
@@ -372,7 +375,7 @@ def _vault_or_fail(args: argparse.Namespace) -> Path | None:
 def _engine_json(binary: str | None, name: str, argv: list[str], timeout: int) -> tuple[object, str | None]:
     """Run an engine with --json; (parsed, None) or (None, error)."""
     if binary is None:
-        return None, f"{name} not installed — toolkit engines install"
+        return None, f"{name} not installed — unisphere engines install"
     try:
         proc = subprocess.run([binary, *argv, "--json"], capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.SubprocessError) as exc:
@@ -437,7 +440,8 @@ def _render_graph(result: dict) -> str:
     if op == "path":
         if not data.get("connected"):
             return f"{data.get('from')} and {data.get('to')} are not connected"
-        chain = data.get("path") or []
+        # With --include-inferred each hop is an object ({path, kind, …}), otherwise a plain path.
+        chain = [p.get("path", "?") if isinstance(p, dict) else p for p in data.get("path") or []]
         return "\n".join([st.dim(f"{len(chain) - 1} hop(s)")] + [
             f"  {'  ' * i}{'└ ' if i else ''}{st.bold(Path(p).stem)}  {st.dim(p)}" for i, p in enumerate(chain)])
     rows = data if isinstance(data, list) else []
@@ -524,7 +528,7 @@ def _render_link(result: dict) -> str:
         note = st.dim(f"  ({r['note']})") if r.get("note") else ""
         out.append(f"  {st.mark(level)} {r['name']:<10} {r['action']:<8} {r['path']}{target}{note}")
     if result["vault"]:
-        out.append(st.dim(f"  toolkit defaults to TOOLKIT_VAULT={result['vault']} (an exported value wins)"))
+        out.append(st.dim(f"  unisphere defaults to TOOLKIT_VAULT={result['vault']} (an exported value wins)"))
     if not result["on_path"]:
         out.append(f"  {st.mark('warn')} {result['bin_dir']} is not on PATH — add it to your shell profile")
     return "\n".join(out)
@@ -553,78 +557,78 @@ CATALOG = {
         "summary": "Is everything current and healthy? Engines, plugins, vault, pipeline, companion CLIs.",
         "json": "{ok, problems[{section, detail}], toolkit, engines{engines[], cloud_pin}, plugins{plugins[{plugin, latest, "
                 "state, installs[]}]}, vault{notes, inbox, dlq, graph}, pipeline{ok, problems, facts}, companions[]}",
-        "example": "toolkit status --json",
+        "example": "unisphere status --json",
         "exit": "1 when problems is non-empty",
     },
     "search": {
         "summary": "Ranked full-text (BM25) search over the vault's active notes (farsight).",
         "json": "{ok, query, vault, results[{path, score, title, description}]}",
-        "example": "toolkit search agent memory --limit 5 --json",
+        "example": "unisphere search agent memory --limit 5 --json",
     },
     "graph stats": {
         "summary": "Graph size, dangling links, boundary violations and the most-linked notes (gaiafield).",
         "json": "{ok, op, vault, result{nodes, edges, dangling_edges, boundary_violations, top_linked[]}}",
-        "example": "toolkit graph stats --json",
+        "example": "unisphere graph stats --json",
     },
     "graph neighbors": {
         "summary": "Notes linked to or from a note, out to a depth (gaiafield). NOTE is a path or a bare note name.",
         "json": "{ok, op, vault, note, result[{path, title, description, depth}]}",
-        "example": "toolkit graph neighbors Gaiafield --depth 2 --json",
+        "example": "unisphere graph neighbors Gaiafield --depth 2 --json",
     },
     "graph path": {
         "summary": "Shortest link path between two notes (gaiafield).",
         "json": "{ok, op, vault, result{from, to, connected, path[]}}",
-        "example": "toolkit graph path Alex-Vega Gaiafield --json",
+        "example": "unisphere graph path Alex-Vega Gaiafield --json",
     },
     "graph candidates": {
         "summary": "Same-topic notes with no link to this one yet — link suggestions (gaiafield infer must have run).",
-        "json": "{ok, op, vault, note, result[{path, title, score, label}]}",
-        "example": "toolkit graph candidates Gaiafield --json",
+        "json": "{ok, op, vault, note, result[{path, score, label, kind, det_distance, surprise}]}",
+        "example": "unisphere graph candidates Gaiafield --json",
     },
     "doctor": {
         "summary": "The vault's structure: PARA folders, note counts, frontmatter errors, profiles, DLQ, graph.",
         "json": "{ok, vault_path, para_folders, note_counts, frontmatter_parse_errors[], profiles, dlq, graph}",
-        "example": "toolkit doctor --json",
+        "example": "unisphere doctor --json",
     },
     "profile": {
         "summary": "A plugin's resolved profile (defaults merged with the vault's Config/toolkit/<plugin>.md). Always JSON.",
         "json": "{ok, plugin, vault_path, profile}",
-        "example": "toolkit profile obsidian",
+        "example": "unisphere profile obsidian",
     },
     "engines status": {
         "summary": "Installed vs. latest release of each engine (farsight, gaiafield).",
         "json": "{ok, engines[{engine, installed_tag, latest_tag, up_to_date, installed_path}]}",
-        "example": "toolkit engines status --json",
+        "example": "unisphere engines status --json",
     },
     "engines install": {
         "summary": "Download, verify (sha256) and install the latest engine releases.",
         "json": "{ok, results[{engine, ok, action, tag, path}]}",
-        "example": "toolkit engines install",
+        "example": "unisphere engines install",
     },
     "engines update": {
         "summary": "Same as engines install: bring every engine to its latest release.",
         "json": "{ok, results[{engine, ok, action, tag, path}]}",
-        "example": "toolkit engines update --json",
+        "example": "unisphere engines update --json",
     },
     "vault init": {
         "summary": "Scaffold a new vault (PARA folders and AGENTS.md) at PATH.",
         "json": "{ok, path}",
-        "example": "toolkit vault init ~/Notes",
+        "example": "unisphere vault init ~/Notes",
     },
     "demo": {
         "summary": "Sixty seconds of first-hand value on the example vault: scan, search, graph, candidates.",
         "json": "{ok, steps[]}",
-        "example": "toolkit demo",
+        "example": "unisphere demo",
     },
     "link": {
-        "summary": "Put toolkit, the engines and Obsidian's CLI on PATH (~/.local/bin); --vault sets toolkit's default vault.",
+        "summary": "Put unisphere (and its alias toolkit), the engines and Obsidian's CLI on PATH (~/.local/bin); --vault sets its default vault.",
         "json": "{ok, bin_dir, on_path, vault, links[{name, path, action, target}]}",
-        "example": "toolkit link --vault ~/Documents/TheVoid",
+        "example": "unisphere link --vault ~/Documents/TheVoid",
     },
     "commands": {
         "summary": "This catalogue: every command, its arguments, its JSON, and the companion CLIs.",
         "json": "{ok, conventions, commands[{name, summary, arguments[], json, example}], companions[]}",
-        "example": "toolkit commands --json",
+        "example": "unisphere commands --json",
     },
 }
 
@@ -633,8 +637,8 @@ COMPANIONS = [
         "cli": "obsidian",
         "use_for": "The running Obsidian app: open a note, the daily note, search in the app, run an Obsidian command, "
                    "read or change a note through Obsidian so plugins and the UI see it.",
-        "not_for": "Search and link analysis over the vault files — use toolkit search / toolkit graph (no app needed).",
-        "setup": "Obsidian 1.12+: Settings → General → Advanced → Command line interface; toolkit link puts it on PATH.",
+        "not_for": "Search and link analysis over the vault files — use unisphere search / unisphere graph (no app needed).",
+        "setup": "Obsidian 1.12+: Settings → General → Advanced → Command line interface; unisphere link puts it on PATH.",
         "discover": "obsidian help",
     },
     {
@@ -689,6 +693,7 @@ def catalog(parser: argparse.ArgumentParser) -> dict:
         "ok": True,
         "conventions": {
             "json": "add --json to any command for one JSON object on stdout; text output is for people and may change",
+            "alias": "toolkit is the same command under its older name",
             "exit_codes": {"0": "ok", "1": "a problem or an error — the JSON carries ok:false and error or problems",
                            "2": "usage error"},
             "vault": "TOOLKIT_VAULT, else ./vault at the repo root",
@@ -701,7 +706,7 @@ def catalog(parser: argparse.ArgumentParser) -> dict:
 
 def _render_catalog(result: dict) -> str:
     st = ui.Style()
-    out = [st.bold("toolkit") + st.dim(" — every command takes --json for agents"), ""]
+    out = [st.bold("unisphere") + st.dim(" (alias toolkit) — every command takes --json for agents"), ""]
     wide = max(len(c["name"]) for c in result["commands"])
     for c in result["commands"]:
         args = " ".join(a["name"].upper() if a["positional"] else f"[{a['name']}]" for a in c["arguments"])
@@ -712,7 +717,7 @@ def _render_catalog(result: dict) -> str:
     for c in result["companions"]:
         out.append(f"  {st.accent(c['cli'].ljust(wide))}  {c['use_for']}")
         out.append(f"  {' ' * wide}  {st.dim('setup: ' + c['setup'])}")
-    out += ["", st.dim("agents: toolkit commands --json · exit 0 ok, 1 problem/error, 2 usage")]
+    out += ["", st.dim("agents: unisphere commands --json · exit 0 ok, 1 problem/error, 2 usage")]
     return "\n".join(out)
 
 
@@ -724,13 +729,20 @@ def cmd_commands(args: argparse.Namespace) -> int:
 # --- argument parsing ------------------------------------------------------------------
 
 
+def _prog() -> str:
+    """Usage lines name the command as it was typed: `toolkit` scripts see `toolkit`."""
+    name = Path(sys.argv[0]).name
+    return name if name in ("unisphere", "toolkit") else "unisphere"
+
+
 def _build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="emit JSON output")
 
     parser = argparse.ArgumentParser(
-        prog="toolkit", parents=[common],
-        description="The agentic-toolkit CLI. People read the text; agents add --json and start from `toolkit commands --json`.",
+        prog=_prog(), parents=[common],
+        description="unisphere (alias toolkit): the agentic-toolkit CLI. People read the text; agents add --json and "
+                    "start from `unisphere commands --json`.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

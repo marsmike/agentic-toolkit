@@ -1,4 +1,4 @@
-"""`toolkit status`: one read-only answer to "is everything current and healthy?".
+"""`unisphere status`: one read-only answer to "is everything current and healthy?".
 
 Sections: the toolkit checkout, the engines (installed vs. latest release, the cloud pin), the Claude
 Code plugins installed from this marketplace (per scope, vs. the version in this checkout), the
@@ -225,9 +225,12 @@ def _problems(result: dict) -> list[dict]:
 
     for row in result["engines"]["engines"]:
         if not row["installed_tag"]:
-            add("engines", f"{row['engine']} not installed — toolkit engines install")
+            add("engines", f"{row['engine']} not installed — unisphere engines install")
         elif result["engines"]["checked_latest"] and row["latest_tag"] and not row["up_to_date"]:
-            add("engines", f"{row['engine']} {row['installed_tag']} → {row['latest_tag']} — toolkit engines update")
+            add("engines", f"{row['engine']} {row['installed_tag']} → {row['latest_tag']} — unisphere engines update")
+        elif result["engines"]["checked_latest"] and not row["latest_tag"]:
+            # Unknown is not current: only --offline may skip the check. [earned: PR #71 review]
+            add("engines", f"{row['engine']}: latest release unknown — {row.get('note') or 'release check failed'}")
     for row in result["plugins"]["plugins"]:
         if row["state"] == "outdated":
             old = ", ".join(sorted({str(i["version"]) for i in row["installs"] if i["version"] != row["latest"]}))

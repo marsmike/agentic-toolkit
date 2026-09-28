@@ -1,4 +1,4 @@
-"""The `toolkit` CLI as an interface: the catalogue agents start from, `status`, `search`/`graph`,
+"""The `unisphere` CLI (alias `toolkit`) as an interface: the catalogue agents start from, `status`, `search`/`graph`,
 `link`, and the plain-vs-coloured text people read. [earned: 2026-09-28]"""
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def test_every_command_is_in_the_catalogue(capsys):
     assert code == 0 and data["ok"]
     assert [c["name"] for c in data["commands"]] == names
     for c in data["commands"]:
-        assert c["summary"] and c["json"] and c["example"].startswith("toolkit ")
+        assert c["summary"] and c["json"] and c["example"].startswith("unisphere ")
         assert all(a["name"] != "json" for a in c["arguments"])
     assert {c["cli"] for c in data["companions"]} == {"obsidian", "td"}
     assert set(data["conventions"]["exit_codes"]) == {"0", "1", "2"}
@@ -182,21 +182,85 @@ def test_link_writes_a_shim_and_never_clobbers_foreign_files(tmp_path, monkeypat
     monkeypatch.setattr(linker, "OBSIDIAN_APP_CLI", tmp_path / "no-obsidian")
     bin_dir = tmp_path / "bin"
     result = linker.link(REPO_ROOT, bin_dir, tmp_path / "MyVault")
-    shim = (bin_dir / "toolkit").read_text(encoding="utf-8")
-    assert result["links"][0] == {"name": "toolkit", "path": str(bin_dir / "toolkit"), "action": "created"}
-    assert f'--project "{REPO_ROOT}"' in shim and f'TOOLKIT_VAULT="{tmp_path / "MyVault"}"' in shim
-    assert (bin_dir / "toolkit").stat().st_mode & 0o111
+    shim = (bin_dir / "unisphere").read_text(encoding="utf-8")
+    assert result["links"][0] == {"name": "unisphere", "path": str(bin_dir / "unisphere"), "action": "created"}
+    assert f"--project {REPO_ROOT}" in shim and f"TOOLKIT_VAULT={tmp_path / 'MyVault'}" in shim
+    assert (bin_dir / "unisphere").stat().st_mode & 0o111
+    alias = next(r for r in result["links"] if r["name"] == "toolkit")
+    assert alias["action"] == "created" and (bin_dir / "toolkit").resolve() == (bin_dir / "unisphere").resolve()
 
     again = linker.link(REPO_ROOT, bin_dir, None)
-    assert again["links"][0]["action"] == "updated"
-    assert "TOOLKIT_VAULT" not in (bin_dir / "toolkit").read_text(encoding="utf-8")
+    assert [r["action"] for r in again["links"][:2]] == ["updated", "updated"]
+    assert "TOOLKIT_VAULT" not in (bin_dir / "unisphere").read_text(encoding="utf-8")
 
-    (bin_dir / "toolkit").write_text("#!/bin/sh\necho someone else's\n", encoding="utf-8")
+    (bin_dir / "unisphere").write_text("#!/bin/sh\necho someone else's\n", encoding="utf-8")
     refused = linker.link(REPO_ROOT, bin_dir, None)
     assert refused["links"][0]["action"] == "skipped" and not refused["ok"]
-    assert "someone else's" in (bin_dir / "toolkit").read_text(encoding="utf-8")
+    assert "someone else's" in (bin_dir / "unisphere").read_text(encoding="utf-8")
     assert linker.link(REPO_ROOT, bin_dir, None, force=True)["links"][0]["action"] == "updated"
 
     for row in again["links"][1:]:
         if row["action"] != "skipped":
             assert (bin_dir / row["name"]).is_symlink()
+
+
+def test_link_replaces_the_old_toolkit_shim_but_not_a_foreign_symlink(tmp_path, monkeypatch):
+    monkeypatch.setattr(linker, "OBSIDIAN_APP_CLI", tmp_path / "no-obsidian")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "toolkit").write_text("#!/bin/sh\n# Written by `toolkit link` — old\n", encoding="utf-8")
+    elsewhere = tmp_path / "someone-elses-gaiafield"
+    elsewhere.write_text("", encoding="utf-8")
+    (bin_dir / "gaiafield").symlink_to(elsewhere)
+
+    rows = {r["name"]: r for r in linker.link(REPO_ROOT, bin_dir, None)["links"]}
+    assert rows["toolkit"]["action"] == "updated" and (bin_dir / "toolkit").is_symlink()
+    assert rows["gaiafield"]["action"] == "skipped"
+    assert (bin_dir / "gaiafield").resolve() == elsewhere.resolve(), "a foreign symlink was replaced"
+
+
+def test_shim_quotes_paths(tmp_path):
+    """A vault path is data: $(…), quotes and spaces must not run or break the shim."""
+    marker = tmp_path / "ran"
+    odd = tmp_path / f"My Vault $(touch {marker}) 'x'"
+    shim = linker.shim_text(REPO_ROOT, odd)
+    probe = tmp_path / "probe.sh"
+    probe.write_text(shim.replace('exec uv run', 'printf %s "$TOOLKIT_VAULT" #'), encoding="utf-8")
+    import subprocess
+
+    out = subprocess.run(["sh", str(probe)], capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"}).stdout
+    assert out == str(odd) and not marker.exists()
+
+
+# --- review regressions (PR #71) ----------------------------------------------------------------
+
+
+def test_path_render_accepts_inferred_hops():
+    text = cli._render_graph({"op": "path", "result": {"connected": True, "path": [
+        "A.md", {"path": "B.md", "kind": "inferred"}, "C.md"]}})
+    assert "2 hop(s)" in text and "B.md" in text
+
+
+def test_unknown_latest_release_is_a_problem_unless_offline(monkeypatch):
+    rows = [{"engine": "gaiafield", "installed_tag": "gaiafield-v0.2.4", "latest_tag": None, "up_to_date": False,
+             "note": "could not check latest release: offline"}]
+    base = {"plugins": {"plugins": []}, "vault": {"found": True, "dlq": {}, "checkout": {}}, "pipeline": {}}
+    online = status._problems({**base, "engines": {"engines": rows, "checked_latest": True}})
+    assert online and "latest release unknown" in online[0]["detail"]
+    assert not status._problems({**base, "engines": {"engines": rows, "checked_latest": False}})
+
+
+def test_unreadable_dlq_entry_counts_as_open(tmp_path):
+    dlq = tmp_path / "00_Memory" / "dlq"
+    dlq.mkdir(parents=True)
+    (dlq / "bad.md").write_bytes(b"---\nstatus: resolved\n---\n\xff\xfe broken")
+    assert vault.dlq_status(tmp_path)["open"] == 1
+
+
+def test_toolkit_is_an_alias_of_unisphere(capsys):
+    import tomllib
+
+    scripts = tomllib.loads((REPO_ROOT / "core" / "pyproject.toml").read_text(encoding="utf-8"))["project"]["scripts"]
+    assert scripts["unisphere"] == scripts["toolkit"] == "toolkit_core.cli:main"
+    _, data = run_json(capsys, "commands")
+    assert all(c["example"].startswith("unisphere ") for c in data["commands"])

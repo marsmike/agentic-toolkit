@@ -230,8 +230,8 @@ def dlq_status(vault_path: Path) -> dict:
     for entry in entries:
         try:
             frontmatter, _ = read_note(entry)
-        except (OSError, FrontmatterError):
-            frontmatter = {}
+        except (OSError, UnicodeDecodeError, FrontmatterError):
+            frontmatter = {}  # unreadable is open: a person has to look at it
         if str(frontmatter.get("status", "")).strip().lower() != "resolved":
             open_notes.append(entry.relative_to(vault_path).as_posix())
     count, n_open = len(entries), len(open_notes)

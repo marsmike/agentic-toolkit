@@ -1,22 +1,25 @@
-"""`toolkit link`: put `toolkit`, the engines and Obsidian's CLI on PATH.
+"""`unisphere link`: put `unisphere` (and its alias `toolkit`), the engines and Obsidian's CLI on PATH.
 
-`toolkit` becomes a small shell shim that runs this checkout through `uv` (so a `git pull` is the
-whole update), carrying a default TOOLKIT_VAULT that an exported one still overrides. The engines
-and Obsidian's bundled CLI become symlinks, so `toolkit engines update` or an Obsidian update is
-picked up without linking again. A file that is neither our shim nor a symlink is never replaced
-without `--force`. [earned: 2026-09-28 — `gaiafield` and `toolkit` were "command not found" on
-the owner's Mac while the plugins used them fine through the install directory]
+`unisphere` becomes a small shell shim that runs this checkout through `uv` (so a `git pull` is the
+whole update), carrying a default TOOLKIT_VAULT that an exported one still overrides; `toolkit` is a
+symlink to it. The engines and Obsidian's bundled CLI become symlinks, so `unisphere engines update`
+or an Obsidian update is picked up without linking again. Nothing is replaced that this command did
+not write — our shim, or a symlink already pointing where we would point it — without `--force`.
+[earned: 2026-09-28 — `gaiafield` and `toolkit` were "command not found" on the owner's Mac while
+the plugins used them fine through the install directory]
 """
 
 from __future__ import annotations
 
 import os
+import shlex
 from pathlib import Path
 
 from toolkit_core import engines
 from toolkit_core.status import OBSIDIAN_APP_CLI
 
-SHIM_MARKER = "# Written by `toolkit link`"
+SHIM_MARKER = "# Written by `unisphere link`"
+LEGACY_SHIM_MARKER = "# Written by `toolkit link`"
 
 
 def default_bin_dir() -> Path:
@@ -24,28 +27,33 @@ def default_bin_dir() -> Path:
 
 
 def shim_text(repo_root: Path, vault_path: Path | None) -> str:
+    # Paths are shell-quoted: a vault path with $(…), quotes or backslashes must stay data.
+    # [earned: PR #71 review]
     lines = [
         "#!/bin/sh",
-        f"{SHIM_MARKER} — the agentic-toolkit CLI from {repo_root}. Run `toolkit link` again to change it.",
+        f"{SHIM_MARKER} — the agentic-toolkit CLI from {repo_root}. Run `unisphere link` again to change it.",
     ]
     if vault_path is not None:
-        lines.append(f'if [ -z "${{TOOLKIT_VAULT:-}}" ]; then TOOLKIT_VAULT="{vault_path}"; export TOOLKIT_VAULT; fi')
-    lines.append(f'exec uv run --quiet --locked --project "{repo_root}" toolkit "$@"')
+        lines.append(f'if [ -z "${{TOOLKIT_VAULT:-}}" ]; then TOOLKIT_VAULT={shlex.quote(str(vault_path))}; export TOOLKIT_VAULT; fi')
+    lines.append(f'exec uv run --quiet --locked --project {shlex.quote(str(repo_root))} unisphere "$@"')
     return "\n".join(lines) + "\n"
 
 
-def _ours(path: Path) -> bool:
+def _ours(path: Path, target: Path | None) -> bool:
+    """Our shim, or a symlink that already points at `target`. A foreign symlink is not ours:
+    replacing it would silently redirect someone else's command. [earned: PR #71 review]"""
     if path.is_symlink():
-        return True
+        return target is not None and Path(os.readlink(path)) == target
     try:
-        return SHIM_MARKER in path.read_text(encoding="utf-8", errors="replace")[:400]
+        head = path.read_text(encoding="utf-8", errors="replace")[:400]
     except OSError:
         return False
+    return SHIM_MARKER in head or LEGACY_SHIM_MARKER in head
 
 
-def _place(dest: Path, force: bool, write) -> dict:
+def _place(dest: Path, force: bool, write, target: Path | None = None) -> dict:
     if dest.exists() or dest.is_symlink():
-        if not force and not _ours(dest):
+        if not force and not _ours(dest, target):
             return {"path": str(dest), "action": "skipped", "note": "exists and is not ours — rerun with --force to replace"}
         dest.unlink()
         action = "updated"
@@ -63,18 +71,20 @@ def link(repo_root: Path, bin_dir: Path, vault_path: Path | None, force: bool = 
         dest.write_text(shim_text(repo_root, vault_path), encoding="utf-8")
         dest.chmod(0o755)
 
-    results.append({"name": "toolkit", **_place(bin_dir / "toolkit", force, write_shim)})
+    shim = bin_dir / "unisphere"
+    results.append({"name": "unisphere", **_place(shim, force, write_shim)})
 
-    targets = {name: engines.binary_path(name) for name in engines.ENGINES}
+    targets = {"toolkit": shim}
+    targets.update({name: engines.binary_path(name) for name in engines.ENGINES})
     if OBSIDIAN_APP_CLI.is_file():
         targets["obsidian"] = OBSIDIAN_APP_CLI
     for name, target in targets.items():
         if not target.is_file():
             results.append({"name": name, "path": str(bin_dir / name), "action": "skipped",
-                            "note": f"{target} not found" + (" — toolkit engines install" if name in engines.ENGINES else "")})
+                            "note": f"{target} not found" + (" — unisphere engines install" if name in engines.ENGINES else "")})
             continue
         results.append({"name": name, "target": str(target),
-                        **_place(bin_dir / name, force, lambda dest, t=target: dest.symlink_to(t))})
+                        **_place(bin_dir / name, force, lambda dest, t=target: dest.symlink_to(t), target)})
 
     on_path = str(bin_dir) in os.environ.get("PATH", "").split(os.pathsep)
     return {
