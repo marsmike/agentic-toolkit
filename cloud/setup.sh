@@ -33,7 +33,7 @@ git config --global user.email >/dev/null || git config --global user.email "nor
 # same command again: a no-op when they are present.
 # The command runs as `python -m toolkit_core.cli`, not by its script name: the CLI was renamed
 # (toolkit → unisphere, 2026-09-28), and the module path works in every tag on either side of that.
-TOOLKIT_PIN=gaiafield-v0.2.5
+TOOLKIT_PIN=gaiafield-v0.2.6
 TOOLKIT_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/agentic-toolkit"
 if command -v uv >/dev/null 2>&1; then
   tmp=$(mktemp -d)
