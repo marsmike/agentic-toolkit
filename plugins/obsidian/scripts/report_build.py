@@ -39,6 +39,7 @@ from vault_utils import (
     profile_value,
     read_frontmatter,
     require_vault,
+    resolve_title,
     utc_timestamp,
 )
 
@@ -186,7 +187,7 @@ def _github_base(vault: Path) -> str:
 
 def _note_link(vault: Path, rel: str, gh: str) -> str:
     rel = rel if rel.endswith(".md") else rel + ".md"
-    name = escape(Path(rel).stem.replace("-", " "))
+    name = escape(resolve_title(vault, rel))
     obsidian = f"obsidian://open?vault={quote(vault.name)}&file={quote(rel.removesuffix('.md'))}"
     head = f'<a href="{escape(gh + quote(rel))}">{name}</a>' if gh else f"<b>{name}</b>"
     return f'<span>{head} <span class="alt">· <a href="{escape(obsidian)}">Obsidian</a></span></span>'
@@ -319,32 +320,72 @@ def _capture_facts(vault: Path, capture: str) -> tuple[list[str], int]:
     return [u for u in (fm.get("links") or []) if _web(u)], len(fm.get("media") or [])
 
 
-def _item_html(vault: Path, it: dict, gh: str, by_source: dict[str, list[str]]) -> str:
+def _run_ts(run: str) -> str | None:
+    """A ledger run label ('YYYY-MM-DD HH:MM') as an ISO UTC timestamp `format_ts` accepts —
+    the pipeline's own clock (UTC, contract/VAULT_SCHEMA.md), the weakest fallback for an item's
+    ingested time: when it ran, not necessarily when the source was captured."""
+    m = re.match(r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})$", run or "")
+    return f"{m.group(1)}T{m.group(2)}:00Z" if m else None
+
+
+def _ingested(vault: Path, it: dict, run: str) -> tuple[str | None, bool]:
+    """(ingested_at, estimated) for one imported item: the capture's own frontmatter when it can
+    still be found — archived or still in the inbox, and carries the `_estimated` flag too — else
+    the ledger row's own `ingested_at` (an older row, logged before every capture carried the
+    field), else the run's own time as a last resort, always marked estimated.
+    [earned: 2026-09-28 battle test — every item in "What came in" showed no ingest time at all]"""
+    path = imports_log._capture_file(vault, it.get("capture", ""))
+    if path:
+        cfm, _ = read_frontmatter(path)
+        ia = cfm.get("ingested_at")
+        if isinstance(ia, str) and ia:
+            return ia, bool(cfm.get("ingested_at_estimated")) or len(ia) < 16
+    ia = it.get("ingested_at")
+    if isinstance(ia, str) and ia:
+        return ia, len(ia) < 16
+    return _run_ts(run), True
+
+
+def _distilled(vault: Path, f: dict, found: list[str]) -> tuple[str | None, bool]:
+    """(distilled_at, estimated) for one imported item: `fate()`'s own lookup (through the
+    manifest line's `[[wikilink]]`) when it has one, else the first found note's own frontmatter —
+    a note reached only through `by_source` (its capture's manifest line was plain prose) still
+    has its own timestamp worth showing."""
+    distilled_at, estimated = f.get("distilled_at"), bool(f.get("distilled_at_estimated"))
+    if not distilled_at and found:
+        nfm, _ = read_frontmatter(vault / found[0])
+        distilled_at = nfm.get("distilled_at") if isinstance(nfm.get("distilled_at"), str) else None
+        estimated = bool(nfm.get("distilled_at_estimated"))
+    if distilled_at:
+        estimated = estimated or len(str(distilled_at)) < 16
+    return distilled_at, estimated
+
+
+def _item_html(vault: Path, it: dict, gh: str, by_source: dict[str, list[str]], run: str) -> str:
     f = it["fate"]
     kind = imports_log.LABEL.get(str(it.get("category") or ""), str(it.get("category") or "Item").capitalize())
     title = escape(it.get("title") or it.get("capture") or it.get("found") or it.get("doc_id", "?"))
     src = _web(it.get("source"))
     head = f'<a class="title" href="{escape(src)}">{title}</a>' if src else f'<span class="title">{title}</span>'
     links, media = _capture_facts(vault, it.get("capture", ""))
-    ingested_at = it.get("ingested_at")
-    meta = [escape(x) for x in (it.get("author"), _host(src) if src else None, it.get("via"),
-                                f"enrichment {it['enrichment']}" if it.get("enrichment") else None,
-                                f"ingested {format_ts(ingested_at)}" if ingested_at else None) if x]
-    if media:
-        meta.append(f"{media} image{'s' if media != 1 else ''} kept")
     found = list(dict.fromkeys([n if n.endswith(".md") else n + ".md" for n in f["notes"]] + by_source.get(_key(src), [])))
     found = [n for n in found if (vault / n).is_file()]
     notes = [_note_link(vault, n, gh) for n in found]
-    became = escape(f["detail"])
-    # The first found note's own `distilled_at` — not `f["distilled_at"]` alone, which only ever
-    # comes from a manifest line's `[[wikilink]]`: a note reached only through `by_source` (its
-    # capture's manifest line was plain prose) still has its own timestamp worth showing.
-    distilled_at = f.get("distilled_at")
-    if not distilled_at and f["status"] == "distilled" and found:
-        nfm, _ = read_frontmatter(vault / found[0])
-        distilled_at = nfm.get("distilled_at") if isinstance(nfm.get("distilled_at"), str) else None
+
+    meta = [escape(x) for x in (it.get("author"), _host(src) if src else None, it.get("via"),
+                                f"enrichment {it['enrichment']}" if it.get("enrichment") else None) if x]
+    if media:
+        meta.append(f"{media} image{'s' if media != 1 else ''} kept")
+    ingested_at, ingested_est = _ingested(vault, it, run)
+    if ingested_at:
+        meta.append(escape(f"ingested {format_ts(ingested_at, estimated=ingested_est)}"))
+    # `became` (the manifest line's own free text) never carries "Distilled <date>." any more
+    # (imports_log.fate() strips it — that sentence only ever repeated this one clean meta line).
+    distilled_at, distilled_est = _distilled(vault, f, found)
     if distilled_at and f["status"] == "distilled":
-        became += f" (distilled {escape(format_ts(distilled_at))})"
+        meta.append(escape(f"distilled {format_ts(distilled_at, estimated=distilled_est)}"))
+
+    became = escape(f["detail"])
     out = [f'<li class="item"><div class="row"><span class="kind">{escape(kind)}</span>'
            f'<span class="status s-{f["status"]}">{STATUS.get(f["status"], f["status"])}</span></div>{head}']
     if meta:
@@ -454,7 +495,7 @@ def render(vault: Path, run: str | None = None, today: date | None = None) -> st
         tally = " · ".join(f"{n} {STATUS[s].lower()}" for s, n in counts.items() if n)
         out.append(f'<section style="display:grid;gap:12px"><div><h2>{title}</h2><p class="lede">{len(items)} '
                    f'item{"s" if len(items) != 1 else ""}: {tally}. Each with its source, the links it pointed at, and the notes it became.</p></div>'
-                   '<ul class="items">' + "".join(_item_html(vault, it, gh, by_source) for it in items) + "</ul></section>")
+                   '<ul class="items">' + "".join(_item_html(vault, it, gh, by_source, shown["run"]) for it in items) + "</ul></section>")
     out.append(f'<section class="panel"><h3><span>Notes this run wrote</span><span>{len(written)}</span></h3>')
     if written:
         out.append('<ul class="notes">' + "".join(

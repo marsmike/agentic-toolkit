@@ -74,6 +74,15 @@ def run(vault: Path) -> dict:
         _git(sandbox, "add", "-A")
         _git(sandbox, "commit", "-q", "-m", "hand note")
 
+        # A later pipeline commit, same week, enriches a note the *first* pipeline commit added
+        # with an estimated processed_date (so it never counted as "new"). It must not vanish
+        # from both lists: `changed - new` used to exclude every path ever added this week, not
+        # only what "New" actually lists. [earned: 2026-09-28 battle test]
+        estimated = res / "Eval-Pipeline-Estimated.md"
+        estimated.write_text(estimated.read_text(encoding="utf-8") + "\nEnriched later.\n", encoding="utf-8")
+        _git(sandbox, "add", "-A")
+        _git(sandbox, "commit", "-q", "-m", "pipeline 2026-09-24 09:00: 0 distilled, 0 dropped, 0 failed")
+
         radar = sandbox / "00_Memory" / "radar"
         radar.mkdir(parents=True, exist_ok=True)
         rows = [
@@ -107,8 +116,14 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 1: new/enriched from the pipeline commit only; new={new!r} enriched={enr!r}")
         if "Eval-Pipeline-Undistilled" not in new or "Eval-Pipeline-Unknown" in new:
             problems.append(f"phase 1: no processed_date is new whatever `created` says; a non-date one is not; new={new!r}")
-        if "Eval-Pipeline-Legacy" in new + enr or "Eval-Pipeline-Estimated" in new + enr:
-            problems.append(f"phase 1: an added note dated before the week or estimated is not new; new={new!r}")
+        if "Eval-Pipeline-Legacy" in new + enr:
+            problems.append(f"phase 1: an added note dated before the week is not new; new={new!r}")
+        if "Eval-Pipeline-Estimated" in new:
+            problems.append(f"phase 1: an added note with an estimated processed_date is not new; new={new!r}")
+        if "Eval-Pipeline-Estimated" not in enr:
+            problems.append(
+                f"phase 1: a later pipeline commit enriching a note an earlier one added (estimated "
+                f"date, so never 'new') must still show as enriched, not vanish from both lists; enriched={enr!r}")
         if not (0 <= new.find("Eval-Pipeline-New") < new.find("Eval-Pipeline-Earlier") < new.find("Eval-Root-Profile")):
             problems.append(f"phase 1: New runs newest first, undated last; new={new!r}")
         if "Eval-Root-Profile" not in new or "[[Index" in new + enr:

@@ -23,6 +23,13 @@ DEFAULT_INTERESTS_NOTE = "03_Areas/Trend Radar Profile.md"
 RISING_MIN_STRONG = 3      # radar's TREND_MIN_STRONG: fewer strong items is noise, not a rise
 RISING_FACTOR = 1.5        # this week's strong against the median of the weeks before it
 RISING_MIN_WEEKS = 2       # weeks of history before anything can be called rising
+# A ledger row scored against an interest id the owner has since renamed or removed: neither a
+# live interest (not in the current names) nor an epic (its own always-valid naming). Every such
+# id collapses into this one bucket instead of listing each stale slug as if it were still a
+# current interest — `name_of` names it "Retired interests". [earned: 2026-09-28 battle test —
+# "ai agents multi agent systems" (an old slug) and "AI Agents, Harnesses & Reliability" (its
+# rename) both showed up in What's moving, as two different interests]
+RETIRED_ID = "retired"
 
 
 def slug(name: str, limit: int = 40) -> str:
@@ -31,7 +38,9 @@ def slug(name: str, limit: int = 40) -> str:
 
 def interest_names(vault: Path) -> dict[str, str]:
     """Interest id → display name, from the interests note the radar profile points at; an epic
-    id (`epic-…`, from Todoist) is named from its slug."""
+    id (`epic-…`, from Todoist) is named from its slug. An interest's own `aliases:` (old names it
+    was renamed from) map their slugs to the current name too, so a rename recorded there does not
+    orphan the interest's own history."""
     names: dict[str, str] = {}
     rel = os.environ.get("TOOLKIT_RADAR_INTERESTS_NOTE")
     if not rel:
@@ -44,10 +53,36 @@ def interest_names(vault: Path) -> dict[str, str]:
         for it in fm.get("interests") or []:
             if isinstance(it, dict) and it.get("name"):
                 names[slug(it["name"])] = str(it["name"])
+                for alias in it.get("aliases") or []:
+                    if isinstance(alias, str) and alias.strip():
+                        names[slug(alias)] = str(it["name"])
     return names
 
 
+def canon(iid: str, names: dict[str, str]) -> str:
+    """A raw interest id as it should be aggregated: itself when it's a live interest or an epic,
+    else `RETIRED_ID` — a ledger row scored days or months ago against an interest the owner has
+    since renamed or dropped must not resurrect that old slug as if it were still current."""
+    return iid if iid in names or iid.startswith("epic-") else RETIRED_ID
+
+
+_GH_RELEASE_RE = re.compile(r"^https?://github\.com/([^/]+)/([^/]+)/releases(?:/tag/.+)?/?(?:\?.*)?$")
+
+
+def release_title(url: str, title: str) -> str:
+    """A GitHub release feed's own title is often just the tag ("v2.1.275"), meaningless without
+    the repo it's from; prefix the repo name parsed from the item's own URL, the way every other
+    feed item already names what it's about. [earned: 2026-09-28 battle test — "Top feed items"
+    listed bare "v2.1.275", "v2.1.283" rows with no repo in sight]"""
+    m = _GH_RELEASE_RE.match(str(url or ""))
+    if m and title and not title.lower().startswith(m.group(2).lower()):
+        return f"{m.group(2)} {title}"
+    return title
+
+
 def name_of(names: dict[str, str], iid: str) -> str:
+    if iid == RETIRED_ID:
+        return "Retired interests"
     if iid in names:
         return names[iid]
     if iid.startswith("epic-"):
@@ -86,9 +121,11 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
         day = str(r.get("run") or r.get("saved_at") or "")[:10]
         if not re.match(r"\d{4}-\d{2}-\d{2}$", day) or day < since:
             continue
-        strong = [str(i) for i in (r.get("strong") or [])]
-        worth = [str(i) for i in (r.get("worth") or [])]
+        raw_strong = [str(i) for i in (r.get("strong") or [])]
+        strong = list(dict.fromkeys(canon(i, names) for i in raw_strong))
+        worth = list(dict.fromkeys(canon(str(i), names) for i in (r.get("worth") or [])))
         best, top = _best(r.get("p"))
+        top = canon(top, names) if top else top
         promoted = r.get("canonical") in promoted_keys
         try:
             y, w, _ = date.fromisoformat(day).isocalendar()
@@ -103,7 +140,7 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
             today_counts["judged"] += 1
             today_counts["strong"] += bool(strong)
             today_counts["promoted"] += promoted
-        for iid in (r.get("p") or {}) if isinstance(r.get("p"), dict) else []:
+        for iid in {canon(str(i), names) for i in (r.get("p") or {})} if isinstance(r.get("p"), dict) else []:
             per[iid]["judged"] += 1
         for iid in worth:
             per[iid]["worth"] += 1
@@ -113,9 +150,11 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
                 per[iid]["promoted"] += 1
         if strong and week:  # one item, one column: under the interest it scored highest for
             p = r.get("p") if isinstance(r.get("p"), dict) else {}
-            weeks[week][max(strong, key=lambda i: float(p.get(i, 0) or 0))] += 1
+            best_raw = max(raw_strong, key=lambda i: float(p.get(i, 0) or 0))
+            weeks[week][canon(best_raw, names)] += 1
         if strong or worth:
-            items.append({"day": day, "title": str(r.get("title") or "")[:160], "url": str(r.get("url") or ""),
+            item_url = str(r.get("url") or "")
+            items.append({"day": day, "title": release_title(item_url, str(r.get("title") or ""))[:160], "url": item_url,
                           "feed": str(r.get("feed") or ""), "kind": str(r.get("kind") or ""), "p": round(best, 2),
                           "top": top, "strong": strong, "worth": worth, "promoted": promoted,
                           "in_vault": bool(r.get("in_vault"))})
