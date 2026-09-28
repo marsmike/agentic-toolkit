@@ -241,6 +241,25 @@ def cmd_demo(args: argparse.Namespace) -> int:
 # --- status ----------------------------------------------------------------------------
 
 
+def _format_last_run_utc(iso: str) -> str:
+    """Render a routine's ISO 8601 `last` timestamp as its true UTC wall time — labelled "UTC"
+    only when the string actually converts to one. This used to just take the first 16
+    characters of whatever string a routine reported (`iso[:16].replace("T", " ")`) and append
+    the literal " UTC" unconditionally: correct only when the source was already UTC, but
+    `watchdog.py`'s `facts["last_run"]` carries whatever offset the underlying git/ledger
+    timestamp had (e.g. a committer's local "+02:00"), so a two-hour-old run could show as
+    current. Naive (offset-less) or unparseable strings are shown as-is, with no "UTC" claim
+    this function can't back up. [battle-test 2026-09-28: `unisphere status` showed "last
+    2026-09-28 21:42 UTC" for a fact whose JSON was "2026-09-28T21:42:24+02:00" — 19:42 UTC]"""
+    try:
+        dt = datetime.datetime.fromisoformat(iso)
+    except ValueError:
+        return iso
+    if dt.tzinfo is None:
+        return dt.strftime("%Y-%m-%d %H:%M")
+    return dt.astimezone(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M") + " UTC"
+
+
 def _render_status(result: dict) -> str:
     st = ui.Style()
     tk = result["toolkit"]
@@ -330,9 +349,9 @@ def _render_status(result: dict) -> str:
             rows += [f"{st.mark('bad')} {item.get('detail')}" for item in p.get("problems", [])]
         for r in routines:
             if r.get("last"):
-                when = r["last"][:16].replace("T", " ")
+                when = _format_last_run_utc(r["last"])
                 age = st.dim(f" ({r['age_hours']} h ago)") if r.get("age_hours") is not None else ""
-                rows.append(f"{st.mark('ok' if p.get('ok', True) else 'warn')} {r['name']}: last {when} UTC{age}"
+                rows.append(f"{st.mark('ok' if p.get('ok', True) else 'warn')} {r['name']}: last {when}{age}"
                             + (st.dim(f" — {r['note']}") if r.get("note") else ""))
             elif r.get("note"):
                 rows.append(f"{st.mark('info')} {r['name']}: {r['note']}"

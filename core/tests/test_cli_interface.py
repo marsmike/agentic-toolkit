@@ -58,7 +58,11 @@ def test_catalogue_lists_positional_arguments_first(capsys):
 
 def test_text_is_plain_when_piped_or_no_color(monkeypatch):
     assert not ui.Style().color  # pytest's stdout is not a TTY
-    assert ui.Style(color=False).mark("ok") == "✓"
+    # `mark()` routes its symbol through `term.glyph()` (battle-test 2026-09-28: it used to
+    # hardcode the unicode glyph, so a pipe, UNISPHERE_ASCII=1 or a non-UTF-8 locale still saw
+    # "✓"/"✗" instead of the ASCII fallback `term.py` promises) — not a TTY, so ASCII here
+    # regardless of `color`, which only ever governed the ANSI wrapping, never the glyph choice.
+    assert ui.Style(color=False).mark("ok") == "*"
     monkeypatch.setenv("NO_COLOR", "1")
 
     class Tty:
@@ -69,6 +73,32 @@ def test_text_is_plain_when_piped_or_no_color(monkeypatch):
     monkeypatch.delenv("NO_COLOR")
     assert ui.color_enabled(Tty())
     assert "\033[" in ui.Style(color=True).mark("bad")
+
+
+def test_mark_falls_back_to_ascii_with_color_on(monkeypatch):
+    """`status`/`doctor`/`link` marks (✓ ✗ ! ·) must honour the same ASCII fallback as
+    `--help`/the startup banner — `UNISPHERE_ASCII=1`, `TERM=dumb`/`linux`, or a non-UTF-8 locale
+    with no known-UTF-8 `LC_ALL`/`LC_CTYPE`/`LANG` — even on a real TTY with colour on.
+    `ui.Style.mark()` used to read its symbol straight out of its own `MARKS` dict instead of
+    `term.glyph()`, so none of this ever reached it. [battle-test 2026-09-28: `unisphere status`
+    on a pty with `UNISPHERE_ASCII=1`, and `unisphere status | cat`, both still printed ✓/✗/!/·]
+    """
+
+    from toolkit_core import term
+
+    monkeypatch.setattr(term, "is_tty", lambda stream=None: True)
+    monkeypatch.setenv("LANG", "en_US.UTF-8")
+    monkeypatch.delenv("UNISPHERE_ASCII", raising=False)
+    monkeypatch.delenv("TERM", raising=False)
+    style = ui.Style(color=True)
+    assert style.mark("ok") == f"\033[32m✓\033[0m"  # sanity: unicode on a real UTF-8 TTY
+
+    monkeypatch.setenv("UNISPHERE_ASCII", "1")
+    assert style.mark("ok") == f"\033[32m*\033[0m"
+
+    monkeypatch.delenv("UNISPHERE_ASCII")
+    monkeypatch.setenv("LANG", "C")
+    assert style.mark("ok") == f"\033[32m*\033[0m"
 
 
 # --- DLQ: only open entries need a person --------------------------------------------------
@@ -146,6 +176,46 @@ def test_status_text_names_every_section(tmp_path, monkeypatch, capsys):
     for label in ("ENGINES", "PLUGINS", "VAULT", "COMPANIONS"):
         assert label in out
     assert "\033[" not in out
+
+
+@pytest.mark.parametrize(
+    ("iso", "expect"),
+    [
+        ("2026-09-28T21:42:24+02:00", "2026-09-28 19:42 UTC"),  # a non-UTC offset converts
+        ("2026-09-28T19:42:24Z", "2026-09-28 19:42 UTC"),
+        ("2026-09-28T19:42:24+00:00", "2026-09-28 19:42 UTC"),
+        ("2026-09-28T19:42", "2026-09-28 19:42"),  # naive: no offset to convert, no "UTC" claim
+        ("not-a-real-timestamp", "not-a-real-timestamp"),  # unparseable: shown verbatim
+    ],
+)
+def test_format_last_run_utc_converts_real_offsets(iso, expect):
+    """`status`'s U-SHADOWS used to take the first 16 characters of a routine's ISO timestamp and
+    append the literal " UTC" regardless of the string's actual offset — correct only when the
+    source happened to already be UTC. `watchdog.py`'s `facts["last_run"]` carries whatever
+    offset the underlying git/ledger timestamp had (a real run showed a +02:00 offset).
+    [battle-test 2026-09-28]"""
+    assert cli._format_last_run_utc(iso) == expect
+
+
+def test_status_u_shadows_shows_true_utc_not_the_offset_as_is():
+    """End-to-end through `_render_status`: a routine fact with a non-UTC offset renders its
+    converted UTC wall time, not the offset's own clock reading relabelled "UTC".
+    [battle-test 2026-09-28]"""
+    result = {
+        "toolkit": {"found": False},
+        "engines": {"engines": [], "checked_latest": False},
+        "plugins": {"plugins": []},
+        "vault": {"found": True, "path": "/tmp/vault", "source": "test", "notes": 0, "inbox": 0,
+                  "graph": {}, "dlq": {}, "checkout": {}},
+        "pipeline": {"present": True, "checked": True, "ok": True, "problems": [],
+                     "routines": [{"name": "Daily ReadWise Ingest+Distill",
+                                   "last": "2026-09-28T21:42:24+02:00", "age_hours": 0.4}]},
+        "companions": [],
+        "ok": True,
+    }
+    out = cli._render_status(result)
+    assert "2026-09-28 19:42 UTC" in out
+    assert "21:42 UTC" not in out
 
 
 # --- search and graph ---------------------------------------------------------------------
