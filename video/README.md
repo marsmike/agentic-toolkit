@@ -33,7 +33,7 @@ Which capture is filmed is decision D8 (outcome-lead). `main` moved from 72bb351
 ## Re-capture
 
 Needs `uv`, `git` and a `claude` binary. Only `claude` is taken from this machine, through a directory that
-holds nothing else, so no installed `toolkit` can leak onto PATH:
+holds nothing else, so no installed `unisphere` can leak onto PATH:
 
 ```bash
 mkdir -p /private/tmp/prereq-bin

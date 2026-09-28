@@ -1,8 +1,7 @@
-"""`unisphere link`: put `unisphere` (and its alias `toolkit`), the engines and Obsidian's CLI on PATH.
+"""`unisphere link`: put `unisphere`, the engines and Obsidian's CLI on PATH.
 
 `unisphere` becomes a small shell shim that runs this checkout through `uv` (so a `git pull` is the
-whole update), carrying a default TOOLKIT_VAULT that an exported one still overrides; `toolkit` is a
-symlink to it. The engines and Obsidian's bundled CLI become symlinks, so `unisphere engines update`
+whole update), carrying a default TOOLKIT_VAULT that an exported one still overrides. The engines and Obsidian's bundled CLI become symlinks, so `unisphere engines update`
 or an Obsidian update is picked up without linking again. Nothing is replaced that this command did
 not write — our shim, or a symlink already pointing where we would point it — without `--force`.
 [earned: 2026-09-28 — `gaiafield` and `toolkit` were "command not found" on the owner's Mac while
@@ -19,7 +18,7 @@ from toolkit_core import engines
 from toolkit_core.status import OBSIDIAN_APP_CLI
 
 SHIM_MARKER = "# Written by `unisphere link`"
-LEGACY_SHIM_MARKER = "# Written by `toolkit link`"
+LEGACY_SHIM_MARKER = "# Written by `toolkit link`"  # what shims from before the rename carry
 
 
 def default_bin_dir() -> Path:
@@ -74,8 +73,7 @@ def link(repo_root: Path, bin_dir: Path, vault_path: Path | None, force: bool = 
     shim = bin_dir / "unisphere"
     results.append({"name": "unisphere", **_place(shim, force, write_shim)})
 
-    targets = {"toolkit": shim}
-    targets.update({name: engines.binary_path(name) for name in engines.ENGINES})
+    targets = {name: engines.binary_path(name) for name in engines.ENGINES}
     if OBSIDIAN_APP_CLI.is_file():
         targets["obsidian"] = OBSIDIAN_APP_CLI
     for name, target in targets.items():
@@ -85,6 +83,13 @@ def link(repo_root: Path, bin_dir: Path, vault_path: Path | None, force: bool = 
             continue
         results.append({"name": name, "target": str(target),
                         **_place(bin_dir / name, force, lambda dest, t=target: dest.symlink_to(t), target)})
+
+    # The CLI was `toolkit` until 2026-09-28: remove the shim or alias an earlier link wrote there,
+    # never a `toolkit` someone else put on PATH.
+    old = bin_dir / "toolkit"
+    if (old.exists() or old.is_symlink()) and _ours(old, shim):
+        old.unlink()
+        results.append({"name": "toolkit", "path": str(old), "action": "removed", "note": "renamed to unisphere"})
 
     on_path = str(bin_dir) in os.environ.get("PATH", "").split(os.pathsep)
     return {

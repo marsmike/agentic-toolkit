@@ -215,7 +215,7 @@ def semantic_scores(query: str, corpus: list[Doc], vault: Path, rebuild: bool = 
 def _engines_install_dir() -> Path:
     """Mirrors `core/toolkit_core/engines.py::install_dir()` — plugin scripts are
     self-contained (no import of `core`, see this module's docstring), so the
-    well-known `toolkit engines install` dir is redefined here rather than imported.
+    well-known `unisphere engines install` dir is redefined here rather than imported.
     Keep both in sync. Invariant: suffix is `.exe` iff `os.name == "nt"` — identical
     expression to `engines.py::binary_path()` and to `graph.py`'s own mirror; the
     three must never drift apart on this check."""
@@ -227,8 +227,8 @@ def _engines_install_dir() -> Path:
 
 def farsight_binary() -> str | None:
     """`TOOLKIT_FARSIGHT_BIN` env var wins; then a `farsight` binary on PATH; then the
-    well-known `toolkit engines install` dir — the one added probe step, so
-    `toolkit engines install` alone is enough with no PATH/env wiring."""
+    well-known `unisphere engines install` dir — the one added probe step, so
+    `unisphere engines install` alone is enough with no PATH/env wiring."""
     env = os.environ.get("TOOLKIT_FARSIGHT_BIN")
     if env:
         return env

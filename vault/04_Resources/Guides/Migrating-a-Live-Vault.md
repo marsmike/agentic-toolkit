@@ -46,7 +46,7 @@ from active notes into the archive, and, once the graph was embedded, over 2,000
 gaiafield's shipped gate. None of these is a reason
 to stop; all of them are reasons to run the read-only passes before any `--fix`.
 
-`toolkit engines install`, then `toolkit doctor`: note counts, dangling links, boundary
+`unisphere engines install`, then `unisphere doctor`: note counts, dangling links, boundary
 violations, which vault and profile were resolved. Save the output; the later steps compare against it.
 
 ## 3. Give the vault a profile
@@ -116,7 +116,7 @@ documents) and check that de-duplication by document id holds before the full sw
 ## 9. Cut over
 
 Snapshot the real vault (sync history, a tarball, or both). Point `TOOLKIT_VAULT` at it, run
-`toolkit doctor`, distill **one** capture end to end with the Phase 1 checkpoint on, read the
+`unisphere doctor`, distill **one** capture end to end with the Phase 1 checkpoint on, read the
 diff. Then the backlog, in batches small enough to review. Update the vault's own `AGENTS.md`
 last, once it describes what actually runs.
 

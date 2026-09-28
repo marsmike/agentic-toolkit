@@ -25,10 +25,10 @@ settings, body prose for rationale a future editor would want.
 
 ## Debugging a setting that isn't taking effect
 
-`toolkit doctor` (see [[Toolkit-CLI]]) reports profile completeness per plugin — present or
+`unisphere doctor` (see [[Toolkit-CLI]]) reports profile completeness per plugin — present or
 missing, nothing finer. It does **not** report which step of the resolution order (env var, vault
 profile note, shipped default) supplied a setting's current value; that distinction only exists in
-`toolkit profile <plugin>`'s merged JSON output, and even there the merge itself doesn't label
+`unisphere profile <plugin>`'s merged JSON output, and even there the merge itself doesn't label
 which layer a given key came from. To debug a setting that isn't taking effect, check the
 environment and the profile note directly rather than expecting doctor to point at the source. See
 [[Troubleshooting-Toolkit-Doctor]] for doctor's actual four-section report shape.

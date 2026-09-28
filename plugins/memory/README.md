@@ -51,7 +51,7 @@ PATH — so it can never fail merely because a venv wasn't set up.
 `00_Memory/dlq/` — same convention `plugins/obsidian` established (`description`/
 `status`/`created`/`confidence` frontmatter, a "What happened / Why it's here /
 Resolution" body). Two writers: the SessionEnd hook (a capture failure) and the
-`distill-memory` skill (a candidate it can't confidently classify or place). `toolkit
+`distill-memory` skill (a candidate it can't confidently classify or place). `unisphere
 doctor` (in `core/`) surfaces the count, same as for `plugins/obsidian`.
 
 ## Profile

@@ -11,7 +11,7 @@ enrichment_targets:
 
 # Toolkit Maintenance
 
-Keeping this vault and its plugin configuration healthy: running `toolkit doctor` periodically,
+Keeping this vault and its plugin configuration healthy: running `unisphere doctor` periodically,
 distilling the capture inbox before it grows stale, and re-tuning profile settings like the search
 score gate in [[Semantic-Search-Score-Calibration]] when the embedding model changes.
 

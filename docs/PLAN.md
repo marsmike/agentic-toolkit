@@ -27,7 +27,7 @@ agentic-toolkit/                    # NEW public repo, fresh git history (privac
     templates/                      #   vault CLAUDE.md template for `vault init`
   core/                             # Python (uv workspace member): toolkit CLI + lib
     toolkit_core/{profile,vault,knowledge}.py
-    cli: `toolkit vault init` · `toolkit doctor` · `toolkit profile`
+    cli: `unisphere vault init` · `unisphere doctor` · `unisphere profile`
   crates/                           # Rust (cargo workspace), CLI-in/JSON-out only
     farsight/                       #   hybrid BM25+vector search (vault + PDF chunks)
     gaiafield/                      #   knowledge graph over existing wikilinks → SQLite
@@ -45,7 +45,7 @@ agentic-toolkit/                    # NEW public repo, fresh git history (privac
 2. **Eval gates (Graduation Pattern)** — every plugin ships capability evals that start low and graduate into a regression suite; green regression suite gates trunk merges. This resolves the CD-vs-reliability tension. *`Concepts/Graduation-Pattern.md`; SkillsBench: ungated skills degrade −1.3pp; `Reliability-Over-Capability.md`.*
 3. **The public ratchet** — every contract/CLAUDE.md rule cites the dated failure that earned it; changelog links rule → incident → regression case. *Osmani field survey: "every line traces to a specific historical failure."*
 4. **Two hook classes** — *ratchet hooks* (deterministic failures, auto-enforced) vs *stop-and-ask hooks* (judgment calls → decision log/ADR). *web3nomad's judgment-vs-bug counter in the Osmani note; arscontexta fix-vs-report gate.*
-5. **Dead-letter question as acceptance criterion** — every shipped automation names where its failures go; `toolkit doctor` surfaces the DLQ. Confidence labels gate auto-apply vs report (guards gaiafield against "successful corruption"). *arscontexta DLQ claim.*
+5. **Dead-letter question as acceptance criterion** — every shipped automation names where its failures go; `unisphere doctor` surfaces the DLQ. Confidence labels gate auto-apply vs report (guards gaiafield against "successful corruption"). *arscontexta DLQ claim.*
 6. **Dual-channel descriptions** — retrieval-verification loop (predict-from-description, score 1–5, flag <3) ships as an obsidian-plugin maintenance skill; BM25 queries condensed to 3–5 high-IDF terms. *arscontexta BM25-dilution claims.*
 7. **Typed judgments** — a model answers narrow questions with probabilities, code owns every threshold, and the result is advice at the checkpoint, never a write; question wording is versioned data a reasoning model tunes against golden labels. *R8–R9; vault note Typed-Judgments.*
 8. **Listing budget** — curated set capped by the ~25–30 item Tier-1 discovery ceiling; Osmani scope test as admission bar: "if you cannot name the behaviour a component delivers, remove it." *`Skills-Architecture-Redesign-Research-Findings`.*
@@ -61,7 +61,7 @@ agentic-toolkit/                    # NEW public repo, fresh git history (privac
 
 Five roles: (1) `vault init` template; (2) deterministic test corpus for farsight/gaiafield/contract (planted graph structure, schema edge cases, unknown-frontmatter-key tolerance); (3) executable contract — CI fails schema changes that don't update the example; (4) Graduation-Pattern eval substrate — public, reproducible, cheap; (5) the ratchet's public corpus — anonymized minimal repros of real TheVoid failures become regression cases with dated citations.
 
-**Using your own vault:** `./vault` is the out-of-the-box default — clone the repo and everything works immediately against it. To point the toolkit at a real vault, set `TOOLKIT_VAULT=/path/to/your/vault` (resolution order: env var → `./vault` fallback; documented in `contract/PROFILE.md` and readable via `toolkit doctor`). `toolkit vault init /path/to/new` scaffolds a fresh personal vault from the same template. Tests and evals always run against `./vault` regardless of the env var, so a user's vault is never touched by CI or test runs. Design: ~100–150 notes (below the 200-note structural threshold from arscontexta's scale curve) at realistic ~10 links/note density; one clearly-fictional persona for profile demos; **content = the toolkit's own documentation written as vault notes** — the docs demo the system by being the system. Growth only via init needs, test cases, ratchet repros.
+**Using your own vault:** `./vault` is the out-of-the-box default — clone the repo and everything works immediately against it. To point the toolkit at a real vault, set `TOOLKIT_VAULT=/path/to/your/vault` (resolution order: env var → `./vault` fallback; documented in `contract/PROFILE.md` and readable via `unisphere doctor`). `unisphere vault init /path/to/new` scaffolds a fresh personal vault from the same template. Tests and evals always run against `./vault` regardless of the env var, so a user's vault is never touched by CI or test runs. Design: ~100–150 notes (below the 200-note structural threshold from arscontexta's scale curve) at realistic ~10 links/note density; one clearly-fictional persona for profile demos; **content = the toolkit's own documentation written as vault notes** — the docs demo the system by being the system. Growth only via init needs, test cases, ratchet repros.
 
 ## Curation waves
 
@@ -75,7 +75,7 @@ feinschmiede is absorbed: fein-* plugins keep their names (shipped brand, PyPI c
 
 ## Delivery model
 
-- **R0 — walking skeleton (one release):** new repo, `contract/` extracted from TheVoid CLAUDE.md, `toolkit vault init` + `doctor`, example vault, obsidian plugin on the platform, CI + gitleaks. Proof: a stranger clones, inits a vault, installs one plugin, it works.
+- **R0 — walking skeleton (one release):** new repo, `contract/` extracted from TheVoid CLAUDE.md, `unisphere vault init` + `doctor`, example vault, obsidian plugin on the platform, CI + gitleaks. Proof: a stranger clones, inits a vault, installs one plugin, it works.
 - **R1…Rn:** one increment each — next plugin curated onto the platform or next engine milestone (farsight parity → gaiafield v1 → v2). Every merge: version bump, evals green, changelog entry (doubles as social material). The repo is never publicly mid-migration.
 - **Flywheel as operating system:** research/readwise capture SOTA → distill to vault → tech-radar positions → features cite vault notes → changelog/social amplify. Goal 1 and Goal 5 are the same loop.
 
@@ -103,7 +103,7 @@ New repo scaffolded at `~/Developer/agentic-toolkit-v2` (local name only; at pub
 **Stage 1 (one agent, blocking):** `contract/` — extract VAULT_SCHEMA.md from TheVoid's CLAUDE.md (~145 lines, authoritative; schema documented as floor-not-ceiling), PROFILE.md, KNOWLEDGE_API.md, ROUTING.md, and the `vault init` CLAUDE.md template with the always-loaded/skill-depth split. Everything downstream depends on this.
 
 **Stage 2 (parallel agents, disjoint dirs):**
-- *core agent* — `core/`: toolkit_core (profile.py, vault.py with `TOOLKIT_VAULT` → `./vault` resolution, frontmatter IO tolerant of unknown keys), CLI `toolkit vault init` (scaffolds from the `./vault` template) + `toolkit doctor` (active vault, profile completeness, DLQ surfacing stub), pytest suite.
+- *core agent* — `core/`: toolkit_core (profile.py, vault.py with `TOOLKIT_VAULT` → `./vault` resolution, frontmatter IO tolerant of unknown keys), CLI `unisphere vault init` (scaffolds from the `./vault` template) + `unisphere doctor` (active vault, profile completeness, DLQ surfacing stub), pytest suite.
 - *example-vault agent(s)* — `vault/`: ~100–150 fictional-persona notes that are the toolkit docs (PARA, distill workflow, harness concepts), realistic link density, planted graph structure + schema edge cases for engine tests; profile examples.
 - *obsidian-plugin agent* — `plugins/obsidian/`: port from v1 (`~/Developer/agentic-toolkit/obsidian`), vendored env dropped (uv-managed), profile convention adopted, retrieval-verification skill added, skill files within DESIGN.md budgets.
 - *CI agent* — `.github/workflows/`: path-filtered lint+test, gitleaks, release-binaries skeleton (no crates built in R0).
@@ -114,7 +114,7 @@ Out of scope for R0 (subsequent releases): farsight, gaiafield, feinschmiede abs
 
 ## Verification
 
-- Stranger test end-to-end on a clean clone: `toolkit vault init` produces a valid vault; `claude plugin marketplace add <local path>` + install obsidian plugin succeeds; one skill invocation works against the example vault.
+- Stranger test end-to-end on a clean clone: `unisphere vault init` produces a valid vault; `claude plugin marketplace add <local path>` + install obsidian plugin succeeds; one skill invocation works against the example vault.
 - `pytest` green in `core/`; schema-consistency CI check fails when VAULT_SCHEMA.md and examples/vault diverge (verified by intentional break).
 - gitleaks + manual scan: no personal data anywhere (the example vault's persona is fictional; profiles are examples only).
 - Every vault citation in `docs/PLAN.md` resolves to a real note in TheVoid.

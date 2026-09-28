@@ -117,7 +117,7 @@ note to `00_Memory/dlq/` via `scripts/vault_utils.write_dlq_note()`: `vault_norm
 on unparseable frontmatter it refuses to write through, `retrieval_verification.py` on
 an incomplete scores map, `graph.py` on a gaiafield binary that's present but fails on a
 real invocation (never on the normal absent-binary state), and the `distill` skill/agent
-on unresolved search/placement/source ambiguity. `toolkit doctor` (in `core/`) surfaces
+on unresolved search/placement/source ambiguity. `unisphere doctor` (in `core/`) surfaces
 the DLQ count, plus (R3) a graph section: db present/absent, node/edge/dangling/boundary
 counts, and index freshness. See
 `00_Memory/dlq/*.md` in the example vault for the worked convention this follows:
@@ -160,7 +160,7 @@ before the first `ensure_index()` call) is normal and silent — no DLQ note, sa
 farsight's absence in `search.py`. A binary that IS present but fails on a real invocation
 (`reason="call-failed"`) is abnormal: `graph.py` writes a DLQ note to `00_Memory/dlq/`
 (via `vault_utils.write_dlq_note`) before degrading, so a broken gaiafield install is
-visible in `toolkit doctor`'s DLQ count rather than silently reducing the workflow.
+visible in `unisphere doctor`'s DLQ count rather than silently reducing the workflow.
 
 The `distill` skill's phase 1 is the first consumer: after its search step, when the graph
 is available, it fetches depth-1 neighbors of the top matches and folds backlink/bridge
@@ -174,7 +174,7 @@ with raw target text `links.py`'s `audit()`/`fix()` need. Getting that list woul
 either a new gaiafield CLI verb (an engine change, out of scope here) or reading the
 SQLite database directly, which `contract/KNOWLEDGE_API.md`'s "never bypass an engine's
 internal state" rule forbids — so `links.py`'s own Python scan stays the only
-implementation. `toolkit doctor` (in `core/`) surfaces gaiafield's own dangling-edge count
+implementation. `unisphere doctor` (in `core/`) surfaces gaiafield's own dangling-edge count
 separately, as a graph-level cross-check, not a replacement for this check.
 
 ### Inferred edges (v2)
@@ -215,7 +215,7 @@ after the deterministic graph-context step, it fetches inferred candidates for t
 proposed placement's top matches and presents them as a separately labeled, report-only
 block in the Phase 1 handoff — never merged into the deterministic backlink/bridge lists.
 
-`toolkit doctor` (in `core/`) gains an `inference` sub-section under `graph`: model name,
+`unisphere doctor` (in `core/`) gains an `inference` sub-section under `graph`: model name,
 high/low gates, and inferred/ambiguous edge counts when `gaiafield stats` reports them;
 `"not inferred"` when a v2 binary's index exists but `gaiafield infer` hasn't run yet;
 `"engine lacks inference"` for a v1 binary whose `stats` output has no inference fields at
@@ -286,7 +286,7 @@ all. Same "surfaces, never mutates" character as the rest of doctor — it never
 
 ## Evals
 
-`evals/run.py` runs 21 capability evals against `./vault`, emitting JSON
+`evals/run.py` runs 25 capability evals against `./vault`, emitting JSON
 `{eval, pass, detail}` per check. The table below covers search, graph, lint and the generated
 views; the four judgment evals (`distill_judge`, `link_adjudication`, `search_judge`, `typed_maintenance`)
 run offline against a stubbed transport in CI and, with `TOOLKIT_EVAL_LIVE_JEV=1` and a

@@ -1,4 +1,4 @@
-"""The `unisphere` CLI (alias `toolkit`) as an interface: the catalogue agents start from, `status`, `search`/`graph`,
+"""The `unisphere` CLI as an interface: the catalogue agents start from, `status`, `search`/`graph`,
 `link`, and the plain-vs-coloured text people read. [earned: 2026-09-28]"""
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ def test_status_text_names_every_section(tmp_path, monkeypatch, capsys):
 
 needs_engines = pytest.mark.skipif(
     knowledge.farsight_binary() is None or knowledge.gaiafield_binary() is None,
-    reason="engines not installed (toolkit engines install)",
+    reason="engines not installed (unisphere engines install)",
 )
 
 
@@ -186,11 +186,10 @@ def test_link_writes_a_shim_and_never_clobbers_foreign_files(tmp_path, monkeypat
     assert result["links"][0] == {"name": "unisphere", "path": str(bin_dir / "unisphere"), "action": "created"}
     assert f"--project {REPO_ROOT}" in shim and f"TOOLKIT_VAULT={tmp_path / 'MyVault'}" in shim
     assert (bin_dir / "unisphere").stat().st_mode & 0o111
-    alias = next(r for r in result["links"] if r["name"] == "toolkit")
-    assert alias["action"] == "created" and (bin_dir / "toolkit").resolve() == (bin_dir / "unisphere").resolve()
+    assert all(r["name"] != "toolkit" for r in result["links"]) and not (bin_dir / "toolkit").exists()
 
     again = linker.link(REPO_ROOT, bin_dir, None)
-    assert [r["action"] for r in again["links"][:2]] == ["updated", "updated"]
+    assert again["links"][0]["action"] == "updated"
     assert "TOOLKIT_VAULT" not in (bin_dir / "unisphere").read_text(encoding="utf-8")
 
     (bin_dir / "unisphere").write_text("#!/bin/sh\necho someone else's\n", encoding="utf-8")
@@ -204,7 +203,7 @@ def test_link_writes_a_shim_and_never_clobbers_foreign_files(tmp_path, monkeypat
             assert (bin_dir / row["name"]).is_symlink()
 
 
-def test_link_replaces_the_old_toolkit_shim_but_not_a_foreign_symlink(tmp_path, monkeypatch):
+def test_link_removes_its_old_toolkit_entry_but_not_foreign_files(tmp_path, monkeypatch):
     monkeypatch.setattr(linker, "OBSIDIAN_APP_CLI", tmp_path / "no-obsidian")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -214,7 +213,14 @@ def test_link_replaces_the_old_toolkit_shim_but_not_a_foreign_symlink(tmp_path, 
     (bin_dir / "gaiafield").symlink_to(elsewhere)
 
     rows = {r["name"]: r for r in linker.link(REPO_ROOT, bin_dir, None)["links"]}
-    assert rows["toolkit"]["action"] == "updated" and (bin_dir / "toolkit").is_symlink()
+    assert rows["toolkit"]["action"] == "removed" and not (bin_dir / "toolkit").exists()
+
+    (bin_dir / "toolkit").symlink_to(bin_dir / "unisphere")  # the alias an earlier link wrote
+    assert {r["name"]: r for r in linker.link(REPO_ROOT, bin_dir, None)["links"]}["toolkit"]["action"] == "removed"
+
+    (bin_dir / "toolkit").write_text("#!/bin/sh\necho another tool\n", encoding="utf-8")
+    assert "toolkit" not in {r["name"] for r in linker.link(REPO_ROOT, bin_dir, None)["links"]}
+    assert (bin_dir / "toolkit").read_text(encoding="utf-8") == "#!/bin/sh\necho another tool\n"
     assert rows["gaiafield"]["action"] == "skipped"
     assert (bin_dir / "gaiafield").resolve() == elsewhere.resolve(), "a foreign symlink was replaced"
 
@@ -257,10 +263,12 @@ def test_unreadable_dlq_entry_counts_as_open(tmp_path):
     assert vault.dlq_status(tmp_path)["open"] == 1
 
 
-def test_toolkit_is_an_alias_of_unisphere(capsys):
+def test_the_cli_is_unisphere_only(capsys):
+    """Renamed from `toolkit` on 2026-09-28, with no alias left behind."""
     import tomllib
 
     scripts = tomllib.loads((REPO_ROOT / "core" / "pyproject.toml").read_text(encoding="utf-8"))["project"]["scripts"]
-    assert scripts["unisphere"] == scripts["toolkit"] == "toolkit_core.cli:main"
+    assert scripts == {"unisphere": "toolkit_core.cli:main"}
+    assert cli._build_parser().prog == "unisphere"
     _, data = run_json(capsys, "commands")
     assert all(c["example"].startswith("unisphere ") for c in data["commands"])

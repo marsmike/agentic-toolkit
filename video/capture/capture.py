@@ -15,7 +15,7 @@ each README command in `env -i` and record it with record.py into
 changes, change them here and re-capture.
 
 Only the `claude` binary is taken from this machine: PREREQ_BIN holds a
-symlink to it and nothing else, so no installed toolkit leaks onto PATH.
+symlink to it and nothing else, so no installed unisphere leaks onto PATH.
 """
 import platform
 import subprocess
@@ -30,7 +30,7 @@ PREREQ_BIN = Path("/private/tmp/prereq-bin")
 HERE = Path(__file__).resolve().parent
 COLS, ROWS = 120, 32
 
-# $HOME/.local/bin is where `uv tool install` puts `toolkit` (what
+# $HOME/.local/bin is where `uv tool install` puts `unisphere` (what
 # `uv tool update-shell` adds for a newcomer).
 PATH = f"{HOME}/.local/bin:{PREREQ_BIN}:/usr/bin:/bin:/opt/homebrew/bin"
 ENV = {"HOME": str(HOME), "PATH": PATH, "TERM": "xterm-256color", "LANG": "en_US.UTF-8"}
@@ -40,14 +40,14 @@ PATHS = {
     # README "New here" block.
     "headline": [
         ("install", f"uv tool install git+{REPO}#subdirectory=core"),
-        ("engines", "toolkit engines install"),
+        ("engines", "unisphere engines install"),
         ("plugins", "claude plugin marketplace add marsmike/agentic-toolkit"),
-        ("demo", "toolkit demo"),
+        ("demo", "unisphere demo"),
     ],
     # README "From source" line.
     "from-source": [
         ("clone", f"git clone {REPO}"),
-        ("demo", "cd agentic-toolkit && uv run toolkit demo"),
+        ("demo", "cd agentic-toolkit && uv run unisphere demo"),
         ("plugins", "cd agentic-toolkit && claude plugin marketplace add ."),
     ],
     # NOT in the README: From source plus the two fixes the verbatim run
@@ -55,8 +55,8 @@ PATHS = {
     # `add ./` is the accepted local form). Evidence for decision D6.
     "from-source-fixed": [
         ("clone", f"git clone {REPO}"),
-        ("engines", "cd agentic-toolkit && uv run toolkit engines install"),
-        ("demo", "cd agentic-toolkit && uv run toolkit demo"),
+        ("engines", "cd agentic-toolkit && uv run unisphere engines install"),
+        ("demo", "cd agentic-toolkit && uv run unisphere demo"),
         ("plugins", "cd agentic-toolkit && claude plugin marketplace add ./"),
     ],
 }
@@ -70,8 +70,8 @@ SESSIONS = {
     "from-source-main-0dd21a7": [
         f"git clone {REPO}",
         "cd agentic-toolkit",
-        "uv run toolkit engines install",
-        "uv run toolkit demo",
+        "uv run unisphere engines install",
+        "uv run unisphere demo",
         "claude plugin marketplace add ./",
     ],
 }

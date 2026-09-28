@@ -1,4 +1,4 @@
-"""Terminal rendering for the human side of the `toolkit` CLI. The agent side is `--json`.
+"""Terminal rendering for the human side of the `unisphere` CLI. The agent side is `--json`.
 
 Colour only on a TTY, never with NO_COLOR set or TERM=dumb (https://no-color.org), so piped or
 logged text output stays plain. No dependency: a handful of ANSI codes is all the CLI needs.

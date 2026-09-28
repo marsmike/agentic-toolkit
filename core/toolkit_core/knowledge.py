@@ -1,7 +1,7 @@
-"""Graph status for `toolkit doctor`: gaiafield binary discovery + a `stats` call.
+"""Graph status for `unisphere doctor`: gaiafield binary discovery + a `stats` call.
 
 Same preference chain as `plugins/obsidian/scripts/graph.py` (`TOOLKIT_GAIAFIELD_BIN` env
-var, else `gaiafield` on PATH, else the well-known `toolkit engines install` dir) —
+var, else `gaiafield` on PATH, else the well-known `unisphere engines install` dir) —
 deliberately reimplemented rather than imported, since `core` never depends on a plugin
 (docs/PLAN.md's plugin-independence rule runs both directions: plugins depend on
 core/contract only, and core stays plugin-agnostic too). The well-known-dir step lives
@@ -41,8 +41,8 @@ QUERY_TIMEOUT = 30
 
 def gaiafield_binary() -> str | None:
     """`TOOLKIT_GAIAFIELD_BIN` env var wins; then a `gaiafield` binary on PATH; then the
-    well-known `toolkit engines install` dir (`engines.binary_path`) — the one added
-    probe step that makes "clone + uv tool install + toolkit engines install" alone
+    well-known `unisphere engines install` dir (`engines.binary_path`) — the one added
+    probe step that makes "clone + uv tool install + unisphere engines install" alone
     enough, no PATH/env wiring required."""
     env = os.environ.get(GAIAFIELD_BIN_ENV)
     if env:
@@ -114,7 +114,7 @@ def _inference_status(stats: dict) -> dict:
 
 
 def graph_status(vault_path: Path) -> dict:
-    """Graph section for `toolkit doctor`. Never raises: every failure mode collapses
+    """Graph section for `unisphere doctor`. Never raises: every failure mode collapses
     into a `present`/`note` pair the caller can render directly, matching the rest of
     doctor's report shape."""
     binary = gaiafield_binary()
@@ -161,7 +161,7 @@ def graph_status(vault_path: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# `toolkit demo` support — real, best-effort calls to both engines. Every function here
+# `unisphere demo` support — real, best-effort calls to both engines. Every function here
 # returns None (never raises) on any failure so demo.py can treat "engine call didn't
 # work" as just another step to report honestly, not a crash. This deliberately
 # duplicates a slice of plugins/obsidian/scripts/graph.py's shape (ensure_index /

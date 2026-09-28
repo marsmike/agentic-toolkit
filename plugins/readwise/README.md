@@ -98,7 +98,7 @@ any script via `uv run --project scripts python3 scripts/<name>.py ...` from the
 
 `00_Memory/dlq/` via `scripts/vault_utils.write_dlq_note()` — same convention the obsidian
 plugin's scripts use (`description`/`status`/`created`/`confidence` frontmatter, a "What
-happened / Why it's here / Resolution" body). `toolkit doctor` (in `core/`) surfaces the
+happened / Why it's here / Resolution" body). `unisphere doctor` (in `core/`) surfaces the
 count, and `Now.md` lists the open ones.
 
 ## Dedup-before-distill

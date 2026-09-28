@@ -7,7 +7,7 @@ SETUP
      export TOOLKIT_REPO="$PWD" CLAUDE_PLUGIN_ROOT="$PWD/plugins/obsidian"
      export TOOLKIT_GAIAFIELD_MODEL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/agentic-toolkit/models/potion-base-8M"
    If `uv` is missing: pip install uv
-   Engines: uv run --locked toolkit engines install
+   Engines: uv run --locked unisphere engines install
    (farsight and gaiafield, sha256-verified, into ~/.local/share/agentic-toolkit/bin, where
    search.py and graph.py look; about 15 s. They are the vault's interface: without them search
    falls back to BM25 and the dossier has no graph. If the install fails, go on and say so in
@@ -82,5 +82,5 @@ available, skip it and say so.
 
 FINISH with one line: end's "summary" exactly as printed (it counts what came in from the
 ledgers), the commit, whether it was pushed, whether the report was published, and the engines
-(`farsight <version>, gaiafield <version>` from `uv run --locked toolkit engines status`, or
+(`farsight <version>, gaiafield <version>` from `uv run --locked unisphere engines status`, or
 "engines missing"). No number the scripts did not print.

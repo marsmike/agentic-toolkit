@@ -1,4 +1,4 @@
-"""`toolkit engines` — fetch and track the prebuilt Rust engine binaries (farsight,
+"""`unisphere engines` — fetch and track the prebuilt Rust engine binaries (farsight,
 gaiafield) from GitHub Releases, so a `uv tool install` user never hand-downloads a
 binary or sets an env var.
 
@@ -107,7 +107,7 @@ def is_windows_triple(triple: str) -> bool:
 def install_dir() -> Path:
     """`$XDG_DATA_HOME/agentic-toolkit/bin`, else `~/.local/share/agentic-toolkit/bin`.
     This exact path (mirrored, not imported, in the plugin-side discovery chains — see
-    module docstring) is what makes `toolkit engines install` alone enough: no PATH or
+    module docstring) is what makes `unisphere engines install` alone enough: no PATH or
     env var wiring required afterwards."""
     xdg = os.environ.get("XDG_DATA_HOME")
     base = Path(xdg).expanduser() if xdg else Path.home() / ".local" / "share"
@@ -371,7 +371,7 @@ def _installed_binary_problem(entry: dict, path: Path) -> str | None:
 
 def status_all(fetch: bool = True) -> list[dict]:
     """Installed vs. latest for every known engine — read-only, never downloads. With
-    `fetch=False` no network call is made and `latest_tag` stays None (`toolkit status --offline`)."""
+    `fetch=False` no network call is made and `latest_tag` stays None (`unisphere status --offline`)."""
     manifest = read_manifest()
     triple = target_triple()
     fetch_error: str | None = None
@@ -402,7 +402,7 @@ def status_all(fetch: bool = True) -> list[dict]:
         }
         notes = []
         if problem:
-            notes.append(f"{problem}: run `toolkit engines install --force`")
+            notes.append(f"{problem}: run `unisphere engines install --force`")
         if fetch_error and latest_tag is None:
             notes.append(f"could not check latest release: {fetch_error}")
         if notes:

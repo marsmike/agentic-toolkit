@@ -1,5 +1,5 @@
 <!--
-Maintainers: this file is installed by `toolkit vault init` as the AGENTS.md of every new vault (Claude Code, Codex and others read it).
+Maintainers: this file is installed by `unisphere vault init` as the AGENTS.md of every new vault (Claude Code, Codex and others read it).
 It is always loaded, so it carries only hard requirements — rules that must hold even when no
 skill has been invoked. Procedural depth (the full distill workflow, placement heuristics, failure
 modes by name) belongs in a skill's references/, loaded only on invocation. If you're tempted to

@@ -6,7 +6,7 @@
 
     uv run video/scripts/build_graph.py [--gaiafield PATH]
 
-gaiafield indexes vault/ into a throwaway SQLite file (the same extraction `toolkit demo` reports as
+gaiafield indexes vault/ into a throwaway SQLite file (the same extraction `unisphere demo` reports as
 nodes=83 edges=783); this script reads its nodes and resolved edges and places them with a seeded
 force layout, so every render draws the same picture. The scenes' highlights (search hits, the
 neighbours note, the INFERRED pairs) are looked up by path from the capture the video replays, so

@@ -1,7 +1,7 @@
-"""`unisphere` (alias `toolkit`): one front door to the vault, its engines and the plugins, for people
-and agents. Named for the Commonwealth's unisphere, the network everything connects through, next to
-the engines' own Hamilton names (farsight, gaiafield). `toolkit` stays as an alias, so every existing
-script, skill and routine that calls it keeps working.
+"""`unisphere`: one front door to the vault, its engines and the plugins, for people and agents.
+Named for the Commonwealth's unisphere, the network everything connects through, next to the
+engines' own Hamilton names (farsight, gaiafield). It was `toolkit` until 2026-09-28; the Python
+package keeps its name (`toolkit_core`), so `python -m toolkit_core.cli` reaches it in any version.
 
 People get readable, coloured text (colour only on a TTY; NO_COLOR is honoured). Agents pass
 `--json` to any command for a stable object, and start from `unisphere commands --json`: every
@@ -173,7 +173,7 @@ def cmd_profile(args: argparse.Namespace) -> int:
 
     merged = profile.resolve_profile(resolution.path, args.plugin)
     result = {"ok": True, "plugin": args.plugin, "vault_path": str(resolution.path), "profile": merged}
-    # `toolkit profile` always prints JSON: it's a data command, not a status report.
+    # `unisphere profile` always prints JSON: it's a data command, not a status report.
     print(_dumps(result))
     return 0
 
@@ -218,7 +218,7 @@ def _render_engines_status(result: dict) -> str:
         elif r["installed_tag"]:
             mark = "update available"
         else:
-            mark = "run: toolkit engines install"
+            mark = "run: unisphere engines install"
         lines.append(f"  {r['engine']:<10} installed={installed:<20} latest={latest:<20} {mark}")
         if r.get("note"):
             lines.append(f"    {r['note']}")
@@ -523,7 +523,7 @@ def _render_link(result: dict) -> str:
     st = ui.Style()
     out = []
     for r in result["links"]:
-        level = {"created": "ok", "updated": "ok", "skipped": "warn"}[r["action"]]
+        level = {"created": "ok", "updated": "ok", "removed": "info", "skipped": "warn"}[r["action"]]
         target = st.dim(f" → {r['target']}") if r.get("target") else ""
         note = st.dim(f"  ({r['note']})") if r.get("note") else ""
         out.append(f"  {st.mark(level)} {r['name']:<10} {r['action']:<8} {r['path']}{target}{note}")
@@ -621,7 +621,7 @@ CATALOG = {
         "example": "unisphere demo",
     },
     "link": {
-        "summary": "Put unisphere (and its alias toolkit), the engines and Obsidian's CLI on PATH (~/.local/bin); --vault sets its default vault.",
+        "summary": "Put unisphere, the engines and Obsidian's CLI on PATH (~/.local/bin); --vault sets its default vault.",
         "json": "{ok, bin_dir, on_path, vault, links[{name, path, action, target}]}",
         "example": "unisphere link --vault ~/Documents/TheVoid",
     },
@@ -693,7 +693,6 @@ def catalog(parser: argparse.ArgumentParser) -> dict:
         "ok": True,
         "conventions": {
             "json": "add --json to any command for one JSON object on stdout; text output is for people and may change",
-            "alias": "toolkit is the same command under its older name",
             "exit_codes": {"0": "ok", "1": "a problem or an error — the JSON carries ok:false and error or problems",
                            "2": "usage error"},
             "vault": "TOOLKIT_VAULT, else ./vault at the repo root",
@@ -706,7 +705,7 @@ def catalog(parser: argparse.ArgumentParser) -> dict:
 
 def _render_catalog(result: dict) -> str:
     st = ui.Style()
-    out = [st.bold("unisphere") + st.dim(" (alias toolkit) — every command takes --json for agents"), ""]
+    out = [st.bold("unisphere") + st.dim(" — every command takes --json for agents"), ""]
     wide = max(len(c["name"]) for c in result["commands"])
     for c in result["commands"]:
         args = " ".join(a["name"].upper() if a["positional"] else f"[{a['name']}]" for a in c["arguments"])
@@ -729,19 +728,13 @@ def cmd_commands(args: argparse.Namespace) -> int:
 # --- argument parsing ------------------------------------------------------------------
 
 
-def _prog() -> str:
-    """Usage lines name the command as it was typed: `toolkit` scripts see `toolkit`."""
-    name = Path(sys.argv[0]).name
-    return name if name in ("unisphere", "toolkit") else "unisphere"
-
-
 def _build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="emit JSON output")
 
     parser = argparse.ArgumentParser(
-        prog=_prog(), parents=[common],
-        description="unisphere (alias toolkit): the agentic-toolkit CLI. People read the text; agents add --json and "
+        prog="unisphere", parents=[common],
+        description="unisphere: the agentic-toolkit CLI. People read the text; agents add --json and "
                     "start from `unisphere commands --json`.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -793,9 +786,9 @@ def _build_parser() -> argparse.ArgumentParser:
     sub.add_argument("--include-ambiguous", action="store_true", help="also the AMBIGUOUS band")
 
     link_parser = subparsers.add_parser("link", parents=[common], help=CATALOG["link"]["summary"])
-    link_parser.add_argument("--vault", help="default TOOLKIT_VAULT for the toolkit shim (an exported value wins)")
+    link_parser.add_argument("--vault", help="default TOOLKIT_VAULT for the unisphere shim (an exported value wins)")
     link_parser.add_argument("--bin-dir", help="where to link (default ~/.local/bin)")
-    link_parser.add_argument("--force", action="store_true", help="replace files there that toolkit did not write")
+    link_parser.add_argument("--force", action="store_true", help="replace files there that unisphere did not write")
 
     subparsers.add_parser("commands", parents=[common], help=CATALOG["commands"]["summary"])
 
