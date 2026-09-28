@@ -4,6 +4,26 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Battle-tested against the real vault, Reader, Kagi, Tavily and the cloud runs (obsidian 3.2.1,
+  radar 3.3.1, readwise 3.1.1, gaiafield 0.2.6).** Each feature of the week ran on live data in a
+  scratch copy; what broke is fixed with a test:
+  - readwise: file names X links as domains (`train.py`, `program.md`) no longer land in a tweet
+    capture's `links:`, while real sites on `.sh`, `.rs`, `.pl` and `.cc` still do.
+  - obsidian: Now's "Enriched this week" no longer drops a note added and enriched the same week;
+    the run report shows one line per item, "ingested … UTC · distilled … UTC", and the notes'
+    real titles (dots kept); the dashboard shows UTC dates in English, "1 capture", GitHub
+    releases with their repo name, and interests renamed in the profile under their new names
+    (`aliases:` in the interests note), with truly retired ones last in one dimmed row.
+  - radar: the Signal Radar's labels and dots keep clear of each other and of the ring labels,
+    long item titles wrap, a name found once in one feed no longer claims that feed's sector,
+    early warning shows only real signals, times are UTC; the weekly digest, trend and feeds
+    count a renamed interest's history under its new name.
+  - unisphere and gaiafield: status shows the routines' true UTC times; ASCII, colour and width
+    settings reach status, doctor and link; errors name the subcommand and never show Python or
+    Rust internals; `link` re-runs report "unchanged"; negative `--limit`/`--depth` are refused;
+    gaiafield's `candidates`/`surprise` text output reads as text.
+  [earned: 2026-09-28 — the owner's goal: every feature of the week battle-tested and working]
+
 - **Every capture and note carries when it came in and when it was distilled (obsidian 3.2.0,
   readwise 3.1.0, radar 3.3.0).** Two contract fields, `ingested_at` and `distilled_at` (ISO 8601
   UTC, `2026-09-28T18:59:34Z`): every capture writer stamps `ingested_at`; `retire_capture.py`

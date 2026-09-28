@@ -399,7 +399,7 @@ MODEL_FAMILIES = (
 )
 
 
-def _interest_vocab(it: "interests_mod.Interest") -> set[str]:
+def _interest_vocab(it: interests_mod.Interest) -> set[str]:
     """Lowercase, non-generic words from an interest's own name, gloss, tags and queries."""
     text = " ".join([it.name, it.gloss, *it.tags, *it.queries])
     words = {w.lower() for w in re.findall(r"[A-Za-z][A-Za-z0-9+#.'-]*", text)}
@@ -419,7 +419,7 @@ def _named_for(entity_name: str, vocab: set[str]) -> bool:
     return any(head in fam and fam & vocab for fam in MODEL_FAMILIES)
 
 
-def assign_sectors(blips: list[dict], names: dict[str, str], interest_list: "list[interests_mod.Interest]" = ()) -> list[dict]:
+def assign_sectors(blips: list[dict], names: dict[str, str], interest_list: list[interests_mod.Interest] = ()) -> list[dict]:
     vocabs = {it.id: _interest_vocab(it) for it in interest_list}
     counts: Counter = Counter()
     for b in blips:

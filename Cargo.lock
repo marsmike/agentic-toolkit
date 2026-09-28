@@ -488,7 +488,7 @@ dependencies = [
 
 [[package]]
 name = "gaiafield"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "clap",
  "model2vec-rs",

@@ -87,9 +87,9 @@ def link(repo_root: Path, bin_dir: Path, vault_path: Path | None, force: bool = 
         # this — but str() on a plain message (vs. one built from an errno) never shows
         # "[Errno 17] File exists: '…'". [battle-test 2026-09-28: `--bin-dir` naming a file gave
         # the raw Python errno text instead of a plain sentence]
-        raise OSError(f"{bin_dir} exists and is not a directory — pass a different --bin-dir")
+        raise OSError(f"{bin_dir} exists and is not a directory — pass a different --bin-dir") from None
     except PermissionError:
-        raise OSError(f"{bin_dir} is not writable — check its permissions or pass a different --bin-dir")
+        raise OSError(f"{bin_dir} is not writable — check its permissions or pass a different --bin-dir") from None
     results = []
 
     shim_content = shim_text(repo_root, vault_path)

@@ -218,12 +218,12 @@ def test_status_behind_checkout_hints_name_the_directory(tmp_path):
             "pipeline": {}}
     toolkit_problems = status._problems({**base, "toolkit": {"found": True, "behind": 1, "path": "/tk"},
                                           "vault": {"found": True, "dlq": {}, "checkout": {}}})
-    assert f"git -C /tk pull" in toolkit_problems[0]["detail"]
+    assert "git -C /tk pull" in toolkit_problems[0]["detail"]
 
     vault_problems = status._problems({**base, "toolkit": {"found": False},
                                         "vault": {"found": True, "path": "/v", "dlq": {},
                                                   "checkout": {"behind": 1}}})
-    assert f"git -C /v pull" in vault_problems[0]["detail"]
+    assert "git -C /v pull" in vault_problems[0]["detail"]
 
 
 # --- search and graph ---------------------------------------------------------------------

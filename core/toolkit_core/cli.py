@@ -257,7 +257,7 @@ def _format_last_run_utc(iso: str) -> str:
         return iso
     if dt.tzinfo is None:
         return dt.strftime("%Y-%m-%d %H:%M")
-    return dt.astimezone(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M") + " UTC"
+    return dt.astimezone(datetime.UTC).strftime("%Y-%m-%d %H:%M") + " UTC"
 
 
 def _render_status(result: dict) -> str:
