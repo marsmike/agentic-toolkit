@@ -93,6 +93,7 @@ button, input { font: inherit; color: inherit; }
 .irow .c { font: 12.5px ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }
 .irow .c.s { color: var(--text); font-weight: 600; }
 .irow.head { cursor: default; } .irow.head .c, .irow.head .n { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.irow.retired { opacity: .55; } .irow.retired:hover .n, .irow.retired[aria-pressed="true"] .n { color: var(--text-2); }
 .rise { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--good); border: 1px solid currentColor; border-radius: 4px; padding: 1px 5px; flex: none; }
 .ritems { display: grid; gap: 0; }
 .ritem { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); align-items: start; }
@@ -261,6 +262,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
 (() => {
   "use strict";
   const DATA = JSON.parse(document.getElementById("data").textContent) || {notes: [], runs: [], inbox: 0, vault: "TheVoid"};
+  const RETIRED_ID = "retired";  // radar_ledger.RETIRED_ID — a renamed/dropped interest's rows, aggregated but never live
   const TYPES = ["tweet", "article", "video", "paper", "repo", "podcast", "own"];
   const TYPE_LABEL = {tweet: "Tweet", article: "Article", video: "Video", paper: "Paper", repo: "Repo", podcast: "Podcast", own: "Own / other"};
   const RANGES = [["today", "Today"], ["yesterday", "Yesterday"], ["7", "7 days"], ["30", "30 days"], ["all", "12 weeks"]];
@@ -503,12 +505,16 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
       for (const id of it.strong) { const a = agg[id] = agg[id] || {w: 0, s: 0, p: 0}; a.s++; if (it.promoted) a.p++; }
     }
     if (S.interest && !agg[S.interest]) agg[S.interest] = {w: 0, s: 0, p: 0};
-    const rows = Object.entries(agg).sort((a, b) => b[1].s - a[1].s || b[1].w - a[1].w || iname(a[0]).localeCompare(iname(b[0])));
+    // "Retired interests" (a renamed/dropped id's rows, all collapsed into one bucket) sorts last
+    // whatever its counts — it is history, not a live interest to compare against the rest.
+    const rows = Object.entries(agg).sort((a, b) =>
+      a[0] === RETIRED_ID ? (b[0] === RETIRED_ID ? 0 : 1) : b[0] === RETIRED_ID ? -1 :
+      b[1].s - a[1].s || b[1].w - a[1].w || iname(a[0]).localeCompare(iname(b[0])));
     const judged = Object.values(RADAR.interests).reduce((m, i) => Math.max(m, i.judged || 0), 0);
     document.getElementById("ihint").textContent = judged ? `${judged} item${judged === 1 ? "" : "s"} judged in 12 weeks · click an interest` : "no radar data yet";
     const head = el("div", {class: "irow head"}, el("span", {class: "n", text: "interest"}), el("span", {class: "c", text: "worth"}), el("span", {class: "c", text: "strong"}), el("span", {class: "c", text: "promoted"}));
     document.getElementById("interests").replaceChildren(head, ...(rows.length ? rows.map(([id, a]) =>
-      el("button", {class: "irow", "aria-pressed": String(S.interest === id), onclick: () => set("interest", id), "aria-label": `${iname(id)}: ${a.s} strong`},
+      el("button", {class: "irow" + (id === RETIRED_ID ? " retired" : ""), "aria-pressed": String(S.interest === id), onclick: () => set("interest", id), "aria-label": `${iname(id)}: ${a.s} strong`},
         el("span", {class: "n"}, el("span", {text: iname(id)}), RADAR.rising.includes(id) ? el("span", {class: "rise", text: "rising"}) : null),
         el("span", {class: "c", text: String(a.w)}), el("span", {class: "c s", text: String(a.s)}), el("span", {class: "c", text: String(a.p)}))) :
       [el("div", {class: "empty", text: "Nothing judged in this range."})]));
@@ -519,7 +525,9 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
     if (!weeks.length) { box.replaceChildren(el("div", {class: "empty", text: "No weeks yet."})); lg.replaceChildren(); return; }
     const totals = {};
     for (const w of weeks) for (const [id, n] of Object.entries(RADAR.weeks[w])) totals[id] = (totals[id] || 0) + n;
-    const top = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
+    // "Retired interests" never earns its own column/colour here — it folds into "Other" below,
+    // the same as every id outside the top 3 (excluding it from the candidates does that for free).
+    const top = Object.entries(totals).filter(([id]) => id !== RETIRED_ID).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
     const series = [...top, "other"];
     const val = (w, s) => s === "other" ? Object.entries(RADAR.weeks[w]).filter(([id]) => !top.includes(id)).reduce((a, [, n]) => a + n, 0) : (RADAR.weeks[w][s] || 0);
     const tot = w => series.reduce((a, s) => a + val(w, s), 0);
@@ -555,7 +563,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
           src ? el("a", {class: "t", href: src, target: "_blank", rel: "noopener noreferrer", text: it.title}) : el("span", {class: "t", text: it.title}),
           el("div", {class: "m"}, el("span", {text: [it.feed, it.kind, dayName(it.day)].filter(Boolean).join(" · ")}),
             status ? el("span", {class: "st " + status[0], text: status[1]}) : null,
-            ...it.strong.slice(0, 3).map(id => el("button", {class: "tag", text: iname(id), onclick: () => set("interest", id)})))));
+            ...it.strong.filter(id => id !== RETIRED_ID).slice(0, 3).map(id => el("button", {class: "tag", text: iname(id), onclick: () => set("interest", id)})))));
     }), list.length > S.rshown ? el("button", {class: "more", onclick: () => { S.rshown += 40; render(); }, text: `Show more (${list.length - S.rshown} left)`}) : null);
   }
 
