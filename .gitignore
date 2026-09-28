@@ -16,6 +16,9 @@ vault/.trash/
 # gaiafield's generated graph store — regenerable via `gaiafield index`, never committed
 vault/.gaiafield/
 
+# The cheat sheet's intermediate page (docs/cheatsheet/build.py writes it next to the PDF and PNG)
+docs/cheatsheet/cheatsheet.html
+
 # Local
 .DS_Store
 .env

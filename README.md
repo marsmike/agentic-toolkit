@@ -127,6 +127,12 @@ and an interactive graph view. There is no separate docs tree to drift out of
 date, and the docs are periodically verified *against the codebase* — claims
 that stop being true are treated as bugs.
 
+**The cheat sheet** — every command, skill and routine on one A3 page, in the explainer's design:
+[PDF](docs/cheatsheet/agentic-toolkit-cheatsheet.pdf) · [PNG](docs/cheatsheet/agentic-toolkit-cheatsheet.png)
+(rebuild with `python3 docs/cheatsheet/build.py`).
+
+<a href="docs/cheatsheet/agentic-toolkit-cheatsheet.pdf"><img alt="agentic-toolkit cheat sheet" src="docs/cheatsheet/agentic-toolkit-cheatsheet.png" width="720"></a>
+
 Preview locally:
 
 ```bash
