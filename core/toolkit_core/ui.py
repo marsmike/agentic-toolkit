@@ -50,8 +50,10 @@ class Style:
         return self._wrap(text, "cyan")
 
     def mark(self, level: str) -> str:
-        symbol, color = MARKS[level]
-        return self._wrap(symbol, color)
+        from toolkit_core import term  # local import: term.py doesn't import ui, keep the edge one-directional
+
+        _, color = MARKS[level]
+        return self._wrap(term.glyph(level), color)
 
     def level(self, text: str, level: str) -> str:
         return self._wrap(text, MARKS[level][1])

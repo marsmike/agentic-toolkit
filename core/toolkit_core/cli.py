@@ -241,6 +241,25 @@ def cmd_demo(args: argparse.Namespace) -> int:
 # --- status ----------------------------------------------------------------------------
 
 
+def _format_last_run_utc(iso: str) -> str:
+    """Render a routine's ISO 8601 `last` timestamp as its true UTC wall time — labelled "UTC"
+    only when the string actually converts to one. This used to just take the first 16
+    characters of whatever string a routine reported (`iso[:16].replace("T", " ")`) and append
+    the literal " UTC" unconditionally: correct only when the source was already UTC, but
+    `watchdog.py`'s `facts["last_run"]` carries whatever offset the underlying git/ledger
+    timestamp had (e.g. a committer's local "+02:00"), so a two-hour-old run could show as
+    current. Naive (offset-less) or unparseable strings are shown as-is, with no "UTC" claim
+    this function can't back up. [battle-test 2026-09-28: `unisphere status` showed "last
+    2026-09-28 21:42 UTC" for a fact whose JSON was "2026-09-28T21:42:24+02:00" — 19:42 UTC]"""
+    try:
+        dt = datetime.datetime.fromisoformat(iso)
+    except ValueError:
+        return iso
+    if dt.tzinfo is None:
+        return dt.strftime("%Y-%m-%d %H:%M")
+    return dt.astimezone(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M") + " UTC"
+
+
 def _render_status(result: dict) -> str:
     st = ui.Style()
     tk = result["toolkit"]
@@ -289,7 +308,7 @@ def _render_status(result: dict) -> str:
         level, tail = {
             "current": ("ok", "current"),
             "outdated": ("warn", f"{r['latest']} available — claude plugin update {r['plugin']}@{status.MARKETPLACE}"),
-            "orphaned": ("warn", "no longer in the marketplace — claude plugin uninstall"),
+            "orphaned": ("warn", f"no longer in the marketplace — claude plugin uninstall {r['plugin']}@{status.MARKETPLACE}"),
             "not-installed": ("info", "not installed"),
         }[r["state"]]
         rows.append(f"{st.mark(level)} {r['plugin']:<10} {' / '.join(versions):<8} {st.level(tail, level)}"
@@ -330,9 +349,9 @@ def _render_status(result: dict) -> str:
             rows += [f"{st.mark('bad')} {item.get('detail')}" for item in p.get("problems", [])]
         for r in routines:
             if r.get("last"):
-                when = r["last"][:16].replace("T", " ")
+                when = _format_last_run_utc(r["last"])
                 age = st.dim(f" ({r['age_hours']} h ago)") if r.get("age_hours") is not None else ""
-                rows.append(f"{st.mark('ok' if p.get('ok', True) else 'warn')} {r['name']}: last {when} UTC{age}"
+                rows.append(f"{st.mark('ok' if p.get('ok', True) else 'warn')} {r['name']}: last {when}{age}"
                             + (st.dim(f" — {r['note']}") if r.get("note") else ""))
             elif r.get("note"):
                 rows.append(f"{st.mark('info')} {r['name']}: {r['note']}"
@@ -398,10 +417,14 @@ def _note_lines(st: ui.Style, rank: str, note: dict, extra: str = "") -> list[st
     return lines
 
 
-def _render_search(result: dict) -> str:
+def _render_search(result: dict, limit: int | None = None) -> str:
     st = ui.Style()
     hits = result["results"]
     if not hits:
+        if limit == 0:
+            # "no notes match" is the wrong message here — the query may well have matches;
+            # --limit 0 is what actually produced an empty result. [battle-test 2026-09-28]
+            return f"--limit 0: nothing to show (not necessarily no matches) for {result['query']!r}"
         return f"no notes match {result['query']!r}"
     out = [st.dim(f"{len(hits)} note(s) for {result['query']!r} in {result['vault']}"), ""]
     for i, hit in enumerate(hits, 1):
@@ -421,7 +444,8 @@ def cmd_search(args: argparse.Namespace) -> int:
     if error:
         _error(args, error)
         return 1
-    _emit({"ok": True, "query": query, "vault": str(vault_path), "results": hits}, args.json, _render_search)
+    _emit({"ok": True, "query": query, "vault": str(vault_path), "results": hits}, args.json,
+          lambda r: _render_search(r, args.limit))
     return 0
 
 
@@ -953,14 +977,14 @@ def _render_catalog(result: dict) -> str:
     wide = max(len(c["name"]) for c in result["commands"])
     for c in result["commands"]:
         args = " ".join(a["name"].upper() if a["positional"] else f"[{a['name']}]" for a in c["arguments"])
-        out.append(f"  {st.accent(c['name'].ljust(wide))}  {c['summary']}")
+        out += ui.wrap_field(f"  {st.accent(c['name'].ljust(wide))}  ", c["summary"])
         if args:
-            out.append(f"  {' ' * wide}  {st.dim(args)}")
+            out += [st.dim(line) for line in ui.wrap(args, wide + 4)]
     out += ["", st.bold("companion CLIs")]
     for c in result["companions"]:
-        out.append(f"  {st.accent(c['cli'].ljust(wide))}  {c['use_for']}")
-        out.append(f"  {' ' * wide}  {st.dim('setup: ' + c['setup'])}")
-    out += ["", st.dim("agents: unisphere commands --json · exit 0 ok, 1 problem/error, 2 usage")]
+        out += ui.wrap_field(f"  {st.accent(c['cli'].ljust(wide))}  ", c["use_for"])
+        out += [st.dim(line) for line in ui.wrap(f"setup: {c['setup']}", wide + 4)]
+    out += [""] + [st.dim(line) for line in ui.wrap("agents: unisphere commands --json · exit 0 ok, 1 problem/error, 2 usage", 0)]
     return "\n".join(out)
 
 
@@ -999,12 +1023,31 @@ class _Parser(argparse.ArgumentParser):
             kwargs.pop("color", None)
             super().__init__(*args, **kwargs)
 
+    # Matches argparse's own "the following arguments are required: <dest>" message when the
+    # missing argument is one of this file's `add_subparsers(dest=...)` calls (`command`,
+    # `vault_command`, `graph_command`, `engines_command`) — never a real positional's dest
+    # (`note`, `path`, `plugin`, ...), which argparse phrases the same way but whose name IS the
+    # right word to show a user. [battle-test 2026-09-28: `unisphere vault`/`graph`/`engines`
+    # with no subcommand leaked "vault_command"/"graph_command"/"engines_command" — an internal
+    # Python variable name, not anything a user typed or would recognise]
+    _MISSING_SUBCOMMAND_RE = re.compile(r"^the following arguments are required: (\w*_?command)$")
+
     def error(self, message: str) -> None:  # type: ignore[override]
+        if self._MISSING_SUBCOMMAND_RE.match(message):
+            message = "a subcommand is required"
         raise _UsageError(self, message)
 
 
-def _sub(parser: argparse.ArgumentParser):
-    return parser.add_subparsers(dest="command", required=True)
+def _non_negative_int(value: str) -> int:
+    """argparse `type=` for `--limit`/`--depth`: these are forwarded straight into an engine's
+    (farsight's/gaiafield's) own argv, and a negative value used to sail through unisphere's own
+    `int()` parsing fine, only to be rejected downstream by the Rust engine's clap parser — whose
+    error text and usage line then leaked through verbatim, wildly inconsistent with this CLI's
+    own careful one-line errors everywhere else. [battle-test 2026-09-28]"""
+    n = int(value)
+    if n < 0:
+        raise argparse.ArgumentTypeError(f"must not be negative, got {n}")
+    return n
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -1048,7 +1091,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     search_parser = subparsers.add_parser("search", parents=[common], add_help=False, help=CATALOG["search"]["summary"])
     search_parser.add_argument("terms", nargs="+", help="One or more query words")
-    search_parser.add_argument("--limit", type=int, default=10, help="Maximum number of results to show (default: 10)")
+    search_parser.add_argument("--limit", type=_non_negative_int, default=10, help="Maximum number of results to show (default: 10)")
 
     graph_parser = subparsers.add_parser("graph", parents=[common], add_help=False, help=GROUP_HELP["graph"]["summary"])
     graph_subparsers = graph_parser.add_subparsers(dest="graph_command", required=True, parser_class=_Parser)
@@ -1059,7 +1102,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = graph_subparsers.add_parser("neighbors", parents=[graph_common], add_help=False,
                                        help=CATALOG["graph neighbors"]["summary"])
     sub.add_argument("note", help="A vault-relative note path or a bare note name (e.g. Gaiafield)")
-    sub.add_argument("--depth", type=int, default=1, help="How many hops out to follow (default: 1)")
+    sub.add_argument("--depth", type=_non_negative_int, default=1, help="How many hops out to follow (default: 1)")
     sub.add_argument("--direction", choices=("in", "out", "both"), default="both",
                       help="Follow links into the note, out of it, or both (default: both)")
     sub.add_argument("--include-inferred", action="store_true",
@@ -1072,7 +1115,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = graph_subparsers.add_parser("candidates", parents=[graph_common], add_help=False,
                                        help=CATALOG["graph candidates"]["summary"])
     sub.add_argument("note", help="A vault-relative note path or a bare note name (e.g. Gaiafield)")
-    sub.add_argument("--limit", type=int, default=10, help="Maximum number of candidates to show (default: 10)")
+    sub.add_argument("--limit", type=_non_negative_int, default=10, help="Maximum number of candidates to show (default: 10)")
     sub.add_argument("--include-ambiguous", action="store_true", help="Also include the lower-confidence AMBIGUOUS band")
 
     link_parser = subparsers.add_parser("link", parents=[common], add_help=False, help=CATALOG["link"]["summary"])
@@ -1150,19 +1193,26 @@ _EXAMPLE_COMMENT_CAP = 48  # brew/kubectl-style: align comments to one column, b
 
 def _example_lines(examples: list[tuple[str, str]], st: ui.Style | None = None) -> list[str]:
     """EXAMPLES rows, comments aligned to one column the way brew/kubectl do it: the pad is the
-    longest command in *this* block plus 2, capped at `_EXAMPLE_COMMENT_CAP`. A command past the
-    cap gets its comment dimmed on the next line instead of pushing the whole column out."""
+    longest command in *this* block plus 2, capped at `_EXAMPLE_COMMENT_CAP` (and further capped
+    to fit a narrow terminal — `ui.width()`, so `COLUMNS=60` etc are honoured the same way every
+    other help section is). A command whose padded line wouldn't fit the terminal gets its
+    comment wrapped and dimmed on the following line(s) instead of pushing the column out past
+    the edge. [battle-test 2026-09-28: at COLUMNS=60 an EXAMPLES row was 91 characters wide]"""
     st = st or ui.Style()
-    short = [len(cmd) for cmd, _ in examples if len(cmd) <= _EXAMPLE_COMMENT_CAP]
-    pad = min(max(short, default=_EXAMPLE_COMMENT_CAP) + 2, _EXAMPLE_COMMENT_CAP)
+    avail = ui.width()
+    cap = min(_EXAMPLE_COMMENT_CAP, max(4, avail - 10))
+    short = [len(cmd) for cmd, _ in examples if len(cmd) <= cap]
+    pad = min(max(short, default=cap) + 2, cap)
     out = []
     for cmd, note in examples:
-        comment = st.dim(f"# {note}")
-        if len(cmd) > _EXAMPLE_COMMENT_CAP:
+        comment_text = f"# {note}"
+        one_line = f"  {cmd.ljust(pad)}  {comment_text}"
+        if len(cmd) > cap or len(one_line) > avail:
             out.append(f"  {cmd}")
-            out.append(f"      {comment}")
+            for line in ui.wrap(comment_text, 6):
+                out.append(st.dim(line))
         else:
-            out.append(f"  {cmd.ljust(pad)}  {comment}")
+            out.append(f"  {cmd.ljust(pad)}  {st.dim(comment_text)}")
     return out
 
 
@@ -1215,17 +1265,17 @@ def _top_level_help_text(st: ui.Style) -> str:
 
     docs_url = "https://marsmike.github.io/agentic-toolkit/"
     book = term.glyph("book")
-    out += ["", st.heading("LEARN MORE"),
-            "  unisphere help <command>       more about any command, same as `<command> --help`",
-            "  unisphere commands --json      the full catalogue — arguments, JSON, examples — for an agent",
-            f"  {(book + ' ') if book else ''}{term.link(docs_url)}"]
+    out += ["", st.heading("LEARN MORE")]
+    out += ui.wrap_field("  unisphere help <command>       ", "more about any command, same as `<command> --help`")
+    out += ui.wrap_field("  unisphere commands --json      ", "the full catalogue — arguments, JSON, examples — for an agent")
+    out += [f"  {(book + ' ') if book else ''}{term.link(docs_url)}"]
     return "\n".join(out)
 
 
 def _leaf_help_text(path: list[str], parser: argparse.ArgumentParser, st: ui.Style) -> str:
     name = " ".join(path)
     entry = CATALOG[name]
-    out = [st.bold(f"unisphere {name}") + " — " + entry["summary"], ""]
+    out = ui.wrap_field(st.bold(f"unisphere {name}") + " — ", entry["summary"]) + [""]
     out += ui.wrap(entry["description"], 0)
     out += ["", st.heading("USAGE"), "  " + _colorize_usage_line(st, parser)]
 
@@ -1246,7 +1296,7 @@ def _leaf_help_text(path: list[str], parser: argparse.ArgumentParser, st: ui.Sty
 
     out += ["", st.heading("EXAMPLES")]
     out += _example_lines(entry["examples"], st)
-    out += ["", st.dim("JSON: --json prints ") + entry["json"]]
+    out += [""] + ui.wrap_field(st.dim("JSON: --json prints "), entry["json"])
     out += _see_also_lines(st, entry)
     return "\n".join(out)
 
@@ -1254,7 +1304,7 @@ def _leaf_help_text(path: list[str], parser: argparse.ArgumentParser, st: ui.Sty
 def _parent_help_text(path: list[str], sub: argparse._SubParsersAction, st: ui.Style) -> str:
     name = " ".join(path)
     entry = GROUP_HELP[name]
-    out = [st.bold(f"unisphere {name}") + " — " + entry["summary"], ""]
+    out = ui.wrap_field(st.bold(f"unisphere {name}") + " — ", entry["summary"]) + [""]
     out += ui.wrap(entry["description"], 0)
     out += ["", st.heading("USAGE"), f"  {st.command('unisphere ' + name)} {st.metavar('<command>')} {st.dim('[flags]')}"]
 
@@ -1394,9 +1444,22 @@ def main(argv: list[str] | None = None) -> int:
         return _unknown_command_error(path, rest[0], sub.choices, st)
 
     try:
-        args = parser.parse_args(argv)
+        args, extras = parser.parse_known_args(argv)
     except _UsageError as exc:
         return _usage_error(exc, st)
+    if extras:
+        # `parser.parse_args()` would raise this "unrecognized arguments" error itself, but
+        # always attributed to the top-level parser regardless of which subparser actually
+        # rejected the flag (an argparse quirk: only the outermost parse_args() call checks for
+        # leftovers, so self.error() always means the outermost self). `node` is the deepest
+        # subparser `_walk_command` actually resolved for this argv, so its own usage/prog shows
+        # up in the error instead of unisphere's top-level one. [battle-test 2026-09-28:
+        # `unisphere search --unknown-flag foo` showed the top-level USAGE listing every command,
+        # not `unisphere search`'s]
+        try:
+            node.error(f"unrecognized arguments: {' '.join(extras)}")
+        except _UsageError as exc:
+            return _usage_error(exc, st)
 
     if args.command == "vault" and args.vault_command == "init":
         return cmd_vault_init(args)

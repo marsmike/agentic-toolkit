@@ -74,9 +74,15 @@ def test_vault_init_scaffolds_and_refuses_nonempty(tmp_path, agents_md_template)
     occupied = tmp_path / "occupied"
     occupied.mkdir()
     (occupied / "existing.txt").write_text("keep", encoding="utf-8")
-    with pytest.raises(vault.VaultInitError):
+    with pytest.raises(vault.VaultInitError) as excinfo:
         vault.scaffold_vault(occupied, agents_md_template)
     assert (occupied / "existing.txt").read_text(encoding="utf-8") == "keep"
+    # The message reaches the CLI user verbatim (cli.py's `vault init` handler just str()s
+    # the exception) — it must name the actual `--force` flag, never the Python kwarg
+    # spelling `force=True` [battle-test 2026-09-28].
+    message = str(excinfo.value)
+    assert "--force" in message
+    assert "force=True" not in message
 
 
 def test_profile_resolution_precedence(tmp_path, monkeypatch):
@@ -87,9 +93,28 @@ def test_profile_resolution_precedence(tmp_path, monkeypatch):
     monkeypatch.delenv("TOOLKIT_OBSIDIAN_SEARCH_SCORE_GATE", raising=False)
     assert profile.get(tmp_path, "obsidian", "search_score_gate", default=0.5) == 0.7
     monkeypatch.setenv("TOOLKIT_OBSIDIAN_SEARCH_SCORE_GATE", "0.9")
-    assert profile.get(tmp_path, "obsidian", "search_score_gate", default=0.5) == "0.9"
+    # An env override is parsed as a YAML scalar, the same as the note's own frontmatter field
+    # would be — a float from either source, never a float from the note and a str from the env
+    # var for what's meant to be the same value [battle-test 2026-09-28].
+    value = profile.get(tmp_path, "obsidian", "search_score_gate", default=0.5)
+    assert value == 0.9 and isinstance(value, float)
     assert profile.get(tmp_path, "obsidian", "missing_key", default="the-default") == "the-default"
     assert profile.read_profile_note(tmp_path, "no-such-plugin") == {}
+
+
+def test_profile_env_override_type_matches_frontmatter_type(tmp_path, monkeypatch):
+    """`env_overrides()` (used by `resolve_profile()`/`unisphere profile --json`) must coerce the
+    same way `get()` does, and must never turn a single-value override into a list/dict.
+    [battle-test 2026-09-28]"""
+    monkeypatch.setenv("TOOLKIT_OBSIDIAN_SEARCH_SCORE_GATE", "0.9")
+    monkeypatch.setenv("TOOLKIT_OBSIDIAN_ENABLED", "true")
+    monkeypatch.setenv("TOOLKIT_OBSIDIAN_LABEL", "plain-string")
+    monkeypatch.setenv("TOOLKIT_OBSIDIAN_LISTY", "[a, b]")
+    overrides = profile.env_overrides("obsidian")
+    assert overrides["search_score_gate"] == 0.9 and isinstance(overrides["search_score_gate"], float)
+    assert overrides["enabled"] is True
+    assert overrides["label"] == "plain-string"
+    assert overrides["listy"] == "[a, b]"  # a YAML-list-shaped override stays the raw string
 
 
 def test_doctor_green_on_example_vault(monkeypatch, repo_root, capsys):

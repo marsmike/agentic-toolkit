@@ -29,12 +29,16 @@ rejected), and a note with no frontmatter block at all is valid, not an error.
 ## Scoring
 
 BM25 (`k1=1.5`, `b=0.75`, the same defaults `search.py` uses) over each note's
-`title` (from the filename) and frontmatter `description`, each counted twice for extra
-weight, plus the first 2000 characters of body — one formula, no separate scoring path,
-mirroring `search.py`'s `Doc.text` construction so this is a drop-in replacement rather
-than a divergent reimplementation. See `vault/04_Resources/Concepts/BM25-Dilution.md` and
-the specimen pair it names for why a condensed `description` field outranks a diluted one
-for the same underlying content.
+`title` (from the filename), frontmatter `description`, and every `#`-heading pulled from
+the *whole* body (not just the first 2000 characters — capped at 500 joined characters),
+each counted twice for extra weight, plus the first 2000 characters of body — one formula,
+no separate scoring path, mirroring `search.py`'s `Doc.text` construction so this is a
+drop-in replacement rather than a divergent reimplementation. The heading weighting means a
+note whose only match sits in a section title past the 2000-character window (e.g. "how were
+contrails solved" against a heading at character 3512 of an 8 KB note) still ranks on that
+match instead of being invisible to the query (farsight 0.1.2). See
+`vault/04_Resources/Concepts/BM25-Dilution.md` and the specimen pair it names for why a
+condensed `description` field outranks a diluted one for the same underlying content.
 
 ## Why no persisted index
 

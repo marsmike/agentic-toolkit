@@ -16,6 +16,8 @@ import json
 import os
 from pathlib import Path
 
+import yaml
+
 from toolkit_core.vault import parse_frontmatter
 
 
@@ -36,11 +38,30 @@ def _env_prefix(plugin: str) -> str:
     return f"TOOLKIT_{plugin.upper()}_"
 
 
+def _coerce_scalar(value: str):
+    """Parse an env var string the same way its value would be typed had it come from
+    frontmatter YAML instead — `"0.99"` -> `0.99`, `"true"` -> `True`, `"5"` -> `5` — so a caller
+    reading `search_score_gate` gets a `float` whether it came from `Config/toolkit/<plugin>.md`
+    or `TOOLKIT_<PLUGIN>_SEARCH_SCORE_GATE`, never a `float` from one source and a `str` from the
+    other for what's meant to be the same value. Falls back to the raw string, tolerantly, on
+    anything `yaml.safe_load` can't parse as a plain scalar (or that parses to a list/dict — an
+    env var overriding a single config key should never turn it into a collection).
+    [battle-test 2026-09-28: `unisphere profile obsidian --json` returned a `float` for
+    `search_score_gate` from the note and a `str` for the same key set via env var]"""
+    try:
+        parsed = yaml.safe_load(value)
+    except yaml.YAMLError:
+        return value
+    return value if isinstance(parsed, (list, dict)) else parsed
+
+
 def env_overrides(plugin: str) -> dict:
-    """All `TOOLKIT_<PLUGIN>_<KEY>` env vars currently set, keyed by lowercased <KEY>."""
+    """All `TOOLKIT_<PLUGIN>_<KEY>` env vars currently set, keyed by lowercased <KEY>, with each
+    value parsed as a YAML scalar so it matches the type a profile note's frontmatter would give
+    the same value (see `_coerce_scalar`)."""
     prefix = _env_prefix(plugin)
     return {
-        name[len(prefix) :].lower(): value
+        name[len(prefix) :].lower(): _coerce_scalar(value)
         for name, value in os.environ.items()
         if name.startswith(prefix)
     }
@@ -57,7 +78,7 @@ def get(vault_path: Path, plugin: str, key: str, default=None):
     """Resolve one profile value: env var -> note field -> default."""
     env_name = f"{_env_prefix(plugin)}{key.upper()}"
     if env_name in os.environ:
-        return os.environ[env_name]
+        return _coerce_scalar(os.environ[env_name])
     note = read_profile_note(vault_path, plugin)
     if key in note:
         return note[key]

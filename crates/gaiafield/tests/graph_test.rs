@@ -821,6 +821,115 @@ fn concurrent_infers_serialize_on_one_database() {
     }
 }
 
+/// Mixed concurrency: 12 `index` workers AND 6 `infer` workers racing on the same *cold* database
+/// at once (not two homogeneous pools started one after the other — every previous concurrency
+/// test here is index-only or infer-only). This is the actual shape a real pipeline run produces
+/// (parallel distill workers each call both `distill_check`'s `gaiafield index` and
+/// `distill_judge.py`'s `graph.ensure_inferred`), and it stresses more than either test alone:
+/// `infer` reads the deterministic graph while `index` may still be writing it, so a worker can
+/// legitimately see zero nodes/edges to embed if it wins the race before any indexer has
+/// committed — that's correct, not a bug (an infer run with nothing indexed yet just embeds
+/// nothing), so this test only asserts what every worker DOES commit is unique, not that every
+/// worker sees a populated graph. [battle-test 2026-09-28: verified by hand first against the
+/// owner's real 1,485-node vault copy — 12 index + 6 infer concurrent, zero "database is locked",
+/// exact count parity with a single run — this locks that guarantee in as a regression test
+/// against the repo's own `./vault`]
+#[test]
+fn mixed_index_and_infer_concurrent_on_one_database() {
+    let db = fresh_db_path("mixed-concurrent");
+    let vault = vault_path();
+    let model_dir = shared_model_dir();
+
+    // Reference: a clean, sequential index then infer, to know the graph this vault converges to.
+    let reference = fresh_db_path("mixed-concurrent-ref");
+    let expected_edges = {
+        let conn = gaiafield::open_db(&reference).expect("open db");
+        gaiafield::index(&vault, &conn, true)
+            .expect("reference index should succeed")
+            .edges
+    };
+    let expected_inferred_rows: i64 = {
+        let conn = gaiafield::open_db(&reference).expect("reopen db");
+        gaiafield::infer(&vault, &conn, &model_dir, true, false)
+            .expect("reference infer should succeed");
+        conn.query_row("SELECT COUNT(*) FROM inferred_edges", [], |r| r.get(0))
+            .expect("count inferred_edges")
+    };
+
+    gaiafield::open_db(&db).expect("create db");
+
+    let index_workers = 12;
+    let infer_workers = 6;
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(index_workers + infer_workers));
+
+    let index_handles: Vec<_> = (0..index_workers)
+        .map(|_| {
+            let (db, barrier) = (db.clone(), barrier.clone());
+            std::thread::spawn(move || {
+                let conn = gaiafield::open_db(&db).expect("open db");
+                barrier.wait();
+                gaiafield::index(&vault_path(), &conn, true).map(|r| r.edges)
+            })
+        })
+        .collect();
+    let infer_handles: Vec<_> = (0..infer_workers)
+        .map(|_| {
+            let (db, barrier, model_dir) = (db.clone(), barrier.clone(), model_dir.clone());
+            std::thread::spawn(move || {
+                let conn = gaiafield::open_db(&db).expect("open db");
+                barrier.wait();
+                gaiafield::infer(&vault_path(), &conn, &model_dir, true, false)
+            })
+        })
+        .collect();
+
+    for h in index_handles {
+        let edges = h
+            .join()
+            .expect("indexer thread panicked")
+            .expect("index should not fail (no 'database is locked')");
+        assert!(
+            edges == 0 || edges == expected_edges,
+            "an indexer saw a partial or duplicated graph: {edges} edges, expected 0 or {expected_edges}"
+        );
+    }
+    for h in infer_handles {
+        h.join()
+            .expect("infer thread panicked")
+            .expect("infer should not fail (no 'database is locked')");
+    }
+
+    let conn = gaiafield::open_db(&db).expect("reopen db");
+    let edges: i64 = conn
+        .query_row("SELECT COUNT(*) FROM edges", [], |r| r.get(0))
+        .expect("count edges");
+    assert_eq!(edges as usize, expected_edges, "final edge count must match a single run");
+
+    let inferred_rows: i64 = conn
+        .query_row("SELECT COUNT(*) FROM inferred_edges", [], |r| r.get(0))
+        .expect("count inferred_edges");
+    assert_eq!(
+        inferred_rows, expected_inferred_rows,
+        "final inferred_edges count must match a single run"
+    );
+
+    let duplicate_pairs: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM (
+                 SELECT source, target FROM inferred_edges
+                 GROUP BY source, target HAVING COUNT(*) > 1
+             )",
+            [],
+            |r| r.get(0),
+        )
+        .expect("count duplicate (source, target) pairs");
+    assert_eq!(duplicate_pairs, 0, "inferred_edges must never duplicate a (source, target) pair");
+
+    for path in [&db, &reference] {
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+}
+
 /// (v2-e) `neighbors` WITHOUT `--include-inferred` is byte-identical to v1 behavior on a db that
 /// HAS been `infer`'d — the deterministic layer's own CLI output never changes shape just because
 /// inferred edges now exist alongside it (contract rule 4: traversal defaults to deterministic).

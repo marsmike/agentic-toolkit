@@ -58,7 +58,11 @@ def test_catalogue_lists_positional_arguments_first(capsys):
 
 def test_text_is_plain_when_piped_or_no_color(monkeypatch):
     assert not ui.Style().color  # pytest's stdout is not a TTY
-    assert ui.Style(color=False).mark("ok") == "✓"
+    # `mark()` routes its symbol through `term.glyph()` (battle-test 2026-09-28: it used to
+    # hardcode the unicode glyph, so a pipe, UNISPHERE_ASCII=1 or a non-UTF-8 locale still saw
+    # "✓"/"✗" instead of the ASCII fallback `term.py` promises) — not a TTY, so ASCII here
+    # regardless of `color`, which only ever governed the ANSI wrapping, never the glyph choice.
+    assert ui.Style(color=False).mark("ok") == "*"
     monkeypatch.setenv("NO_COLOR", "1")
 
     class Tty:
@@ -148,6 +152,80 @@ def test_status_text_names_every_section(tmp_path, monkeypatch, capsys):
     assert "\033[" not in out
 
 
+@pytest.mark.parametrize(
+    ("iso", "expect"),
+    [
+        ("2026-09-28T21:42:24+02:00", "2026-09-28 19:42 UTC"),  # a non-UTC offset converts
+        ("2026-09-28T19:42:24Z", "2026-09-28 19:42 UTC"),
+        ("2026-09-28T19:42:24+00:00", "2026-09-28 19:42 UTC"),
+        ("2026-09-28T19:42", "2026-09-28 19:42"),  # naive: no offset to convert, no "UTC" claim
+        ("not-a-real-timestamp", "not-a-real-timestamp"),  # unparseable: shown verbatim
+    ],
+)
+def test_format_last_run_utc_converts_real_offsets(iso, expect):
+    """`status`'s U-SHADOWS used to take the first 16 characters of a routine's ISO timestamp and
+    append the literal " UTC" regardless of the string's actual offset — correct only when the
+    source happened to already be UTC. `watchdog.py`'s `facts["last_run"]` carries whatever
+    offset the underlying git/ledger timestamp had (a real run showed a +02:00 offset).
+    [battle-test 2026-09-28]"""
+    assert cli._format_last_run_utc(iso) == expect
+
+
+def test_status_u_shadows_shows_true_utc_not_the_offset_as_is():
+    """End-to-end through `_render_status`: a routine fact with a non-UTC offset renders its
+    converted UTC wall time, not the offset's own clock reading relabelled "UTC".
+    [battle-test 2026-09-28]"""
+    result = {
+        "toolkit": {"found": False},
+        "engines": {"engines": [], "checked_latest": False},
+        "plugins": {"plugins": []},
+        "vault": {"found": True, "path": "/tmp/vault", "source": "test", "notes": 0, "inbox": 0,
+                  "graph": {}, "dlq": {}, "checkout": {}},
+        "pipeline": {"present": True, "checked": True, "ok": True, "problems": [],
+                     "routines": [{"name": "Daily ReadWise Ingest+Distill",
+                                   "last": "2026-09-28T21:42:24+02:00", "age_hours": 0.4}]},
+        "companions": [],
+        "ok": True,
+    }
+    out = cli._render_status(result)
+    assert "2026-09-28 19:42 UTC" in out
+    assert "21:42 UTC" not in out
+
+
+def test_status_text_orphaned_plugin_hint_names_the_plugin(tmp_path):
+    """`_render_status`'s PLUGINS row for an "orphaned" plugin used to say just "claude plugin
+    uninstall" with no plugin name — `_problems()`'s JSON-facing hint (same data) already
+    included "{plugin}@{marketplace}"; the text a person actually reads was missing the one thing
+    they'd need to copy-paste the command. [battle-test 2026-09-28]"""
+    result = {
+        "toolkit": {"found": False},
+        "engines": {"engines": [], "checked_latest": False},
+        "plugins": {"plugins": [{"plugin": "imagine", "state": "orphaned", "latest": None, "installs": [
+            {"scope": "user", "version": "abc1234"}]}]},
+        "vault": {"found": True, "path": str(tmp_path), "source": "test", "notes": 0, "inbox": 0,
+                  "graph": {}, "dlq": {}, "checkout": {}},
+        "pipeline": {}, "companions": [], "ok": True,
+    }
+    out = cli._render_status(result)
+    assert f"claude plugin uninstall imagine@{status.MARKETPLACE}" in out
+
+
+def test_status_behind_checkout_hints_name_the_directory(tmp_path):
+    """A "behind its upstream" hint (toolkit checkout or vault checkout) used to say a bare
+    "git pull" with no `-C <path>` — copy-pasted from a shell sitting anywhere else, that pulls
+    (or fails against) the wrong repo. [battle-test 2026-09-28]"""
+    base = {"engines": {"engines": [], "checked_latest": False}, "plugins": {"plugins": []},
+            "pipeline": {}}
+    toolkit_problems = status._problems({**base, "toolkit": {"found": True, "behind": 1, "path": "/tk"},
+                                          "vault": {"found": True, "dlq": {}, "checkout": {}}})
+    assert f"git -C /tk pull" in toolkit_problems[0]["detail"]
+
+    vault_problems = status._problems({**base, "toolkit": {"found": False},
+                                        "vault": {"found": True, "path": "/v", "dlq": {},
+                                                  "checkout": {"behind": 1}}})
+    assert f"git -C /v pull" in vault_problems[0]["detail"]
+
+
 # --- search and graph ---------------------------------------------------------------------
 
 needs_engines = pytest.mark.skipif(
@@ -171,6 +249,22 @@ def test_search_json(example_vault_copy, capsys):
     assert code == 0 and data["query"] == "dead letter queue"
     assert 0 < len(data["results"]) <= 3
     assert set(data["results"][0]) >= {"path", "score", "title"}
+
+
+@needs_engines
+def test_search_limit_zero_is_not_misreported_as_no_matches(example_vault_copy, capsys):
+    """`--limit 0` legitimately asks for zero results back — the text render used to say "no
+    notes match", indistinguishable from a genuine no-match query, even for a term with real
+    hits. [battle-test 2026-09-28]"""
+    code, data = run_json(capsys, "search", "dead", "letter", "queue", "--limit", "0")
+    assert code == 0 and data["results"] == []  # sanity: the query does have real matches (see above)
+
+    _, out = run(capsys, "search", "dead", "letter", "queue", "--limit", "0")
+    assert "no notes match" not in out
+    assert "--limit 0" in out
+
+    _, out = run(capsys, "search", "zzyzxqqqnonexistentterm123nomatch")
+    assert "no notes match" in out  # a genuine no-match query is unaffected
 
 
 @needs_engines
@@ -308,9 +402,10 @@ def test_toolkit_checkout_behind_is_a_problem_uncommitted_is_not():
     `unisphere status` unhealthy even though it printed `CHECKOUT !`]"""
     base = {"engines": {"engines": [], "checked_latest": False}, "plugins": {"plugins": []},
             "vault": {"found": True, "dlq": {}, "checkout": {}}, "pipeline": {}}
-    behind = status._problems({**base, "toolkit": {"found": True, "behind": 2, "uncommitted": 0}})
+    behind = status._problems({**base, "toolkit": {"found": True, "behind": 2, "uncommitted": 0, "path": "/tk"}})
     assert behind and behind[0]["section"] == "toolkit" and "2 commit(s) behind" in behind[0]["detail"]
-    assert not status._problems({**base, "toolkit": {"found": True, "behind": 0, "uncommitted": 3}})
+    assert "git -C /tk pull" in behind[0]["detail"]
+    assert not status._problems({**base, "toolkit": {"found": True, "behind": 0, "uncommitted": 3, "path": "/tk"}})
     assert not status._problems({**base, "toolkit": {"found": False}})
     assert not status._problems(base)  # no "toolkit" key at all — must not raise
 
