@@ -455,6 +455,23 @@ def main() -> None:
         n = len((assets / name).read_bytes())
         print(f"{name}: {n:,} bytes")
 
+    # GitHub's social-preview image (Settings > General > Social preview) has to be a raster
+    # file, not the SVG GitHub itself won't render there; social-preview.png is the committed,
+    # rasterized copy of social-preview.svg (1280x640, the same dimensions it was rendered at
+    # above), produced with rsvg-convert exactly like icon.png below — same tool, same
+    # SKIPPED-when-absent fallback, so a rebuild without rsvg-convert still succeeds and just
+    # leaves the tracked PNG as it was.
+    rsvg = shutil.which("rsvg-convert")
+    social_png = assets / "social-preview.png"
+    if rsvg:
+        subprocess.run(
+            [rsvg, "-w", "1280", "-h", "640", "-o", str(social_png), str(assets / "social-preview.svg")],
+            check=True,
+        )
+        print(f"social-preview.png: {social_png.stat().st_size:,} bytes")
+    else:
+        print("social-preview.png: SKIPPED (rsvg-convert not found on PATH — rasterize social-preview.svg by hand)")
+
     # docs-site: Quartz's Favicon and CustomOgImages plugins both read exactly one
     # docs-site/static/icon.png (see docs-site/quartz.config.ts's Plugin.Favicon()/
     # Plugin.CustomOgImages() and .github/workflows/docs.yml). icon.svg is kept
