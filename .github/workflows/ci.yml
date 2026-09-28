@@ -71,7 +71,7 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: video/package-lock.json
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
       - run: npm ci --ignore-scripts
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
       - run: uv sync --all-packages --locked  # root project has no deps; members (toolkit-core) carry them [earned: CI run 30203390547 — ModuleNotFoundError toolkit_core/yaml]
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
       - run: uv sync --all-packages --locked  # root project has no deps; members (toolkit-core) carry them [earned: CI run 30203390547 — ModuleNotFoundError toolkit_core/yaml]
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
       - run: uv sync --all-packages --locked  # root project has no deps; members (toolkit-core) carry them [earned: CI run 30203390547 — ModuleNotFoundError toolkit_core/yaml]
