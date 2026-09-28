@@ -24,12 +24,18 @@ graph — offline (gaiafield and Kagi stubbed).
                carries its data and the note wikilinks the anchor note; nothing else in the vault
                changes but the radar dir
 8. no graph  — without gaiafield the graph is "skipped" and the anchor still comes from the files
+9. vocab/early (pure, no sandbox) — "Sonnet 5.5" on one mention keeps its sector because "Sonnet"
+               is a sibling of "Opus"/"Fable", already in that interest's own query; "SpaceX" on
+               one judged mention across three families is Other and must not card in Early
+               warning; an Other thing with high relevance, or two independently-judged mentions,
+               still cards; a real-sector thing always cards (real cases, 2026-09-28 second pass)
 """
 from __future__ import annotations
 
 import json
 import os
 import subprocess
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -165,6 +171,41 @@ def _entity_checks(problems: list[str]) -> None:
         problems.append("entities: a GitHub release address names its repo")
 
 
+def _sector_and_early_checks(problems: list[str]) -> None:
+    """Pure function-level checks (no sandbox) for the 2026-09-28 review's second pass, real cases:
+    "Sonnet 5.5" (one mention, p=0.8 on Claude Code & Anthropic Ecosystem, whose own query already
+    reads "Opus Fable pricing") should keep that sector; "SpaceX"/"Windows 11"/"Soup" (one mention
+    each, no name match) should stay Other and, since Other, also stay out of Early warning unless
+    they separately clear a high relevance or two independently-judged mentions."""
+    import signal_radar as sr
+    from interests import Interest
+
+    claude_code = Interest(id="claude-code", name="Claude Code & Anthropic Ecosystem",
+                           gloss="Claude Code as a daily engineering environment.", queries=("Opus Fable pricing",))
+    music = Interest(id="music", name="Music Production & DJing", gloss="Synths, DAWs and DJ gear for producers.")
+    sonnet = {"name": "Sonnet 5.5", "_interests": Counter({"claude-code": 0.8}), "_interest_support": Counter({"claude-code": 1})}
+    windows = {"name": "Windows 11", "_interests": Counter({"music": 0.72}), "_interest_support": Counter({"music": 1})}
+    sr.assign_sectors([sonnet, windows], {"claude-code": claude_code.name, "music": music.name}, [claude_code, music])
+    if sonnet["sector"] != "claude-code":
+        problems.append(f"vocab: Sonnet 5.5 (an Opus/Fable sibling) should keep claude-code on one mention, got {sonnet['sector']!r}")
+    if windows["sector"] != "other":
+        problems.append(f"vocab: Windows 11 names nothing in music's vocabulary, still needs two mentions, got {windows['sector']!r}")
+
+    base = {"stage": "new", "first_seen": "2026-01-01", "families": ["hn", "kagi_news", "reddit"]}
+    spacex_shape = {**base, "sector": "other", "parts": {"relevance": 0.58}, "_interest_support": Counter({"ai-agents": 1, "frontier": 1})}
+    high_relevance = {**base, "sector": "other", "parts": {"relevance": 0.85}, "_interest_support": Counter({"x": 1})}
+    two_sources = {**base, "sector": "other", "parts": {"relevance": 0.58}, "_interest_support": Counter({"x": 2})}
+    real_sector = {**base, "sector": "claude-code", "parts": {"relevance": 0.3}, "_interest_support": Counter({"claude-code": 1})}
+    if sr._early_eligible(spacex_shape):
+        problems.append("early: an Other thing named by three families but only one judged mention (SpaceX's shape) must not card")
+    if not sr._early_eligible(high_relevance):
+        problems.append("early: an Other thing with relevance >= EARLY_OTHER_MIN_RELEVANCE should still card")
+    if not sr._early_eligible(two_sources):
+        problems.append("early: an Other thing with two independently-judged mentions should still card")
+    if not sr._early_eligible(real_sector):
+        problems.append("early: a real-sector thing needs no extra bar — assign_sectors already corroborated it")
+
+
 def run(vault: Path) -> dict:
     import interests
     import kagi
@@ -200,6 +241,7 @@ def run(vault: Path) -> dict:
     sandbox = None
     try:
         _entity_checks(problems)
+        _sector_and_early_checks(problems)
         sandbox = make_sandbox(vault)
         (sandbox / "03_Areas" / "Sig-Interests.md").write_text(INTERESTS_NOTE, encoding="utf-8")
         (sandbox / "04_Resources" / "Qwen-Notes.md").write_text(QWEN_NOTE, encoding="utf-8")

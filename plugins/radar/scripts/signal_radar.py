@@ -356,12 +356,48 @@ def short_name(name: str) -> str:
 # Agents from one reddit thread that also happened to name Anthropic]
 MIN_SECTOR_SUPPORT = 2
 
+# A single strong mention still earns a sector when the entity's own NAME — not just the article
+# that mentioned it — is what the interest is about: a literal word from the interest's own gloss,
+# tags or queries, or a sibling in a well-known model family the interest already names a member
+# of. Small and non-exhaustive on purpose (in the spirit of entities.py's BRANDS/FILLER lists): a
+# family or word absent here just falls back to the two-mention rule like anything else. [earned:
+# 2026-09-28, "Sonnet 5.5" fell to Other on one mention despite p=0.8 on Claude Code & Anthropic
+# Ecosystem, the interest whose own query already reads "Opus Fable pricing"]
+MODEL_FAMILIES = (
+    {"claude", "opus", "sonnet", "haiku", "fable"},
+    {"gpt", "chatgpt", "o1", "o3", "o4"},
+    {"gemini", "gemma"},
+    {"qwen"}, {"deepseek"}, {"llama"}, {"mistral"}, {"grok"}, {"kimi"}, {"mimo"}, {"minimax"},
+)
 
-def assign_sectors(blips: list[dict], names: dict[str, str]) -> list[dict]:
+
+def _interest_vocab(it: "interests_mod.Interest") -> set[str]:
+    """Lowercase, non-generic words from an interest's own name, gloss, tags and queries."""
+    text = " ".join([it.name, it.gloss, *it.tags, *it.queries])
+    words = {w.lower() for w in re.findall(r"[A-Za-z][A-Za-z0-9+#.'-]*", text)}
+    return words - entities.GENERIC
+
+
+def _head_word(name: str) -> str:
+    """The name's first word, casefolded: "sonnet" from "Sonnet 5.5", "qwen" from "Qwen3.8"."""
+    m = re.match(r"[A-Za-z][A-Za-z+#'-]*", name)
+    return m.group(0).lower() if m else name.lower()
+
+
+def _named_for(entity_name: str, vocab: set[str]) -> bool:
+    head = _head_word(entity_name)
+    if head in vocab:
+        return True
+    return any(head in fam and fam & vocab for fam in MODEL_FAMILIES)
+
+
+def assign_sectors(blips: list[dict], names: dict[str, str], interest_list: "list[interests_mod.Interest]" = ()) -> list[dict]:
+    vocabs = {it.id: _interest_vocab(it) for it in interest_list}
     counts: Counter = Counter()
     for b in blips:
         support = b.get("_interest_support") or Counter()
-        candidates = [iid for iid, _ in b["_interests"].most_common() if support.get(iid, 0) >= MIN_SECTOR_SUPPORT]
+        candidates = [iid for iid, _ in b["_interests"].most_common()
+                      if support.get(iid, 0) >= MIN_SECTOR_SUPPORT or _named_for(b["name"], vocabs.get(iid, set()))]
         b["sector"] = candidates[0] if candidates else "other"
         counts[b["sector"]] += 1
     keep = [iid for iid, _ in counts.most_common() if iid != "other"][:MAX_SECTORS]
@@ -492,6 +528,26 @@ def web_check(vault: Path, out: Path, candidates: list[dict], now: datetime) -> 
     return t_ms + k_ms, [t_status]
 
 
+# A card is a stronger claim than a dot on the scope: something with a real sector is already
+# corroborated (assign_sectors required two mentions to agree, or a name match), so the existing
+# new/recent/multi-source-or-engaged gate is enough. An Other-sector thing — no interest it clearly
+# belongs to — needs to earn its place instead of riding in on raw source count: a celebrity or
+# generic-tech name picked up by three outlets (SpaceX: hn, kagi_news, reddit) is still noise if
+# only one of those mentions was ever judged relevant to anything. "Independent sources" here means
+# mentions that separately cleared the judge's bar for some interest (_interest_support), not just
+# distinct families. [earned: 2026-09-28, SpaceX/Windows 11/Soup filling half the early-warning
+# cards once the two-mention sector rule correctly parked them in Other]
+EARLY_OTHER_MIN_RELEVANCE = 0.8  # the judge's own "strong" bar (judgments/policy.py T_STRONG)
+EARLY_OTHER_MIN_SOURCES = 2
+
+
+def _early_eligible(b: dict) -> bool:
+    if b["sector"] != "other":
+        return True
+    support = b.get("_interest_support") or {}
+    return b["parts"]["relevance"] >= EARLY_OTHER_MIN_RELEVANCE or max(support.values(), default=0) >= EARLY_OTHER_MIN_SOURCES
+
+
 def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[str, Any]:
     today = now.date()
     since = (today - timedelta(days=RECENT_DAYS + BASELINE_DAYS)).isoformat()
@@ -507,7 +563,8 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
     for m in mentions:
         for n in entities.of(m["title"], m["url"], m.get("entities"), vocab):
             outside_keys.setdefault(entities.key(n), n)
-    names = {it.id: it.name for it in interests_mod.load(vault)}
+    interest_list = interests_mod.load(vault)
+    names = {it.id: it.name for it in interest_list}
     alias = current_ids({i for m in mentions for i in (m.get("p") or {})}, names)
     ents = collect(mentions + vault_ms, outside_keys, vocab)
     graph, by_key, notes, graph_section = vault_graph.build(vault, now)
@@ -546,13 +603,14 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
 
     blips.sort(key=lambda b: (-b["strength"], b["key"]))
     blips = blips[:MAX_BLIPS]
-    sectors = assign_sectors(blips, names)
+    sectors = assign_sectors(blips, names, interest_list)
+    early_from = (now - timedelta(hours=EARLY_HOURS)).date().isoformat()
+    early = [b["key"] for b in blips if b["stage"] == "new" and b["first_seen"] >= early_from
+             and (len(b["families"]) >= 2 or (b["parts"]["engagement"] >= 0.9 and b["parts"]["relevance"] >= 0.6))
+             and _early_eligible(b)]
     for b in blips:
         del b["_interests"]
         del b["_interest_support"]
-    early_from = (now - timedelta(hours=EARLY_HOURS)).date().isoformat()
-    early = [b["key"] for b in blips if b["stage"] == "new" and b["first_seen"] >= early_from
-             and (len(b["families"]) >= 2 or (b["parts"]["engagement"] >= 0.9 and b["parts"]["relevance"] >= 0.6))]
     week = reports.week_of(today.isoformat())
     trend = reports.trend(state, week) if state else {}
     data = {
