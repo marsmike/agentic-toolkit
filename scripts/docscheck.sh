@@ -91,6 +91,23 @@ else
   echo "ok: badge matches marketplace.json and the eval count matches run.py"
 fi
 
+# --- (e) docs.yml's rsync excludes and Docs-Site.md's stated exclusion list must agree ---
+# [earned: 2026-09-28 repo audit A4 — Docs-Site.md claimed 05_Archive/ was excluded while
+# docs.yml's rsync didn't actually exclude it, so it published anyway]
+echo "== docscheck: docs.yml rsync excludes vs. Docs-Site.md's stated list =="
+DOCS_SITE_NOTE="$VAULT_DIR/04_Resources/Guides/Docs-Site.md"
+DOCS_YML="$REPO_ROOT/.github/workflows/docs.yml"
+yml_excludes="$(grep -oE "exclude '[^']+/'" "$DOCS_YML" | sed -E "s/exclude '([^']+)\/'/\1/" | sort)"
+doc_excludes="$(sed -n '/^## What gets published/,/^## /p' "$DOCS_SITE_NOTE" | grep -oE '^- `[^`]+/`' | sed -E 's/^- `([^`]+)\/`/\1/' | sort)"
+if [ "$yml_excludes" != "$doc_excludes" ]; then
+  echo "FAIL: docs.yml rsync --exclude list does not match Docs-Site.md's stated exclusion list"
+  echo "  docs.yml:      $(echo "$yml_excludes" | tr '\n' ' ')"
+  echo "  Docs-Site.md:  $(echo "$doc_excludes" | tr '\n' ' ')"
+  fail=1
+else
+  echo "ok: docs.yml and Docs-Site.md agree on what's excluded ($(echo "$yml_excludes" | tr '\n' ' '))"
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo "docscheck: FAILED"
   exit 1

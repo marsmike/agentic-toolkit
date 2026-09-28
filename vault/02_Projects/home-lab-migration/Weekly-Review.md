@@ -12,7 +12,8 @@ type: weekly-review
 
 Home-lab migration project, week of 2026-07-20. (Same title as
 [[field-guide/Weekly-Review|the field-guide project's weekly review]] — both projects use the
-plain [[Templates/Weekly-Review|Weekly Review template]] unmodified.)
+plain `Templates/Weekly-Review` template unmodified; not linked, since `Templates/` isn't built
+on the docs site.)
 
 ## Done this week
 

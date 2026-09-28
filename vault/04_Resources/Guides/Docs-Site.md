@@ -21,19 +21,30 @@ the pipeline; everything a visitor reads is a vault note.
 
 ## What gets published, and what doesn't
 
-The workflow `rsync`s `vault/` into Quartz's `content/` directory, excluding three things:
+The workflow `rsync`s `vault/` into Quartz's `content/` directory, excluding four things:
 
 - `00_Memory/` — agent self-memory; not a public docs surface.
 - `01_Capture/` — the raw inbox; not-yet-distilled, not public docs surface.
+- `05_Archive/` — frozen (`contract/VAULT_SCHEMA.md`: "never link here from new notes"); excluded
+  explicitly, not just left unlinked — Quartz's Explorer and search list every page it builds
+  regardless of whether anything links to it, so an unexcluded `05_Archive/` would still surface
+  on the site.
 - `.gaiafield/` — the local graph-engine's SQLite cache, a binary artifact, not a doc.
+
+This matches the vault's own active-content filter (see `contract/VAULT_SCHEMA.md`): the filter
+excludes `00_Memory`/`01_Capture`/`05_Archive` from search, enrichment and generated indexes, and
+the publish step excludes the same three from the site, plus the engine-cache directory that isn't
+part of the schema's folder table at all.
+
+`Templates/` takes a different route: the rsync does **not** exclude it (so it does land in
+`quartz/content/`), but `docs-site/quartz.config.ts`'s `ignorePatterns` tells Quartz not to build a
+page for it — deliberately, since `Templates/` isn't itself vault content either. A wikilink to a
+template is therefore never resolvable on the site; write one as plain text instead, the way the
+two project `Weekly-Review.md` notes now reference `Templates/Weekly-Review`.
 
 `Config/` is deliberately **included**, even though it looks like plumbing: active vault notes
 wikilink into it directly (`[[Config/toolkit/obsidian.md]]` from
 [[Profiles-and-Config]]), and excluding it would turn those into broken links on the live site.
-This matches the vault's own active-content filter (see `contract/VAULT_SCHEMA.md`) in spirit but
-not exactly — the filter excludes `00_Memory`/`01_Capture`/`05_Archive`, while the publish step
-excludes those same three (`05_Archive` implicitly, since nothing links there) plus the
-engine-cache directory that isn't part of the schema's folder table at all.
 
 ## Wikilinks, backlinks, and the graph view
 

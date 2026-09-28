@@ -12,8 +12,8 @@ type: weekly-review
 
 Field-guide project, week of 2026-07-20. (Same title as
 [[home-lab-migration/Weekly-Review|the home-lab project's weekly review]] — deliberately, both
-projects use the plain [[Templates/Weekly-Review|Weekly Review template]] and neither needs a
-disambiguating suffix within its own folder.)
+projects use the plain `Templates/Weekly-Review` template (not linked: `Templates/` isn't built
+on the docs site) and neither needs a disambiguating suffix within its own folder.)
 
 ## Done this week
 

@@ -70,6 +70,11 @@ jobs:
       # Publish everything except:
       #   - 00_Memory/  — agent self-memory (journal, DLQ); not public docs surface
       #   - 01_Capture/ — raw inbox; not-yet-distilled, not public docs surface
+      #   - 05_Archive/ — frozen (contract/VAULT_SCHEMA.md's active-content filter groups it
+      #                   with 00_Memory/01_Capture); nothing links there, but Quartz's Explorer
+      #                   and search have no such filter, so an unexcluded 05_Archive/ would still
+      #                   be browsable/searchable on the site. [earned: 2026-09-28 repo audit A4 —
+      #                   Docs-Site.md claimed this exclusion while the workflow didn't do it]
       #   - .gaiafield/ — local graph-engine cache (SQLite binary), not a doc
       # Config/ is deliberately INCLUDED: it holds the toolkit profile
       # examples (Config/toolkit/*.md), and active vault notes wikilink into
@@ -83,6 +88,7 @@ jobs:
           rsync -a repo/vault/ quartz/content/ \
             --exclude '00_Memory/' \
             --exclude '01_Capture/' \
+            --exclude '05_Archive/' \
             --exclude '.gaiafield/'
           # Quartz's homepage requires a page at the exact slug "index"; the
           # vault follows Obsidian's own convention of capitalizing it
