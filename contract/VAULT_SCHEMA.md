@@ -63,24 +63,33 @@ them holding still. Check whether an existing field fits before adding a new one
 | `source` | Provenance — URL or citation | Every distilled note |
 | `status` | Lifecycle stage, see below | Every distilled note |
 | `processed_date` | ISO date the note was distilled (back-compat; equals `distilled_at`'s date) | Every distilled note |
-| `ingested_at` | ISO 8601 UTC timestamp, with time and `Z` (e.g. `2026-09-28T18:59:34Z`) — when the item entered the vault as a capture | Every capture; every distilled note (carried over from its capture(s), earliest if several) |
+| `ingested_at` | ISO 8601 UTC timestamp, with time and `Z` (e.g. `2026-09-28T18:59:34Z`) — when the item entered the vault as a capture | Required going forward: every new capture and every note distilled from one, stamped in code. Backfilled onto an existing note only where `backfill_timestamps.py` found real evidence (a capture file or git history); left absent, never guessed, where none existed — on a real vault this reaches most but not all distilled notes (60% measured on ~/Documents/TheVoid, 2026-09-28). Absent is a legitimate value here, not a gap to chase. |
 | `ingested_at_estimated` | `true` when `ingested_at` was inferred (e.g. by `backfill_timestamps.py` from git history) rather than recorded at capture time — mirrors `processed_date_estimated` | Opt-in, on an estimated `ingested_at` |
-| `distilled_at` | ISO 8601 UTC timestamp, with time and `Z` — when the note was distilled from its capture(s) | Every distilled note |
+| `distilled_at` | ISO 8601 UTC timestamp, with time and `Z` — when the note was distilled from its capture(s) | Required going forward: every note distilled in code carries it, and `backfill_timestamps.py` back-dates it (with `distilled_at_estimated: true`) onto every pre-existing distilled note from `processed_date`, which is never itself missing. In practice this one reaches 100% of distilled notes once backfilled. |
 | `distilled_at_estimated` | `true` when `distilled_at` was inferred the same way — the same convention, one flag per field | Opt-in, on an estimated `distilled_at` |
 | `kind` | Note kind (`concept`, `guide`, `research-finding`, `profile`, plus project- and domain-specific values) | Resources |
 | `topics` | Structured topical taxonomy | Resources |
-| `methodology` | Methodology family, when applicable | Resources |
+| `methodology` | Methodology family, when applicable | Opt-in — no generator or skill sets it today (unlike `kind`/`topics`, which the distill skill always fills); add it by hand where it earns its keep. |
 | `tags` | Freeform and/or namespaced — see below | All |
 | `type` | Note type (`meeting-note`, `project-doc`, …), when applicable | — |
 | `author`, `published` | Original author / publish date | External material |
 | `created` | Note creation date | Most notes |
 | `enrichment_targets` | Notes/profiles to notify when this note is enriched | Opt-in |
 
-`ingested_at` and `distilled_at` are always set deterministically in code — a writer script or a
-retirement step stamps `datetime.now(UTC)` at the moment it acts, never left to an LLM to guess
-(`processed_date` stays as the date-only back-compat field, and `processed_date_estimated` stays
-as its own estimated flag — unchanged by this pair). [earned: 2026-09-28 — the owner asked for the
-ingest and distill date and time on every report and note]
+Going forward, `ingested_at` and `distilled_at` are set deterministically in code — a writer
+script or a retirement step stamps `datetime.now(UTC)` at the moment it acts, never left to an
+LLM to guess (`processed_date` stays as the date-only back-compat field, and
+`processed_date_estimated` stays as its own estimated flag — unchanged by this pair). That does
+not make either field present on every note that predates the pair: `backfill_timestamps.py`
+back-fills what evidence supports (real git history for `distilled_at`, a still-present capture
+or its git history for `ingested_at`) and leaves the rest absent rather than guessing — so
+`distilled_at` reaches every distilled note in practice (`processed_date` always has a date to
+back-date from) while `ingested_at` does not (not every distilled note's source capture survives
+or has usable git history). `checks/frontmatter.py` and `core/tests/test_contract.py` both treat
+this honestly: neither ever asserts `ingested_at`/`distilled_at` presence as a hard requirement,
+only their shape when present. [earned: 2026-09-28 — the owner asked for the ingest and distill
+date and time on every report and note; measured against the real vault the same day, `ingested_at`
+turned out to reach 60% of distilled notes and `distilled_at` 100%]
 
 ## Note lifecycle
 
