@@ -17,7 +17,7 @@
       "id": "trig_01UhEejyjK6c1qg2u9q6ii5A",
       "name": "Daily ReadWise Ingest+Distill",
       "cron_expression": "58 */3 * * *",
-      "prompt": "Follow cloud/pipeline.prompt.md (in the agentic-toolkit checkout) exactly: run the TheVoid pipeline once, unattended.",
+      "prompt": "Read /home/user/agentic-toolkit/cloud/pipeline.prompt.md (the agentic-toolkit checkout; if it is not there, the directory holding cloud/pipeline.prompt.md) and follow it exactly: run the TheVoid pipeline once, unattended.",
       "prompt_file": "cloud/pipeline.prompt.md",
       "model": "claude-opus-5-5",
       "allowed_tools": [
@@ -47,7 +47,7 @@
       "id": "trig_01Grkn9K6Y6iBTyc7nUM5CD3",
       "name": "Pipeline watchdog",
       "cron_expression": "58 2-23/3 * * *",
-      "prompt": "Follow cloud/watchdog.prompt.md (in the agentic-toolkit checkout) exactly.",
+      "prompt": "Read /home/user/agentic-toolkit/cloud/watchdog.prompt.md (the agentic-toolkit checkout; if it is not there, the directory holding cloud/watchdog.prompt.md) and follow it exactly.",
       "prompt_file": "cloud/watchdog.prompt.md",
       "model": "claude-haiku-4-5-20251001",
       "allowed_tools": [
@@ -68,7 +68,7 @@
       "id": "trig_01L1quu4XUXvHyC8iwux2uL7",
       "name": "Signal Radar",
       "cron_expression": "28 2-23/3 * * *",
-      "prompt": "Follow cloud/signal.prompt.md (in the agentic-toolkit checkout) exactly.",
+      "prompt": "Read /home/user/agentic-toolkit/cloud/signal.prompt.md (the agentic-toolkit checkout; if it is not there, the directory holding cloud/signal.prompt.md) and follow it exactly.",
       "prompt_file": "cloud/signal.prompt.md",
       "model": "claude-sonnet-5",
       "allowed_tools": [
