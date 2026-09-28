@@ -96,7 +96,13 @@ def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
                 fresh[p] = ""  # never distilled (a root or project note): new, listed last
             elif fm.get("processed_date_estimated") is not True and (when := _date(raw)) >= since.isoformat():
                 fresh[p] = when
-        return _newest_first(list(fresh), fresh), sorted(changed - new), "git"
+        # Exclude only what "New this week" actually lists (`fresh`), not every path ever added
+        # since `since` (`new`): a note the pipeline both wrote and later enriched in the same
+        # week — an estimated or pre-window `processed_date` keeps it out of `fresh` — used to
+        # vanish from both lists, since its own creation commit's "A" excluded it here too.
+        # [earned: 2026-09-28 battle test — a same-week L2 enrichment of a note the pipeline had
+        # itself distilled four days earlier never appeared in Now.md at all]
+        return _newest_first(list(fresh), fresh), sorted(changed - set(fresh)), "git"
     dated = {}
     for p in discover_notes(vault):
         when = _when(read_frontmatter(p)[0])
