@@ -133,8 +133,9 @@ for distill to collide on. See `evals/eval_dedup_guard.py`.
 - `readwise-daily.sh` → `daily_digest.py` — same digest logic, same "missing directory is
   an error, not an empty day" guard; the `Log.md`-write step is dropped (see below).
 - `hooks/session-start.sh` — rewritten to degrade **silently** with no `READWISE_TOKEN`
-  set, rather than printing a "plugin disabled" banner on every session for every user
-  (see Dropped, and `evals/eval_hook_silent_noop.py`).
+  set, rather than printing a "plugin disabled" banner on every session for every user;
+  itself dropped at R12 along with the rest of the standalone skill surface (see Dropped
+  table below — no eval covers it, since it no longer ships).
 - `vault_utils.py` — new for this plugin, a small self-contained subset of the obsidian
   plugin's module of the same name (vault/profile resolution, tolerant frontmatter I/O,
   the DLQ writer) — copied rather than imported, per `contract/KNOWLEDGE_API.md`'s
@@ -178,6 +179,10 @@ for distill to collide on. See `evals/eval_dedup_guard.py`.
 | `book_capture_dedup` | Given a fixture Classic v2 book + highlights (`evals/fixtures/reader_book.json`), `build_captures.write_book_capture()` produces a conformant `category: book` note with the highlights rendered, and a second call over the same book dedups via the title+author slug key rather than writing a second file |
 | `ingest` | `ingest.py` end to end against a stubbed Reader API: captures, provenance, ledger dedup, and a DLQ note with the watermark held when an item fails |
 | `pdf_convert` | A `pdf` item's converted text carries page anchors and `pdf_pages`/`pdf_sha256`/`extractor`, with no `attachment` field and no PDF file written anywhere in the vault; a failed conversion and a failed download both fall back to Reader's `html_content` with `extractor: reader` |
+| `pdf_scheme` | `pdf_extract._download` fetches only `http(s)`, before and after redirects (review-01 SEC-4) — a `file://` source or a web URL that redirects off the web never becomes a capture |
+| `tweet_enrich` | A tweet capture is enriched at ingest with no network calls (fakes stand in for the resolver/fetcher): media/video/quoted-post markers survive, every `t.co` link is expanded in-place, `links` holds only external targets in order, and a linked GitHub repo/arXiv paper/other page is excerpted appropriately |
+| `reader_archive` | `ingest.archive_settled` archives in Reader only what's settled on the remote (pushed and committed), never what's merely local, still in `01_Capture/`, or already archived by an earlier run |
+| `highlights` | The owner's Reader highlights reach the vault: highlights on a document already captured become one highlights capture naming where it went; highlights on an unseen document get their own capture; a highlight already quoted distinctively elsewhere in the vault is recorded, not re-captured |
 
 Every eval that writes runs against a throwaway copy (`evals/_sandbox.py`), so `./vault`
 is never touched. If `./vault` doesn't exist yet, `run.py` exits `2` with a `corpus not

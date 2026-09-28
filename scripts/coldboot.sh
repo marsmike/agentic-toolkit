@@ -26,12 +26,14 @@ WORK="$(mktemp -d -t toolkit-coldboot)"
 trap 'rm -rf "$WORK"' EXIT
 echo "workdir: $WORK"
 
-# Stage 1 — only the doctor half of the README quick start.
-# The README quick start is clone + `uv run unisphere doctor` + `claude plugin marketplace
-# add .` + `claude plugin install obsidian@agentic-toolkit`; the marketplace-add/install
+# Stage 1 — only the doctor half of onboarding.
+# README's own quick-install block is `uv tool install` + `unisphere engines install` +
+# `claude plugin marketplace add` + `unisphere demo`; the fuller walkthrough it links to
+# (04_Resources/Guides/Quick-Start.md in the vault) is clone + marketplace-add-and-install
+# a plugin + `unisphere doctor` + the distill skill. Either way, the marketplace-add/install
 # part needs an isolated CLAUDE_CONFIG_DIR (never the developer's own), so it doesn't run
 # until Stage 4 (--live) below. Stages 1-3 without --live verify the doctor/engine half
-# only, not the full quick start end to end.
+# only, not the full onboarding flow end to end.
 git clone -q "https://github.com/$REPO.git" "$WORK/repo"
 cd "$WORK/repo"
 uv run unisphere doctor

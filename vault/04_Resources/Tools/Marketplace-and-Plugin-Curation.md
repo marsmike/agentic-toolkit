@@ -36,7 +36,8 @@ themselves, so they have no `plugins/` source and never appear in `marketplace.j
 landed in `marketplace.json` as of this writing. Treat everything below as intent, not a shipped
 inventory:
 
-- **Planned core wave** — research, techref, feinschliff joining the three above.
+- **Planned core wave** — techref, feinschliff joining the five above (research already landed,
+  as `radar`).
 - **Planned second wave** — [[Tech-Radar]], the fein-* media plugins
   ([[Feinschliff-Deck-Pipeline]]), [[Handoff-Skill]], [[Autoresearch-Eval-Loop]]: adds capability
   without being required for the walking skeleton.

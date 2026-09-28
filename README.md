@@ -150,7 +150,7 @@ flowchart TD
     end
     vault -->|"wikilinks → edges<br/>(deterministic, EXTRACTED)"| DB[(graph.db)]
     vault -->|"content → embeddings<br/>(potion-base-8M, offline)"| DB
-    DB -->|"neighbors · path · stats"| Skills[skills: distill, lint, doctor]
+    DB -->|"neighbors · path · stats"| Skills["distill skill · vault skill · unisphere CLI"]
     DB -.->|"candidates · surprise<br/><b>report-only, human-gated</b>"| Skills
 ```
 

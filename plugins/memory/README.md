@@ -112,7 +112,7 @@ pass-with-detail (not a failure) if `pyyaml` isn't installed.
 
 ## Evals
 
-`evals/run.py` runs three R0 capability evals against `./vault`, emitting JSON
+`evals/run.py` runs four R0 capability evals against `./vault`, emitting JSON
 `{eval, pass, detail}` per check:
 
 | Eval | Asserts |
@@ -120,6 +120,7 @@ pass-with-detail (not a failure) if `pyyaml` isn't installed.
 | `session_capture` | `hooks/lib/session_capture.capture_session()`, given a fixture transcript, produces a schema-conformant note in `00_Memory/sessions/` (required frontmatter fields, correct turn count, tool names present in the body) |
 | `distill_idempotent` | `distill_memory.write_memory_note()` is idempotent: an identical `(slug, source)` call twice is byte-for-byte unchanged after the second call; a genuinely new source for the same slug updates the same note in place rather than duplicating it |
 | `codec_parity` | `memory_vault`'s hand-rolled frontmatter codec round-trips unknown fields, unicode, and a colon-in-value string unchanged (cross-checked against `yaml.safe_load` when `pyyaml` is available), and raises `ValueError` — per its documented codec contract — instead of silently mis-parsing a nested mapping or a `\|` block scalar |
+| `slug_containment` | `distill_memory.write_memory_note()` refuses a model-proposed slug that would escape `00_Memory/notes/` (`../x`, `a/b`, an absolute path, `..`, a bare drive letter, …), while an ordinary slug still writes there (review-01 SEC-5) |
 
 Every eval here writes, so every eval runs against a throwaway copy
 (`evals/_sandbox.py`) — the real `./vault` is never touched. If `./vault` doesn't exist

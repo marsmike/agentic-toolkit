@@ -3,8 +3,8 @@ name: Docs
 # Publishes ./vault as a static site via Quartz 4 (jackyzha0/quartz) — the
 # vault IS the documentation, this workflow just builds it. See docs-site/
 # for the two config files copied into quartz at build time, and
-# 04_Resources/Guides/ (in the vault itself) for the PARA schema being
-# rendered.
+# 04_Resources/Concepts/PARA-Method.md (in the vault itself) for the PARA
+# schema being rendered.
 on:
   push:
     branches: [main]
@@ -38,9 +38,11 @@ jobs:
       # main branch ships breaking layout/config changes between releases,
       # and this workflow copies our config files over quartz's own, so an
       # unpinned checkout could silently break the build on quartz's schedule
-      # rather than ours. v5.0.0 exists upstream but the toolkit standardizes
-      # on the Quartz 4 line (see docs/PLAN.md); v4.5.2 is the latest v4
-      # release as of writing. Bump deliberately, not automatically.
+      # rather than ours. See 04_Resources/Guides/Docs-Site.md (in the vault)
+      # for the pin itself; v5.0.0 exists upstream but this repo has not
+      # migrated off the Quartz 4 line, undocumented elsewhere as of writing.
+      # v4.5.2 is the latest v4 release as of writing. Bump deliberately, not
+      # automatically.
       - name: Checkout Quartz 4 (pinned release)
         uses: actions/checkout@v7
         with:

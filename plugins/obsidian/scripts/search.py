@@ -5,7 +5,7 @@
     uv run scripts/search.py --rebuild-cache          # (re)build the optional embeddings cache
 
 Always available: a BM25 ranking over each note's title, filename, Index.md summary (if
-any), and body — this is the "filename + Index.md scan" fallback contract/PLAN.md asks
+any), and body — this is the "filename + Index.md scan" fallback docs/PLAN.md asks
 for, not a degraded afterthought; it needs no dependency beyond PyYAML and works on a
 freshly cloned repo with zero setup.
 
