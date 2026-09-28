@@ -482,16 +482,37 @@ footer .srclist { margin-top: 6px; }
     return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   }
 
+  // The ring labels' own boxes ("Hot"/"Rising"/"Watch"/"Faint", stacked above center): computed
+  // once from the fixed band geometry so both the dot layout and placeLabels can keep clear of the
+  // same rectangles the text is actually painted in. {label, ly} let renderScope draw the text
+  // from the same pass instead of recomputing rMid/ly.
+  const RING_CHARW = 6.4, RING_LH = 12;
+  function ringLabelBoxes() {
+    return BANDS.map(([thresh, label], i) => {
+      const rOuter = i === 0 ? R_MIN : radiusFor(BANDS[i - 1][0]);
+      const rInner = radiusFor(thresh);
+      const rMid = (rOuter + rInner) / 2 || R_MIN / 2;
+      const ly = CY - rMid;
+      const w = label.length * RING_CHARW;
+      return {left: CX - 4 - w - 4, top: ly - RING_LH / 2, w: w + 8, h: RING_LH, label, ly};
+    });
+  }
+
   function buildScopeLayout() {
     const n = SECTORS.length || 1;
     const span = 360 / n;
     const bySector = new Map(SECTORS.map(s => [s.id, []]));
     for (const b of BLIPS) { if (!bySector.has(b.sector)) bySector.set(b.sector, []); bySector.get(b.sector).push(b); }
     const positions = new Map();
+    const ringBoxes = ringLabelBoxes();
     SECTORS.forEach((s, i) => {
       const mid = -90 + i * span + span / 2;
       const list = (bySector.get(s.id) || []).slice().sort((a, c) => c.strength - a.strength);
-      const usable = span * 0.78;
+      // A crowded sector gets to use more of its wedge (up to 94%, leaving a sliver at each
+      // boundary so the divider line still reads); a sparse one stays modest — the fixed 0.78 for
+      // every sector regardless of count is what packed ~10 Other items into a tight arc.
+      // [earned: 2026-09-28, the arc still sat on the "Watch" ring label after the first spread]
+      const usable = span * Math.min(0.94, Math.max(0.55, 0.55 + 0.045 * list.length));
       const pts = list.map((b, j) => {
         const frac = list.length > 1 ? j / (list.length - 1) - 0.5 : 0;
         const jitter = (fnv(b.key) - 0.5) * span * 0.12;
@@ -501,7 +522,7 @@ footer .srclist { margin-top: 6px; }
         const [x, y] = polar(CX, CY, r, angle);
         return {key: b.key, x, y, rad: dotRadius(b.mentions)};
       });
-      spreadDots(pts);
+      spreadDots(pts, ringBoxes);
       pts.forEach(p => {
         const dx = p.x - CX, dy = p.y - CY;
         positions.set(p.key, {angle: (Math.atan2(dy, dx) * 180) / Math.PI, r: Math.hypot(dx, dy), sectorMid: mid});
@@ -510,14 +531,30 @@ footer .srclist { margin-top: 6px; }
     return positions;
   }
 
+  // Push a point clear of a rectangle inflated by `margin` — the "label-free band" around a ring
+  // label. Returns whether it moved.
+  function keepClear(p, rect, margin) {
+    const left = rect.left - margin, top = rect.top - margin;
+    const right = rect.left + rect.w + margin, bottom = rect.top + rect.h + margin;
+    const cx = Math.min(Math.max(p.x, left), right), cy = Math.min(Math.max(p.y, top), bottom);
+    let dx = p.x - cx, dy = p.y - cy;
+    let dist = Math.hypot(dx, dy);
+    if (dist >= p.rad) return false;
+    if (dist < 0.01) { dx = 0; dy = 1; dist = 1; }  // center inside the band: push straight down
+    const push = p.rad - dist + 0.5;
+    p.x += (dx / dist) * push; p.y += (dy / dist) * push;
+    return true;
+  }
+
   // Same-strength items in a narrow sector (e.g. a wall of "Faint" items in Other) land almost on
   // top of one another: the angle/radius spacing above is even, but arc length near the middle of
   // a crowded band can still be smaller than two dots' combined radius. A short, deterministic
   // pairwise relaxation in x/y (same idea as placeLabels' overlap loop, keyed off fnv so it never
   // depends on iteration order or Math.random) spreads a tight cluster apart without disturbing
-  // sectors that already have room. [earned: 2026-09-28, ~10 overlapping dots in Other]
-  function spreadDots(pts) {
-    const GAP = 1.5;
+  // sectors that already have room; `ringBoxes` are kept clear too, so the cluster never re-forms
+  // on top of a ring label. [earned: 2026-09-28, ~10 overlapping dots in Other sitting on "Watch"]
+  function spreadDots(pts, ringBoxes = []) {
+    const GAP = 1.5, RING_MARGIN = 3;
     for (let iter = 0; iter < 40; iter++) {
       let moved = false;
       for (let i = 0; i < pts.length; i++) {
@@ -535,6 +572,9 @@ footer .srclist { margin-top: 6px; }
           const push = (minDist - dist) / 2;
           a.x += (dx / dist) * push; a.y += (dy / dist) * push;
           b.x -= (dx / dist) * push; b.y -= (dy / dist) * push;
+        }
+        for (const rect of ringBoxes) {
+          if (keepClear(pts[i], rect, RING_MARGIN)) moved = true;
         }
       }
       if (!moved) break;
@@ -562,17 +602,10 @@ footer .srclist { margin-top: 6px; }
       ringsG.append(sv("circle", {class: "ring", cx: CX, cy: CY, r}));
     });
     svg.append(ringsG);
-    const RING_CHARW = 6.4, RING_LH = 12;
+    const ringObstacles = ringLabelBoxes();
     const ringLabelsG = sv("g");
-    const ringObstacles = [];
-    BANDS.forEach(([thresh, label], i) => {
-      const rOuter = i === 0 ? R_MIN : radiusFor(BANDS[i - 1][0]);
-      const rInner = radiusFor(thresh);
-      const rMid = (rOuter + rInner) / 2 || R_MIN / 2;
-      const ly = CY - rMid;
-      const w = label.length * RING_CHARW;
-      ringLabelsG.append(sv("text", {class: "ring-label", x: CX - 4, y: ly, "text-anchor": "end"}, label));
-      ringObstacles.push({left: CX - 4 - w - 4, top: ly - RING_LH / 2, w: w + 8, h: RING_LH});
+    ringObstacles.forEach(rb => {
+      ringLabelsG.append(sv("text", {class: "ring-label", x: CX - 4, y: rb.ly, "text-anchor": "end"}, rb.label));
     });
 
     // sweep (decorative, respects reduced motion via CSS)
