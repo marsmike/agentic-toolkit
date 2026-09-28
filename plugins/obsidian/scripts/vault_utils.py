@@ -110,7 +110,11 @@ def resolve_vault() -> VaultResolution:
     return VaultResolution(repo_root / "vault", "default:./vault")
 
 
-EXAMPLE_VAULT = Path(__file__).resolve().parents[3] / "vault"
+# The checkout's own ./vault, three levels above scripts/. A copy of the scripts elsewhere (an
+# installed plugin, an eval's temp dir — /tmp/x/ on Linux has too few parents) has none.
+# [earned: 2026-09-28 — an unguarded parents[3] raised IndexError on import in CI's /tmp stubs]
+_UP = Path(__file__).resolve().parents
+EXAMPLE_VAULT = _UP[3] / "vault" if len(_UP) > 3 else None
 
 
 def example_vault(vault: Path) -> bool:
@@ -120,7 +124,7 @@ def example_vault(vault: Path) -> bool:
     there and reports on the wrong thing. Evals work on sandbox copies, never this path.
     [earned: 2026-09-28 — the 20:58 UTC watchdog run missed /home/user/TheVoid, checked ./vault
     and reported OK from the example vault's history]"""
-    if os.environ.get("TOOLKIT_ALLOW_EXAMPLE_VAULT"):
+    if EXAMPLE_VAULT is None or os.environ.get("TOOLKIT_ALLOW_EXAMPLE_VAULT"):
         return False
     try:
         return vault.resolve() == EXAMPLE_VAULT.resolve()

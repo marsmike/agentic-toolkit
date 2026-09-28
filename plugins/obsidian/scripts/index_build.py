@@ -25,7 +25,7 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 
 from vault_utils import (
@@ -115,7 +115,7 @@ def build(vault: Path) -> tuple[str, dict]:
 
     needs = stats["entries"] - stats["from_description"]
     out = ["# Vault Index", "",
-           f"*Last rebuild: {date.today().isoformat()} · {stats['entries']} entries · {needs} without a description ({COG})*", ""]
+           f"*Last rebuild: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M')} UTC · {stats['entries']} entries · {needs} without a description ({COG})*", ""]
     for folder in (ROOT, *ACTIVE_CONTENT_FOLDERS):
         if folder not in groups:
             continue

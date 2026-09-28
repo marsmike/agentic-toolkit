@@ -245,7 +245,7 @@ def test_example_vault_index_has_no_drift():
         built, _ = index_build.build(EXAMPLE_VAULT)
     finally:
         sys.path.remove(str(scripts_dir))
-    undated = re.compile(r"^\*Last rebuild: \d{4}-\d{2}-\d{2} ", re.M)
+    undated = re.compile(r"^\*Last rebuild: \d{4}-\d{2}-\d{2}(?: \d{2}:\d{2} UTC)? ", re.M)
     committed = (EXAMPLE_VAULT / "Index.md").read_text(encoding="utf-8")
     assert undated.sub("*Last rebuild: ", committed) == undated.sub("*Last rebuild: ", built), (
         "vault/Index.md drifted from index_build.py: rebuild it")
