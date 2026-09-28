@@ -3,7 +3,8 @@
 Sections: the toolkit checkout, the engines (installed vs. latest release, the cloud pin), the Claude
 Code plugins installed from this marketplace (per scope, vs. the version in this checkout), the
 vault (notes, graph, DLQ), the pipeline (the obsidian plugin's watchdog verdict, when the vault
-runs one) and the companion CLIs agents use next to `unisphere` (Obsidian's, Todoist's `td`).
+runs one) and the companion CLIs agents use next to `unisphere` (Obsidian's, Todoist's `td`,
+Tavily's `tvly`).
 
 Every check collapses its failure into data: a `problems` list of {section, detail} the caller can
 render or branch on, and `ok` is true only when that list is empty. Nothing here writes anything.
@@ -213,6 +214,23 @@ def companions_section() -> dict:
             row.update(ready=True, auth_mode=auth.get("authMode"))
         else:
             row.update(ready=False, note="not logged in — td auth login")
+    rows.append(row)
+
+    tvly = shutil.which("tvly") or (str(p) if (p := Path.home() / ".local" / "bin" / "tvly").is_file() else None)
+    row = {"cli": "tvly", "path": tvly, "on_path": shutil.which("tvly") is not None}
+    if tvly is None:
+        row.update(ready=False, note="not found — uv tool install tavily-cli")
+    else:
+        row["version"] = _first_line(_run([tvly, "--version"])).removeprefix("tavily-cli ").strip()
+        proc = _run([tvly, "--status", "--json"])
+        try:
+            state = json.loads(proc.stdout) if proc and proc.returncode == 0 else None
+        except json.JSONDecodeError:
+            state = None
+        if isinstance(state, dict) and state.get("authenticated"):
+            row.update(ready=True, auth_mode="authenticated")
+        else:
+            row.update(ready=False, note="no key — set TAVILY_API_KEY (keyless tvly is rate-capped)")
     rows.append(row)
     return {"companions": rows}
 

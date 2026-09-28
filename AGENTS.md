@@ -14,6 +14,7 @@ R12 — a `CLAUDE.md` next to it would silently win and hide this file]
 | Running the pipeline as a Claude cloud routine | `cloud/README.md` |
 | Why anything is the way it is | `docs/PLAN.md` |
 | Which command does what, as JSON (search, graph, status, companion CLIs) | run `unisphere commands --json` |
+| The web beyond the vault (search, a page, a site) | the Tavily CLI `tvly … --json`, never a hand-written API call; scripts go through `plugins/radar/scripts/tavily.py` and `plugins/obsidian/scripts/fetch_source.py` |
 
 ## Skills
 

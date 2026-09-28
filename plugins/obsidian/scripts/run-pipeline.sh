@@ -23,7 +23,8 @@ export TOOLKIT_VAULT="$VAULT"
 # - Files: read the repo and the vault, write the vault only; the agent's own file tools never read or
 #   write either .git (history, hooks, remote; the granted scripts' git calls still work) and never write
 #   Config/toolkit (a profile names the host a key is sent to).
-# - WebFetch: only the domains in TOOLKIT_PIPELINE_FETCH_DOMAINS, for a stub's own source; a
+# - WebFetch and fetch_source.py (the Tavily CLI): only the domains in TOOLKIT_PIPELINE_FETCH_DOMAINS,
+#   for a stub's own source; a
 #   stub elsewhere ends as a short note with its link (distill "A stub is not the content").
 KEYS_FILE="${TOOLKIT_KEYS_FILE:-$HOME/.env}"
 [[ "$KEYS_FILE" = /* ]] || KEYS_FILE="$PWD/$KEYS_FILE"
@@ -41,6 +42,8 @@ done
 # script or a steered prompt cannot print or forward them. [earned: 2026-09-24, Copilot review of #26]
 AGENT_ENV+=("CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1")
 FETCH_DOMAINS="${TOOLKIT_PIPELINE_FETCH_DOMAINS:-github.com raw.githubusercontent.com}"
+# fetch_source.py (a stub's source through `tvly extract`) keeps to the same domains as WebFetch.
+AGENT_ENV+=("TOOLKIT_PIPELINE_FETCH_DOMAINS=$FETCH_DOMAINS")
 
 script() {  # plugin, script, [fixed leading args]: the command, with and without further args
   local cmd="uv run --locked --project plugins/$1/scripts python3 plugins/$1/scripts/$2${3:+ $3}"
@@ -49,7 +52,7 @@ script() {  # plugin, script, [fixed leading args]: the command, with and withou
 ALLOWED="$(script obsidian pipeline_run.py begin)$(script obsidian pipeline_run.py queue)"
 ALLOWED+="$(script obsidian pipeline_run.py end)$(script obsidian index_build.py)"
 ALLOWED+="$(script obsidian distill_judge.py)$(script obsidian distill_check.py)"
-ALLOWED+="$(script obsidian retire_capture.py)$(script obsidian search.py)"
+ALLOWED+="$(script obsidian retire_capture.py)$(script obsidian search.py)$(script obsidian fetch_source.py)"
 ALLOWED+="$(script radar radar.py scan)$(script radar radar.py gaps)$(script radar radar.py weekly)"
 ALLOWED+="$(script readwise ingest.py)"
 # No bare Glob or Grep grant: a tool-level grant searches any directory (a run searched $HOME and

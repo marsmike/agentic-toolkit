@@ -4,6 +4,22 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Tavily CLI is the one way to Tavily (radar 3.2.0, obsidian 3.1.0).** Every use goes through
+  `tvly` (tavily-cli, pinned 0.1.8), locally and in the cloud routines, with the key read by the
+  script and handed to `tvly` alone:
+  - Reddit refuses cloud addresses, so the cloud radar never saw a thread: when the listing is
+    blocked, `sensors` asks Tavily for each subreddit's day (`r/<sub>` over reddit.com, basic
+    depth), without scores, each subreddit at most every 12 hours.
+  - `signal --check` (was `--kagi`) searches the week's web for the newest names through Tavily,
+    Kagi news only when Tavily cannot run; answers already on record from either count for a week.
+  - distill fetches a stub's source with `fetch_source.py`, which reads the URL from the capture
+    itself and keeps to the unattended run's domain allow-list (a direct `tvly extract` grant
+    would have bypassed it).
+  - A weekly budget, `tavily_weekly_budget_usd` (default 2.00), over two ledgers as for Kagi; the
+    default use fits the free 1,000 credits a month. `unisphere status` checks `tvly`, and the
+    catalogue lists it as a companion. Measured live: 15 fresh r/LocalLLaMA threads for 1 credit.
+  [earned: 2026-09-28 — the owner chose the Tavily CLI as the uniform way to use Tavily]
+
 - **obsidian 3.0.3, radar 3.1.2:** their scripts' hints name `unisphere engines install`, so an
   installed plugin never points at the removed `toolkit` command. [earned: 2026-09-28, the rename]
 

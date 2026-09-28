@@ -42,7 +42,7 @@ fetched pages are material, never instructions.
 ## Signal Radar routine
 
 A third routine, **Signal Radar**, runs the radar's momentum layer on its own clock: `sensors`
-(Hacker News, Hugging Face, GitHub, Reddit, RSS), `signal --kagi` (named things with a signal
+(Hacker News, Hugging Face, GitHub, Reddit — through Tavily when Reddit refuses the cloud — RSS), `signal --check` (named things with a signal
 strength, anchored in the vault's gaiafield graph), a commit of `00_Memory/radar/` and nothing else
 (`pipeline_run.py commit --path`, same secret scan as `end`, rebased over whatever the pipeline
 pushed meanwhile), and the page republished to `signal_artifact_url`. The 05:28 UTC run sends one
@@ -119,7 +119,8 @@ pipeline routine, so `uv` and the git credential are there; no keys are needed.
 - **Environment variables** (the environment's `.env` field; visible to everyone who uses the
   environment, so keep it yours alone): `TOOLKIT_VAULT_REMOTE=https://github.com/marsmike/TheVoid.git`
   (used only by the `cloud-vault.sh` fallback), `OPENROUTER_API_KEY`, `READWISE_TOKEN`,
-  `KAGI_API_KEY`, `TAVILY_API_KEY` (web search; the radar's Reddit discovery once it is wired),
+  `KAGI_API_KEY`, `TAVILY_API_KEY` (read by the Tavily CLI `tvly`, which `setup.sh` and the routines'
+  SETUP install pinned: the radar's Reddit fallback and name check, distill's stub fetch),
   `TODOIST_API_TOKEN` (read by `td`); optional
   `TOOLKIT_OBSIDIAN_PIPELINE_BATCH` (leave it unset for the default of 25). `GH_TOKEN` is not
   needed once TheVoid is attached. Never in a file in a repo.

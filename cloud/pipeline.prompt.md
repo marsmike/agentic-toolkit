@@ -13,6 +13,9 @@ SETUP
    falls back to BM25 and the dossier has no graph. If the install fails, go on and say so in
    FINISH. The model gaiafield embeds with lives in TOOLKIT_GAIAFIELD_MODEL_DIR, put there by the
    environment's setup script; if it is missing, the first `infer` downloads it once, about 30 MB.)
+   Tavily CLI (the one way to use Tavily, pinned): tvly --version 2>/dev/null || uv tool install tavily-cli==0.1.8
+   (`tvly` lands in ~/.local/bin, where the scripts look. It reads TAVILY_API_KEY; the scripts
+   hand it the key themselves. If the install fails, go on: the Tavily steps report SKIPPED.)
 2. Vault: use the session's TheVoid checkout (the directory holding AGENTS.md and 00_Memory/;
    the routine attaches the repository, so this checkout is the one git may push from):
      export TOOLKIT_VAULT=<that path>

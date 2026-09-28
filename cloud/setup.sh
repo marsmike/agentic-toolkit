@@ -61,5 +61,12 @@ else
   echo "gaiafield missing: model not fetched here"
 fi
 
-echo "uv: $(uv --version 2>/dev/null || echo missing) · td: $(td --version 2>/dev/null || echo missing)"
+# The Tavily CLI: the one way the toolkit uses Tavily (radar sensors and name check, distill's stub
+# fetch). Pinned; the routines' SETUP installs it too when this cached script predates it.
+TAVILY_CLI_PIN="tavily-cli==0.1.8"
+if command -v uv >/dev/null 2>&1; then
+  uv tool install -q "$TAVILY_CLI_PIN" || echo "tvly not installed here; the routine's SETUP installs it"
+fi
+
+echo "uv: $(uv --version 2>/dev/null || echo missing) · td: $(td --version 2>/dev/null || echo missing) · tvly: $(tvly --version 2>/dev/null || echo missing)"
 python3 -c "import os; print('vars set:', {k: bool(os.environ.get(k)) for k in ('TOOLKIT_VAULT_REMOTE','GH_TOKEN','OPENROUTER_API_KEY','READWISE_TOKEN','KAGI_API_KEY','TAVILY_API_KEY','TODOIST_API_TOKEN')})"

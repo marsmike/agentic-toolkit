@@ -12,6 +12,8 @@
                   further queries this run, status "partial"
  4. reddit ok   — stickied posts skipped, score = ups, origin f"r/{sub}"
  5. reddit blk  — blocked on both hosts for one sub -> status "blocked", no further subs tried
+                  (Tavily unavailable); with Tavily (stubbed `tavily._run`) the subreddits come through
+                  `tvly` as "partial", without scores, and not again within 12 h
  6. rss+atom    — RSS 2.0 and Atom both parsed, items published outside the 7-day window dropped,
                   a non-feed response is a per-feed failure (status "partial") that doesn't stop
                   the others
@@ -85,7 +87,22 @@ def run(vault: Path) -> dict:
     saved_env = {k: os.environ.pop(k, None) for k in (
         "TOOLKIT_RADAR_SENSORS", "TOOLKIT_RADAR_SENSOR_FEEDS", "TOOLKIT_RADAR_SENSOR_GITHUB_TOPICS",
         "TOOLKIT_RADAR_SENSOR_SUBREDDITS", "TOOLKIT_RADAR_SENSOR_KAGI_NEWS", "GITHUB_TOKEN", "GH_TOKEN")}
-    real_request, real_max_judge = sensors._request, sensors.MAX_JUDGE_PER_RUN
+    import tavily
+    real_request, real_max_judge, real_tavily = sensors._request, sensors.MAX_JUDGE_PER_RUN, tavily._run
+    tavily_calls: list[list[str]] = []
+    tavily_state = {"available": False}
+
+    def tavily_stub(args):
+        if not tavily_state["available"]:
+            raise tavily.NoKey("TAVILY_API_KEY is not set")
+        tavily_calls.append(args)
+        sub = args[1].removeprefix("r/")
+        return {"results": [
+            {"url": f"https://www.reddit.com/r/{sub}/comments/tv{len(tavily_calls)}/a_thread/", "title": f"A thread : r/{sub}"},
+            {"url": "https://www.reddit.com/r/SomewhereElse/comments/zz9/off_topic/", "title": "Elsewhere"},
+            {"url": f"https://evilreddit.com/r/{sub}/comments/ev1/lookalike/", "title": "Lookalike host"},
+            {"url": "https://example.com/not-reddit", "title": "Not reddit"}]}
+    tavily._run = tavily_stub
     state: dict = {"calls": [], "github_calls": 0, "github_block_topic": False, "reddit_block": False,
                    "reddit": {}, "hn_front": {"hits": []}, "hn_bydate": {"hits": []},
                    "hf_models": [], "hf_spaces": [], "github_new": {"items": []}, "github_topic": {"items": []},
@@ -261,6 +278,34 @@ def run(vault: Path) -> dict:
         if r["sources"]["reddit"]["status"] != "blocked" or reddit_calls != 2:
             problems.append(f"phase 5: blocked on both hosts must stop after 2 calls (www + old) for one sub, "
                             f"got {reddit_calls} calls, status {r['sources']['reddit']['status']}")
+        if "Tavily skipped" not in r["sources"]["reddit"]["detail"]:
+            problems.append(f"phase 5: without Tavily the detail must say it was skipped, got {r['sources']['reddit']['detail']!r}")
+
+        # 5b. blocked, Tavily available: every subreddit through tvly, their own threads only, no scores
+        tavily_state["available"] = True
+        subs = sensors._profile_list(sandbox, "sensor_subreddits", sensors.DEFAULT_SUBREDDITS)
+        out5b = sandbox.parent / "radar-reddit-tavily"
+        r = sensors.collect(sandbox, out5b, NOW, only=["reddit"])
+        src = r["sources"]["reddit"]
+        day = json.loads((out5b / "sensors" / f"{NOW.date().isoformat()}.json").read_text(encoding="utf-8"))["items"]
+        reddit_items = {k: v for k, v in day.items() if k.startswith("reddit:")}
+        if src["status"] != "partial" or len(tavily_calls) != len(subs) or len(reddit_items) != len(subs):
+            problems.append(f"phase 5b: expected partial with one tvly call and one thread per subreddit "
+                            f"({len(subs)}), got {src['status']}, {len(tavily_calls)} calls, {len(reddit_items)} items")
+        if any(v["score"] is not None or not v["origin"].startswith("r/") or v["title"].endswith(v["origin"])
+               for v in reddit_items.values()):
+            problems.append(f"phase 5b: Tavily threads carry no score, origin r/<sub> and a clean title, got {reddit_items}")
+        if tavily_calls and not {"--include-domains", "reddit.com", "--time-range", "day", "--depth", "basic"} <= set(tavily_calls[0]):
+            problems.append(f"phase 5b: the fallback is a basic reddit.com search over the day, got {tavily_calls[0]}")
+        if not (out5b / "tavily-ledger.jsonl").is_file():
+            problems.append("phase 5b: the sensors must record their Tavily calls in tavily-ledger.jsonl")
+
+        # 5c. three hours later: no subreddit is asked again within 12 h
+        calls = len(tavily_calls)
+        r = sensors.collect(sandbox, out5b, NOW + timedelta(hours=3), only=["reddit"])
+        if len(tavily_calls) != calls or r["sources"]["reddit"]["status"] != "partial":
+            problems.append(f"phase 5c: no tvly call within 12 h, got {len(tavily_calls) - calls}")
+        tavily_state["available"] = False
         state["reddit_block"] = False
 
         # 6. rss + atom, 7-day window, a non-feed is a per-feed failure
@@ -353,7 +398,7 @@ def run(vault: Path) -> dict:
         if stray or snapshot(sandbox) != vault_before:
             problems.append(f"phase 11: only out/sensors/ may gain files (stray: {stray}) and the vault must be untouched")
     finally:
-        sensors._request, sensors.MAX_JUDGE_PER_RUN = real_request, real_max_judge
+        sensors._request, sensors.MAX_JUDGE_PER_RUN, tavily._run = real_request, real_max_judge, real_tavily
         for k, v in saved_env.items():
             os.environ.pop(k, None)
             if v is not None:
