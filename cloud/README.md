@@ -20,11 +20,15 @@ alone and every change to it is a reviewed commit:
 
 ## Pipeline routine
 
+The three routines' instructions name the checkout's path, `/home/user/<repository>`: a session
+starts in `/home/user`, and a relative `cloud/…` sent a run to `/home/user/cloud/…` first. [earned:
+2026-09-28, the watchdog's first Read failed with "File does not exist"]
+
 The routine attaches both repositories as sources (see Settings), so the session starts with a
 checkout of each, and its instruction only points at the prompt file:
 
 ```text
-Follow cloud/pipeline.prompt.md (in the agentic-toolkit checkout) exactly: run the TheVoid pipeline once, unattended.
+Read /home/user/agentic-toolkit/cloud/pipeline.prompt.md (the agentic-toolkit checkout; if it is not there, the directory holding cloud/pipeline.prompt.md) and follow it exactly: run the TheVoid pipeline once, unattended.
 ```
 
 `pipeline.prompt.md` then does, in order: SETUP (engines installed, the vault checkout put on a
@@ -49,7 +53,7 @@ pipeline, whose run distills for up to two hours]
 Its instruction:
 
 ```text
-Follow cloud/signal.prompt.md (in the agentic-toolkit checkout) exactly.
+Read /home/user/agentic-toolkit/cloud/signal.prompt.md (the agentic-toolkit checkout; if it is not there, the directory holding cloud/signal.prompt.md) and follow it exactly.
 ```
 
 Settings: the same environment and both repositories as sources (the vault is what it commits
@@ -92,7 +96,7 @@ OpenRouter key died between two runs]
 Its instruction:
 
 ```text
-Follow cloud/watchdog.prompt.md (in the agentic-toolkit checkout) exactly.
+Read /home/user/agentic-toolkit/cloud/watchdog.prompt.md (the agentic-toolkit checkout; if it is not there, the directory holding cloud/watchdog.prompt.md) and follow it exactly.
 ```
 
 Settings: attach both repositories as sources (the vault checkout is what it reads); schedule
