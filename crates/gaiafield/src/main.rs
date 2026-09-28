@@ -273,6 +273,15 @@ fn main() -> ExitCode {
     }
 }
 
+/// Human text output never leaks Rust's `Debug` formatting for an `Option` (`Some(2)`/`None`);
+/// `det_distance` is unreachable-in-the-deterministic-graph when `None`, so render that as `n/a`.
+fn fmt_det_distance(det_distance: Option<usize>) -> String {
+    match det_distance {
+        Some(d) => d.to_string(),
+        None => "n/a".to_string(),
+    }
+}
+
 fn resolve_db(vault: &std::path::Path, db_flag: Option<PathBuf>) -> PathBuf {
     db_flag.unwrap_or_else(|| gaiafield::default_db_path(vault))
 }
@@ -690,8 +699,12 @@ fn run_candidates(
     } else {
         for c in &result {
             println!(
-                "{:.3}  [{}]  {}  (surprise {:.3}, det_distance {:?})",
-                c.score, c.label, c.path, c.surprise, c.det_distance
+                "{:.3}  [{}]  {}  (surprise {:.3}, det_distance {})",
+                c.score,
+                c.label,
+                c.path,
+                c.surprise,
+                fmt_det_distance(c.det_distance)
             );
         }
     }
@@ -731,8 +744,14 @@ fn run_surprise(
     } else {
         for r in &result {
             println!(
-                "{:.3}  [{}]  {} <-> {}  (score {:.3}, det_distance {:?}, same_subtree {})",
-                r.surprise, r.label, r.a, r.b, r.score, r.det_distance, r.same_subtree
+                "{:.3}  [{}]  {} <-> {}  (score {:.3}, det_distance {}, same_subtree {})",
+                r.surprise,
+                r.label,
+                r.a,
+                r.b,
+                r.score,
+                fmt_det_distance(r.det_distance),
+                r.same_subtree
             );
         }
     }
@@ -782,4 +801,22 @@ fn run_calibrate(
         }
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fmt_det_distance;
+
+    /// `candidates`/`surprise` text output must never leak Rust's `Debug` formatting for
+    /// `Option<usize>` (`Some(2)`, `None`) — a real vault has notes with no deterministic path
+    /// between them, so `det_distance` is `None` for some of the highest-surprise rows on every
+    /// run of `gaiafield surprise` against a large vault. [earned: 2026-09-28, battle test —
+    /// `gaiafield surprise` on the owner's real vault printed "det_distance None" for its
+    /// top-10 rows]
+    #[test]
+    fn det_distance_never_prints_rust_debug_syntax() {
+        assert_eq!(fmt_det_distance(Some(2)), "2");
+        assert_eq!(fmt_det_distance(Some(0)), "0");
+        assert_eq!(fmt_det_distance(None), "n/a");
+    }
 }
