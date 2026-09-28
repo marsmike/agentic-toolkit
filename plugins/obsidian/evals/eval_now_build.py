@@ -14,6 +14,9 @@ ago and a weak one; one capture is parked, one DLQ note is open and one resolved
                parked capture out
 4. board     — Kanban frontmatter, the four lanes in order, every card a `- [ ]` line, settings JSON
 5. bases     — every view Now.md embeds exists in the shipped Vault.base
+6. no dead links on the docs site — Now.md/Pipeline.md never wikilink into 00_Memory/ or
+               01_Capture/ (docs.yml excludes both), and the nav line never links [[Log]] when
+               Log.md doesn't exist (2026-09-28 repo audit A1/A2)
 """
 from __future__ import annotations
 
@@ -153,6 +156,16 @@ def run(vault: Path) -> dict:
         embedded = set(re.findall(r"!\[\[Vault\.base#([^\]]+)\]\]", now))
         if not embedded or embedded - views:
             problems.append(f"phase 5: embedded views missing from Vault.base: {sorted(embedded - views) or 'none embedded'}")
+        # 6. no dead links on the docs site: no wikilink into an excluded folder, and [[Log]] only
+        # when Log.md exists (it doesn't here — no log_vault.py call in this fixture)
+        for name, text in (("Now.md", now), ("Boards/Pipeline.md", board)):
+            bad = [m for m in re.findall(r"\[\[([^\]|]+)", text) if m.startswith(("00_Memory/", "01_Capture/"))]
+            if bad:
+                problems.append(f"phase 6: {name} wikilinks into an excluded folder: {bad}")
+        if "[[Log]]" in now or "[[Log|" in now:
+            problems.append("phase 6: Now.md links [[Log]] although Log.md does not exist in the fixture")
+        if "obsidian://open?vault=" not in stuck or "obsidian://open?vault=" not in inbox:
+            problems.append(f"phase 6: Stuck/Inbox should reference 00_Memory/01_Capture notes via an obsidian:// link, not a wikilink; stuck={stuck!r} inbox={inbox!r}")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
