@@ -270,7 +270,16 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const addDays = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n); return iso(d); };
   const TODAY = iso(new Date());
-  const fmtDay = s => new Date(s + "T12:00:00").toLocaleDateString(undefined, {weekday: "short", day: "numeric", month: "short"});
+  // `s` is always the note's own "YYYY-MM-DD" `day` string already: showing it as-is is both the
+  // ISO format the owner asked for and immune to the browser's locale (`toLocaleDateString`
+  // without a fixed locale rendered German weekday/month abbreviations, "Mi., 23. Sept.", on a
+  // browser whose locale is not English). [earned: 2026-09-28 battle test]
+  const fmtDay = s => s;
+  // `iso` is always UTC, `Z`-suffixed (dashboard_build.py's `utc_timestamp()`/`_utc_z()`): read it
+  // as plain text instead of `new Date(iso).toLocaleString()`, which rendered in the browser's own
+  // locale and timezone ("built Mo., 22:08" on a German-locale browser). English, fixed
+  // "YYYY-MM-DD HH:MM UTC", explicit about the timezone either way.
+  const fmtUTC = iso => { const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(String(iso || "")); return m ? `${m[1]} ${m[2]} UTC` : String(iso || ""); };
   const dayName = s => s === TODAY ? "Today" : s === addDays(TODAY, -1) ? "Yesterday" : fmtDay(s);
 
   // ---- state ----------------------------------------------------------------------------------
@@ -358,11 +367,11 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
       [list.length, "notes distilled", prev || list.length ? `${d >= 0 ? "▲" : "▼"} ${Math.abs(d)} vs previous ${len === 1 ? "day" : len + " days"}` : ""],
       [list.length ? Math.round(100 * tweets / list.length) + "%" : "–", `from tweets (${tweets})`, ""],
       [domains, "domains touched", ""],
-      [DATA.inbox, "captures waiting in the inbox", "at build time"],
+      [DATA.inbox, `capture${DATA.inbox === 1 ? "" : "s"} waiting in the inbox`, "at build time"],
     ];
     document.getElementById("kpis").replaceChildren(...tiles.map(([v, l, extra]) =>
-      el("div", {class: "card kpi"}, el("div", {class: "v"}, String(v), extra && l !== "captures waiting in the inbox" ? el("span", {class: "delta", text: extra}) : null),
-        el("div", {class: "l", text: l + (extra && l === "captures waiting in the inbox" ? ` · ${extra}` : "")}))));
+      el("div", {class: "card kpi"}, el("div", {class: "v"}, String(v), extra && !l.startsWith("capture") ? el("span", {class: "delta", text: extra}) : null),
+        el("div", {class: "l", text: l + (extra && l.startsWith("capture") ? ` · ${extra}` : "")}))));
   }
 
   function renderActivity(sp) {
@@ -396,7 +405,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
       });
       col.append(sv("rect", {x, y: T, width: bw, height: H - B - T, fill: "transparent"}));
       if (i % 5 === 4 || i === 29) { const t = sv("text", {x: x + bw / 2, y: H - 6, "text-anchor": "middle"}); t.textContent = d === TODAY ? "today" : d.slice(8) + "." + d.slice(5, 7); svg.append(t); }
-      col.addEventListener("mousemove", ev => showTip(ev, () => [el("b", {text: dayName(d) + " · " + tot(d) + " notes"}),
+      col.addEventListener("mousemove", ev => showTip(ev, () => [el("b", {text: dayName(d) + " · " + tot(d) + ` note${tot(d) === 1 ? "" : "s"}`}),
         ...TYPES.filter(t => by[d][t]).map(t => el("div", {class: "r"}, el("span", {class: "sw", style: `background:${color(t)}`}), `${TYPE_LABEL[t]} ${by[d][t]}`))]));
       col.addEventListener("mouseleave", hideTip);
       col.addEventListener("click", () => setRange("day:" + d));
@@ -420,7 +429,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
     for (let i = 0; i < weeks * 7; i++) {
       const d = addDays(start, i), c = count[d] || 0;
       cells.push(el("button", {class: "d" + (d > TODAY ? " future" : ""), style: `background:var(--seq-${level(c)})`,
-        "data-in": String(d >= sp[0] && d <= sp[1] && sp[0] === sp[1]), "aria-label": `${fmtDay(d)}: ${c} notes`,
+        "data-in": String(d >= sp[0] && d <= sp[1] && sp[0] === sp[1]), "aria-label": `${fmtDay(d)}: ${c} note${c === 1 ? "" : "s"}`,
         onclick: () => setRange("day:" + d),
         onmousemove: ev => showTip(ev, () => [el("b", {text: dayName(d)}), el("div", {text: `${c} note${c === 1 ? "" : "s"}`})]),
         onmouseleave: hideTip}));
@@ -465,7 +474,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
         el("span", {class: "type"}, el("span", {class: "sw", style: `background:${color(n.type)}`}), TYPE_LABEL[n.type]),
         n.author ? el("span", {class: "who", text: n.author, title: n.author}) : null,
         src ? el("a", {class: "src", href: src, target: "_blank", rel: "noopener noreferrer", text: host(src), title: src}) : null),
-      el("a", {class: "title", href: obsidian(n.path), text: n.title.replace(/(?<!\d)-|-(?!\d)/g, " "), title: n.path}),
+      el("a", {class: "title", href: obsidian(n.path), text: n.title, title: n.path}),
       n.desc ? el("p", {text: n.desc}) : null,
       el("div", {class: "tags"},
         el("button", {class: "tag kind", text: n.kind, onclick: () => set("kind", n.kind)}),
@@ -496,7 +505,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
     if (S.interest && !agg[S.interest]) agg[S.interest] = {w: 0, s: 0, p: 0};
     const rows = Object.entries(agg).sort((a, b) => b[1].s - a[1].s || b[1].w - a[1].w || iname(a[0]).localeCompare(iname(b[0])));
     const judged = Object.values(RADAR.interests).reduce((m, i) => Math.max(m, i.judged || 0), 0);
-    document.getElementById("ihint").textContent = judged ? `${judged} items judged in 12 weeks · click an interest` : "no radar data yet";
+    document.getElementById("ihint").textContent = judged ? `${judged} item${judged === 1 ? "" : "s"} judged in 12 weeks · click an interest` : "no radar data yet";
     const head = el("div", {class: "irow head"}, el("span", {class: "n", text: "interest"}), el("span", {class: "c", text: "worth"}), el("span", {class: "c", text: "strong"}), el("span", {class: "c", text: "promoted"}));
     document.getElementById("interests").replaceChildren(head, ...(rows.length ? rows.map(([id, a]) =>
       el("button", {class: "irow", "aria-pressed": String(S.interest === id), onclick: () => set("interest", id), "aria-label": `${iname(id)}: ${a.s} strong`},
@@ -554,8 +563,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
     const runs = (DATA.runs || []).slice(0, 24);
     document.getElementById("runhint").textContent = runs.length ? `${DATA.runs.length} in 12 weeks · latest ${runs.length}` : "";
     document.getElementById("runs").replaceChildren(...(runs.length ? runs.map((r, idx) => {
-      const at = new Date(r.at);
-      const when = isNaN(at) ? r.at : at.toLocaleString(undefined, {weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+      const when = fmtUTC(r.at);
       const items = r.items || [];
       const summary = el("summary", {class: "run"},
         el("span", {class: "when", text: when}),
@@ -587,8 +595,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
   }
 
   // ---- chrome ----------------------------------------------------------------------------------
-  const built = new Date(DATA.built);
-  document.getElementById("sub").textContent = `${DATA.notes.length} notes in ${DATA.window || 84} days · built ${isNaN(built) ? DATA.built : built.toLocaleString(undefined, {weekday: "short", hour: "2-digit", minute: "2-digit"})} by the pipeline`;
+  document.getElementById("sub").textContent = `${DATA.notes.length} note${DATA.notes.length === 1 ? "" : "s"} in ${DATA.window || 84} days · built ${fmtUTC(DATA.built)} by the pipeline`;
   document.getElementById("importslink").href = importsUrl("");
   if (safeUrl(DATA.report || "")) { const r = document.getElementById("reportlink"); r.href = DATA.report; r.target = "_blank"; r.rel = "noopener"; r.hidden = false; }
   if (DATA.missing) document.getElementById("alert").replaceChildren(el("div", {class: "alert"},

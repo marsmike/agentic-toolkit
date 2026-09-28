@@ -66,6 +66,20 @@ def canon(iid: str, names: dict[str, str]) -> str:
     return iid if iid in names or iid.startswith("epic-") else RETIRED_ID
 
 
+_GH_RELEASE_RE = re.compile(r"^https?://github\.com/([^/]+)/([^/]+)/releases(?:/tag/.+)?/?(?:\?.*)?$")
+
+
+def release_title(url: str, title: str) -> str:
+    """A GitHub release feed's own title is often just the tag ("v2.1.275"), meaningless without
+    the repo it's from; prefix the repo name parsed from the item's own URL, the way every other
+    feed item already names what it's about. [earned: 2026-09-28 battle test — "Top feed items"
+    listed bare "v2.1.275", "v2.1.283" rows with no repo in sight]"""
+    m = _GH_RELEASE_RE.match(str(url or ""))
+    if m and title and not title.lower().startswith(m.group(2).lower()):
+        return f"{m.group(2)} {title}"
+    return title
+
+
 def name_of(names: dict[str, str], iid: str) -> str:
     if iid == RETIRED_ID:
         return "Retired interests"
@@ -139,7 +153,8 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
             best_raw = max(raw_strong, key=lambda i: float(p.get(i, 0) or 0))
             weeks[week][canon(best_raw, names)] += 1
         if strong or worth:
-            items.append({"day": day, "title": str(r.get("title") or "")[:160], "url": str(r.get("url") or ""),
+            item_url = str(r.get("url") or "")
+            items.append({"day": day, "title": release_title(item_url, str(r.get("title") or ""))[:160], "url": item_url,
                           "feed": str(r.get("feed") or ""), "kind": str(r.get("kind") or ""), "p": round(best, 2),
                           "top": top, "strong": strong, "worth": worth, "promoted": promoted,
                           "in_vault": bool(r.get("in_vault"))})

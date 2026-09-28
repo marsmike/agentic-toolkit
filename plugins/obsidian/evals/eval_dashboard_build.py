@@ -119,6 +119,19 @@ def run(vault: Path) -> dict:
         if radar_ledger.load(sandbox, (today - timedelta(days=83)).isoformat(), today)["rising"]:
             problems.append("radar: 4 strong against a median of 3 must not be rising")
         (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        # "Top feed items" from a GitHub release feed is often just the tag ("v2.1.275"), useless
+        # without the repo: the title gets the repo name from the item's own URL prefixed.
+        cases = [
+            ("https://github.com/anthropics/claude-code/releases/tag/v2.1.275", "v2.1.275", "claude-code v2.1.275"),
+            ("https://github.com/acme/widget/releases", "3.0", "widget 3.0"),
+            ("https://github.com/acme/widget/releases", "Widget 3.0", "Widget 3.0"),
+            ("https://example.org/not-github", "v2.1.275", "v2.1.275"),
+            ("https://github.com/acme/widget/releases/tag/v2", "widget v2 release notes", "widget v2 release notes"),
+        ]
+        for url, title, want in cases:
+            got = radar_ledger.release_title(url, title)
+            if got != want:
+                problems.append(f"release_title({url!r}, {title!r}): got {got!r}, want {want!r}")
         # retired interests: an id the owner has since renamed or dropped from the interests note
         # must not resurface as a second, stale-slug interest next to its current name.
         retired_row = {"run": today.isoformat(), "canonical": "example.org/retired", "url": "https://example.org/retired",

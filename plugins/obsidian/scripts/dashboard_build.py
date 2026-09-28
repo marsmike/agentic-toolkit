@@ -28,7 +28,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -106,6 +106,17 @@ def _item(it: dict) -> dict:
             "status": f["status"], "detail": one_line(f["detail"], 220), "notes": f["notes"][:4]}
 
 
+def _utc_z(iso_with_offset: str) -> str:
+    """Git's `%cI` (the committer's own local offset, e.g. `+02:00`) as the vault's one
+    ingested_at/distilled_at format instead: UTC, `Z`-suffixed. The template shows this string
+    as-is, so any committer's timezone renders identically. [earned: 2026-09-28 battle test —
+    a run committed at 21:54 local time showed as "Mo., 21:54" — local time, not UTC as labelled]"""
+    try:
+        return datetime.fromisoformat(iso_with_offset).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return iso_with_offset
+
+
 def runs(vault: Path, since: str, imports: list[dict]) -> list[dict]:
     imported = {r["run"]: [_item(it) for it in r["items"]] for r in imports}
     if not (vault / ".git").exists():
@@ -118,7 +129,7 @@ def runs(vault: Path, since: str, imports: list[dict]) -> list[dict]:
         m = RUN.search(subject)
         if m:
             key = imports_log.RUN_SUBJECT.match(subject)
-            out.append({"at": when, "sha": sha, "distilled": int(m.group(1)), "dropped": int(m.group(2)),
+            out.append({"at": _utc_z(when), "sha": sha, "distilled": int(m.group(1)), "dropped": int(m.group(2)),
                         "failed": int(m.group(3)), "summary": subject.split(": ", 1)[-1][:300],
                         "run": key.group(1) if key else "", "items": imported.get(key.group(1), []) if key else []})
     return out
