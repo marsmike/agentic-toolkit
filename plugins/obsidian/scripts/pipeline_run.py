@@ -48,6 +48,7 @@ import imports_log
 from vault_utils import (
     atomic_write,
     contained,
+    example_vault,
     inside,
     profile_value,
     read_frontmatter,
@@ -664,6 +665,11 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     vault, now = require_vault(), datetime.now(UTC)
+    if args.cmd != "queue" and example_vault(vault):
+        # begin/end/commit write and push; on the example vault they would commit into the toolkit.
+        print(json.dumps({"status": "refused", "detail": f"{vault} is the toolkit's example vault, not the "
+                          "owner's: set TOOLKIT_VAULT to the real vault"}, indent=2 if args.json else None))
+        return 1
     if args.cmd == "begin":
         result = begin(vault, now)
     elif args.cmd == "queue":

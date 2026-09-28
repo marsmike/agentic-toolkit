@@ -23,7 +23,7 @@ from pathlib import Path
 
 import imports_log
 import radar_ledger
-from vault_utils import contained, git_output, read_frontmatter, require_vault
+from vault_utils import contained, example_vault, git_output, read_frontmatter, require_vault
 
 LOCK = Path("00_Memory") / "pipeline.lock"
 STATE = Path("00_Memory") / "pipeline-state.json"
@@ -186,7 +186,14 @@ def main() -> int:
     ap.add_argument("--now", help="ISO time to check against (default: now, UTC)")
     args = ap.parse_args()
     now = datetime.fromisoformat(args.now).astimezone(UTC) if args.now else datetime.now(UTC)
-    result = check(require_vault(), now, args.max_age_hours)
+    vault = require_vault()
+    if example_vault(vault):
+        problems = [{"kind": "wrong-vault", "detail": f"{vault} is the toolkit's example vault, not the "
+                     "owner's: set TOOLKIT_VAULT to the real vault (/home/user/TheVoid in the routine)"}]
+        result = {"ok": False, "checked_at": now.strftime("%Y-%m-%dT%H:%M+00:00"), "problems": problems,
+                  "facts": {}, "notification": notification(problems), "weekly_digest": ""}
+    else:
+        result = check(vault, now, args.max_age_hours)
     if args.json:
         print(json.dumps(result, indent=2))
     elif result["ok"]:

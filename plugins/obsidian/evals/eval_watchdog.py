@@ -14,6 +14,8 @@ In a git sandbox with a `pipeline …` commit an hour old:
               more than --max-age-hours is `signal-stale`
 10. stats    — `facts.week` counts the window's runs and what they distilled; the Sunday-evening check carries a
               `weekly_digest` (≤ 600 chars) and any other time it is empty
+12. wrong-vault — pointed at the toolkit's own example vault, the watchdog reports that (exit 1, its
+              own notification) and `pipeline_run.py begin` refuses to run
 """
 from __future__ import annotations
 
@@ -161,6 +163,21 @@ def run(vault: Path) -> dict:
         r = watchdog.check(sandbox, now + timedelta(hours=4, minutes=40))
         if kinds(r) != ["signal-stale"]:
             problems.append(f"signal: a signal commit older than the limit must be signal-stale alone, got {kinds(r)}")
+
+        # 12. the toolkit's own example vault is never checked as if it were the owner's, and the
+        # pipeline's writing commands refuse it
+        env = {k: v for k, v in os.environ.items() if k != "TOOLKIT_ALLOW_EXAMPLE_VAULT"}
+        env["TOOLKIT_VAULT"] = str(vault)
+        cli = subprocess.run([sys.executable, str(scripts_dir / "watchdog.py"), "--json"], capture_output=True,
+                             text=True, check=False, env=env)
+        out = json.loads(cli.stdout or "{}")
+        if cli.returncode != 1 or [p["kind"] for p in out.get("problems", [])] != ["wrong-vault"] \
+                or "example vault" not in out.get("notification", ""):
+            problems.append(f"wrong-vault: the example vault must be a problem with its own notification, got {cli.stdout[:160]}")
+        pr = subprocess.run([sys.executable, str(scripts_dir / "pipeline_run.py"), "begin", "--json"], capture_output=True,
+                            text=True, check=False, env=env)
+        if pr.returncode != 1 or json.loads(pr.stdout or "{}").get("status") != "refused":
+            problems.append(f"wrong-vault: pipeline_run begin must refuse the example vault, got {pr.returncode} {pr.stdout[:120]}")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)

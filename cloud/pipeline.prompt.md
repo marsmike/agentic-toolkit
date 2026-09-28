@@ -16,9 +16,10 @@ SETUP
    Tavily CLI (the one way to use Tavily, pinned): tvly --version 2>/dev/null || uv tool install tavily-cli==0.1.8
    (`tvly` lands in ~/.local/bin, where the scripts look. It reads TAVILY_API_KEY; the scripts
    hand it the key themselves. If the install fails, go on: the Tavily steps report SKIPPED.)
-2. Vault: use the session's TheVoid checkout (the directory holding AGENTS.md and 00_Memory/;
-   the routine attaches the repository, so this checkout is the one git may push from):
-     export TOOLKIT_VAULT=<that path>
+2. Vault: use the session's TheVoid checkout, which the routine attaches at /home/user/TheVoid
+   (so this checkout is the one git may push from), never the toolkit's own vault/ folder (an
+   example vault):
+     export TOOLKIT_VAULT=/home/user/TheVoid
    The checkout usually arrives on a detached HEAD at origin/main; put it on a tracking `main`
    before anything else, with exactly this sequence (the one git allowed here besides begin/end).
    It resets only when nothing would be lost: HEAD and any existing `main` must already be on

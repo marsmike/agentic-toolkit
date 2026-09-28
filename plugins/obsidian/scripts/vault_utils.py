@@ -110,6 +110,24 @@ def resolve_vault() -> VaultResolution:
     return VaultResolution(repo_root / "vault", "default:./vault")
 
 
+EXAMPLE_VAULT = Path(__file__).resolve().parents[3] / "vault"
+
+
+def example_vault(vault: Path) -> bool:
+    """True when `vault` is this checkout's own example vault (`./vault`), unless
+    TOOLKIT_ALLOW_EXAMPLE_VAULT is set. The unattended entry points refuse it: it has AGENTS.md
+    and 00_Memory/ like a real vault, so a routine that cannot find the owner's vault lands
+    there and reports on the wrong thing. Evals work on sandbox copies, never this path.
+    [earned: 2026-09-28 — the 20:58 UTC watchdog run missed /home/user/TheVoid, checked ./vault
+    and reported OK from the example vault's history]"""
+    if os.environ.get("TOOLKIT_ALLOW_EXAMPLE_VAULT"):
+        return False
+    try:
+        return vault.resolve() == EXAMPLE_VAULT.resolve()
+    except OSError:
+        return False
+
+
 def require_vault() -> Path:
     """Resolve the vault or raise SystemExit(1) with a clear message. For CLI entry points."""
     res = resolve_vault()

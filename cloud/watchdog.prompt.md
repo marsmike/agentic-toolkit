@@ -1,7 +1,11 @@
 Check the TheVoid pipeline once, then stop. Ask no questions, run no pipeline, edit and commit
 nothing, print no environment value.
-1. cd into the agentic-toolkit checkout (the directory holding cloud/watchdog.prompt.md) and export
-   TOOLKIT_VAULT=<the TheVoid checkout: the directory holding AGENTS.md and 00_Memory/>.
+1. cd into the agentic-toolkit checkout (the directory holding cloud/watchdog.prompt.md) and
+     export TOOLKIT_VAULT=/home/user/TheVoid
+   (the routine attaches the vault there, next to /home/user/agentic-toolkit). Never the toolkit's
+   own vault/ folder: that is an example vault, and checking it says nothing about the pipeline.
+   If /home/user/TheVoid does not exist, send ONE push notification "watchdog: no TheVoid checkout
+   in this session" and stop.
 2. Run: uv run --locked --project plugins/obsidian/scripts python3 plugins/obsidian/scripts/watchdog.py --json
 3. If "ok" is true: finish with one line, `OK <facts.last_run>: <facts.last_summary>`, and send nothing.
    If "ok" is false: send ONE push notification whose text is the result's `notification` field,
