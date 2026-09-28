@@ -652,16 +652,16 @@ pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<In
         return index_pass(vault, conn, full);
     }
     conn.execute_batch("BEGIN IMMEDIATE")?;
-    match index_pass(vault, conn, full) {
-        Ok(report) => {
-            conn.execute_batch("COMMIT")?;
-            Ok(report)
-        }
-        Err(e) => {
-            let _ = conn.execute_batch("ROLLBACK");
-            Err(e)
-        }
+    // A failed COMMIT (BUSY while a reader holds on) must not leave the connection inside the
+    // transaction, or the next `index` on it would join the abandoned one.
+    let result = index_pass(vault, conn, full).and_then(|report| {
+        conn.execute_batch("COMMIT")?;
+        Ok(report)
+    });
+    if result.is_err() && !conn.is_autocommit() {
+        let _ = conn.execute_batch("ROLLBACK");
     }
+    result
 }
 
 fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<IndexReport> {

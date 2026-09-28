@@ -104,15 +104,14 @@ fn index_recovers_expected_node_count_and_density() {
     let _ = std::fs::remove_dir_all(db.parent().unwrap());
 }
 
-/// (b) Exactly one dangling edge, and it's the planted
-/// `[[Nonexistent-Note-For-Linting-Demo]]` in `Vault-Maintenance-and-Linting.md`.
 /// Concurrent indexers on one database — parallel distill workers each run `gaiafield index` —
 /// all succeed and leave the same graph a single run does: no "database is locked", no edges
 /// duplicated by interleaved delete/insert pairs. [earned: 2026-09-28, the 09:58 pipeline run]
 #[test]
 fn concurrent_indexers_serialize_on_one_database() {
     let db = fresh_db_path("concurrent");
-    let expected = index_full(&fresh_db_path("concurrent-ref"));
+    let reference = fresh_db_path("concurrent-ref");
+    let expected = index_full(&reference);
     gaiafield::open_db(&db).expect("create db");
 
     let workers = 6;
@@ -143,8 +142,14 @@ fn concurrent_indexers_serialize_on_one_database() {
         .query_row("SELECT COUNT(*) FROM edges", [], |r| r.get(0))
         .expect("count edges");
     assert_eq!(edges as usize, expected.edges);
+
+    for path in [&db, &reference] {
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
 }
 
+/// (b) Exactly one dangling edge, and it's the planted
+/// `[[Nonexistent-Note-For-Linting-Demo]]` in `Vault-Maintenance-and-Linting.md`.
 #[test]
 fn exactly_one_dangling_edge_is_the_planted_specimen() {
     let db = fresh_db_path("dangling");
