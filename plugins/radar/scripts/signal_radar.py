@@ -281,6 +281,7 @@ def score(e: Entity, today: date, anchor_of=None, horizons: dict[str, str] | Non
         stage = "steady"
     spark = Counter(m["at"] for m in outside)
     items = sorted(week, key=lambda m: (m.get("eng_pct") or 0, max((m.get("p") or {}).values(), default=0)), reverse=True)
+    interest_weight, interest_support = _interest_weights(e.mentions, alias)
     return {
         "key": e.key, "name": display_name(e), "stage": stage, "strength": strength,
         "parts": {k: round(v, 3) for k, v in parts.items()}, "families": families, "mentions": len(week),
@@ -291,7 +292,8 @@ def score(e: Entity, today: date, anchor_of=None, horizons: dict[str, str] | Non
                    "score": m.get("score")} for m in items[:6]],
         "vault_notes": anchored["notes"][:4],
         "graph": {"neighborhood": anchored["neighborhood"], "hubs": anchored["hubs"]},
-        "_interests": _interest_weights(e.mentions, alias),
+        "_interests": interest_weight,
+        "_interest_support": interest_support,
     }
 
 
@@ -309,15 +311,24 @@ def current_ids(old_ids, names: dict[str, str]) -> dict[str, str]:
     return out
 
 
-def _interest_weights(mentions: list[dict], alias: dict[str, str] | None = None) -> Counter:
+def _interest_weights(mentions: list[dict], alias: dict[str, str] | None = None) -> tuple[Counter, Counter]:
+    """(summed weight, distinct-mention support) per interest, both keyed the same way. `support`
+    is how many different mentions cleared the bar for that interest — one mention naming several
+    interests at once (a single ambiguous item scoring 0.5+ on two of them) supports each of those
+    once, not zero; it is `assign_sectors` that then asks for more than one such mention before it
+    trusts the sector, which this alone does not decide."""
     w: Counter = Counter()
+    n: Counter = Counter()
     for m in mentions:
         for iid, p in (m.get("p") or {}).items():
             if p >= 0.5:
-                w[(alias or {}).get(iid, iid)] += p
+                key = (alias or {}).get(iid, iid)
+                w[key] += p
+                n[key] += 1
         for iid in m.get("interests") or []:
             w[iid] += 1.0
-    return w
+            n[iid] += 1
+    return w, n
 
 
 def pretty_id(iid: str) -> str:
@@ -335,11 +346,23 @@ def short_name(name: str) -> str:
     return " ".join(words)
 
 
+# A sector is what an entity IS, not which single item it happened to be mentioned in: one
+# incidental co-occurrence (a DJ-gear driver post that mentions "Windows 11", one ambiguous
+# reddit thread that scores both "AI Agents" and "Frontier Models") should not pin a sector on its
+# own. Require at least two distinct mentions to agree before trusting a specific interest; a
+# generic tech or celebrity name that only ever clears the bar once falls back to Other instead of
+# being early-warned under a sector it is not really about. [earned: 2026-09-28, review —
+# "Windows 11" under Music Production from one Native Instruments forum post, "SpaceX" under AI
+# Agents from one reddit thread that also happened to name Anthropic]
+MIN_SECTOR_SUPPORT = 2
+
+
 def assign_sectors(blips: list[dict], names: dict[str, str]) -> list[dict]:
     counts: Counter = Counter()
     for b in blips:
-        top = b["_interests"].most_common(1)
-        b["sector"] = top[0][0] if top else "other"
+        support = b.get("_interest_support") or Counter()
+        candidates = [iid for iid, _ in b["_interests"].most_common() if support.get(iid, 0) >= MIN_SECTOR_SUPPORT]
+        b["sector"] = candidates[0] if candidates else "other"
         counts[b["sector"]] += 1
     keep = [iid for iid, _ in counts.most_common() if iid != "other"][:MAX_SECTORS]
     for b in blips:
@@ -526,6 +549,7 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
     sectors = assign_sectors(blips, names)
     for b in blips:
         del b["_interests"]
+        del b["_interest_support"]
     early_from = (now - timedelta(hours=EARLY_HOURS)).date().isoformat()
     early = [b["key"] for b in blips if b["stage"] == "new" and b["first_seen"] >= early_from
              and (len(b["families"]) >= 2 or (b["parts"]["engagement"] >= 0.9 and b["parts"]["relevance"] >= 0.6))]

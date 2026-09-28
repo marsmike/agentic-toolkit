@@ -10,7 +10,10 @@ graph — offline (gaiafield and Kagi stubbed).
                which ran days before, is new, in the early list and a blind spot (no note has it);
                the same RSS article also arriving through Reader is one mention, not a third family
 4. filters   — an item the judge found irrelevant for every interest is no blip; a thing seen
-               every day until five days ago and not since is "fading"
+               every day until five days ago and not since is "fading"; "Windows 11", judged
+               relevant to Audio Plugins by exactly one incidental mention (real case, 2026-09-28:
+               a Native Instruments forum post about a DJ controller driver), is still a blip but
+               falls to Other rather than being sector-pinned by that one mention
 5. sources   — the sensors' "blocked" Reddit status reaches the page; the graph reports ok
 6. check     — Tavily unavailable: Kagi answers, at most CHECKS_PER_DAY names are asked, a second run the same day
                asks none again, and a hit joins the blip as family "kagi"; its calls go to its own
@@ -82,6 +85,19 @@ def _rows(local: str, audio: str) -> list[dict]:
         rows.append({"run": _day(n), "feed": "reddit.com", "title": f"Progress on Grimoire 2 build {n}",
                      "url": f"https://www.reddit.com/r/LocalLLaMA/comments/g{n}/x/", "kind": "news",
                      "p": {local: 0.7, audio: 0.05}, "backend": "jev"})
+    # A generic OS name with exactly one incidental high score (real case, 2026-09-28: a Native
+    # Instruments forum post about a DJ controller driver, judged relevant to Audio Plugins because
+    # the post is, scores "Windows 11" itself along with it): one corroborating mention is not
+    # enough to earn a sector, so this must land in Other rather than under Audio Plugins.
+    # day 6, not day 0: old enough to never be "new"/"rising" (so it never competes for a
+    # web-check slot in the later phases below), young enough to still be inside this window.
+    rows.append({"run": _day(6), "feed": "Hacker News", "title": "Windows 11½",
+                 "url": "https://definitelynotwindows.com/", "kind": "news",
+                 "p": {local: 0.04, audio: 0.03}, "backend": "jev"})
+    rows.append({"run": _day(6), "feed": "Native Instruments Community",
+                 "title": "[SOLVED] Rane SL3 working on Windows 11 with Traktor Pro 3",
+                 "url": "https://community.native-instruments.com/discussion/1/x", "kind": "news",
+                 "p": {local: 0.04, audio: 0.72}, "backend": "jev"})
     return rows
 
 
@@ -215,6 +231,13 @@ def run(vault: Path) -> dict:
                 problems.append(f"join: an older note makes qwen38 not new, got {q['stage']} {q['first_seen']}")
             if q["sector"] != local:
                 problems.append(f"join: qwen38 belongs to {local}, got {q['sector']}")
+        w11 = blips.get("windows11")
+        if not w11:
+            problems.append(f"misfile: expected a windows11 blip (relevance clears the bar once), got {sorted(blips)}")
+        elif w11["sector"] != "other":
+            problems.append("misfile: windows11 has only one mention that scores Audio Plugins "
+                            f"(a Native Instruments forum post that happens to name it) — one is not a sector, "
+                            f"got {w11['sector']}")
         z = blips.get("zither")
         if not z or z["stage"] != "new" or "zither" not in data["early"] or "zither" not in data["blind_spots"] \
                 or set(z["families"]) != {"hn", "rss"} or z["mentions"] != 2:
