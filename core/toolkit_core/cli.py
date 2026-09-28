@@ -173,7 +173,7 @@ def cmd_profile(args: argparse.Namespace) -> int:
 
     merged = profile.resolve_profile(resolution.path, args.plugin)
     result = {"ok": True, "plugin": args.plugin, "vault_path": str(resolution.path), "profile": merged}
-    # `toolkit profile` always prints JSON: it's a data command, not a status report.
+    # `unisphere profile` always prints JSON: it's a data command, not a status report.
     print(_dumps(result))
     return 0
 
@@ -218,7 +218,7 @@ def _render_engines_status(result: dict) -> str:
         elif r["installed_tag"]:
             mark = "update available"
         else:
-            mark = "run: toolkit engines install"
+            mark = "run: unisphere engines install"
         lines.append(f"  {r['engine']:<10} installed={installed:<20} latest={latest:<20} {mark}")
         if r.get("note"):
             lines.append(f"    {r['note']}")
@@ -786,9 +786,9 @@ def _build_parser() -> argparse.ArgumentParser:
     sub.add_argument("--include-ambiguous", action="store_true", help="also the AMBIGUOUS band")
 
     link_parser = subparsers.add_parser("link", parents=[common], help=CATALOG["link"]["summary"])
-    link_parser.add_argument("--vault", help="default TOOLKIT_VAULT for the toolkit shim (an exported value wins)")
+    link_parser.add_argument("--vault", help="default TOOLKIT_VAULT for the unisphere shim (an exported value wins)")
     link_parser.add_argument("--bin-dir", help="where to link (default ~/.local/bin)")
-    link_parser.add_argument("--force", action="store_true", help="replace files there that toolkit did not write")
+    link_parser.add_argument("--force", action="store_true", help="replace files there that unisphere did not write")
 
     subparsers.add_parser("commands", parents=[common], help=CATALOG["commands"]["summary"])
 

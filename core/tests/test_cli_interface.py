@@ -141,7 +141,7 @@ def test_status_text_names_every_section(tmp_path, monkeypatch, capsys):
 
 needs_engines = pytest.mark.skipif(
     knowledge.farsight_binary() is None or knowledge.gaiafield_binary() is None,
-    reason="engines not installed (toolkit engines install)",
+    reason="engines not installed (unisphere engines install)",
 )
 
 

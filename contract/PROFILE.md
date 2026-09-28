@@ -36,7 +36,7 @@ credential is absent.
 ## Shipping a profile
 
 Every plugin that reads a profile ships a `profile.example.md` alongside it: the exact frontmatter
-shape it expects, with placeholder values, and body prose explaining each field. `toolkit vault
+shape it expects, with placeholder values, and body prose explaining each field. `unisphere vault
 init` and the plugin's own docs point here rather than duplicating the shape elsewhere.
 
 ## Tests and evals

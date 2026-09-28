@@ -18,7 +18,7 @@ from toolkit_core import engines
 from toolkit_core.status import OBSIDIAN_APP_CLI
 
 SHIM_MARKER = "# Written by `unisphere link`"
-LEGACY_SHIM_MARKER = "# Written by `toolkit link`"
+LEGACY_SHIM_MARKER = "# Written by `toolkit link`"  # what shims from before the rename carry
 
 
 def default_bin_dir() -> Path:
