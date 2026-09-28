@@ -4,6 +4,9 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **obsidian 3.0.3, radar 3.1.2:** their scripts' hints name `unisphere engines install`, so an
+  installed plugin never points at the removed `toolkit` command. [earned: 2026-09-28, the rename]
+
 - **The CLI is `unisphere` now, one front door for people and for agents.** Named for the
   Commonwealth's unisphere, next to farsight and gaiafield; the `toolkit` command is gone (the Python
   package stays `toolkit_core`, and the cloud setup calls `python -m toolkit_core.cli`, which works
