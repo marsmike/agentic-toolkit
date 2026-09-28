@@ -972,14 +972,14 @@ def _render_catalog(result: dict) -> str:
     wide = max(len(c["name"]) for c in result["commands"])
     for c in result["commands"]:
         args = " ".join(a["name"].upper() if a["positional"] else f"[{a['name']}]" for a in c["arguments"])
-        out.append(f"  {st.accent(c['name'].ljust(wide))}  {c['summary']}")
+        out += ui.wrap_field(f"  {st.accent(c['name'].ljust(wide))}  ", c["summary"])
         if args:
-            out.append(f"  {' ' * wide}  {st.dim(args)}")
+            out += [st.dim(line) for line in ui.wrap(args, wide + 4)]
     out += ["", st.bold("companion CLIs")]
     for c in result["companions"]:
-        out.append(f"  {st.accent(c['cli'].ljust(wide))}  {c['use_for']}")
-        out.append(f"  {' ' * wide}  {st.dim('setup: ' + c['setup'])}")
-    out += ["", st.dim("agents: unisphere commands --json · exit 0 ok, 1 problem/error, 2 usage")]
+        out += ui.wrap_field(f"  {st.accent(c['cli'].ljust(wide))}  ", c["use_for"])
+        out += [st.dim(line) for line in ui.wrap(f"setup: {c['setup']}", wide + 4)]
+    out += [""] + [st.dim(line) for line in ui.wrap("agents: unisphere commands --json · exit 0 ok, 1 problem/error, 2 usage", 0)]
     return "\n".join(out)
 
 
@@ -1188,19 +1188,26 @@ _EXAMPLE_COMMENT_CAP = 48  # brew/kubectl-style: align comments to one column, b
 
 def _example_lines(examples: list[tuple[str, str]], st: ui.Style | None = None) -> list[str]:
     """EXAMPLES rows, comments aligned to one column the way brew/kubectl do it: the pad is the
-    longest command in *this* block plus 2, capped at `_EXAMPLE_COMMENT_CAP`. A command past the
-    cap gets its comment dimmed on the next line instead of pushing the whole column out."""
+    longest command in *this* block plus 2, capped at `_EXAMPLE_COMMENT_CAP` (and further capped
+    to fit a narrow terminal — `ui.width()`, so `COLUMNS=60` etc are honoured the same way every
+    other help section is). A command whose padded line wouldn't fit the terminal gets its
+    comment wrapped and dimmed on the following line(s) instead of pushing the column out past
+    the edge. [battle-test 2026-09-28: at COLUMNS=60 an EXAMPLES row was 91 characters wide]"""
     st = st or ui.Style()
-    short = [len(cmd) for cmd, _ in examples if len(cmd) <= _EXAMPLE_COMMENT_CAP]
-    pad = min(max(short, default=_EXAMPLE_COMMENT_CAP) + 2, _EXAMPLE_COMMENT_CAP)
+    avail = ui.width()
+    cap = min(_EXAMPLE_COMMENT_CAP, max(4, avail - 10))
+    short = [len(cmd) for cmd, _ in examples if len(cmd) <= cap]
+    pad = min(max(short, default=cap) + 2, cap)
     out = []
     for cmd, note in examples:
-        comment = st.dim(f"# {note}")
-        if len(cmd) > _EXAMPLE_COMMENT_CAP:
+        comment_text = f"# {note}"
+        one_line = f"  {cmd.ljust(pad)}  {comment_text}"
+        if len(cmd) > cap or len(one_line) > avail:
             out.append(f"  {cmd}")
-            out.append(f"      {comment}")
+            for line in ui.wrap(comment_text, 6):
+                out.append(st.dim(line))
         else:
-            out.append(f"  {cmd.ljust(pad)}  {comment}")
+            out.append(f"  {cmd.ljust(pad)}  {st.dim(comment_text)}")
     return out
 
 
@@ -1263,7 +1270,7 @@ def _top_level_help_text(st: ui.Style) -> str:
 def _leaf_help_text(path: list[str], parser: argparse.ArgumentParser, st: ui.Style) -> str:
     name = " ".join(path)
     entry = CATALOG[name]
-    out = [st.bold(f"unisphere {name}") + " — " + entry["summary"], ""]
+    out = ui.wrap_field(st.bold(f"unisphere {name}") + " — ", entry["summary"]) + [""]
     out += ui.wrap(entry["description"], 0)
     out += ["", st.heading("USAGE"), "  " + _colorize_usage_line(st, parser)]
 
@@ -1284,7 +1291,7 @@ def _leaf_help_text(path: list[str], parser: argparse.ArgumentParser, st: ui.Sty
 
     out += ["", st.heading("EXAMPLES")]
     out += _example_lines(entry["examples"], st)
-    out += ["", st.dim("JSON: --json prints ") + entry["json"]]
+    out += [""] + ui.wrap_field(st.dim("JSON: --json prints "), entry["json"])
     out += _see_also_lines(st, entry)
     return "\n".join(out)
 
@@ -1292,7 +1299,7 @@ def _leaf_help_text(path: list[str], parser: argparse.ArgumentParser, st: ui.Sty
 def _parent_help_text(path: list[str], sub: argparse._SubParsersAction, st: ui.Style) -> str:
     name = " ".join(path)
     entry = GROUP_HELP[name]
-    out = [st.bold(f"unisphere {name}") + " — " + entry["summary"], ""]
+    out = ui.wrap_field(st.bold(f"unisphere {name}") + " — ", entry["summary"]) + [""]
     out += ui.wrap(entry["description"], 0)
     out += ["", st.heading("USAGE"), f"  {st.command('unisphere ' + name)} {st.metavar('<command>')} {st.dim('[flags]')}"]
 

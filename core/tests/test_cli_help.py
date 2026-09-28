@@ -335,3 +335,36 @@ def test_link_is_plain_text_without_hyperlink_support(monkeypatch):
     monkeypatch.delenv("FORCE_HYPERLINK", raising=False)
     monkeypatch.setattr(term, "is_tty", lambda stream=None: False)
     assert term.link("https://example.com", "docs") == "docs"
+
+
+# --- COLUMNS wrapping -------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("argv", [("help", "search"), ("help", "graph"), ("help", "graph", "neighbors"), ("commands",)])
+def test_help_and_commands_wrap_to_columns(capsys, monkeypatch, argv):
+    """Every other help section (ARGUMENTS/FLAGS/ENVIRONMENT/COMMANDS body) already wraps to
+    `COLUMNS` via `ui.wrap_field`/`ui.wrap`, but EXAMPLES rows, a leaf/parent command's own
+    title+summary line, the trailing "JSON: --json prints ..." line, and `unisphere commands`'s
+    text-mode summaries/companion descriptions didn't consult it at all — at `COLUMNS=60` an
+    EXAMPLES row was 91 characters wide, a title line 93, and a `commands` companion row 191.
+    [battle-test 2026-09-28]"""
+    monkeypatch.setenv("COLUMNS", "60")
+    code, out = run(capsys, *argv)
+    assert code == 0
+    in_usage = False  # the USAGE line itself (argparse's own layout) isn't part of this fix
+    for line in out.splitlines():
+        if line.strip() == "USAGE":
+            in_usage = True
+            continue
+        if in_usage:
+            in_usage = bool(line.strip())
+            continue
+        plain = ANSI.sub("", line)
+        # A bare, copy-pasteable example command with no "# comment" alongside it (too long to
+        # fit one with its comment, so the comment moved to its own wrapped line below) is allowed
+        # to exceed COLUMNS on its own — a shell command can't be word-wrapped the way prose can,
+        # the same limitation gh/kubectl accept for their own long example invocations. This test
+        # is about the comment no longer pushing the line out, not about the command text itself.
+        if plain.strip().startswith("unisphere ") and "  # " not in plain:
+            continue
+        assert len(plain) <= 60, f"line exceeds COLUMNS=60 ({len(plain)} chars): {plain!r}"
