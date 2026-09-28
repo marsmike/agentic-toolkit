@@ -104,18 +104,21 @@ def from_todoist(vault: Path) -> list[Interest]:
         return []
     wanted = {s.strip().lower() for s in str(profile_value(vault, "todoist_sections", DEFAULT_TODOIST_SECTIONS)).split(",")}
     try:
-        sections = {s["id"] for s in _run_td(["section", "list", f"id:{project}"]) if str(s.get("name", "")).lower() in wanted}
+        raw_sections = _run_td(["section", "list", f"id:{project}"])
         tasks = _run_td(["task", "list", "--project", f"id:{project}", "--full", "--all"])
-    except (subprocess.SubprocessError, OSError, json.JSONDecodeError, KeyError):
+    except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
         return []
+    # A malformed section (no id) is skipped, not an aborted load. [earned: 2026-09-28 week review]
+    sections = {s["id"] for s in raw_sections if isinstance(s, dict) and s.get("id") and str(s.get("name", "")).lower() in wanted}
     out = []
     for t in tasks:
-        if t.get("parentId") or t.get("checked") or t.get("sectionId") not in sections:
+        if not isinstance(t, dict) or t.get("parentId") or t.get("checked") or t.get("sectionId") not in sections:
             continue
+        task_id = t.get("id")
         name = str(t.get("content") or "").strip()
-        if name:
+        if name and task_id:  # a malformed task (no id) is skipped, not an aborted load
             out.append(Interest(id="epic-" + slug(name, 34), name=name,
-                                gloss=_what_sentence(str(t.get("description") or "")), todoist_task_id=str(t["id"])))
+                                gloss=_what_sentence(str(t.get("description") or "")), todoist_task_id=str(task_id)))
     return out
 
 

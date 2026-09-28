@@ -33,7 +33,7 @@ import reports
 from judgments import policy
 from judgments.urls import _canonical
 from reader import Item
-from vault_utils import profile_value
+from vault_utils import atomic_write, profile_value
 
 WINDOW_DAYS = 7
 
@@ -47,20 +47,33 @@ def _published(stamp: str) -> datetime | None:
 
 
 def gaps(vault: Path, out: Path, now: datetime, promote: bool = False) -> dict[str, Any]:
-    from radar import RunUsage, judge_items, read_jsonl, vault_sources  # lazy: radar imports this module
+    from radar import (  # lazy: radar imports this module
+        RunUsage,
+        judge_items,
+        profile_number,  # lazy: radar imports this module
+        read_jsonl,
+        vault_sources,
+    )
 
     week = reports.week_of(now.date().isoformat())
     path = out / f"gaps-{week}.json"
-    if path.exists():
-        return {"status": "exists", "week": week, "detail": f"{path.name} already written this week"}
+    if path.is_file():
+        # A truncated write (killed mid-write) is not "done this week" — recompute rather than
+        # leave the digest missing its "Found outside your feeds" section forever. [earned:
+        # 2026-09-28 week review]
+        try:
+            json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
+        else:
+            return {"status": "exists", "week": week, "detail": f"{path.name} already written this week"}
     interests = interests_mod.load(vault)
     if not interests:
         return {"status": "no-interests", "detail": "no interests: set `interests_note` in Config/toolkit/radar.md"}
     reason = judge.unavailable_reason(vault)
     if reason:
         return {"status": "SKIPPED", "detail": f"judgment backend unavailable ({reason}); nothing sent"}
-    ledger = kagi.ledger(out,
-                         float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
+    ledger = kagi.ledger(out, profile_number(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD))
 
     spent_before = ledger.spent_this_week(now)
     known = {r["canonical"] for r in read_jsonl(out / "seen.jsonl")} | set(vault_sources(vault))
@@ -113,19 +126,19 @@ def gaps(vault: Path, out: Path, now: datetime, promote: bool = False) -> dict[s
     if promote and strong:
         result |= _promote(out, strong, {i.id: i.name for i in interests}, now, vault)
     out.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"week": week, "rows": rows, "sites": sites.most_common(), **{k: result[k] for k in (
-        "searched", "found", "strong")}}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    atomic_write(path, json.dumps({"week": week, "rows": rows, "sites": sites.most_common(), **{k: result[k] for k in (
+        "searched", "found", "strong")}}, indent=2, ensure_ascii=False) + "\n")
     return {**result, "file": str(path)}
 
 
 def _promote(out: Path, strong: list[dict], names: dict[str, str], now: datetime, vault: Path) -> dict:
     """Save the strongest to Reader within what is left of the day's promotion budget."""
-    from radar import append_jsonl, read_jsonl
+    from radar import append_jsonl, profile_number, read_jsonl
 
     run_date = now.date().isoformat()
     ledger = out / "promoted.jsonl"
     done = read_jsonl(ledger)
-    per_day = int(profile_value(vault, "promote_per_day", policy.PROMOTE_PER_DAY))  # shared with scan's budget
+    per_day = profile_number(vault, "promote_per_day", policy.PROMOTE_PER_DAY, cast=int)  # shared with scan's budget
     budget = max(0, per_day - sum(1 for r in done if r.get("date") == run_date))
     already = {r["canonical"] for r in done}
     location = str(profile_value(vault, "promote_location", "later"))

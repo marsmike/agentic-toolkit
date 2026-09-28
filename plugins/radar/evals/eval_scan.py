@@ -19,6 +19,10 @@
                  (8d: `promote_per_day` from the profile/env wins over the constant)
                  day, counted across scans; one GitHub release stream at most once in
                  RELEASE_STREAM_DAYS (the strongest release that day; a later day skips the stream)
+                 (8e/8f, direct `settle()`: a failed promotion is retried from promote_retry.jsonl
+                 even once the item is outside --since, and given up (archived) after
+                 MAX_PROMOTE_RETRIES straight failures; 8g: a non-numeric promote_per_day falls
+                 back to the constant instead of crashing scan)
 9. todoist     — with --todoist and Portfolio epics as interests, one comment per epic with strong
                  items, dated, with links and p; a second scan the same day adds none; without
                  `td` nothing happens and nothing fails
@@ -26,6 +30,8 @@
                  bulk_update and nothing else is: not with no key, not an item a failed or
                  --limit-ed run did not judge, not with --keep-in-feed; a Reader error while
                  archiving leaves the scan ok; the only write to Reader is location=archive
+10. timeout    — a bare TimeoutError from urlopen (the real `reader._request`, not the stub)
+                 becomes reader.ReaderError, never a crash
 """
 from __future__ import annotations
 
@@ -342,6 +348,67 @@ def run(vault: Path) -> dict:
         if promoted:
             problems.append("phase 8: a release stream promoted yesterday must not be promoted again within the week")
 
+        # 8e/8f. stranded: once an item is older than --since it is never fetched again, so a
+        # failed promotion must still be retried (from promote_retry.jsonl, regardless of the
+        # window) rather than left in limbo; after MAX_PROMOTE_RETRIES straight failures it is
+        # given up on and archived instead of retried forever
+        strand = Item(id="strand1", url="https://stranded.example.org/post", canonical="stranded.example.org/post",
+                     title="A stranded item", summary="", site="stranded.example.org", feed="stranded.example.org",
+                     published="", category="", saved_at="")
+        strand_rows = [{"canonical": strand.canonical, "backend": "jev", "p": {"x": 0.95}}]
+        def day_n(n: int) -> str:
+            return (NOW.date() + timedelta(days=n)).isoformat()
+
+        out8e = sandbox.parent / "stranded"
+        out8e.mkdir(exist_ok=True)
+        mode["promote_status"] = 500
+        radar.settle([strand], {strand.canonical}, strand_rows, {}, day_n(0), False, True, "later", out8e)
+        mode["promote_status"] = 200
+        retry_rows = radar.read_jsonl(out8e / radar.RETRY_FILE)
+        if len(retry_rows) != 1 or retry_rows[0].get("given_up") or retry_rows[0].get("canonical") != strand.canonical:
+            problems.append(f"phase 8e: a failed promotion must be recorded once for retry, got {retry_rows}")
+        promoted.clear()
+        n = len(calls)
+        # `fetched=[]`/`recorded=set()`: the item is no longer within the window, as if a real
+        # scan's `reader.list_feed(since)` no longer returned it.
+        radar.settle([], set(), strand_rows, {}, day_n(1), False, True, "later", out8e)
+        if [u["id"] for u in promoted] != ["strand1"] or len(calls) != n:
+            problems.append(f"phase 8e: a stranded item outside the window must still be retried and promoted "
+                            f"without a judgment request, got {[u['id'] for u in promoted]}, {len(calls) - n} calls")
+
+        out8f = sandbox.parent / "stranded-giveup"
+        out8f.mkdir(exist_ok=True)
+        archived.clear()
+        mode["promote_status"] = 500
+        radar.settle([strand], {strand.canonical}, strand_rows, {}, day_n(0), True, True, "later", out8f)
+        for i in range(1, radar.MAX_PROMOTE_RETRIES):
+            radar.settle([], set(), strand_rows, {}, day_n(i), True, True, "later", out8f)
+        mode["promote_status"] = 200
+        rows8f = radar.read_jsonl(out8f / radar.RETRY_FILE)
+        if not rows8f or not rows8f[-1].get("given_up"):
+            problems.append(f"phase 8f: after {radar.MAX_PROMOTE_RETRIES} failed attempts the item must be given up, got {rows8f}")
+        if not any("strand1" in a for a in archived):
+            problems.append(f"phase 8f: a given-up stranded item must be archived, got {archived}")
+        promoted.clear()
+        n = len(calls)
+        radar.settle([], set(), strand_rows, {}, day_n(radar.MAX_PROMOTE_RETRIES), True, True, "later", out8f)
+        if promoted or len(calls) != n:
+            problems.append("phase 8f: a given-up item must never be promoted (or retried) again")
+
+        # 8g. a non-numeric promote_per_day (profile or env) falls back to the constant instead of
+        # crashing scan
+        os.environ[env_key] = "not-a-number"
+        try:
+            promoted.clear()
+            r = radar.scan(sandbox, sandbox.parent / "cap-bad", since, NOW, promote=True)
+            if r.get("status") != "ok":
+                problems.append(f"phase 8g: a non-numeric promote_per_day must not crash scan, got {r.get('status')}")
+        finally:
+            if env_before is None:
+                os.environ.pop(env_key, None)
+            else:
+                os.environ[env_key] = env_before
+
         # 6. epics
         os.environ["TOOLKIT_RADAR_TODOIST_PROJECT_ID"] = "p1"
         interests_mod._run_td = lambda args: TD_SECTIONS if args[0] == "section" else TD_TASKS
@@ -374,6 +441,28 @@ def run(vault: Path) -> dict:
         finally:
             radar._td_comment = real_td
             mode["strong_prefix"] = None
+
+        # 10. a bare timeout from the stdlib client becomes reader.ReaderError, not a crash (the
+        # genuine `_request`, captured in `real` before it was replaced by `reader_stub` above)
+        import urllib.request as _urllib_request
+        real_reader_request = real[1]
+        real_urlopen = _urllib_request.urlopen
+
+        def _timeout_urlopen(*a, **k):
+            raise TimeoutError("timed out")
+        os.environ["READWISE_TOKEN"] = "stub-token-not-a-secret"
+        _urllib_request.urlopen = _timeout_urlopen
+        try:
+            try:
+                real_reader_request("GET", "https://readwise.io/api/v3/list/?location=feed")
+                problems.append("phase 10: a bare TimeoutError from urlopen must not pass through silently")
+            except reader.ReaderError:
+                pass
+            except TimeoutError:
+                problems.append("phase 10: a bare TimeoutError must be converted to reader.ReaderError")
+        finally:
+            _urllib_request.urlopen = real_urlopen
+            os.environ.pop("READWISE_TOKEN", None)
     finally:
         judge._post, reader._request, reader.PAGE_DELAY_S, interests_mod._run_td, policy.ITEMS_PER_REQUEST = real
         for k, v in saved_env.items():

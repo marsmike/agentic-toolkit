@@ -299,17 +299,29 @@ def pulse(vault: Path, now: datetime, days: int = 56) -> dict[str, Any]:
         except (UnparseableFrontmatter, OSError):
             skipped += 1
             continue
-        day_str = str(fm.get("created") or fm.get("processed_date") or "")[:10]
-        try:
-            day = date.fromisoformat(day_str)
-        except ValueError:
+        # `created` first, but a present-and-unparseable `created` (a placeholder like "TBD") must
+        # still fall back to `processed_date` rather than be treated as "found, just bad". [earned:
+        # 2026-09-28 week review]
+        day = None
+        for key in ("created", "processed_date"):
+            raw = str(fm.get(key) or "")[:10]
+            if not raw:
+                continue
+            try:
+                day = date.fromisoformat(raw)
+                break
+            except ValueError:
+                continue
+        if day is None:
             skipped += 1
             continue
         if day < since:
             continue
         mentions.append(_note_mention(path, vault, fm, body, day.isoformat()))
 
-    for clip in clips_mod.load(vault, since):
+    the_clips, clips_skipped = clips_mod.load(vault, since)
+    skipped += clips_skipped
+    for clip in the_clips:
         mentions.append(_clip_mention(clip, vault))
 
     _apply_df_stop(mentions)

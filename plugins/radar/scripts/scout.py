@@ -31,7 +31,6 @@ already subscribed); nothing is ever promoted or saved there.
 """
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -50,7 +49,6 @@ from judgments import policy
 from judgments import questions as Q
 from judgments.state import in_chunks
 from judgments.urls import _canonical
-from vault_utils import profile_value
 
 LAUNCH_ANGLES = ("new API", "new service launch", "open-source release", "new dataset")
 CANDIDATES_PER_REQUEST = 8
@@ -321,12 +319,12 @@ def render_scout(week: str, picks: list[dict], now: datetime) -> str:
 
 def scout(vault: Path, out: Path, now: datetime, week: str | None = None, force: bool = False,
          dry_run: bool = False) -> dict[str, Any]:
-    from radar import read_jsonl, vault_sources  # lazy: radar imports this module (like gaps.py)
+    from radar import profile_number, read_jsonl, vault_sources  # lazy: radar imports this module (like gaps.py)
 
     wk = week or reports.week_of(now.date().isoformat())
     written = out / "scout.jsonl"
     already = written.is_file() and any(
-        json.loads(ln).get("week") == wk for ln in written.read_text(encoding="utf-8").splitlines() if ln.strip())
+        reports.week_of_row(ln) == wk for ln in written.read_text(encoding="utf-8").splitlines() if ln.strip())
     if (vault / "01_Capture" / f"Radar-Scout-{wk}.md").exists() or already:
         if not force and not dry_run:
             return {"status": "exists", "week": wk, "detail": f"the scout capture for {wk} was already written"}
@@ -341,14 +339,13 @@ def scout(vault: Path, out: Path, now: datetime, week: str | None = None, force:
     since_dt = now - timedelta(days=policy.SCOUT_WINDOW_DAYS)
     since = since_dt.date().isoformat()
     rows = read_jsonl(out / "state.jsonl")
-    the_clips = clips_mod.load(vault, since_dt.date())
+    the_clips, clips_skipped = clips_mod.load(vault, since_dt.date())
 
     cands: dict[str, Candidate] = {}
     _from_state(cands, rows, since)
     _from_clips(cands, the_clips)
 
-    ledger = kagi.ledger(out,
-                         float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
+    ledger = kagi.ledger(out, profile_number(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD))
     spent_before = ledger.spent_this_week(now)
     strong_count: dict[str, int] = {}
     for r in rows:
@@ -357,6 +354,8 @@ def scout(vault: Path, out: Path, now: datetime, week: str | None = None, force:
                 strong_count[iid] = strong_count.get(iid, 0) + 1
     search_ids = set(sorted((it.id for it in interests), key=lambda i: -strong_count.get(i, 0))[:policy.SCOUT_SEARCH_INTERESTS])
     searched, notes = _from_kagi(cands, now, interests, ledger, search_ids)
+    if clips_skipped:
+        notes.append(f"{clips_skipped} clip(s) skipped: unparseable frontmatter")
     visited = {k for c in the_clips if c.source and (k := candidate_key(c.source))}
     visited |= feed_homes(rows)
 

@@ -14,7 +14,9 @@ graph — offline (gaiafield and Kagi stubbed).
 5. sources   — the sensors' "blocked" Reddit status reaches the page; the graph reports ok
 6. check     — Tavily unavailable: Kagi answers, at most CHECKS_PER_DAY names are asked, a second run the same day
                asks none again, and a hit joins the blip as family "kagi"; its calls go to its own
-               ledger file, and the pipeline's spend in the other one counts against the same budget
+               ledger file, and the pipeline's spend in the other one counts against the same budget;
+               with Tavily available it asks the news index first (6c); a name with 0 news hits (6d)
+               falls back to a general search, still under the same ledger/budget
 7. writes    — signal.json, Signal-Radar.html and Signal-Radar.md in the radar dir, the page
                carries its data and the note wikilinks the anchor note; nothing else in the vault
                changes but the radar dir
@@ -167,6 +169,8 @@ def run(vault: Path) -> dict:
         if not tavily_state["available"]:
             raise tavily.NoKey("TAVILY_API_KEY is not set")
         tavily_calls.append(args)
+        if tavily_state.get("news_empty") and "news" in args:
+            return {"results": []}
         return {"results": [{"url": f"https://www.reddit.com/r/LocalLLaMA/comments/t{len(tavily_calls)}/zither/",
                              "title": "Zither is out", "content": "", "score": 0.9}]}
     tavily._run = tavily_stub
@@ -290,10 +294,24 @@ def run(vault: Path) -> dict:
                             f"got {len(tavily_calls)} and {len(kagi_calls) - calls}")
         if ts.get("status") != "ok" or not z or "tavily" not in z["families"]:
             problems.append(f"tavily: a hit should join the asked name ({asked}) as family tavily, got {ts} {z and z['families']}")
-        if tavily_calls and not {"--depth", "basic", "--time-range", "week"} <= set(tavily_calls[0]):
-            problems.append(f"tavily: the check is a basic search over the week, got {tavily_calls[0]}")
+        if tavily_calls and not {"--depth", "basic", "--time-range", "week", "--topic", "news"} <= set(tavily_calls[0]):
+            problems.append(f"tavily: the check is a basic search over the week, news topic first, got {tavily_calls[0]}")
         if not (out / "tavily-ledger-signal.jsonl").is_file() or not (out / "signal-tavily.jsonl").is_file():
             problems.append("tavily: the Signal Radar must write tavily-ledger-signal.jsonl and signal-tavily.jsonl")
+
+        # 6d: a name too new for Tavily's news index (0 hits) falls back to a general search, still
+        # under the same ledger/budget, and a hit from that fallback still joins the blip
+        (out / "signal-tavily.jsonl").unlink()  # let this name be asked again
+        tavily_state["news_empty"] = True
+        n = len(tavily_calls)
+        data = signal_radar.build(sandbox, out, NOW + timedelta(days=2, hours=2), check=True)
+        tavily_state["news_empty"] = False
+        made = tavily_calls[n:]
+        if len(made) < 2 or "news" not in made[0] or "news" in made[1]:
+            problems.append(f"6d: an empty news search must fall back to a general one (still budgeted), got {made}")
+        ts = next((x for x in data["sources"] if x["family"] == "tavily"), {})
+        if ts.get("status") != "ok" or ts.get("items") != 1 or not any("tavily" in b["families"] for b in data["blips"]):
+            problems.append(f"6d: the fallback's hit should still join a blip as family tavily, got {ts}")
 
         # 8: no graph
         def no_graph(args, timeout=None):

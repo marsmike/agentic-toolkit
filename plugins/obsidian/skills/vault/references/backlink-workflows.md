@@ -8,7 +8,7 @@ After creating a distilled note with bidirectional links:
    ```bash
    grep -rl "\[\[$(basename "$new_note" .md)\]\]" "$VAULT"/{02_Projects,03_Areas,04_Resources}
    ```
-   Expected: at least one hit from a note you enriched (step 8 of distill's workflow.md).
+   Expected: at least one hit from a note you enriched (distill's SKILL.md, invariant 4).
 
 2. **Check enriched notes reference the new note back:** `Read` each enriched note and
    confirm the wikilink is present and reads sensibly in context.

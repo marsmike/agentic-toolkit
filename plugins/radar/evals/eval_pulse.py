@@ -15,7 +15,9 @@
    `week.clips` and the clips column of `daily` see it
 5. interests — `radar_interests` tallies this week vs. the baseline the same way tags do
 6. skipped — a note with unparseable frontmatter and one with neither `created` nor
-   `processed_date` are both skipped and counted, never crash the run
+   `processed_date` are both skipped and counted, never crash the run (6b: `created` present but
+   unparseable, e.g. "TBD", still falls back to a valid `processed_date` rather than being
+   skipped); a clip candidate with unparseable frontmatter is skipped and counted too
 7. symlink outside the vault — ignored, not counted, not skipped
 8. shape — mentions carry family "vault", entities [], score/eng_pct/p None; origin falls back to
    the PARA folder when a note has no `kind`; `daily` covers exactly the last 28 days with zeros
@@ -106,6 +108,12 @@ def _build(vault: Path) -> None:
     (res / "bad-frontmatter.md").write_text("---\ntags: [unterminated\n---\n# Bad\n", encoding="utf-8")
     _note(res / "no-date.md", ["rising-tag"], day=None)
 
+    # 5b. NOT skipped: `created` present but unparseable (a placeholder like "TBD") must still
+    # fall back to a valid `processed_date`, not be treated as "found, just bad"
+    (res / "tbd-created.md").write_text(
+        "---\ndescription: tbd-created\ncreated: TBD\nprocessed_date: " + THIS_WEEK_DATES[0].isoformat() +
+        "\ntags:\n  - processed-date-fallback-tag\n---\n\n# TBD created\n\nBody.\n", encoding="utf-8")
+
     # 6. symlink outside the vault, disguised as a content note
     outside = vault.parent / "outside.md"
     outside.write_text("---\ncreated: 2026-09-24\ntags: [smuggled]\n---\n# Outside\n", encoding="utf-8")
@@ -119,6 +127,9 @@ def _build(vault: Path) -> None:
         "tags:\n  - rising-tag\nradar_interests:\n  - claude-code-anthropic-ecosystem\n---\n\n# A Clip\n",
         encoding="utf-8",
     )
+
+    # 8. a clip candidate with unparseable frontmatter is skipped and counted, not silently dropped
+    (capture / "Bad-Clip.md").write_text("---\nvia: clip\ntags: [unterminated\n---\n# Bad Clip\n", encoding="utf-8")
 
 
 def run(vault: Path) -> dict:
@@ -200,10 +211,15 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 5: interest should be this_week=3 baseline=0.25, got {ci}")
 
         # 6. skipped
-        if result["skipped"] != 2:
-            problems.append(f"phase 6: expected 2 skipped (bad frontmatter + no date), got {result['skipped']}")
+        if result["skipped"] != 3:
+            problems.append(f"phase 6: expected 3 skipped (bad frontmatter + no date + bad clip), got {result['skipped']}")
         if any(m["url"].endswith("bad-frontmatter.md") or m["url"].endswith("no-date.md") for m in result["mentions"]):
             problems.append("phase 6: a skipped note must not appear as a mention")
+
+        # 6b. an unparseable `created` must still fall back to `processed_date`, not be skipped
+        tbd = next((m for m in result["mentions"] if m["url"].endswith("tbd-created.md")), None)
+        if not tbd or tbd["at"] != THIS_WEEK_DATES[0].isoformat():
+            problems.append(f"phase 6b: a bad `created` with a valid processed_date must fall back to it, got {tbd}")
 
         # 7. symlink outside the vault
         if any("symlinked-outside" in m["url"] or "smuggled" in m["tags"] for m in result["mentions"]):

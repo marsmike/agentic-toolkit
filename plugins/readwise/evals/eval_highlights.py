@@ -3,7 +3,10 @@
 1. capture  — highlights on a document already in the vault become one highlights capture that
               names where the document went, `via: clip`, every highlight quoted with its note
 2. new doc  — highlights on a document the vault has never seen (fetched by id) get their own capture
-3. known    — a highlight whose text is already in the vault is recorded, not captured
+3. known    — a long, distinctive highlight already quoted anywhere in the vault is recorded, not
+              captured again; a short, generic one quoted only in an unrelated note is captured
+              anyway (it is not safe to assume that's the same highlight), but still counts as
+              known when the quoting note is tied to the highlight's own document
 4. ledger   — every highlight id is a ledger row; a rerun captures nothing twice
 5. archive  — archive_settled never archives a highlight
 6. note     — a Reader note on a document is rendered as the owner's note
@@ -41,13 +44,18 @@ def run(vault: Path) -> dict:
     from vault_utils import read_frontmatter
 
     problems: list[str] = []
+    long_text = ("A highlight long enough and specific enough that it could not plausibly appear "
+                 "anywhere else in the vault by coincidence")
+    short_text = "Worth revisiting soon"
     listing = {"highlight": [_hl("h1", "P", "Sustained fifty tokens a second for code"),
                              _hl("h2", "P", "The second highlight", note="check this on the M5"),
                              _hl("h3", "Q", "A highlight on an unseen doc"),
                              _hl("h4", "P", "Already quoted in a vault note, word for word"),
                              {**_hl("h5", "P", "Already quoted in a vault note, word for word, and then much more"),
                               "highlight_location": "7"},  # Reader mixes numbers and strings
-                             _hl("h6", "R", "On a document Reader can't return right now")],
+                             _hl("h6", "R", "On a document Reader can't return right now"),
+                             _hl("h7", "P", long_text),  # distinctive: safe to match anywhere in the vault
+                             _hl("h9", "Q", short_text)],  # short, but quoted in Q's own note
                "note": [{"id": "n7", "parent_id": "P", "category": "note", "content": "",
                          "notes": "Try this on the M5 Max", "created_at": "2026-09-12T08:00:00+00:00"}]}
     parents = {"Q": {"id": "Q", "title": "Unseen Doc", "author": "Someone", "source_url": "https://example.org/q"}}
@@ -63,7 +71,10 @@ def run(vault: Path) -> dict:
         ingest.fetch_full = fetch
         ingest.GET_DELAY_S = 0
         (sandbox / "04_Resources" / "Eval-HL-Quote.md").write_text(
-            "---\nstatus: distilled\n---\n# Q\n\n> Already quoted in a vault note, word for word\n", encoding="utf-8")
+            "---\nstatus: distilled\nreadwise_doc_id: Q\n---\n# Q\n\n"
+            "> Already quoted in a vault note, word for word\n"
+            f"> {long_text}\n"
+            f"> {short_text}\n", encoding="utf-8")
         ledger = {"P": {"doc_id": "P", "capture": "01_Capture/Readwise-Tweet-p-2026-09-11.md", "via": "clip"}}
         items = [{"id": "P", "title": "The Parent", "author": "Ivan", "source_url": "https://x.com/i/status/1", "category": "tweet"}]
         rows, summary = ingest.ingest_highlights(sandbox, items, ledger, {}, {}, NOW)
@@ -73,7 +84,7 @@ def run(vault: Path) -> dict:
         p_cap = next((c for c in caps if "The-Parent" in c), None)
         if p_cap:
             fm, body = read_frontmatter(sandbox / p_cap)
-            if fm.get("via") != "clip" or fm.get("readwise_highlight_ids") != ["h1", "h2", "h5", "n7"] or \
+            if fm.get("via") != "clip" or fm.get("readwise_highlight_ids") != ["h1", "h2", "h4", "h5", "n7"] or \
                     "`01_Capture/Readwise-Tweet-p-2026-09-11.md`" not in body or \
                     "> Sustained fifty tokens a second for code" not in body or "*my note:* check this on the M5" not in body \
                     or "*Note (2026-09-12):* Try this on the M5 Max" not in body:
@@ -86,10 +97,20 @@ def run(vault: Path) -> dict:
                 problems.append("prefix: a highlight matched only by its first words was not captured")
         if not any("Unseen-Doc" in c for c in caps):
             problems.append("new doc: no capture for the unseen document")
-        known = [r for r in rows if r["doc_id"] == "h4"]
-        if not known or known[0].get("found") != "text in the vault" or known[0].get("capture"):
-            problems.append(f"known: {known}")
-        if sorted(r["doc_id"] for r in rows) != ["h1", "h2", "h3", "h4", "h5", "n7"] or summary.get("parent_failed") != 1:
+        # h4 is short and only quoted in an unrelated note (Q's, not P's): no longer "known" —
+        # it must be captured like any highlight the vault doesn't already have.
+        short_unrelated = [r for r in rows if r["doc_id"] == "h4"]
+        if not short_unrelated or short_unrelated[0].get("found") or not short_unrelated[0].get("capture"):
+            problems.append(f"short/unrelated: h4 should be captured, not recorded as known: {short_unrelated}")
+        # h7 is long and distinctive, so a vault-wide match (even in Q's unrelated note) still counts.
+        distinctive = [r for r in rows if r["doc_id"] == "h7"]
+        if not distinctive or distinctive[0].get("found") != "text in the vault" or distinctive[0].get("capture"):
+            problems.append(f"distinctive: a long, specific highlight should match anywhere in the vault: {distinctive}")
+        # h9 is short but quoted in a note tied to its own parent (Q): still known.
+        own_doc = [r for r in rows if r["doc_id"] == "h9"]
+        if not own_doc or own_doc[0].get("found") != "text in the vault" or own_doc[0].get("capture"):
+            problems.append(f"own-doc: a short highlight quoted in its own document's note should be known: {own_doc}")
+        if sorted(r["doc_id"] for r in rows) != ["h1", "h2", "h3", "h4", "h5", "h7", "h9", "n7"] or summary.get("parent_failed") != 1:
             problems.append(f"ledger/retry: {[r['doc_id'] for r in rows]}, {summary}")
 
         ledger.update({r["doc_id"]: r for r in rows})
@@ -116,7 +137,7 @@ def run(vault: Path) -> dict:
         before = sorted(p.name for p in (sandbox / "01_Capture").glob("Readwise-Highlights-*.md"))
         rows3, s3 = ingest.ingest_highlights(sandbox, items, fresh, {}, {}, NOW)
         after = sorted(p.name for p in (sandbox / "01_Capture").glob("Readwise-Highlights-*.md"))
-        if before != after or s3.get("recovered") != 6:
+        if before != after or s3.get("recovered") != 7:
             problems.append(f"crash: files {len(before)}->{len(after)}, {s3}")
         # --- 11. gone: the parent was deleted in Reader ---
         listing["highlight"].append({**_hl("h8", "G", "The last trace of a deleted page"), "url": "https://read.readwise.io/read/h8"})

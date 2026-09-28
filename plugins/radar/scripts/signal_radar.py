@@ -42,7 +42,7 @@ import tavily
 import vault_graph
 import vault_pulse
 from judgments.urls import _canonical
-from vault_utils import atomic_write, profile_value
+from vault_utils import atomic_write
 
 RECENT_DAYS = 3          # "now": today and the two days before
 BASELINE_DAYS = 14       # what "now" is compared with, the days before RECENT_DAYS
@@ -358,13 +358,29 @@ class _Skip(Exception):
     """The backend cannot run (no key, no CLI, over budget): the check is skipped, not failed."""
 
 
+def _load_check_row(line: str) -> dict | None:
+    """One line of `signal-tavily.jsonl` / `signal-kagi.jsonl`, or None for a truncated or
+    malformed one (killed mid-append) or a row missing what every reader needs — must not crash
+    the once-a-day name check. [earned: 2026-09-28 week review]"""
+    try:
+        row = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(row, dict) or not {"day", "key", "name", "hits"} <= row.keys():
+        return None
+    return row
+
+
 def _name_check(out: Path, candidates: list[dict], now: datetime, family: str, log_name: str,
                 ask: Any = None) -> tuple[list[dict], dict]:
     """One backend's check: ask `ask(name)` about the newest, least corroborated names, at most
     CHECKS_PER_DAY a day and each name once a week, logging every answer in `log_name`; then every
     answer on record from the last week becomes a mention of `family`. `ask=None` only reads."""
     log = out / log_name
-    rows = [json.loads(ln) for ln in log.read_text(encoding="utf-8").splitlines() if ln.strip()] if log.is_file() else []
+    rows = []
+    for ln in (log.read_text(encoding="utf-8").splitlines() if log.is_file() else []):
+        if ln.strip() and (row := _load_check_row(ln)) is not None:
+            rows.append(row)
     today = now.date().isoformat()
     week_ago = (now.date() - timedelta(days=7)).isoformat()
     asked_today = sum(1 for r in rows if r["day"] == today)
@@ -401,12 +417,20 @@ def _name_check(out: Path, candidates: list[dict], now: datetime, family: str, l
 
 
 def _tavily_ask(vault: Path, out: Path, now: datetime) -> Any:
-    ledger = tavily.ledger(out, float(profile_value(vault, "tavily_weekly_budget_usd", tavily.DEFAULT_WEEKLY_BUDGET_USD)),
+    from radar import profile_number  # lazy: radar imports this module
+
+    ledger = tavily.ledger(out, profile_number(vault, "tavily_weekly_budget_usd", tavily.DEFAULT_WEEKLY_BUDGET_USD),
                            signal=True)
 
     def ask(name: str) -> list[dict]:
         try:
-            found = tavily.search(f'"{name}"', ledger, max_results=5, time_range="week", now=now)
+            # "Is this name taking off this week": Tavily's news index first (one credit); a name
+            # too new to be news yet still shows up in the general web index, so ask that only
+            # when news came back empty (another credit, still under the same budget). [earned:
+            # 2026-09-28 week review]
+            found = tavily.search(f'"{name}"', ledger, max_results=5, time_range="week", topic="news", now=now)
+            if not found:
+                found = tavily.search(f'"{name}"', ledger, max_results=5, time_range="week", now=now)
         except (tavily.NoKey, tavily.NoCli, tavily.OverBudget) as e:
             raise _Skip(str(e)) from e
         except tavily.TavilyError as e:  # rate limit, HTTP, a bad answer: Kagi still gets its turn [PR #75 review]
@@ -417,7 +441,9 @@ def _tavily_ask(vault: Path, out: Path, now: datetime) -> Any:
 
 
 def _kagi_ask(vault: Path, out: Path, now: datetime) -> Any:
-    ledger = kagi.ledger(out, float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)),
+    from radar import profile_number  # lazy: radar imports this module
+
+    ledger = kagi.ledger(out, profile_number(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD),
                          signal=True)
     week_ago = (now.date() - timedelta(days=7)).isoformat()
 

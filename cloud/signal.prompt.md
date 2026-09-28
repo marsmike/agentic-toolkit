@@ -38,7 +38,7 @@ RUN
 3. Commit this routine's own files and nothing else (the one git allowed here besides SETUP 2; the
    list is the Signal Radar's row in cloud/README.md "Two routines, one vault", and a file not
    written yet is skipped):
-     uv run --locked --project plugins/obsidian/scripts python3 plugins/obsidian/scripts/pipeline_run.py commit --path 00_Memory/radar/sensors --path 00_Memory/radar/signal.json --path 00_Memory/radar/Signal-Radar.html --path 00_Memory/radar/Signal-Radar.md --path 00_Memory/radar/signal-kagi.jsonl --path 00_Memory/radar/kagi-ledger-signal.jsonl --path 00_Memory/radar/signal-tavily.jsonl --path 00_Memory/radar/tavily-ledger-signal.jsonl --path 00_Memory/radar/tavily-ledger.jsonl --message "signal radar <UTC YYYY-MM-DD HH:MM>: <blips> signals, <early> early, <blind_spots> blind spots" --json
+     uv run --locked --project plugins/obsidian/scripts python3 plugins/obsidian/scripts/pipeline_run.py commit --path 00_Memory/radar/sensors --path 00_Memory/radar/signal.json --path 00_Memory/radar/Signal-Radar.html --path 00_Memory/radar/Signal-Radar.md --path 00_Memory/radar/signal-kagi.jsonl --path 00_Memory/radar/kagi-ledger-signal.jsonl --path 00_Memory/radar/signal-tavily.jsonl --path 00_Memory/radar/tavily-ledger-signal.jsonl --message "signal radar <UTC YYYY-MM-DD HH:MM>: <blips> signals, <early> early, <blind_spots> blind spots" --json
    Fill the message from step 2's numbers. Its status must be "ok" (a commit, or "nothing
    changed"); "refused" (a key-shaped string in a fetched title: its DLQ note, naming file and line, is committed alone; or something
    already staged) and "failed" mean the page is not in the vault: publish nothing and report it. A

@@ -639,24 +639,29 @@ pub struct IndexReport {
     pub boundary_violations: usize,
 }
 
-/// Extract the graph into `conn`. `full` forces re-extraction of every node even if its
-/// mtime+size are unchanged; otherwise only new/changed notes are re-extracted and removed
-/// notes' rows (and their outgoing edges) are deleted — the default incremental path.
-/// When the resolution scope changes, unchanged sources' links are also re-extracted.
+/// Run `f` inside one write transaction (`BEGIN IMMEDIATE` .. `COMMIT`): two concurrent writers
+/// queue on the busy timeout instead of interleaving their delete/insert pairs, which would
+/// duplicate rows. Inside a caller's transaction it joins that one. `to_err` converts a
+/// `rusqlite::Error` from the `BEGIN`/`COMMIT` bookkeeping itself into `f`'s error type.
 ///
-/// The pass is one write transaction, taken up front (`BEGIN IMMEDIATE`): two concurrent
-/// indexers queue on the busy timeout instead of interleaving their per-note delete/insert
-/// pairs, which would duplicate edges. Inside a caller's transaction it joins that one.
-pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<IndexReport> {
+/// Shared by `index` and `infer_with_gates` — both take this same shape: scan the vault (and, for
+/// `infer`, run the model) before the lock, then diff against a *fresh* read of the database and
+/// write, all inside it, so the diff can never be compared against a snapshot the lock has since
+/// made stale.
+fn with_write_txn<T, E>(
+    conn: &Connection,
+    to_err: impl Fn(rusqlite::Error) -> E,
+    f: impl FnOnce() -> Result<T, E>,
+) -> Result<T, E> {
     if !conn.is_autocommit() {
-        return index_pass(vault, conn, full);
+        return f();
     }
-    conn.execute_batch("BEGIN IMMEDIATE")?;
+    conn.execute_batch("BEGIN IMMEDIATE").map_err(&to_err)?;
     // A failed COMMIT (BUSY while a reader holds on) must not leave the connection inside the
-    // transaction, or the next `index` on it would join the abandoned one.
-    let result = index_pass(vault, conn, full).and_then(|report| {
-        conn.execute_batch("COMMIT")?;
-        Ok(report)
+    // transaction, or the next call on it would join the abandoned one.
+    let result = f().and_then(|v| {
+        conn.execute_batch("COMMIT").map_err(&to_err)?;
+        Ok(v)
     });
     if result.is_err() && !conn.is_autocommit() {
         let _ = conn.execute_batch("ROLLBACK");
@@ -664,11 +669,34 @@ pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<In
     result
 }
 
-fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<IndexReport> {
-    if full {
-        conn.execute_batch("DELETE FROM nodes; DELETE FROM edges;")?;
-    }
+/// One resolved outgoing edge a node file will produce, precomputed during the (lock-free) vault
+/// scan — resolution only depends on the file listing, never on database state.
+struct ScannedEdge {
+    target: Option<String>,
+    raw_target: String,
+    dangling: bool,
+    boundary_violation: bool,
+}
 
+/// One node file plus everything the disk walk, frontmatter parse, and link resolution can
+/// determine about it without touching the database.
+struct ScannedNode {
+    rel: String,
+    mtime: i64,
+    size: u64,
+    meta: NoteMeta,
+    edges: Vec<ScannedEdge>,
+}
+
+/// Vault-only state for one `index` pass: walk, parse, and resolve every node's links up front —
+/// no database access, so this runs before the write lock is taken.
+struct IndexScan {
+    nodes: Vec<ScannedNode>,
+    node_paths: HashSet<String>,
+    resolution_scope: String,
+}
+
+fn index_scan(vault: &Path) -> IndexScan {
     let all_files = discover_all_files(vault);
     let node_files = discover_nodes(vault);
     let node_paths: HashSet<String> = node_files.iter().map(|f| f.rel.clone()).collect();
@@ -680,14 +708,6 @@ fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<I
         node_files.iter().map(|f| &f.rel).collect::<Vec<_>>(),
     ))
     .expect("paths serialize");
-    let previous_scope: Option<String> = conn
-        .query_row(
-            "SELECT value FROM gaiafield_meta WHERE key = 'resolution_scope'",
-            [],
-            |row| row.get(0),
-        )
-        .optional()?;
-    let scope_changed = previous_scope.as_deref() != Some(&resolution_scope);
 
     let by_path: HashMap<String, usize> = all_files
         .iter()
@@ -705,6 +725,97 @@ fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<I
         by_stem.entry(stem.to_string()).or_default().push(i);
     }
 
+    let nodes = node_files
+        .iter()
+        .map(|file| {
+            let (mtime, size) = file_stat(&file.abs);
+            let meta = read_note(file);
+            let edges = extract_links(&meta.body)
+                .into_iter()
+                .flat_map(|link| -> Vec<ScannedEdge> {
+                    match resolve_link(
+                        &link.target,
+                        &file.rel,
+                        &all_files,
+                        &by_path,
+                        &by_stem,
+                        &node_paths,
+                    ) {
+                        LinkTarget::Dangling => vec![ScannedEdge {
+                            target: None,
+                            raw_target: link.target,
+                            dangling: true,
+                            boundary_violation: false,
+                        }],
+                        LinkTarget::BoundaryViolation(target) => vec![ScannedEdge {
+                            target: Some(target),
+                            raw_target: link.target,
+                            dangling: false,
+                            boundary_violation: true,
+                        }],
+                        // Not modeled — see `LinkTarget::OutOfScope` doc comment.
+                        LinkTarget::OutOfScope(_) => Vec::new(),
+                        LinkTarget::Node(candidates) => candidates
+                            .into_iter()
+                            .map(|target| ScannedEdge {
+                                target: Some(target),
+                                raw_target: link.target.clone(),
+                                dangling: false,
+                                boundary_violation: false,
+                            })
+                            .collect(),
+                    }
+                })
+                .collect();
+            ScannedNode {
+                rel: file.rel.clone(),
+                mtime,
+                size,
+                meta,
+                edges,
+            }
+        })
+        .collect();
+
+    IndexScan {
+        nodes,
+        node_paths,
+        resolution_scope,
+    }
+}
+
+/// Extract the graph into `conn`. `full` forces re-extraction of every node even if its
+/// mtime+size are unchanged; otherwise only new/changed notes are re-extracted and removed
+/// notes' rows (and their outgoing edges) are deleted — the default incremental path.
+/// When the resolution scope changes, unchanged sources' links are also re-extracted.
+///
+/// The vault walk, frontmatter parse, and link resolution (`index_scan`) run first, with no lock
+/// held. Only the diff against the database and the writes it produces (`index_write`) run inside
+/// one write transaction (`BEGIN IMMEDIATE`): two concurrent indexers queue on the busy timeout
+/// instead of interleaving their per-note delete/insert pairs, which would duplicate edges — and
+/// the diff itself is taken from a fresh read of `nodes`/`gaiafield_meta`, never the pre-lock
+/// scan, so a change the lock has since made stale can't be compared against.
+pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<IndexReport> {
+    let scan = index_scan(vault);
+    with_write_txn(conn, |e| e, || index_write(conn, full, &scan))
+}
+
+fn index_write(conn: &Connection, full: bool, scan: &IndexScan) -> rusqlite::Result<IndexReport> {
+    if full {
+        conn.execute_batch("DELETE FROM nodes; DELETE FROM edges;")?;
+    }
+
+    let previous_scope: Option<String> = conn
+        .query_row(
+            "SELECT value FROM gaiafield_meta WHERE key = 'resolution_scope'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let scope_changed = previous_scope.as_deref() != Some(scan.resolution_scope.as_str());
+
+    // Fresh read, taken now that the write lock is held — never the pre-lock scan — so the diff
+    // below reflects whatever the last writer actually committed.
     let existing: HashMap<String, (i64, i64)> = {
         let mut stmt = conn.prepare("SELECT path, mtime, size FROM nodes")?;
         let rows = stmt.query_map([], |row| {
@@ -717,17 +828,16 @@ fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<I
     };
 
     let mut report = IndexReport {
-        total_nodes: node_files.len(),
+        total_nodes: scan.nodes.len(),
         ..Default::default()
     };
     let now = now_secs();
 
-    for file in &node_files {
-        let (mtime, size) = file_stat(&file.abs);
+    for file in &scan.nodes {
         let unchanged = !full
             && existing
                 .get(&file.rel)
-                .map(|&(m, s)| m == mtime && s as u64 == size)
+                .map(|&(m, s)| m == file.mtime && s as u64 == file.size)
                 .unwrap_or(false);
         if unchanged {
             report.unchanged += 1;
@@ -736,7 +846,6 @@ fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<I
             }
         }
         let is_new = !existing.contains_key(&file.rel);
-        let meta = read_note(file);
 
         if !unchanged {
             conn.execute(
@@ -748,56 +857,31 @@ fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<I
                     updated_at=excluded.updated_at",
                 rusqlite::params![
                     file.rel,
-                    meta.title,
-                    meta.description,
-                    meta.status,
-                    meta.kind,
-                    serde_json::to_string(&meta.tags).unwrap_or_else(|_| "[]".to_string()),
-                    mtime,
-                    size as i64,
+                    file.meta.title,
+                    file.meta.description,
+                    file.meta.status,
+                    file.meta.kind,
+                    serde_json::to_string(&file.meta.tags).unwrap_or_else(|_| "[]".to_string()),
+                    file.mtime,
+                    file.size as i64,
                     now,
                 ],
             )?;
         }
 
         conn.execute("DELETE FROM edges WHERE source = ?1", [&file.rel])?;
-        for link in extract_links(&meta.body) {
-            let resolution = resolve_link(
-                &link.target,
-                &file.rel,
-                &all_files,
-                &by_path,
-                &by_stem,
-                &node_paths,
-            );
-            match resolution {
-                LinkTarget::Dangling => {
-                    conn.execute(
-                        "INSERT INTO edges (source, target, raw_target, edge_type, dangling, boundary_violation)
-                         VALUES (?1, NULL, ?2, 'EXTRACTED', 1, 0)",
-                        rusqlite::params![file.rel, link.target],
-                    )?;
-                }
-                LinkTarget::BoundaryViolation(target) => {
-                    conn.execute(
-                        "INSERT INTO edges (source, target, raw_target, edge_type, dangling, boundary_violation)
-                         VALUES (?1, ?2, ?3, 'EXTRACTED', 0, 1)",
-                        rusqlite::params![file.rel, target, link.target],
-                    )?;
-                }
-                LinkTarget::OutOfScope(_) => {
-                    // Not modeled — see `LinkTarget::OutOfScope` doc comment.
-                }
-                LinkTarget::Node(candidates) => {
-                    for target in candidates {
-                        conn.execute(
-                            "INSERT INTO edges (source, target, raw_target, edge_type, dangling, boundary_violation)
-                             VALUES (?1, ?2, ?3, 'EXTRACTED', 0, 0)",
-                            rusqlite::params![file.rel, target, link.target],
-                        )?;
-                    }
-                }
-            }
+        for edge in &file.edges {
+            conn.execute(
+                "INSERT INTO edges (source, target, raw_target, edge_type, dangling, boundary_violation)
+                 VALUES (?1, ?2, ?3, 'EXTRACTED', ?4, ?5)",
+                rusqlite::params![
+                    file.rel,
+                    edge.target,
+                    edge.raw_target,
+                    edge.dangling as i64,
+                    edge.boundary_violation as i64,
+                ],
+            )?;
         }
 
         if is_new {
@@ -808,7 +892,7 @@ fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<I
     }
 
     for old_path in existing.keys() {
-        if !node_paths.contains(old_path) {
+        if !scan.node_paths.contains(old_path) {
             conn.execute("DELETE FROM nodes WHERE path = ?1", [old_path])?;
             // Surviving sources were re-resolved above against the current scope.
             conn.execute("DELETE FROM edges WHERE source = ?1", [old_path])?;
@@ -819,7 +903,7 @@ fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<I
     conn.execute(
         "INSERT INTO gaiafield_meta (key, value) VALUES ('resolution_scope', ?1)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        [&resolution_scope],
+        [&scan.resolution_scope],
     )?;
 
     report.edges =
@@ -1398,6 +1482,20 @@ pub struct InferReport {
     pub elapsed_ms: u64,
 }
 
+/// Read `path -> (mtime, size)` out of `embeddings` — used twice by `infer_with_gates`: once
+/// (optimistically, before the write lock) to decide which notes are worth eagerly embedding, and
+/// once more (authoritatively, inside the lock) as the actual diff base.
+fn read_embeddings_stat(conn: &Connection) -> rusqlite::Result<HashMap<String, (i64, i64)>> {
+    let mut stmt = conn.prepare("SELECT path, mtime, size FROM embeddings")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            (row.get::<_, i64>(1)?, row.get::<_, i64>(2)?),
+        ))
+    })?;
+    Ok(rows.filter_map(Result::ok).collect())
+}
+
 /// Embed every node's content and score every pair for similarity, writing `INFERRED`/`AMBIGUOUS`
 /// rows into `inferred_edges` (contract rule 5, surprise scoring lives in `candidates`/`surprise`
 /// below, not here).
@@ -1413,6 +1511,13 @@ pub struct InferReport {
 ///
 /// A pair that already has an `extracted` edge (either direction, non-dangling, non-boundary)
 /// never gets an inferred row — nothing to suggest where a wikilink already exists.
+///
+/// Like `index`, the write phase (delete/insert/rescore) is one transaction (`BEGIN IMMEDIATE`),
+/// taken against a fresh read of `embeddings` so two concurrent infers can't interleave their
+/// delete/insert pairs and duplicate `inferred_edges` rows (which, unlike `embeddings`, has no
+/// unique constraint to fall back on). Model inference — the expensive part — runs before the
+/// lock, against an optimistic pre-lock snapshot; the rare note whose status that snapshot got
+/// wrong (changed between the two reads) is embedded inline, still under the lock, as a fallback.
 pub fn infer_with_gates(
     vault: &Path,
     conn: &Connection,
@@ -1433,17 +1538,20 @@ pub fn infer_with_gates(
     let start = std::time::Instant::now();
 
     if reset {
-        conn.execute_batch(
-            "DELETE FROM inferred_edges; DELETE FROM embeddings; DELETE FROM gaiafield_meta;",
-        )
-        .map_err(|e| e.to_string())?;
+        with_write_txn(conn, |e| e.to_string(), || {
+            conn.execute_batch(
+                "DELETE FROM inferred_edges; DELETE FROM embeddings; DELETE FROM gaiafield_meta;",
+            )
+            .map_err(|e| e.to_string())
+        })?;
         return Ok(InferReport {
             elapsed_ms: start.elapsed().as_millis() as u64,
             ..Default::default()
         });
     }
 
-    // Inference is a pass on top of the deterministic layer — keep it fresh, incrementally.
+    // Inference is a pass on top of the deterministic layer — keep it fresh, incrementally. Its
+    // own write lock is independent of (and committed before) the one this function takes below.
     index(vault, conn, false).map_err(|e| e.to_string())?;
 
     // A gate pair other than the stored one relabels every pair, not only the changed notes':
@@ -1456,48 +1564,99 @@ pub fn infer_with_gates(
     let gates_changed = matches!(stored_gates, (Some(h), Some(l)) if h != high_gate || l != low_gate);
     let full = full || gates_changed;
 
-    if full {
-        conn.execute_batch("DELETE FROM inferred_edges; DELETE FROM embeddings;")
-            .map_err(|e| e.to_string())?;
-    }
-
     let model = ensure_model(model_dir)?;
 
     let node_files = discover_nodes(vault);
     let node_paths: HashSet<String> = node_files.iter().map(|f| f.rel.clone()).collect();
 
-    let existing: HashMap<String, (i64, i64)> = {
-        let mut stmt = conn
-            .prepare("SELECT path, mtime, size FROM embeddings")
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    (row.get::<_, i64>(1)?, row.get::<_, i64>(2)?),
-                ))
-            })
-            .map_err(|e| e.to_string())?;
-        rows.filter_map(Result::ok).collect()
-    };
+    // Optimistic pre-lock snapshot: decides which notes look worth eagerly embedding before the
+    // write lock is taken. Never the diff of record — `infer_write` below re-reads `embeddings`
+    // fresh, inside the lock, and treats this only as a cache.
+    let snapshot = read_embeddings_stat(conn).map_err(|e| e.to_string())?;
+    let mut precomputed: HashMap<String, Vec<f32>> = HashMap::new();
+    for file in &node_files {
+        let (mtime, size) = file_stat(&file.abs);
+        let unchanged = !full
+            && snapshot
+                .get(&file.rel)
+                .map(|&(m, s)| m == mtime && s as u64 == size)
+                .unwrap_or(false);
+        if unchanged {
+            continue;
+        }
+        let vector = model.encode_single(&embed_text(&read_note(file)));
+        precomputed.insert(file.rel.clone(), vector);
+    }
 
-    let mut embedded_count = 0usize;
+    let (embedded_count, inferred_edges, ambiguous_edges) =
+        with_write_txn(conn, |e| e.to_string(), || {
+            infer_write(
+                conn,
+                &node_files,
+                &node_paths,
+                full,
+                high_gate,
+                low_gate,
+                &model,
+                &precomputed,
+            )
+        })?;
+
+    Ok(InferReport {
+        embedded: embedded_count,
+        inferred_edges,
+        ambiguous_edges,
+        model: MODEL_NAME.to_string(),
+        high_gate,
+        low_gate,
+        elapsed_ms: start.elapsed().as_millis() as u64,
+    })
+}
+
+/// The write phase of `infer_with_gates`, run inside its write transaction: fresh-diff
+/// `embeddings` against the vault, write changed embeddings (falling back to inline model
+/// inference for the rare note `precomputed` missed), rescore every pair touching a changed note,
+/// and write the resulting `inferred_edges` rows plus the run's meta. Returns
+/// `(embedded, inferred_edges, ambiguous_edges)`.
+#[allow(clippy::too_many_arguments)]
+fn infer_write(
+    conn: &Connection,
+    node_files: &[VaultFile],
+    node_paths: &HashSet<String>,
+    full: bool,
+    high_gate: f64,
+    low_gate: f64,
+    model: &StaticModel,
+    precomputed: &HashMap<String, Vec<f32>>,
+) -> Result<(usize, usize, usize), String> {
+    if full {
+        conn.execute_batch("DELETE FROM inferred_edges; DELETE FROM embeddings;")
+            .map_err(|e| e.to_string())?;
+    }
+
+    // Fresh read, taken now that the write lock is held — the actual diff base.
+    let existing = read_embeddings_stat(conn).map_err(|e| e.to_string())?;
+
     // Paths whose embedding changed this run (added or updated) — the only ones that need
     // rescoring against the rest of the corpus (incremental rule).
     let mut changed_paths: Vec<String> = Vec::new();
 
-    for file in &node_files {
+    for file in node_files {
         let (mtime, size) = file_stat(&file.abs);
-        let unchanged = existing
-            .get(&file.rel)
-            .map(|&(m, s)| m == mtime && s as u64 == size)
-            .unwrap_or(false);
+        let unchanged = !full
+            && existing
+                .get(&file.rel)
+                .map(|&(m, s)| m == mtime && s as u64 == size)
+                .unwrap_or(false);
         if unchanged {
             continue;
         }
-        let meta = read_note(file);
-        let text = embed_text(&meta);
-        let vector = model.encode_single(&text);
+        // Reuse the vector computed before the lock; a note the pre-lock snapshot missed (changed
+        // between the two reads) is embedded inline here instead, still under the lock.
+        let vector = match precomputed.get(&file.rel) {
+            Some(v) => v.clone(),
+            None => model.encode_single(&embed_text(&read_note(file))),
+        };
         conn.execute(
             "INSERT INTO embeddings (path, mtime, size, model, dims, vector)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)
@@ -1514,9 +1673,9 @@ pub fn infer_with_gates(
             ],
         )
         .map_err(|e| e.to_string())?;
-        embedded_count += 1;
         changed_paths.push(file.rel.clone());
     }
+    let embedded_count = changed_paths.len();
 
     // Notes no longer in scope: drop their embedding and every inferred edge touching them —
     // mirrors `index`'s node-removal handling, but embeddings have no "dangling" concept (an
@@ -1625,15 +1784,7 @@ pub fn infer_with_gates(
         )
         .map_err(|e| e.to_string())? as usize;
 
-    Ok(InferReport {
-        embedded: embedded_count,
-        inferred_edges,
-        ambiguous_edges,
-        model: MODEL_NAME.to_string(),
-        high_gate,
-        low_gate,
-        elapsed_ms: start.elapsed().as_millis() as u64,
-    })
+    Ok((embedded_count, inferred_edges, ambiguous_edges))
 }
 
 /// `infer_with_gates` at the compile-time defaults (`DEFAULT_HIGH_GATE`/`DEFAULT_LOW_GATE`):

@@ -22,7 +22,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import sys
 from collections import Counter
 from datetime import date, datetime, timedelta
@@ -32,7 +31,7 @@ from urllib.parse import quote, urlsplit
 
 import imports_log
 import radar_ledger
-from vault_utils import atomic_write, contained, profile_value, read_frontmatter, require_vault
+from vault_utils import atomic_write, contained, git_output, profile_value, read_frontmatter, require_vault
 
 OUT = Path("00_Memory") / "last-run-report.html"
 STATE = Path("00_Memory") / "pipeline-state.json"
@@ -162,11 +161,6 @@ MARK = ('<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><cir
         'stroke-width="2"/><circle cx="11" cy="11" r="1.8" fill="currentColor"/></svg>')
 
 
-def _git(vault: Path, *args: str) -> str:
-    run = subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, check=False)
-    return run.stdout if run.returncode == 0 else ""
-
-
 def _web(url: object) -> str:
     """The address, if it may be a link (http or https only); else ""."""
     u = str(url or "").strip()
@@ -175,9 +169,9 @@ def _web(url: object) -> str:
 
 def _github_base(vault: Path) -> str:
     """`https://github.com/<owner>/<repo>/blob/<branch>/` for a GitHub remote, else ""."""
-    remote = _git(vault, "remote", "get-url", "origin").strip()
+    remote = git_output(vault, "remote", "get-url", "origin").strip()
     m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$", remote)
-    branch = _git(vault, "rev-parse", "--abbrev-ref", "HEAD").strip() or "main"
+    branch = git_output(vault, "rev-parse", "--abbrev-ref", "HEAD").strip() or "main"
     return f"https://github.com/{m.group(1)}/{m.group(2)}/blob/{branch}/" if m else ""
 
 
@@ -357,7 +351,7 @@ def changed_notes(vault: Path) -> list[tuple[str, str]]:
     """(A|M, path) for every note this run added or changed: the working tree against HEAD, which
     `end` has not committed yet when the generators run."""
     rows = []
-    for line in _git(vault, "status", "--porcelain", "--untracked-files=all", "--", *NOTE_DIRS).splitlines():
+    for line in git_output(vault, "status", "--porcelain", "--untracked-files=all", "--", *NOTE_DIRS).splitlines():
         code, path = line[:2], line[3:].strip().strip('"')
         if path.endswith(".md"):
             rows.append(("A" if "?" in code or "A" in code else "M", path))

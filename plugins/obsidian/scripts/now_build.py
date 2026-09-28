@@ -26,9 +26,18 @@ from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 
-from map_build import _date, _one_line, _when
+from map_build import _date, _when
 from pipeline_run import STATE, _order
-from vault_utils import atomic_write, contained, discover_notes, read_frontmatter, require_vault, root_active_notes
+from vault_utils import (
+    atomic_write,
+    contained,
+    discover_notes,
+    one_line,
+    read_frontmatter,
+    read_jsonl,
+    require_vault,
+    root_active_notes,
+)
 
 NOW = "Now.md"
 BOARD = "Boards/Pipeline.md"
@@ -95,15 +104,8 @@ def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
 
 
 def radar(vault: Path, since: date) -> list[dict]:
-    path = vault / "00_Memory" / "radar" / "state.jsonl"
-    if not path.is_file():
-        return []
     best: dict[str, dict] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
+    for row in read_jsonl(vault / "00_Memory" / "radar" / "state.jsonl"):
         if not row.get("strong") or str(row.get("run", "")) < since.isoformat():
             continue
         row["score"] = max((row.get("p") or {}).get(t, 0) for t in row["strong"])
@@ -129,7 +131,7 @@ def stuck(vault: Path) -> tuple[list[str], list[str]]:
 
 def inbox(vault: Path, parked: list[str]) -> list[str]:
     captures = [p for p in contained((vault / "01_Capture").glob("*.md"), vault) if p.is_file()]
-    ordered = sorted(captures, key=lambda p: _order(vault, p))
+    ordered = sorted(captures, key=_order)
     return [p.relative_to(vault).as_posix() for p in ordered if p.relative_to(vault).as_posix() not in parked]
 
 
@@ -155,7 +157,7 @@ def _last_run(vault: Path) -> str:
 
 
 def _radar_line(r: dict) -> str:
-    title = _one_line(r.get("title") or r.get("url"), 120).replace("[", "(").replace("]", ")")
+    title = one_line(r.get("title") or r.get("url"), 120).replace("[", "(").replace("]", ")")
     topics = ", ".join(r["strong"])
     return f"- [{title}]({r.get('url')}) — {topics}" + (" · in vault" if r.get("in_vault") else "")
 

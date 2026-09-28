@@ -241,6 +241,12 @@ def _problems(result: dict) -> list[dict]:
     def add(section: str, detail: str) -> None:
         problems.append({"section": section, "detail": detail})
 
+    tk = result.get("toolkit") or {}
+    if tk.get("found") and tk.get("behind"):
+        # Uncommitted local changes are not flagged: this is a dev checkout, and the vault's own
+        # checkout treats "behind" as the only unhealthy state too — see the `v["checkout"]` check
+        # below.
+        add("toolkit", f"checkout is {tk['behind']} commit(s) behind its upstream — git pull")
     for row in result["engines"]["engines"]:
         if not row["installed_tag"]:
             add("engines", f"{row['engine']} not installed — unisphere engines install")

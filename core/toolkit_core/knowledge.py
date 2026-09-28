@@ -113,6 +113,23 @@ def _inference_status(stats: dict) -> dict:
     }
 
 
+def _run_json(binary: str, argv: list[str], timeout: int) -> tuple[object, str | None]:
+    """Run `binary argv... --json` and parse its stdout. The one shell-out + JSON-parse recipe
+    every gaiafield/farsight wrapper below uses (and, via `cli._engine_json`, `unisphere`'s own
+    CLI too) — one subprocess-probing pattern for an engine binary, not one per caller.
+    (parsed stdout, None) on success, (None, error) otherwise; never raises."""
+    try:
+        proc = subprocess.run([binary, *argv, "--json"], capture_output=True, text=True, timeout=timeout, check=True)
+    except subprocess.CalledProcessError as exc:
+        return None, (exc.stderr or str(exc)).strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, str(exc)
+    try:
+        return json.loads(proc.stdout), None
+    except json.JSONDecodeError as exc:
+        return None, str(exc)
+
+
 def graph_status(vault_path: Path) -> dict:
     """Graph section for `unisphere doctor`. Never raises: every failure mode collapses
     into a `present`/`note` pair the caller can render directly, matching the rest of
@@ -128,17 +145,9 @@ def graph_status(vault_path: Path) -> dict:
             "note": f"gaiafield binary found ({binary}) but no graph database yet — run `gaiafield index`",
         }
 
-    try:
-        proc = subprocess.run(
-            [binary, "stats", "--vault", str(vault_path), "--db", str(db_path), "--json"],
-            capture_output=True, text=True, timeout=STATS_TIMEOUT, check=True,
-        )
-        stats = json.loads(proc.stdout)
-    except subprocess.CalledProcessError as exc:
-        detail = (exc.stderr or str(exc)).strip()
-        return {"present": True, "note": f"gaiafield stats failed: {detail}"}
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
-        return {"present": True, "note": f"gaiafield stats failed: {exc}"}
+    stats, error = _run_json(binary, ["stats", "--vault", str(vault_path), "--db", str(db_path)], STATS_TIMEOUT)
+    if error is not None:
+        return {"present": True, "note": f"gaiafield stats failed: {error}"}
 
     db_mtime = db_path.stat().st_mtime
     newest_note = _newest_active_note_mtime(vault_path)
@@ -177,16 +186,9 @@ def farsight_query(vault_path: Path, query: str, k: int = 5) -> dict:
     binary = farsight_binary()
     if binary is None:
         return {"available": False, "note": "farsight not present"}
-    try:
-        proc = subprocess.run(
-            [binary, "query", query, "--vault", str(vault_path), "--k", str(k), "--json"],
-            capture_output=True, text=True, timeout=QUERY_TIMEOUT, check=True,
-        )
-        results = json.loads(proc.stdout)
-    except subprocess.CalledProcessError as exc:
-        return {"available": True, "note": f"farsight query failed: {(exc.stderr or str(exc)).strip()}"}
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
-        return {"available": True, "note": f"farsight query failed: {exc}"}
+    results, error = _run_json(binary, ["query", query, "--vault", str(vault_path), "--k", str(k)], QUERY_TIMEOUT)
+    if error is not None:
+        return {"available": True, "note": f"farsight query failed: {error}"}
     return {"available": True, "binary": binary, "results": results}
 
 
@@ -196,28 +198,16 @@ def gaiafield_index(vault_path: Path) -> dict | None:
     binary = gaiafield_binary()
     if binary is None:
         return None
-    try:
-        proc = subprocess.run(
-            [binary, "index", "--vault", str(vault_path), "--json"],
-            capture_output=True, text=True, timeout=INDEX_TIMEOUT, check=True,
-        )
-        return json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-        return None
+    data, error = _run_json(binary, ["index", "--vault", str(vault_path)], INDEX_TIMEOUT)
+    return None if error is not None else data
 
 
 def gaiafield_neighbors(vault_path: Path, note: str, depth: int = 1) -> list | None:
     binary = gaiafield_binary()
     if binary is None:
         return None
-    try:
-        proc = subprocess.run(
-            [binary, "neighbors", note, "--vault", str(vault_path), "--depth", str(depth), "--json"],
-            capture_output=True, text=True, timeout=STATS_TIMEOUT, check=True,
-        )
-        return json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-        return None
+    data, error = _run_json(binary, ["neighbors", note, "--vault", str(vault_path), "--depth", str(depth)], STATS_TIMEOUT)
+    return None if error is not None else data
 
 
 def gaiafield_infer(vault_path: Path) -> dict | None:
@@ -227,25 +217,13 @@ def gaiafield_infer(vault_path: Path) -> dict | None:
     binary = gaiafield_binary()
     if binary is None:
         return None
-    try:
-        proc = subprocess.run(
-            [binary, "infer", "--vault", str(vault_path), "--json"],
-            capture_output=True, text=True, timeout=INDEX_TIMEOUT, check=True,
-        )
-        return json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-        return None
+    data, error = _run_json(binary, ["infer", "--vault", str(vault_path)], INDEX_TIMEOUT)
+    return None if error is not None else data
 
 
 def gaiafield_candidates(vault_path: Path, note: str, k: int = 3) -> list | None:
     binary = gaiafield_binary()
     if binary is None:
         return None
-    try:
-        proc = subprocess.run(
-            [binary, "candidates", note, "--vault", str(vault_path), "--k", str(k), "--json"],
-            capture_output=True, text=True, timeout=STATS_TIMEOUT, check=True,
-        )
-        return json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-        return None
+    data, error = _run_json(binary, ["candidates", note, "--vault", str(vault_path), "--k", str(k)], STATS_TIMEOUT)
+    return None if error is not None else data

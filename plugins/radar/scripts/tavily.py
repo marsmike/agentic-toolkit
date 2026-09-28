@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from datetime import UTC, datetime
@@ -71,6 +72,18 @@ def binary() -> str | None:
     return str(fallback) if fallback.is_file() else None
 
 
+_TOKEN_RE = re.compile(r"\b[A-Za-z0-9_-]{20,}\b")
+_URL_QUERY_RE = re.compile(r"(https?://\S+?)\?\S+")
+
+
+def _scrub(text: str) -> str:
+    """Redact anything that looks like a key or a URL's query string before it is stored: a
+    `tvly` failure's stderr/stdout ends up in `sensors/*.json` and the Signal Radar's status,
+    both committed to the vault. [earned: 2026-09-28 week review]"""
+    text = _URL_QUERY_RE.sub(r"\1", text)
+    return _TOKEN_RE.sub("***", text)
+
+
 def _run(args: list[str]) -> dict:
     """The one call out to `tvly` in this module. Evals replace it with a stub."""
     key = secret("TAVILY_API_KEY")
@@ -83,13 +96,13 @@ def _run(args: list[str]) -> dict:
     try:
         proc = subprocess.run([exe, *args, "--json"], capture_output=True, text=True, timeout=TIMEOUT, env=env)
     except (OSError, subprocess.SubprocessError) as e:
-        raise TavilyError(f"tvly failed: {e}") from e
+        raise TavilyError(_scrub(f"tvly failed: {e}")) from e
     if proc.returncode != 0:
-        raise TavilyError((proc.stderr.strip() or proc.stdout.strip() or f"tvly exited {proc.returncode}")[:200])
+        raise TavilyError(_scrub(proc.stderr.strip() or proc.stdout.strip() or f"tvly exited {proc.returncode}")[:200])
     try:
         data = json.loads(proc.stdout)
     except json.JSONDecodeError as e:
-        raise TavilyError(f"tvly returned no JSON: {proc.stdout[:120]!r}") from e
+        raise TavilyError(_scrub(f"tvly returned no JSON: {proc.stdout[:120]!r}")) from e
     if not isinstance(data, dict):
         raise TavilyError("tvly returned an unexpected shape")
     return data
@@ -118,12 +131,14 @@ def search(query: str, ledger: Ledger, *, max_results: int = 10, time_range: str
     if topic:
         args += ["--topic", topic]
     data = _run(args)
-    ledger.record({"at": now.isoformat(), "kind": "search", "query": query, "credits": CREDITS["basic"],
-                   "usd": usd, "balance": None})
     rows = []
     for r in data.get("results") or []:
         url = str(r.get("url") or "")
         if url.startswith(("http://", "https://")):
             rows.append({"url": url, "title": str(r.get("title") or ""), "content": str(r.get("content") or ""),
                          "host": urlparse(url).hostname or ""})
+    # `results` (a call's yield) makes a run of empty searches visible in the ledger itself, not
+    # only in whatever the caller does with an empty list. [earned: 2026-09-28 week review]
+    ledger.record({"at": now.isoformat(), "kind": "search", "query": query, "credits": CREDITS["basic"],
+                   "usd": usd, "balance": None, "results": len(rows)})
     return rows

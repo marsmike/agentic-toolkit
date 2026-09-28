@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 
@@ -81,23 +80,18 @@ def _resolve_demo_vault() -> tuple[Path, str, Path | None]:
 
 
 def _gaiafield_surprise(vault_path: Path, top: int = 3) -> list | None:
-    """Direct shell-out to `gaiafield surprise --json`, vault-wide. Kept local to
-    demo.py rather than added to `knowledge.py` (out of scope for this fix) since this
-    is a demo-only fallback: unlike `knowledge.gaiafield_candidates()`, it doesn't
-    depend on any single note having candidates of its own, which is exactly what step
-    4 needs when the top search hits are fully-linked hubs. Mirrors the shape of
-    `knowledge.py`'s other gaiafield wrappers: `None` on any failure, never raises."""
+    """Direct shell-out to `gaiafield surprise --json`, vault-wide, via `knowledge._run_json`
+    (the one subprocess-probing/JSON-parsing recipe for an engine binary). This is a demo-only
+    fallback: unlike `knowledge.gaiafield_candidates()`, it doesn't depend on any single note
+    having candidates of its own, which is exactly what step 4 needs when the top search hits
+    are fully-linked hubs. Mirrors the shape of `knowledge.py`'s other gaiafield wrappers:
+    `None` on any failure, never raises."""
     binary = knowledge.gaiafield_binary()
     if binary is None:
         return None
-    try:
-        proc = subprocess.run(
-            [binary, "surprise", "--vault", str(vault_path), "--top", str(top), "--json"],
-            capture_output=True, text=True, timeout=knowledge.STATS_TIMEOUT, check=True,
-        )
-        return json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-        return None
+    data, error = knowledge._run_json(binary, ["surprise", "--vault", str(vault_path), "--top", str(top)],
+                                      knowledge.STATS_TIMEOUT)
+    return None if error is not None else data
 
 
 def _collect(vault_path: Path, vault_source: str) -> dict:

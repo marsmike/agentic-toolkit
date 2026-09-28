@@ -5,7 +5,9 @@
                  `via: clip | newsletter | radar` (and `radar_interests`); a feed item, a feed item
                  the radar archived without promoting, and a highlight child are not ingested; a
                  clip whose address a vault note already has is recorded, not captured; one tweet
-                 saved twice (twitter.com and x.com?s=12) in the same run is one capture; only
+                 saved twice (twitter.com and x.com?s=12) in the same run is one capture, but two
+                 saves of a non-Twitter page differing only by `?t=` are two captures — `s`/`t`
+                 are Twitter/X's own share-link params, not tracking params on every host; only
                  01_Capture/ and 00_Memory/ change; nothing in Reader is written; an item saved
                  before the four-week window is neither captured nor recorded, even in Later
 3. gap         — an item whose full text fails: status failed, one DLQ note, the watermark stays
@@ -54,6 +56,8 @@ DOCS = [
     _doc("flaky1", "Full text fails once", "later"),
     _doc("tw1", "A tweet", "new", category="tweet", url="https://twitter.com/someone/status/42"),
     _doc("tw2", "The same tweet saved again", "new", category="tweet", url="https://x.com/someone/status/42?s=12"),
+    _doc("tparam1", "A non-Twitter page with a t param", "new", url="https://example.org/tpage?t=abc"),
+    _doc("tparam2", "The same path, a different t param — not Twitter, must not merge", "new", url="https://example.org/tpage?t=xyz"),
     _doc("old1", "Saved before the window", "later", saved_at="2026-08-20T10:00:00Z"),
 ]
 
@@ -109,8 +113,10 @@ def run(vault: Path) -> dict:
             fm, _ = read_frontmatter(p)
             if fm.get("readwise_doc_id") in {d["id"] for d in DOCS}:
                 caps[str(fm["readwise_doc_id"])] = fm
-        if sorted(caps) != ["clip1", "fwd1", "news1", "radar1", "tw1"]:
-            problems.append(f"phase 2: expected captures for clip1, fwd1, news1, radar1, tw1 (tw2 is the same tweet), got {sorted(caps)}")
+        if sorted(caps) != ["clip1", "fwd1", "news1", "radar1", "tparam1", "tparam2", "tw1"]:
+            problems.append(f"phase 2: expected captures for clip1, fwd1, news1, radar1, tparam1, tparam2, tw1 "
+                            f"(tw2 is the same tweet; tparam1/tparam2 differ only by ?t= and must NOT merge — "
+                            f"that's a Twitter/X-only rule), got {sorted(caps)}")
         if caps.get("clip1", {}).get("via") != "clip" or caps.get("news1", {}).get("via") != "newsletter" \
                 or caps.get("fwd1", {}).get("via") != "clip":
             problems.append("phase 2: a clip, a Readwise newsletter (newsletter) and a forwarded email (clip) must say so in `via`")

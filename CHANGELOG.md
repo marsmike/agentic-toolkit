@@ -4,6 +4,27 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Fixes from the review of the week's 88 commits (obsidian 3.1.1, radar 3.2.1, readwise 3.0.1,
+  gaiafield 0.2.5).**
+  - gaiafield: `infer` writes in one transaction like `index`, so parallel distill workers can no
+    longer duplicate or wipe each other's inferred edges; both scan the vault and encode before
+    taking the write lock, which now covers only the database diff (tested with 12 indexers).
+  - The secret scan catches `DB_PASSWORD=`, `userPassword:`, unquoted passwords and credentials
+    inside URLs, and still lets placeholders (`<pw>`, `${VAR}`, `***`) through. A second refused
+    commit on the same day no longer re-finds an older DLQ note.
+  - radar: a truncated ledger line, a read timeout from Reader or Kagi, or a non-numeric profile
+    value no longer crashes a run; a failed promotion is retried from `promote_retry.jsonl` even
+    after it leaves the `--since` window and archived after three failures; the Signal Radar's
+    Reddit fallback writes its own ledger and records each call's yield; the name check asks
+    Tavily's news topic first; `gaps-<week>.json`, replay and discover write atomically.
+  - `fetch_source.py` keeps a Tavily ledger (`00_Memory/tavily-extract-ledger.jsonl`) under the
+    weekly budget, and retries an empty extraction once at advanced depth.
+  - readwise: a short highlight counts as captured only in its own document's notes (a vault-wide
+    match needs ≥ 80 characters or 12 words); `?s=`/`?t=` are stripped only on X/Twitter links.
+  - `unisphere`: `vault init` and `link` answer filesystem errors with the JSON error shape; a
+    toolkit checkout behind its upstream makes `status` unhealthy. DLQ notes are dated in UTC.
+  [earned: 2026-09-28 week review]
+
 - **The Tavily CLI is the one way to Tavily (radar 3.2.0, obsidian 3.1.0).** Every use goes through
   `tvly` (tavily-cli, pinned 0.1.8), locally and in the cloud routines, with the key read by the
   script and handed to `tvly` alone:

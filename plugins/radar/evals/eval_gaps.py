@@ -11,7 +11,10 @@
                 (3b: the budget is `promote_per_day` from the profile/env, shared with scan's)
 4. digest     — the week's digest has a "Found outside your feeds" section
 5. kagi       — `kagi answer` returns FastGPT's output and references, recorded in the ledger;
-                over the weekly budget nothing is sent
+                over the weekly budget nothing is sent (5b: a non-numeric kagi_weekly_budget_usd
+                falls back to the default instead of crashing); a truncated ledger line (5c) or a
+                bare urlopen timeout (5d, the genuine `kagi._request`) must not crash reading or
+                calling Kagi; a truncated gaps-<week>.json (5e) is recomputed, not read as done
 """
 from __future__ import annotations
 
@@ -166,6 +169,54 @@ def run(vault: Path) -> dict:
         r = radar.kagi_cmd(sandbox, out, "search", "anything")
         if r.get("status") != "over-budget" or len(kagi_calls) != n:
             problems.append(f"phase 5: over the budget nothing may be sent, got {r.get('status')}")
+
+        # 5b. a non-numeric kagi_weekly_budget_usd (profile or env) falls back to the default
+        # instead of crashing the kagi skill
+        os.environ["TOOLKIT_RADAR_KAGI_WEEKLY_BUDGET_USD"] = "not-a-number"
+        r = radar.kagi_cmd(sandbox, out, "search", "anything")
+        if r.get("status") != "ok":
+            problems.append(f"phase 5b: a non-numeric kagi_weekly_budget_usd must fall back to the default, got {r}")
+        os.environ.pop("TOOLKIT_RADAR_KAGI_WEEKLY_BUDGET_USD", None)
+
+        # 5c. a truncated line in the kagi ledger (killed mid-append) must not crash reading it —
+        # both Tavily ledgers reuse this class, so this covers them too
+        (out / "kagi-ledger.jsonl").write_text(
+            json.dumps({"at": NOW.isoformat(), "kind": "search", "query": "x", "usd": 0.025, "balance": 9.9}) + "\n"
+            + '{"at": "2026-09-2', encoding="utf-8")  # no closing brace: unparseable
+        rows = kagi.ledger(out, 1.0).rows()
+        if len(rows) != 1 or rows[0]["query"] != "x":
+            problems.append(f"phase 5c: a truncated kagi ledger line must be skipped, not crash reading it, got {rows}")
+
+        # 5d. a bare timeout from the stdlib client becomes kagi.KagiError, not a crash (the
+        # genuine `_request`, captured in `real` before it was replaced by `kagi_stub` above)
+        import urllib.request as _urllib_request
+        real_kagi_request = real[2]
+        real_urlopen = _urllib_request.urlopen
+
+        def _timeout_urlopen(*a, **k):
+            raise TimeoutError("timed out")
+        _urllib_request.urlopen = _timeout_urlopen
+        try:
+            try:
+                real_kagi_request(f"{kagi.BASE}/search?q=x")
+                problems.append("phase 5d: a bare TimeoutError from urlopen must not pass through silently")
+            except kagi.KagiError:
+                pass
+            except TimeoutError:
+                problems.append("phase 5d: a bare TimeoutError must be converted to kagi.KagiError")
+        finally:
+            _urllib_request.urlopen = real_urlopen
+
+        # 5e. an unparseable gaps-<week>.json (truncated write) is treated as absent — this week
+        # is recomputed rather than left permanently missing its "Found outside your feeds" section
+        week = reports.week_of(NOW.date().isoformat())
+        (out / f"gaps-{week}.json").write_text('{"week": "2026-W', encoding="utf-8")  # truncated
+        n = len(kagi_calls)
+        r = gaps.gaps(sandbox, out, NOW)
+        if r.get("status") != "ok" or len(kagi_calls) == n:
+            problems.append(f"phase 5e: a truncated gaps-{week}.json must be recomputed, not read as done, got {r}")
+        if not json.loads((out / f"gaps-{week}.json").read_text(encoding="utf-8")).get("rows"):
+            problems.append("phase 5e: the recomputed gaps file must actually be rewritten")
     finally:
         judge._post, reader._request, kagi._request, policy.PROMOTE_PER_DAY = real
         for k, v in saved_env.items():

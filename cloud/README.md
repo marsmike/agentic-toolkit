@@ -71,8 +71,8 @@ the other at commit time, which is conflict-free only while no file has two writ
 
 | Files in `00_Memory/radar/` | Written by |
 |---|---|
-| `state.jsonl`, `seen.jsonl`, `promoted.jsonl`, `todoist.jsonl`, `YYYY-MM-DD.md`, `weekly.jsonl`, `gaps-*.json`, `feeds-discovered-*`, `kagi-ledger.jsonl` | pipeline (scan, gaps, weekly; discover and scout by hand) |
-| `sensors/`, `signal.json`, `Signal-Radar.html`, `Signal-Radar.md`, `signal-kagi.jsonl`, `kagi-ledger-signal.jsonl` | Signal Radar |
+| `state.jsonl`, `seen.jsonl`, `promoted.jsonl`, `promote_retry.jsonl`, `todoist.jsonl`, `YYYY-MM-DD.md`, `weekly.jsonl`, `gaps-*.json`, `feeds-discovered-*`, `kagi-ledger.jsonl` | pipeline (scan, gaps, weekly; discover and scout by hand) |
+| `sensors/`, `signal.json`, `Signal-Radar.html`, `Signal-Radar.md`, `signal-kagi.jsonl`, `kagi-ledger-signal.jsonl`, `signal-tavily.jsonl`, `tavily-ledger-signal.jsonl` | Signal Radar |
 
 The Kagi budget is one weekly budget over both ledger files. DLQ notes are new files with
 per-day, per-kind names, so both may add them. The Signal Radar reads the pipeline's `state.jsonl`
@@ -131,7 +131,10 @@ pipeline routine, so `uv` and the git credential are there; no keys are needed.
   `mshibanami.github.io` for the GitHub Trending feed it falls back to), `hn.algolia.com`,
   `news.kagi.com` (Kagi News, no key), `www.reddit.com`/`old.reddit.com` (often refused
   from cloud addresses: the source then reports `blocked`), the hosts of the radar's `sensor_feeds`,
-  PyPI and npm. If the environment's network
+  PyPI and npm. `plugins/readwise/scripts/tweet_enrich.py` also follows `t.co` redirects during
+  ingest and fetches whatever host each one resolves to — unknown ahead of time, so a restricted
+  network mode cannot allowlist it; this is why `routines.json` sets `network: full` for the
+  environment rather than a host list. If the environment's network
   level is restricted, allow those hosts or use full access; otherwise each source just prints
   `SKIPPED`.
 - **Connectors:** Todoist, only as the fallback when `td` is missing.

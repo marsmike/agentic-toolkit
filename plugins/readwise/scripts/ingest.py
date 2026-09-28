@@ -47,9 +47,26 @@ WINDOW_DAYS = 28  # the owner's scope: the last four weeks [earned: 2026-09-24, 
 GET_DELAY_S = 3.1  # Reader's list endpoint (which reader_get uses) allows 20 requests a minute
 MAX_429_RETRIES = 4
 RETRY_429_S = 15.0
-TRACKING = re.compile(r"^(utm_|ref$|ref_src$|s$|t$|si$|fbclid$|gclid$|mc_)")
+TRACKING = re.compile(r"^(utm_|ref$|ref_src$|si$|fbclid$|gclid$|mc_)")
+# `s`/`t` are Twitter/X's own share-link params (…?s=12, …?t=…): stripped only on x.com, since on
+# any other host either could be a real query parameter (a search term, a page token) and treating
+# it as tracking would wrongly merge two different pages. [earned: 2026-09-28 — TRACKING dropped a
+# bare `s`/`t` on every host, not just the one it was written for]
+TRACKING_X = re.compile(r"^(utm_|ref$|ref_src$|si$|fbclid$|gclid$|mc_|s$|t$)")
 DEFAULT_NEWSLETTER_SENDERS = ("Readwise",)  # emails from these may be dropped by distill; all others are clips
 NOT_CONTENT = {".obsidian", ".trash", ".git", ".smart-env", "00_Memory"}
+# A highlight this long/specific is implausible to appear by coincidence anywhere else in the
+# vault, so it's safe to treat a vault-wide match as "already captured". Anything shorter is
+# matched only within notes/captures tied to the highlight's own document (source URL or Reader
+# doc id) — a short, generic highlight ("Check this again") can turn up verbatim in an unrelated
+# note. [earned: 2026-09-28 week review — a vault-wide match alone would drop such a highlight
+# silently and for good as "already captured"]
+DISTINCTIVE_CHARS = 80
+DISTINCTIVE_WORDS = 12
+
+
+def _distinctive(text: str) -> bool:
+    return len(text) >= DISTINCTIVE_CHARS or len(text.split()) >= DISTINCTIVE_WORDS
 
 
 def norm_url(url: str) -> str:
@@ -57,8 +74,9 @@ def norm_url(url: str) -> str:
     if not url or not url.startswith("http"):
         return ""
     s = urlsplit(url.strip())
-    query = urlencode([(k, v) for k, v in parse_qsl(s.query) if not TRACKING.match(k)])
     host = s.netloc.lower().removeprefix("www.").replace("mobile.twitter.com", "x.com").replace("twitter.com", "x.com")
+    tracking = TRACKING_X if host == "x.com" else TRACKING
+    query = urlencode([(k, v) for k, v in parse_qsl(s.query) if not tracking.match(k)])
     return urlunsplit(("", host, s.path.rstrip("/"), query, "")).lstrip("/")
 
 
@@ -223,17 +241,46 @@ def ingest_highlights(vault: Path, items: list[dict], ledger: dict[str, dict], i
     kids = [k for k in kids if str(k["id"]) not in held]
     if not kids:
         return healed, {"highlights": 0, "recovered": len(healed)}
-    corpus = " ".join(_norm_text(p.read_text(encoding="utf-8", errors="replace"))
-                      for p in contained(vault.rglob("*.md"), vault) if p.is_file() and "/.obsidian/" not in p.as_posix())
+    # corpus: every note's text, for a distinctive highlight (long/specific enough that a
+    # coincidental match elsewhere is implausible). own_doc: the same notes' text, keyed by
+    # whatever ties them to one Reader document (`readwise_doc_id`, `readwise_parent_id`, or a
+    # normalised `source` URL) — for a short, generic highlight, only a match within its own
+    # document's notes counts as "already captured".
+    corpus_parts: list[str] = []
+    own_doc: dict[str, str] = {}
+    for p in contained(vault.rglob("*.md"), vault):
+        if not p.is_file() or "/.obsidian/" in p.as_posix():
+            continue
+        text = _norm_text(p.read_text(encoding="utf-8", errors="replace"))
+        corpus_parts.append(text)
+        try:
+            fm, _ = read_frontmatter(p)
+        except Exception:  # an unreadable note must not stop ingest; vault_yaml_repair reports it
+            continue
+        keys = {str(fm[k]) for k in ("readwise_doc_id", "readwise_parent_id") if fm.get(k)}
+        src = fm.get("source")
+        for u in (src if isinstance(src, list) else [src]):
+            if isinstance(u, str) and (n := norm_url(u)):
+                keys.add(f"url:{n}")
+        for key in keys:
+            own_doc[key] = f"{own_doc.get(key, '')} {text}"
+    corpus = " ".join(corpus_parts)
     rows = list(healed)
     todo: dict[str, list[dict]] = {}
     for k in kids:
         # The whole highlight must be there, not a prefix. [Copilot review of PR #38]
         text = _norm_text(k.get("content") or k.get("notes") or "")
-        if text and text in corpus:
-            rows.append({"doc_id": str(k["id"]), "highlight_of": str(k["parent_id"]), "found": "text in the vault", "date": today})
+        parent_id = str(k["parent_id"])
+        own_text = own_doc.get(parent_id, "")
+        parent_meta = listed.get(parent_id)
+        if parent_meta:
+            addr = norm_url(str(parent_meta.get("source_url") or parent_meta.get("url") or ""))
+            if addr:
+                own_text = f"{own_text} {own_doc.get(f'url:{addr}', '')}"
+        if text and (text in own_text or (_distinctive(text) and text in corpus)):
+            rows.append({"doc_id": str(k["id"]), "highlight_of": parent_id, "found": "text in the vault", "date": today})
         else:
-            todo.setdefault(str(k["parent_id"]), []).append(k)
+            todo.setdefault(parent_id, []).append(k)
     summary = {"highlights": len(kids), "already_in_vault": len(rows) - len(healed), "recovered": len(healed),
                "captures": 0, "parent_failed": 0}
     if dry_run:

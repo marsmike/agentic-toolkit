@@ -17,8 +17,11 @@ policy, appends one row per item to `00_Memory/radar/state.jsonl`, renders that 
 recorded as seen (judged, repost or back catalogue) in Reader: with `--promote`, a strong one moves
 to Later (profile `promote_location`) tagged `radar` and `radar/<interest>`, with a note when it
 has none; every other one is archived (`--keep-in-feed` skips archiving). An item that could not
-be judged, or whose promotion failed, stays in the feed for the next scan. Nothing is deleted; no
-active content is written. With `--todoist`, each Portfolio epic (an interest from Todoist) that
+be judged stays in the feed for the next scan. A failed promotion also stays in the feed and is
+retried on every scan from `promote_retry.jsonl` regardless of `--since` (an item outside the
+window would otherwise never be fetched again), up to MAX_PROMOTE_RETRIES times, after which it
+is archived like any other settled item. Nothing is deleted; no active content is written besides
+that retry file. With `--todoist`, each Portfolio epic (an interest from Todoist) that
 got a strong item this run gets one dated comment listing them, at most one per epic and day;
 never a new task, never a completed one. Without a key it prints SKIPPED and sends nothing; a backend that
 answers nothing at all is recorded once in the dead-letter queue.
@@ -81,14 +84,17 @@ NOT_CONTENT = {"00_Memory", ".obsidian", ".trash", ".smart-env", "Templates", "C
 
 
 def parse_since(text: str, now: datetime) -> datetime:
-    """`1d`, `36h`, `30d`, or a date `YYYY-MM-DD` (midnight UTC)."""
+    """`1d`, `36h`, `30d`, or a date `YYYY-MM-DD` (midnight UTC unless it names its own offset)."""
     if m := re.fullmatch(r"(\d+)([dh])", text.strip()):
         n = int(m.group(1))
         return now - (timedelta(days=n) if m.group(2) == "d" else timedelta(hours=n))
     try:
-        return datetime.fromisoformat(text.strip()).replace(tzinfo=UTC)
+        parsed = datetime.fromisoformat(text.strip())
     except ValueError:
         raise SystemExit(f"--since: expected like 1d, 36h or YYYY-MM-DD, got {text!r}") from None
+    # An offset the caller wrote (`2026-09-01T00:00:00-05:00`) must not be silently discarded by
+    # forcing UTC onto it; only a naive stamp defaults to UTC. [earned: 2026-09-28 week review]
+    return parsed.astimezone(UTC) if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def item_key(item: Item) -> str:
@@ -121,6 +127,16 @@ def is_backlog(item: Item, since: datetime) -> bool:
     except ValueError:
         return False
     return published < since - timedelta(days=policy.BACKLOG_GRACE_DAYS)
+
+
+def profile_number(vault: Path, key: str, default: float, cast: type = float) -> Any:
+    """A numeric profile value (a budget, a daily cap): the shipped default when the profile note
+    or an env override does not parse as `cast`, rather than crashing the command that reads it.
+    [earned: 2026-09-28, week review — a non-numeric promote_per_day crashed scan]"""
+    try:
+        return cast(profile_value(vault, key, default))
+    except (TypeError, ValueError):
+        return default
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -328,6 +344,29 @@ def _apply(updates: list[dict], done_key: str) -> dict[str, Any]:
     return {done_key: len(done), **({f"{stem}_failed": len(failed)} if failed else {})}
 
 
+RETRY_FILE = "promote_retry.jsonl"
+MAX_PROMOTE_RETRIES = 3  # after this many failed promotions of the same item, give up and archive
+
+
+def _pending_retries(out: Path, promoted_keys: set[str]) -> dict[str, dict]:
+    """canonical -> the last failed attempt's row, plus `attempts` (its count so far), for every
+    canonical `promote_retry.jsonl` has a failed row for that is neither promoted since (already
+    in `promoted_keys`) nor given up on. Read fresh every call: append-only, no other state."""
+    attempts: dict[str, int] = {}
+    last: dict[str, dict] = {}
+    given_up: set[str] = set()
+    for r in read_jsonl(out / RETRY_FILE):
+        c = r.get("canonical")
+        if not c:
+            continue
+        if r.get("given_up"):
+            given_up.add(c)
+            continue
+        attempts[c] = attempts.get(c, 0) + 1
+        last[c] = r
+    return {c: {**r, "attempts": attempts[c]} for c, r in last.items() if c not in promoted_keys and c not in given_up}
+
+
 def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], names: dict[str, str],
            run_date: str, archive: bool, promote: bool, location: str, out: Path | None = None,
            per_day: int | None = None) -> dict[str, Any]:
@@ -335,14 +374,19 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
     original) out of the feed. With `promote`, the strongest not yet promoted, up to
     `promote_per_day` (profile; default PROMOTE_PER_DAY) a day counted in `promoted.jsonl`, go to `location`; a promoted item
     becomes a capture and a note, so the bar is deliberate. Every other recorded item is
-    archived (the daily note still lists it). A failed promotion is neither recorded nor
-    archived: it stays in the feed and competes again next scan. A Reader failure here never
-    fails the scan."""
+    archived (the daily note still lists it).
+
+    A failed promotion is not archived, but it is also not left to rot: once an item is older
+    than `--since` it would never be fetched again, so `promote_retry.jsonl` (`out`) remembers it
+    and it is retried on every scan regardless of the window, up to MAX_PROMOTE_RETRIES times,
+    after which it is archived like any other settled item (the daily note still lists it).
+    [earned: 2026-09-28, week review — a promotion that failed once and then aged out of the
+    window was never promoted or archived again]. A Reader failure here never fails the scan."""
     strong: dict[str, dict[str, float]] = {}
     ledger = (out / "promoted.jsonl") if out else None
     done_before = read_jsonl(ledger) if ledger else []
+    promoted_keys = {r["canonical"] for r in done_before}
     if promote:
-        promoted_keys = {r["canonical"] for r in done_before}
         for r in state_rows:
             s = reports.bands(r)[1]
             if s and r["canonical"] not in promoted_keys:
@@ -353,7 +397,16 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
     if per_day is None:
         per_day = policy.PROMOTE_PER_DAY
     budget = max(0, per_day - sum(1 for r in done_before if r.get("date") == run_date))
-    settled = [it for it in fetched if keys_of(it) & recorded]
+
+    pending = _pending_retries(out, promoted_keys) if promote and out is not None else {}
+    fetched_keys = {k for it in fetched for k in keys_of(it)}
+    retry_items = [Item(id=r["id"], url=r.get("url", ""), canonical=c, title=r.get("title", ""), summary="",
+                        site=r.get("feed", ""), feed=r.get("feed", ""), published="", category="", saved_at="")
+                   for c, r in pending.items() if c not in fetched_keys]
+    all_fetched = fetched + retry_items
+    recorded = recorded | {it.canonical for it in retry_items}
+
+    settled = [it for it in all_fetched if keys_of(it) & recorded]
     candidates = sorted((it for it in settled if item_key(it) in strong), key=lambda it: -max(strong[item_key(it)].values()))
     since = (date.fromisoformat(run_date) - timedelta(days=policy.RELEASE_STREAM_DAYS)).isoformat()
     streams = {release_stream(r["canonical"]) for r in done_before if str(r.get("date", "")) > since} - {None}
@@ -382,9 +435,24 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
         try:
             done, failed = reader.bulk_update(promotions)
         except reader.ReaderError as e:
-            done, failed = [], []
+            done, failed = [], [u["id"] for u in promotions]
             result["promote_error"] = str(e)[:200]
         by_id = {it.id: it for it in settled}
+        if failed and out is not None:
+            retry_rows, gave_up_ids = [], []
+            for fid in failed:
+                it = by_id[fid]
+                c = item_key(it)
+                n = pending.get(c, {}).get("attempts", 0) + 1
+                if n >= MAX_PROMOTE_RETRIES:
+                    retry_rows.append({"canonical": c, "id": fid, "date": run_date, "given_up": True})
+                    gave_up_ids.append(fid)
+                else:
+                    retry_rows.append({"canonical": c, "id": fid, "url": it.url, "title": it.title,
+                                       "feed": it.feed, "date": run_date})
+            append_jsonl(out / RETRY_FILE, retry_rows)
+            if archive and gave_up_ids:
+                archive_ids += [{"id": i, "location": "archive"} for i in gave_up_ids]
         if ledger and done:
             append_jsonl(ledger, [{"canonical": item_key(by_id[i]), "id": i, "date": run_date} for i in done])
         result["promoted"] = len(done)
@@ -469,7 +537,7 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
         names = {i.id: i.name for i in interests}
         location = str(profile_value(vault, "promote_location", DEFAULT_PROMOTE_LOCATION))
         return settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote, location, out,
-                      per_day=int(profile_value(vault, "promote_per_day", policy.PROMOTE_PER_DAY)))
+                      per_day=profile_number(vault, "promote_per_day", policy.PROMOTE_PER_DAY, cast=int))
     append_jsonl(out / "seen.jsonl", [{"canonical": item_key(it), "title_key": title_key(it),
                                         "first_seen": run_date, "backlog": True} for it in backlog])
     result: dict[str, Any] = {"since": since.isoformat(), "fetched": len(fetched), "new": len(items),
@@ -517,21 +585,23 @@ def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, fo
         return {"status": "ok", "feeds": reports.feeds(rows, now)}
     if cmd == "trend":
         wk = week or reports.week_of(now.date().isoformat())
-        wk_clips = clips_mod.load(vault, reports.clip_window_start(wk))
+        wk_clips, clips_skipped = clips_mod.load(vault, reports.clip_window_start(wk))
         return {"status": "ok", "week": wk, "interests": reports.trend(rows, wk),
-                "terms": reports.emerging_terms(rows, wk, wk_clips)}
+                "terms": reports.emerging_terms(rows, wk, wk_clips),
+                **({"clips_skipped": clips_skipped} if clips_skipped else {})}
     wk = week or reports.last_complete_week(now.date())
     if not any(reports.week_of(reports.arrived(r)) == wk for r in rows):
         # A week the radar did not scan has no digest; writing one would hand distill an empty
         # capture. [earned: 2026-09-23, first live week: the last complete week predates the radar]
         return {"status": "empty", "week": wk, "detail": f"no scans in {wk}; nothing to digest"}
-    wk_clips = clips_mod.load(vault, reports.clip_window_start(wk))
+    wk_clips, clips_skipped = clips_mod.load(vault, reports.clip_window_start(wk))
     text = reports.render_weekly(wk, rows, interests_mod.load(vault), now, gaps=gaps_mod.load_week(out, wk), clips=wk_clips)
     try:
         path = reports.write_weekly(vault, wk, text, force, out / "weekly.jsonl")
     except FileExistsError as e:
         return {"status": "exists", "detail": str(e)}
-    return {"status": "ok", "week": wk, "capture": path.relative_to(vault).as_posix()}
+    return {"status": "ok", "week": wk, "capture": path.relative_to(vault).as_posix(),
+            **({"clips_skipped": clips_skipped} if clips_skipped else {})}
 
 
 def sensors_cmd(vault: Path, out: Path, now: datetime, only: list[str] | None) -> dict[str, Any]:
@@ -554,8 +624,7 @@ def sensors_cmd(vault: Path, out: Path, now: datetime, only: list[str] | None) -
 
 def kagi_cmd(vault: Path, out: Path, mode: str, text: str) -> dict[str, Any]:
     """The kagi skill's entry point: one call, under the same ledger and weekly budget as discovery."""
-    ledger = kagi.ledger(out,
-                         float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
+    ledger = kagi.ledger(out, profile_number(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD))
     call = {"search": kagi.search, "news": kagi.news, "answer": kagi.fastgpt, "summarize": kagi.summarize}[mode]
     try:
         answer = call(text, ledger)

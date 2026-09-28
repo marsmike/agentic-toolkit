@@ -17,14 +17,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import imports_log
 import radar_ledger
-from vault_utils import contained, read_frontmatter, require_vault
+from vault_utils import contained, git_output, read_frontmatter, require_vault
 
 LOCK = Path("00_Memory") / "pipeline.lock"
 STATE = Path("00_Memory") / "pipeline-state.json"
@@ -42,15 +41,10 @@ DIGEST_WEEKDAY, DIGEST_HOUR, DIGEST_MINUTE = 6, 20, 50  # Sunday, the 20:58 UTC 
 FAIL_WORDS = ("failed", "build failed", "git-ignored", "missing", "not attempted", "refused")
 
 
-def _git(vault: Path, *args: str) -> str:
-    run = subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, errors="replace", check=False)
-    return run.stdout if run.returncode == 0 else ""
-
-
 def last_pipeline_commit(vault: Path, grep: str = "^pipeline") -> tuple[datetime | None, str]:
     """(commit time, subject) of the newest commit whose subject matches `grep` (`pipeline …` by
     default), or (None, "")."""
-    out = _git(vault, "log", "-1", f"--grep={grep}", "--format=%cI%x09%s").strip()
+    out = git_output(vault, "log", "-1", f"--grep={grep}", "--format=%cI%x09%s").strip()
     if not out:
         return None, ""
     when, _, subject = out.partition("\t")
@@ -150,7 +144,7 @@ def week_stats(vault: Path, now: datetime) -> dict:
     owner's request — "the monitoring job can collect stats too"]"""
     first_day = now.date() - timedelta(days=STATS_DAYS - 1)  # today and the six dates before it, for every source
     since = datetime.combine(first_day, datetime.min.time(), tzinfo=UTC)
-    log = _git(vault, "log", f"--since={since.isoformat()}", "--grep=^pipeline", "--format=%s")
+    log = git_output(vault, "log", f"--since={since.isoformat()}", "--grep=^pipeline", "--format=%s")
     runs = [s for s in log.splitlines() if s.strip()]
     distilled = sum(_counts(s).get("distilled", 0) for s in runs)
     failed = sum(_counts(s).get("failed", 0) for s in runs)

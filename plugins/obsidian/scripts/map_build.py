@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
-from vault_utils import atomic_write, discover_notes, read_frontmatter, require_vault
+from vault_utils import atomic_write, discover_notes, one_line, read_frontmatter, require_vault
 
 MAPS = "Maps"
 CONFIG = Path("Config") / "toolkit" / "maps.md"
@@ -69,11 +69,6 @@ class MapConfig:
     intro: str = ""
     sections: list[tuple[str, list[str]]] = field(default_factory=list)
     start: list[str] = field(default_factory=list)
-
-
-def _one_line(text: object, limit: int = MAX_DESC) -> str:
-    text = re.sub(r"\s+", " ", str(text or "")).strip()
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
 def _date(value: object) -> str:
@@ -144,7 +139,7 @@ def collect(vault: Path) -> list[Note]:
         notes.append(Note(
             rel=path.relative_to(vault).with_suffix("").as_posix(), name=path.stem,
             kind=str(kind).strip().casefold() if isinstance(kind, str) and kind.strip() else "",
-            description=_one_line(fm.get("description")), domains=domains,
+            description=one_line(fm.get("description"), MAX_DESC), domains=domains,
             when=_when(fm),
             links={t.strip() for t in WIKILINK.findall(body)},
         ))

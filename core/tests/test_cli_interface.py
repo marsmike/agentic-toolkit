@@ -4,12 +4,17 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 
 import pytest
 from conftest import EXAMPLE_VAULT, REPO_ROOT
 from toolkit_core import cli, knowledge, status, ui, vault
 from toolkit_core import link as linker
+
+requires_non_root = pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0, reason="root bypasses permission bits, so nothing is unwritable"
+)
 
 
 def run(capsys, *argv: str) -> tuple[int, str]:
@@ -238,6 +243,39 @@ def test_shim_quotes_paths(tmp_path):
     assert out == str(odd) and not marker.exists()
 
 
+@requires_non_root
+def test_link_oserror_is_json_not_a_traceback(tmp_path, monkeypatch, repo_root, capsys):
+    """cmd_link called linker.link() with no try/except: an OSError (an unwritable --bin-dir) rose
+    all the way out as a raw traceback instead of the documented {ok: false, error} JSON, which
+    breaks --json callers. [earned: 2026-09-28]"""
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(linker, "OBSIDIAN_APP_CLI", tmp_path / "no-obsidian")
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o500)  # read + execute, no write: bin_dir.mkdir() under it must fail
+    try:
+        code, data = run_json(capsys, "link", "--bin-dir", str(locked / "bin"))
+    finally:
+        locked.chmod(0o700)
+    assert code == 1 and data == {"ok": False, "error": data.get("error")} and data["error"]
+
+
+@requires_non_root
+def test_vault_init_oserror_is_json_not_a_traceback(tmp_path, monkeypatch, repo_root, capsys):
+    """cmd_vault_init only caught vault.VaultInitError: an OSError from scaffold_vault's own
+    mkdir/write_text (an unwritable target) rose as a raw traceback instead of {ok: false, error}.
+    [earned: 2026-09-28]"""
+    monkeypatch.chdir(repo_root)
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o500)
+    try:
+        code, data = run_json(capsys, "vault", "init", str(locked / "new-vault"))
+    finally:
+        locked.chmod(0o700)
+    assert code == 1 and data == {"ok": False, "error": data.get("error")} and data["error"]
+
+
 # --- review regressions (PR #71) ----------------------------------------------------------------
 
 
@@ -254,6 +292,21 @@ def test_unknown_latest_release_is_a_problem_unless_offline(monkeypatch):
     online = status._problems({**base, "engines": {"engines": rows, "checked_latest": True}})
     assert online and "latest release unknown" in online[0]["detail"]
     assert not status._problems({**base, "engines": {"engines": rows, "checked_latest": False}})
+
+
+def test_toolkit_checkout_behind_is_a_problem_uncommitted_is_not():
+    """The vault's own checkout only flags `behind` as unhealthy (uncommitted is display-only in
+    `_render_status`'s CHECKOUT section) — the toolkit checkout, a dev checkout, follows the same
+    rule: behind its upstream is a problem, uncommitted local work is not. [earned: 2026-09-28 —
+    `_problems()` never read `result["toolkit"]`, so a behind toolkit checkout never made
+    `unisphere status` unhealthy even though it printed `CHECKOUT !`]"""
+    base = {"engines": {"engines": [], "checked_latest": False}, "plugins": {"plugins": []},
+            "vault": {"found": True, "dlq": {}, "checkout": {}}, "pipeline": {}}
+    behind = status._problems({**base, "toolkit": {"found": True, "behind": 2, "uncommitted": 0}})
+    assert behind and behind[0]["section"] == "toolkit" and "2 commit(s) behind" in behind[0]["detail"]
+    assert not status._problems({**base, "toolkit": {"found": True, "behind": 0, "uncommitted": 3}})
+    assert not status._problems({**base, "toolkit": {"found": False}})
+    assert not status._problems(base)  # no "toolkit" key at all — must not raise
 
 
 def test_unreadable_dlq_entry_counts_as_open(tmp_path):

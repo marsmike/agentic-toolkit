@@ -171,6 +171,24 @@ def run(vault: Path) -> dict:
             problems.append("phase 3: a week already written must not be written again after distill retired it")
         except FileExistsError:
             pass
+
+        # 3b. a truncated line in weekly.jsonl (killed mid-append) must not crash the once-a-week
+        # check: it is skipped, not mistaken for this week's row
+        with written.open("a", encoding="utf-8") as f:
+            f.write('{"week": "2026-W41", "capture": "trunc\n')  # no closing brace: unparseable
+        try:
+            reports.write_weekly(sandbox, week, text, written=written)
+            problems.append("phase 3b: a truncated ledger line must not hide the real 'already written' row")
+        except FileExistsError:
+            pass
+        try:
+            reports.write_weekly(sandbox, "2026-W42", text, written=written)
+        except json.JSONDecodeError:
+            problems.append("phase 3b: a truncated weekly.jsonl line must not crash write_weekly for another week")
+        except FileExistsError:
+            problems.append("phase 3b: a truncated line naming no real week must not read as 'already written'")
+        (sandbox / "01_Capture" / "Radar-Week-2026-W42.md").unlink()  # clean up the probe write above
+
         reports.write_weekly(sandbox, week, text + "\n", force=True, written=written)
         changed = {p for p in snapshot(sandbox).keys() ^ before.keys()} | {
             p for p in before if snapshot(sandbox).get(p) != before[p]}

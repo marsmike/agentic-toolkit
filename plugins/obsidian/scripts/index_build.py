@@ -39,6 +39,7 @@ from vault_utils import (
     atomic_write,
     contained,
     git_ignored,
+    one_line,
     parse_existing_index,
     read_frontmatter,
     require_vault,
@@ -50,15 +51,10 @@ ROOT = "Vault root"  # heading for root-level `status: active` notes (contract/V
 SKIP_LINE = re.compile(r"^\s*(#|>|\||!\[|```|---|\*Source:|\*\*Source|<)")
 
 
-def _one_line(text: str) -> str:
-    text = re.sub(r"\s+", " ", str(text)).strip()
-    return text if len(text) <= MAX_SUMMARY else text[: MAX_SUMMARY - 1].rstrip() + "…"
-
-
 def _first_prose_line(body: str) -> str:
     for line in body.splitlines():
         if line.strip() and not SKIP_LINE.match(line):
-            return _one_line(re.sub(r"\[\[([^\]|]+\|)?([^\]]+)\]\]", r"\2", line.strip("-* ")))
+            return one_line(re.sub(r"\[\[([^\]|]+\|)?([^\]]+)\]\]", r"\2", line.strip("-* ")), MAX_SUMMARY)
     return ""
 
 
@@ -98,7 +94,7 @@ def build(vault: Path) -> tuple[str, dict]:
         markers = "".join(m for m in prev_markers if m in (CHECK_MARK, WARNING))
         desc = fm.get("description")
         if isinstance(desc, str) and desc.strip():
-            summary = _one_line(desc)
+            summary = one_line(desc, MAX_SUMMARY)
             stats["from_description"] += 1
         else:
             markers = COG + markers

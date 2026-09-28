@@ -8,16 +8,21 @@
               captures left in the inbox and not reported failed are named as not attempted
 3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted;
               `--failed ""` or a path no longer in 01_Capture/ counts no failure
-4. secrets  — (4b: password assignments in three syntaxes are found, placeholders are not;
-               4c: an image a capture names that git ignores or that is gone gets a DLQ note and a summary count) a staged note holding a key-shaped string makes `end` refuse the commit and write one DLQ
-              note that names the file, never the key; the next clean run commits
+4. secrets  — (4b: password assignments — quoted, bare, underscore/camelCase-prefixed, unquoted —
+               and a credential in a URL are found, placeholders/env lookups/empty values/prose
+               are not; 4c: an image a capture names that git ignores or that is gone gets a DLQ
+               note and a summary count) a staged note holding a key-shaped string makes `end`
+              refuse the commit and write one DLQ note that names the file, never the key; the
+              next clean run commits
 5. sync     — with a bare upstream: a second clone's commit arrives with `begin`, `end` pushes, and a
               conflicting hand edit skips the run (no lock, one DLQ note, the edit kept)
 7. commit   — `commit --path 00_Memory/radar` (a routine's own files) commits only that path, keeps
               an unrelated untracked note out of it, rebases over a commit another clone pushed in
               between and pushes; a key-shaped string commits only its DLQ note (never the value); a path
               outside the vault, "nothing changed" and something staged beforehand commit nothing
-              (the staged file stays staged); a named file not written yet is skipped
+              (the staged file stays staged); a named file not written yet is skipped; a second
+              refusal the same day stages and records nothing new (the first refusal's note
+              already covers it) rather than failing on an empty commit
 6. build    — a generator that fails is reported in `build_failed` and gets one DLQ note across
               runs; its files go back exactly as before it ran (changed, added, deleted; a hand-made
               canvas beside a map untouched); the run still commits
@@ -96,6 +101,17 @@ def _commit_phase(pr, sandbox: Path) -> list[str]:
             or FAKE_KEY in _git(mine, "log", "-p", "-1") or _git(mine, "diff", "--cached", "--name-only") \
             or _git(mine, "rev-parse", "HEAD") != _git(remote, "rev-parse", "HEAD"):
         problems.append(f"phase 7: a key-shaped string must be refused, only its DLQ note committed and pushed, got {r} {files}")
+    # A second refusal the same day: `_dlq_once` finds today's still-active note and skips writing
+    # (there is nothing new to say), and this must not re-find "the" note by globbing the slug —
+    # that glob also matches the first refusal's note, already committed, and re-adding/committing
+    # it either no-ops or recommits stale content. Nothing new to stage or commit is fine; the
+    # first refusal's commit and push must stand untouched. [earned: 2026-09-28]
+    after_first_refusal = _git(mine, "rev-parse", "HEAD")
+    (radar / "signal.json").write_text(f'{{"title": "{FAKE_KEY}", "n": 2}}\n', encoding="utf-8")
+    r = pr.commit_paths(mine, NOW, ["00_Memory/radar"], "signal radar: eval key again")
+    if r.get("status") != "refused" or "dlq_commit" in r or _git(mine, "rev-parse", "HEAD") != after_first_refusal \
+            or _git(mine, "diff", "--cached", "--name-only").strip():
+        problems.append(f"phase 7: a second same-day refusal must stage and record nothing new, got {r}")
     (radar / "signal.json").write_text('{"blips": []}\n', encoding="utf-8")
     if pr.commit_paths(mine, NOW, ["../elsewhere"], "x").get("status") != "refused":
         problems.append("phase 7: a path outside the vault must be refused")
@@ -300,16 +316,33 @@ def run(vault: Path) -> dict:
             problems.append("phase 4: a refused commit must leave nothing staged")
         leak.unlink()
 
-        # 4b. password assignments: each documented syntax is found in the staged diff by kind; a
-        # placeholder, an environment lookup and prose are not
+        # 4b. password assignments: quoted, bare, underscore- or camelCase-prefixed, unquoted, and
+        # a credential embedded in a URL are each found in the staged diff by kind; a placeholder
+        # (angle brackets, an env-var reference, all-asterisks, "changeme"), an environment lookup,
+        # an empty value and prose are not
+        password_lines = ['password="my pass"', "PASSWORD: 'abcdef12'", '{"password": "s3cr3tpw"}',
+                           'DB_PASSWORD="hunter2xyz"', 'POSTGRES_PASSWORD=hunter2xyz', 'userPassword: "hunter2xyz"',
+                           'password: hunter2xyz', 'export PASSWORD=hunter2xyz']
+        url_lines = ['https://user:secret@host.example.com/path']
+        clean_lines = ['password="<redacted: demo>"', 'password = os.environ["PW"]', "passwords are hard to remember",
+                       'password: <redacted>', 'password: ${VAR}', 'password=', 'the password is required',
+                       'password: <password>', 'password: ***', 'password: changeme']
         hits_file = sandbox / "04_Resources" / "Eval-Password-Note.md"
-        hits_file.write_text("\n".join(['password="my pass"', "PASSWORD: 'abcdef12'", '{"password": "s3cr3tpw"}',
-                                          'password="<redacted: demo>"', 'password = os.environ["PW"]',
-                                          "passwords are hard to remember"]) + "\n", encoding="utf-8")
+        hits_file.write_text("\n".join(password_lines + url_lines + clean_lines) + "\n", encoding="utf-8")
         _git(sandbox, "add", "--", str(hits_file.relative_to(sandbox)))
-        found = [h for h in pr.scan_staged(sandbox) if h.get("kind") == "password assignment"]
-        if sorted(h.get("line") for h in found) != [1, 2, 3]:
-            problems.append(f"phase 4b: password assignments found on lines {[h.get('line') for h in found]}, want [1, 2, 3]")
+        hits = pr.scan_staged(sandbox)
+        found = sorted(h.get("line") for h in hits if h.get("kind") == "password assignment")
+        want = list(range(1, len(password_lines) + 1))
+        if found != want:
+            problems.append(f"phase 4b: password assignments found on lines {found}, want {want}")
+        url_found = sorted(h.get("line") for h in hits if h.get("kind") == "credential in URL")
+        url_want = list(range(len(password_lines) + 1, len(password_lines) + len(url_lines) + 1))
+        if url_found != url_want:
+            problems.append(f"phase 4b: credentials in a URL found on lines {url_found}, want {url_want}")
+        clean_start = len(password_lines) + len(url_lines) + 1
+        stray = [h for h in hits if h.get("line", 0) >= clean_start]
+        if stray:
+            problems.append(f"phase 4b: a placeholder, env lookup, empty value or prose must not be flagged, got {stray}")
         _git(sandbox, "reset", "-q", "--", str(hits_file.relative_to(sandbox)))
         hits_file.unlink()
         _begin(pr, sandbox, NOW + timedelta(hours=15))

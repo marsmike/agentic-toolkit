@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from vault_utils import contained, read_frontmatter
+from vault_utils import UnparseableFrontmatter, contained, read_frontmatter
 
 _H1 = re.compile(r"^#\s+(.+)$", re.M)
 
@@ -43,13 +43,19 @@ def _candidate_paths(vault: Path) -> list[Path]:
     return contained(live + archived, vault)  # a link out of the vault is not a clip (Copilot review of #28)
 
 
-def load(vault: Path, since: date) -> list[Clip]:
-    """Every clip (`via: clip`) saved at or after `since`, oldest first."""
+def load(vault: Path, since: date) -> tuple[list[Clip], int]:
+    """Every clip (`via: clip`) saved at or after `since`, oldest first, and how many candidate
+    files were skipped for malformed frontmatter — a clip silently dropped by a YAML typo is worth
+    a number in the caller's output, not just a shorter list. [earned: 2026-09-28 week review]"""
     out: list[Clip] = []
+    skipped = 0
     for path in _candidate_paths(vault):
         try:
-            fm, body = read_frontmatter(path)
+            fm, body = read_frontmatter(path, strict=True)
         except OSError:
+            continue
+        except UnparseableFrontmatter:
+            skipped += 1
             continue
         if str(fm.get("via") or "").strip().lower() != "clip":
             continue
@@ -62,4 +68,4 @@ def load(vault: Path, since: date) -> list[Clip]:
             continue
         out.append(Clip(path=path.relative_to(vault).as_posix(), title=_title(body, path),
                          source=str(fm.get("source") or ""), saved_at=saved, body=body))
-    return sorted(out, key=lambda c: c.saved_at)
+    return sorted(out, key=lambda c: c.saved_at), skipped

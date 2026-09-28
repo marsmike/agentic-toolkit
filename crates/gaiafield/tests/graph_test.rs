@@ -107,6 +107,10 @@ fn index_recovers_expected_node_count_and_density() {
 /// Concurrent indexers on one database — parallel distill workers each run `gaiafield index` —
 /// all succeed and leave the same graph a single run does: no "database is locked", no edges
 /// duplicated by interleaved delete/insert pairs. [earned: 2026-09-28, the 09:58 pipeline run]
+///
+/// 12 workers, not 6: `index`'s write lock now spans only the DB diff+write (the vault walk runs
+/// before `BEGIN IMMEDIATE`), so more/slower workers should still fit inside the 30s busy_timeout
+/// comfortably — this is the regression check for that.
 #[test]
 fn concurrent_indexers_serialize_on_one_database() {
     let db = fresh_db_path("concurrent");
@@ -114,7 +118,7 @@ fn concurrent_indexers_serialize_on_one_database() {
     let expected = index_full(&reference);
     gaiafield::open_db(&db).expect("create db");
 
-    let workers = 6;
+    let workers = 12;
     let barrier = std::sync::Arc::new(std::sync::Barrier::new(workers));
     let handles: Vec<_> = (0..workers)
         .map(|_| {
@@ -738,6 +742,83 @@ fn infer_reset_restores_exact_v1_graph() {
     let _ = std::fs::remove_dir_all(never_inferred.parent().unwrap());
     let _ = std::fs::remove_dir_all(then_reset.parent().unwrap());
     let _ = std::fs::remove_dir_all(&scratch);
+}
+
+/// Concurrent infers on one database — parallel distill workers each run `gaiafield infer` (via
+/// `graph.ensure_inferred` in `plugins/obsidian/scripts/distill_judge.py`) — all succeed and leave
+/// the same `inferred_edges` a single run does: no row duplicated by interleaved delete/insert
+/// pairs. Mirrors `concurrent_indexers_serialize_on_one_database` for the v2 layer;
+/// `inferred_edges` has no unique constraint on `(source, target)` to fall back on the way
+/// `embeddings`' `path` primary key does, so this is the table where interleaving would actually
+/// duplicate rows.
+#[test]
+fn concurrent_infers_serialize_on_one_database() {
+    let db = fresh_db_path("concurrent-infer");
+    let reference = fresh_db_path("concurrent-infer-ref");
+    let vault = vault_path();
+    let model_dir = shared_model_dir();
+
+    let expected = {
+        let conn = gaiafield::open_db(&reference).expect("open db");
+        gaiafield::infer(&vault, &conn, &model_dir, true, false).expect("infer should succeed")
+    };
+    assert!(
+        expected.inferred_edges + expected.ambiguous_edges > 0,
+        "sanity: a single infer run should produce some inferred/ambiguous edges, got {expected:?}"
+    );
+    let expected_rows: i64 = {
+        let conn = gaiafield::open_db(&reference).expect("reopen db");
+        conn.query_row("SELECT COUNT(*) FROM inferred_edges", [], |r| r.get(0))
+            .expect("count inferred_edges")
+    };
+
+    gaiafield::open_db(&db).expect("create db");
+
+    let workers = 6;
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(workers));
+    let handles: Vec<_> = (0..workers)
+        .map(|_| {
+            let (db, barrier, model_dir) = (db.clone(), barrier.clone(), model_dir.clone());
+            std::thread::spawn(move || {
+                let conn = gaiafield::open_db(&db).expect("open db");
+                barrier.wait();
+                gaiafield::infer(&vault_path(), &conn, &model_dir, true, false)
+            })
+        })
+        .collect();
+    for h in handles {
+        h.join()
+            .expect("infer thread panicked")
+            .expect("infer should not fail");
+    }
+
+    let conn = gaiafield::open_db(&db).expect("reopen db");
+    let rows: i64 = conn
+        .query_row("SELECT COUNT(*) FROM inferred_edges", [], |r| r.get(0))
+        .expect("count inferred_edges");
+    assert_eq!(
+        rows, expected_rows,
+        "a concurrent infer saw a partial or duplicated inferred_edges table"
+    );
+
+    let duplicate_pairs: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM (
+                 SELECT source, target FROM inferred_edges
+                 GROUP BY source, target HAVING COUNT(*) > 1
+             )",
+            [],
+            |r| r.get(0),
+        )
+        .expect("count duplicate (source, target) pairs");
+    assert_eq!(
+        duplicate_pairs, 0,
+        "inferred_edges must never hold more than one row per (source, target) pair"
+    );
+
+    for path in [&db, &reference] {
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
 }
 
 /// (v2-e) `neighbors` WITHOUT `--include-inferred` is byte-identical to v1 behavior on a db that

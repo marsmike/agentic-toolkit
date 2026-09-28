@@ -42,7 +42,7 @@ from pathlib import Path
 from typing import Any
 
 import imports_log
-from vault_utils import contained, inside, profile_value, read_frontmatter, require_vault, write_dlq_note
+from vault_utils import atomic_write, contained, inside, profile_value, read_frontmatter, require_vault, write_dlq_note
 
 LOCK = Path("00_Memory") / "pipeline.lock"
 PUSH_ATTEMPTS = 3
@@ -65,6 +65,10 @@ GENERATORS = {  # script → the files it writes (a trailing / = every file dire
     "report_build.py": ("00_Memory/last-run-report.html",),
     "dashboard_build.py": ("Dashboard.html",),
 }
+# A value that reads as a stand-in, never a real secret: <angle brackets>, an env-var reference
+# (`${VAR}`/`$VAR`), all-asterisks, or the word "changeme" — shared by the password and URL
+# patterns below.
+_SECRET_PLACEHOLDER = r"(?:<[^>]*>|\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\*{3,}|changeme)"
 SECRET_PATTERNS = {
     "OpenRouter key": r"sk-or-v1-[0-9a-f]{32,}",
     "Anthropic key": r"sk-ant-[A-Za-z0-9_-]{20,}",
@@ -74,11 +78,18 @@ SECRET_PATTERNS = {
     "Google API key": r"\bAIza[0-9A-Za-z_-]{35}\b",
     "Slack token": r"\bxox[abprs]-[A-Za-z0-9-]{10,}",
     "private key": r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----",
-    # A password written into pasted code, e.g. `password="…"`; a placeholder in <angle brackets>
-    # passes. [earned: 2026-09-25 correction run — a highlight quoted an article's Neo4j password
-    # and no pattern caught it]
-    "password assignment": r"""(?i)\bpass(?:word|wd)\b["']?\s*[:=]\s*(["'])(?!<)[^"'\n]*[^"'\s\n][^"'\n]*\1""",
+    # A password written into pasted code: quoted or bare, `key=value` or `key: value`, the key
+    # prefixed (`DB_PASSWORD`) or camelCased (`userPassword`) — no \b between a letter/underscore
+    # and "pass" would miss both. A placeholder passes: <angle brackets>, `${VAR}`/`$VAR`, `***`,
+    # `changeme`, or nothing after the separator. [earned: 2026-09-25 correction run — a highlight
+    # quoted an article's Neo4j password and no pattern caught it; 2026-09-28 week review — DB_PASSWORD=,
+    # userPassword: and unquoted `password: hunter2` all passed the first fix]
+    "password assignment": rf"""(?i)pass(?:word|wd)[A-Za-z0-9_]*["']?\s*[:=]\s*(?:(["'])(?!{_SECRET_PLACEHOLDER})(?=\S)((?:(?!\1).)*\S)\1|(?!{_SECRET_PLACEHOLDER}\s*$)([A-Za-z0-9!@#%^&_+=~-]{{3,}})(?=\s*$))""",
     "assigned secret": r"(?i)\b(?:api[_-]?key|access[_-]?token|secret[_-]?key|auth[_-]?token)\s*[:=]\s*['\"]?(?=[A-Za-z_\-]*\d)[A-Za-z0-9_\-]{24,}",
+    # `scheme://user:pass@host`, e.g. a database URL pasted whole; a placeholder password passes
+    # the same way. [earned: 2026-09-28 week review — no pattern here looked inside a URL, so a
+    # pasted connection string's password would pass]
+    "credential in URL": rf"""(?i)\b[a-z][a-z0-9+.\-]*://[^\s/'"@]+:(?!{_SECRET_PLACEHOLDER}@)[^\s/'"@]+@""",
 }
 _SECRETS = [(name, re.compile(rx)) for name, rx in SECRET_PATTERNS.items()]
 
@@ -92,12 +103,10 @@ def _state(vault: Path) -> dict[str, Any]:
 
 
 def _save_state(vault: Path, state: dict[str, Any]) -> None:
-    path = vault / STATE
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    atomic_write(vault / STATE, json.dumps(state, indent=2, sort_keys=True) + "\n")
 
 
-def _order(vault: Path, path: Path) -> tuple[int, str]:
+def _order(path: Path) -> tuple[int, str]:
     try:
         fm, _ = read_frontmatter(path)
     except Exception:
@@ -212,7 +221,7 @@ def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
     attempts: dict[str, int] = state.get("attempts", {})
     parked: list[str] = state.get("parked", [])
     captures = sorted((p for p in contained((vault / "01_Capture").glob("*.md"), vault) if p.is_file()),
-                      key=lambda p: _order(vault, p))
+                      key=_order)
     newly_parked = []
     queue = []
     for p in captures:
@@ -270,12 +279,16 @@ def lost_media(vault: Path, rows: list[dict]) -> dict[str, list[str]]:
     return {"ignored": ignored, "missing": missing}
 
 
-def _dlq_once(vault: Path, slug: str, **note: Any) -> None:
-    """One open DLQ note per recurring problem: a run every three hours must not stack them."""
+def _dlq_once(vault: Path, slug: str, **note: Any) -> Path | None:
+    """One open DLQ note per recurring problem: a run every three hours must not stack them. Returns
+    the note actually written, or None when an active one already covers this and nothing new was
+    written — the caller must not re-find "the" note by globbing the slug, which also matches any
+    older note under it. [earned: 2026-09-28 week review — a same-day second refusal, finding nothing
+    new to write, would glob up the first refusal's already-committed note and commit nothing]"""
     for p in (vault / "00_Memory" / "dlq").glob(f"*-{slug}*.md"):
         if str(read_frontmatter(p)[0].get("status", "active")) == "active":
-            return
-    write_dlq_note(vault, slug=slug, **note)
+            return None
+    return write_dlq_note(vault, slug=slug, **note)
 
 
 def _is_repo(vault: Path) -> bool:
@@ -500,21 +513,26 @@ def commit_paths(vault: Path, now: datetime, paths: list[str], message: str) -> 
     if hits:
         _git(vault, "reset", "-q")
         where = "; ".join(f"{h['file']}:{h['line']} ({h['kind']})" for h in hits[:10])
-        _dlq_once(vault, slug="commit-secret-refused", title="A routine refused to commit a key-shaped string",
-                  what_happened=f"The staged diff holds {len(hits)} key-shaped string(s): {where}. Nothing else was committed.",
-                  why_recorded="A key in git is a key on GitHub; the routine commits and pushes unattended.",
-                  resolution="Find where the string came from (a fetched title or summary), then run the routine again.",
-                  confidence="high")
-        # The note names file and line, never the value: it alone is committed, or it is lost with
-        # the session's checkout. [earned: 2026-09-27, Copilot on #61]
-        note = [q.relative_to(vault).as_posix() for q in (vault / "00_Memory" / "dlq").glob("*-commit-secret-refused*.md")]
+        note_path = _dlq_once(vault, slug="commit-secret-refused", title="A routine refused to commit a key-shaped string",
+                              what_happened=f"The staged diff holds {len(hits)} key-shaped string(s): {where}. Nothing else was committed.",
+                              why_recorded="A key in git is a key on GitHub; the routine commits and pushes unattended.",
+                              resolution="Find where the string came from (a fetched title or summary), then run the routine again.",
+                              confidence="high")
         result: dict[str, Any] = {"status": "refused", "secrets": hits}
-        if note and _git(vault, "add", "--", *note).returncode == 0 and not scan_staged(vault) \
-                and _git(vault, "commit", "-q", "-m", f"dlq: {message} refused (key-shaped string)").returncode == 0:
-            result["dlq_commit"] = _git(vault, "rev-parse", "--short", "HEAD").stdout.strip()
-            result["sync"] = _push(vault, now, sweep=False)
-        else:
-            _git(vault, "reset", "-q")
+        # The note names file and line, never the value: it alone is committed, or it is lost with
+        # the session's checkout. The exact path `_dlq_once` wrote, never a glob on the slug: that
+        # also matches an older, already-committed note when today's is an active-note no-op, and
+        # committing it again either fails (nothing changed) or recommits a stale note.
+        # [earned: 2026-09-27, Copilot on #61; 2026-09-28 — a same-day second refusal's glob found
+        # only the first refusal's note, already committed, and recorded nothing for itself]
+        if note_path is not None:
+            note = [note_path.relative_to(vault).as_posix()]
+            if _git(vault, "add", "--", *note).returncode == 0 and not scan_staged(vault) \
+                    and _git(vault, "commit", "-q", "-m", f"dlq: {message} refused (key-shaped string)").returncode == 0:
+                result["dlq_commit"] = _git(vault, "rev-parse", "--short", "HEAD").stdout.strip()
+                result["sync"] = _push(vault, now, sweep=False)
+            else:
+                _git(vault, "reset", "-q")
         return result
     done = _git(vault, "commit", "-q", "-m", message)
     if done.returncode != 0:

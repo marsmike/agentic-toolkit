@@ -54,11 +54,17 @@ def _request(url: str, body: dict | None = None) -> dict:
     req = urllib.request.Request(url, data=data, headers=headers, method="POST" if data else "GET")
     try:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
-            return json.loads(resp.read().decode("utf-8", errors="replace"))
+            raw = resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         raise KagiError(f"HTTP {e.code}: {e.read().decode('utf-8', errors='replace')[:200]}") from e
-    except (urllib.error.URLError, json.JSONDecodeError) as e:
+    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+        # A timeout during resp.read() raises bare TimeoutError/OSError, not URLError. [earned:
+        # 2026-09-28 week review — an unattended run crashed instead of reporting a Kagi failure]
         raise KagiError(f"request failed: {e}") from e
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise KagiError(f"request failed: non-JSON response: {e}") from e
 
 
 # One ledger file per writer, one budget over all of them: the pipeline routine and the Signal Radar
@@ -77,9 +83,23 @@ class Ledger:
 
     @staticmethod
     def _read(path: Path) -> list[dict]:
+        """Tolerant of a truncated last line (killed mid-append) or a row missing what every
+        reader needs: skipped rather than crashing every command that shares this ledger.
+        [earned: 2026-09-28, week review — one bad line broke scan/gaps/discover/scout/signal]"""
         if not path.is_file():
             return []
-        return [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        rows = []
+        for ln in path.read_text(encoding="utf-8").splitlines():
+            ln = ln.strip()
+            if not ln:
+                continue
+            try:
+                row = json.loads(ln)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict) and "at" in row and "usd" in row:
+                rows.append(row)
+        return rows
 
     def rows(self) -> list[dict]:
         return self._read(self.path)

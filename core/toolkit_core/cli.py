@@ -15,7 +15,6 @@ import argparse
 import datetime
 import json
 import re
-import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -42,6 +41,14 @@ def _emit(result: dict, as_json: bool, render_text: Callable[[dict], str]) -> No
         print(render_text(result))
 
 
+def _error(args: argparse.Namespace, message: str) -> dict:
+    """The `{ok: false, error}` shape every command falls back to on a fatal, non-catalogued
+    failure — text output is just `error: <message>`."""
+    result = {"ok": False, "error": message}
+    _emit(result, args.json, lambda r: f"error: {r['error']}")
+    return result
+
+
 # --- vault init --------------------------------------------------------------------
 
 
@@ -58,18 +65,13 @@ def cmd_vault_init(args: argparse.Namespace) -> int:
     template_path = _vault_agents_template_path(repo_root)
 
     if template_path is None:
-        result = {
-            "ok": False,
-            "error": "could not locate contract/templates/VAULT_AGENTS.md (repo root not found)",
-        }
-        _emit(result, args.json, lambda r: f"error: {r['error']}")
+        _error(args, "could not locate contract/templates/VAULT_AGENTS.md (repo root not found)")
         return 1
 
     try:
         vault.scaffold_vault(target, template_path, force=args.force)
-    except vault.VaultInitError as exc:
-        result = {"ok": False, "error": str(exc)}
-        _emit(result, args.json, lambda r: f"error: {r['error']}")
+    except (vault.VaultInitError, OSError) as exc:
+        _error(args, str(exc))
         return 1
 
     result = {"ok": True, "path": str(target)}
@@ -126,11 +128,7 @@ def _render_doctor_text(result: dict) -> str:
 def cmd_doctor(args: argparse.Namespace) -> int:
     resolution = vault.resolve_vault()
     if resolution.path is None:
-        result = {
-            "ok": False,
-            "error": "no vault found: set TOOLKIT_VAULT, or run from inside the agentic-toolkit repo",
-        }
-        _emit(result, args.json, lambda r: f"error: {r['error']}")
+        _error(args, "no vault found: set TOOLKIT_VAULT, or run from inside the agentic-toolkit repo")
         return 1
 
     vault_path = resolution.path
@@ -367,25 +365,19 @@ def _vault_or_fail(args: argparse.Namespace) -> Path | None:
     resolution = vault.resolve_vault()
     if resolution.path is None or not resolution.path.is_dir():
         where = resolution.path or "(none)"
-        _emit({"ok": False, "error": f"no vault at {where}: set TOOLKIT_VAULT"}, args.json, lambda r: f"error: {r['error']}")
+        _error(args, f"no vault at {where}: set TOOLKIT_VAULT")
         return None
     return resolution.path
 
 
 def _engine_json(binary: str | None, name: str, argv: list[str], timeout: int) -> tuple[object, str | None]:
-    """Run an engine with --json; (parsed, None) or (None, error)."""
+    """Run an engine with --json; (parsed, None) or (None, error). `knowledge._run_json` is the
+    one subprocess-probing/JSON-parsing recipe for an engine binary; this just names the engine
+    in the error."""
     if binary is None:
         return None, f"{name} not installed — unisphere engines install"
-    try:
-        proc = subprocess.run([binary, *argv, "--json"], capture_output=True, text=True, timeout=timeout)
-    except (OSError, subprocess.SubprocessError) as exc:
-        return None, f"{name} failed: {exc}"
-    if proc.returncode != 0:
-        return None, (proc.stderr.strip() or proc.stdout.strip() or f"{name} exited {proc.returncode}")
-    try:
-        return json.loads(proc.stdout), None
-    except json.JSONDecodeError as exc:
-        return None, f"{name} returned no JSON: {exc}"
+    data, error = knowledge._run_json(binary, argv, timeout)
+    return (data, None) if error is None else (None, f"{name}: {error}")
 
 
 def _note_lines(st: ui.Style, rank: str, note: dict, extra: str = "") -> list[str]:
@@ -417,7 +409,7 @@ def cmd_search(args: argparse.Namespace) -> int:
                                ["query", *args.terms, "--vault", str(vault_path), "--k", str(args.limit)],
                                knowledge.QUERY_TIMEOUT)
     if error:
-        _emit({"ok": False, "error": error}, args.json, lambda r: f"error: {r['error']}")
+        _error(args, error)
         return 1
     _emit({"ok": True, "query": query, "vault": str(vault_path), "results": hits}, args.json, _render_search)
     return 0
@@ -479,7 +471,7 @@ def cmd_graph(args: argparse.Namespace) -> int:
         # Incremental and cheap; a query against a stale graph would answer about yesterday's vault.
         _, error = _engine_json(binary, "gaiafield", ["index", *base], knowledge.INDEX_TIMEOUT)
         if error:
-            _emit({"ok": False, "error": f"index: {error}"}, args.json, lambda r: f"error: {r['error']}")
+            _error(args, f"index: {error}")
             return 1
     op = args.graph_command
     if op == "stats":
@@ -538,12 +530,16 @@ def cmd_link(args: argparse.Namespace) -> int:
     resolution = vault.resolve_vault()
     repo_root = resolution.repo_root or vault.find_repo_root(Path(__file__).resolve().parent)
     if repo_root is None:
-        _emit({"ok": False, "error": "run from an agentic-toolkit checkout"}, args.json, lambda r: f"error: {r['error']}")
+        _error(args, "run from an agentic-toolkit checkout")
         return 1
     vault_path = Path(args.vault).expanduser().resolve() if args.vault else (
         resolution.path if resolution.source.startswith("env:") else None)
     bin_dir = Path(args.bin_dir).expanduser() if args.bin_dir else linker.default_bin_dir()
-    result = linker.link(repo_root, bin_dir, vault_path, force=args.force)
+    try:
+        result = linker.link(repo_root, bin_dir, vault_path, force=args.force)
+    except OSError as exc:
+        _error(args, str(exc))
+        return 1
     _emit(result, args.json, _render_link)
     return 0 if result["ok"] else 1
 

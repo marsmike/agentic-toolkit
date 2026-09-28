@@ -78,7 +78,10 @@ def _request(method: str, url: str, data: dict | None = None) -> tuple[int, Any,
     try:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
-            return resp.status, (json.loads(raw) if raw else None), None
+            try:
+                return resp.status, (json.loads(raw) if raw else None), None
+            except json.JSONDecodeError as e:
+                raise ReaderError(f"request failed: {method} {url.split('?')[0]} returned non-JSON: {e}") from e
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", errors="replace")
         retry = e.headers.get("Retry-After") if e.headers else None
@@ -87,7 +90,10 @@ def _request(method: str, url: str, data: dict | None = None) -> tuple[int, Any,
         except json.JSONDecodeError:
             parsed = {"error": raw[:300]}
         return e.code, parsed, float(retry) if retry and retry.isdigit() else None
-    except urllib.error.URLError as e:
+    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+        # A timeout during resp.read() raises bare TimeoutError/OSError, not URLError: still ours
+        # to turn into ReaderError so every caller's existing handling applies. [earned: 2026-09-28
+        # week review — an unattended run crashed instead of reporting a Reader failure]
         raise ReaderError(f"request failed: {e}") from e
 
 
@@ -187,7 +193,7 @@ def list_documents(location: str, since: datetime) -> list[dict]:
     keep = []
     for d in out:
         when = _when(d.get("saved_at"))
-        if not d.get("parent_id") and when is not None and when >= since:
+        if d.get("id") not in (None, "") and not d.get("parent_id") and when is not None and when >= since:
             keep.append(d)
     return keep
 

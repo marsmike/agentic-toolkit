@@ -34,8 +34,16 @@ from urllib.parse import urlsplit
 
 import imports_log
 import radar_ledger
-from map_build import _date, _one_line, _tags
-from vault_utils import atomic_write, contained, discover_notes, profile_value, read_frontmatter, require_vault
+from map_build import _date, _tags
+from vault_utils import (
+    atomic_write,
+    contained,
+    discover_notes,
+    one_line,
+    profile_value,
+    read_frontmatter,
+    require_vault,
+)
 
 OUT = "Dashboard.html"
 TEMPLATE = Path(__file__).resolve().parent / "dashboard_template.html"
@@ -76,22 +84,22 @@ def notes(vault: Path, since: str) -> list[dict]:
             "title": p.stem,
             "path": rel,
             "day": day,
-            "desc": _one_line(fm.get("description") or "", DESC_CHARS),
+            "desc": one_line(fm.get("description") or "", DESC_CHARS),
             "kind": str(fm.get("kind") or "").strip() or "unsorted",
             "domains": sorted({t.removeprefix("domain/") for t in tags if t.startswith("domain/")}),
             "folder": rel.split("/", 1)[0] if "/" in rel else "",
             "source": source if source.startswith("http") else "",
             "type": source_type(source),
-            "author": _one_line(fm.get("author") or "", 60),
+            "author": one_line(fm.get("author") or "", 60),
         })
     return sorted(out, key=lambda n: (n["day"], n["title"].lower()), reverse=True)
 
 
 def _item(it: dict) -> dict:
     f = it["fate"]
-    return {"title": _one_line(it.get("title") or it.get("capture") or it.get("found") or it.get("doc_id", ""), 140),
+    return {"title": one_line(it.get("title") or it.get("capture") or it.get("found") or it.get("doc_id", ""), 140),
             "source": it.get("source") or "", "type": str(it.get("category") or ""), "via": it.get("via") or "",
-            "status": f["status"], "detail": _one_line(f["detail"], 220), "notes": f["notes"][:4]}
+            "status": f["status"], "detail": one_line(f["detail"], 220), "notes": f["notes"][:4]}
 
 
 def runs(vault: Path, since: str, imports: list[dict]) -> list[dict]:

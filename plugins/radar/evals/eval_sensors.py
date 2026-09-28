@@ -13,7 +13,10 @@
  4. reddit ok   — stickied posts skipped, score = ups, origin f"r/{sub}"
  5. reddit blk  — blocked on both hosts for one sub -> status "blocked", no further subs tried
                   (Tavily unavailable); with Tavily (stubbed `tavily._run`) the subreddits come through
-                  `tvly` as "partial", without scores, and not again within 12 h
+                  `tvly` as "partial", without scores, its own ledger (tavily-ledger-signal.jsonl,
+                  never tavily-ledger.jsonl — sensors run only from the Signal Radar routine), and
+                  not again within 12 h; a subreddit empty for several runs running is named in the
+                  detail (5d), read back from the ledger's own per-call `results` count
  6. rss+atom    — RSS 2.0 and Atom both parsed, items published outside the 7-day window dropped,
                   a non-feed response is a per-feed failure (status "partial") that doesn't stop
                   the others
@@ -21,7 +24,8 @@
                   last_seen moves, a [HH:MM, score] pair is appended
  8. carry       — a key already judged in an older (but retained) day file carries its p/kind
                   forward instead of being handed to judge_fn
- 9. cap         — only unjudged rows go to judge_fn, highest score first, capped
+ 9. cap         — only unjudged rows go to judge_fn, highest score first, capped (9b: judge_fn
+                  raising must not lose that day's already-fetched items — they are still written)
 10. prune       — day files older than 45 days are removed, the boundary file is kept
 11. contained   — nothing is ever written outside out/sensors/, and the vault itself is untouched
 """
@@ -97,6 +101,8 @@ def run(vault: Path) -> dict:
             raise tavily.NoKey("TAVILY_API_KEY is not set")
         tavily_calls.append(args)
         sub = args[1].removeprefix("r/")
+        if sub in tavily_state.get("empty", ()):
+            return {"results": []}
         return {"results": [
             {"url": f"https://www.reddit.com/r/{sub}/comments/tv{len(tavily_calls)}/a_thread/", "title": f"A thread : r/{sub}"},
             {"url": "https://www.reddit.com/r/SomewhereElse/comments/zz9/off_topic/", "title": "Elsewhere"},
@@ -297,14 +303,28 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 5b: Tavily threads carry no score, origin r/<sub> and a clean title, got {reddit_items}")
         if tavily_calls and not {"--include-domains", "reddit.com", "--time-range", "day", "--depth", "basic"} <= set(tavily_calls[0]):
             problems.append(f"phase 5b: the fallback is a basic reddit.com search over the day, got {tavily_calls[0]}")
-        if not (out5b / "tavily-ledger.jsonl").is_file():
-            problems.append("phase 5b: the sensors must record their Tavily calls in tavily-ledger.jsonl")
+        # Sensors run only from the Signal Radar routine, so its Tavily calls belong in the signal
+        # ledger, never the pipeline's own. [earned: 2026-09-28 week review]
+        if not (out5b / "tavily-ledger-signal.jsonl").is_file() or (out5b / "tavily-ledger.jsonl").is_file():
+            problems.append("phase 5b: the sensors must write tavily-ledger-signal.jsonl, never tavily-ledger.jsonl")
 
         # 5c. three hours later: no subreddit is asked again within 12 h
         calls = len(tavily_calls)
         r = sensors.collect(sandbox, out5b, NOW + timedelta(hours=3), only=["reddit"])
         if len(tavily_calls) != calls or r["sources"]["reddit"]["status"] != "partial":
             problems.append(f"phase 5c: no tvly call within 12 h, got {len(tavily_calls) - calls}")
+
+        # 5d. a subreddit with zero yield several runs running is called out in the source detail
+        # (read back from the ledger's own `results` field, no separate state file)
+        tavily_state["empty"] = {subs[0]}
+        r = None
+        for h in range(sensors.REDDIT_TAVILY_LOW_YIELD_RUNS):
+            r = sensors.collect(sandbox, out5b, NOW + timedelta(hours=24 * (h + 1)), only=["reddit"])
+        detail = r["sources"]["reddit"]["detail"]
+        if subs[0] not in detail or "0 threads" not in detail:
+            problems.append(f"phase 5d: a subreddit empty for {sensors.REDDIT_TAVILY_LOW_YIELD_RUNS}+ runs "
+                            f"running should be called out, got {detail!r}")
+        tavily_state.pop("empty", None)
         tavily_state["available"] = False
         state["reddit_block"] = False
 
@@ -371,6 +391,19 @@ def run(vault: Path) -> dict:
         if r["judged"] != 3:
             problems.append(f"phase 9: collect() must report 3 judged, got {r['judged']}")
         sensors.MAX_JUDGE_PER_RUN = real_max_judge
+
+        # 9b. judge_fn raising must not lose the day's already-fetched items: they are still
+        # written (unjudged), and the run stays "ok" with a short judge_error
+        out9b = sandbox.parent / "radar-judge-fails"
+        state["hn_front"] = {"hits": [hn_hit("7001", "Survives a judge crash", 10.0)]}
+        state["hn_bydate"] = {"hits": []}
+
+        def failing_judge_fn(rows: list[dict]) -> dict[int, dict]:
+            raise RuntimeError("judgment backend exploded")
+        r = sensors.collect(sandbox, out9b, NOW, judge_fn=failing_judge_fn, only=["hn"])
+        items = json.loads(Path(r["file"]).read_text())["items"]
+        if r.get("status") != "ok" or "hn:7001" not in items or "judge_error" not in r:
+            problems.append(f"phase 9b: a judge_fn exception must not lose the fetched items, got {r}")
 
         # 10. pruning: older than 45 days removed, the boundary day kept
         out10 = sandbox.parent / "radar-prune"

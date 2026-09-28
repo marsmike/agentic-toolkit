@@ -8,7 +8,6 @@ is moving out there": the radar's daily note sat in 00_Memory where nothing show
 """
 from __future__ import annotations
 
-import json
 import os
 import re
 from collections import Counter, defaultdict
@@ -16,7 +15,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from vault_utils import read_frontmatter
+from vault_utils import read_frontmatter, read_jsonl
 
 STATE = Path("00_Memory") / "radar" / "state.jsonl"
 PROMOTED = Path("00_Memory") / "radar" / "promoted.jsonl"
@@ -24,20 +23,6 @@ DEFAULT_INTERESTS_NOTE = "03_Areas/Trend Radar Profile.md"
 RISING_MIN_STRONG = 3      # radar's TREND_MIN_STRONG: fewer strong items is noise, not a rise
 RISING_FACTOR = 1.5        # this week's strong against the median of the weeks before it
 RISING_MIN_WEEKS = 2       # weeks of history before anything can be called rising
-
-
-def _rows(path: Path) -> list[dict]:
-    if not path.is_file():
-        return []
-    out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(row, dict):
-            out.append(row)
-    return out
 
 
 def slug(name: str, limit: int = 40) -> str:
@@ -90,14 +75,14 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
         counts      judged, worth, strong, promoted over the window; and for `today`
     """
     names = interest_names(vault)
-    promoted_keys = {r.get("canonical") for r in _rows(vault / PROMOTED)}
-    promoted_days = Counter(str(r.get("date") or "")[:10] for r in _rows(vault / PROMOTED))
+    promoted_keys = {r.get("canonical") for r in read_jsonl(vault / PROMOTED)}
+    promoted_days = Counter(str(r.get("date") or "")[:10] for r in read_jsonl(vault / PROMOTED))
     per: dict[str, Counter] = defaultdict(Counter)
     weeks: dict[str, Counter] = defaultdict(Counter)
     items: list[dict] = []
     counts = Counter()
     today_counts = Counter()
-    for r in _rows(vault / STATE):
+    for r in read_jsonl(vault / STATE):
         day = str(r.get("run") or r.get("saved_at") or "")[:10]
         if not re.match(r"\d{4}-\d{2}-\d{2}$", day) or day < since:
             continue

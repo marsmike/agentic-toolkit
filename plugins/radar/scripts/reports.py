@@ -393,6 +393,17 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
     return "\n".join(lines)
 
 
+def week_of_row(line: str) -> str | None:
+    """A `written`-ledger row's week (weekly.jsonl / scout.jsonl), or None for a truncated or
+    malformed line (killed mid-append) — must not crash the once-a-week write it guards. Shared
+    by `write_weekly` and `scout.py`'s own early "already written" check."""
+    try:
+        row = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    return row.get("week") if isinstance(row, dict) else None
+
+
 def write_weekly(vault: Path, week: str, text: str, force: bool = False, written: Path | None = None,
                  prefix: str = "Radar-Week") -> Path:
     """Write the week's capture once. `written` (00_Memory/radar/weekly.jsonl, or scout.jsonl for
@@ -400,7 +411,8 @@ def write_weekly(vault: Path, week: str, text: str, force: bool = False, written
     written again by the next run. Shared by `weekly` and `scout` — same file, same once-a-week
     rule, only the name differs."""
     path = vault / "01_Capture" / f"{prefix}-{week}.md"
-    done = written.is_file() and any(json.loads(ln).get("week") == week for ln in written.read_text(encoding="utf-8").splitlines() if ln.strip()) if written else False
+    done = written is not None and written.is_file() and any(week_of_row(ln) == week for ln in
+                                                              written.read_text(encoding="utf-8").splitlines() if ln.strip())
     if (path.exists() or done) and not force:
         raise FileExistsError(f"the capture for {week} was already written (it may be distilled or half distilled); --force rewrites it")
     path.parent.mkdir(parents=True, exist_ok=True)

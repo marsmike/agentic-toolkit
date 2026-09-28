@@ -41,7 +41,7 @@ from interests import Interest
 from judgments import policy
 from judgments import questions as Q
 from judgments.state import in_chunks
-from vault_utils import profile_value
+from vault_utils import atomic_write
 
 USER_AGENT = "agentic-toolkit-radar/1.0 (feed discovery)"
 FETCH_TIMEOUT = 15
@@ -287,8 +287,9 @@ def discover(vault: Path, out: Path, now: datetime, only: list[str] | None = Non
     reason = judge.unavailable_reason(vault)
     if reason:
         return {"status": "SKIPPED", "detail": f"judgment backend unavailable ({reason}); nothing sent"}
-    ledger = kagi.ledger(out,
-                         float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)))
+    from radar import profile_number  # lazy: radar imports this module
+
+    ledger = kagi.ledger(out, profile_number(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD))
     try:
         known = subscribed_sites(now - timedelta(days=60))
     except reader.NoToken:
@@ -392,8 +393,8 @@ def discover(vault: Path, out: Path, now: datetime, only: list[str] | None = Non
     run_date = now.date().isoformat()
     out.mkdir(parents=True, exist_ok=True)
     opml = out / f"feeds-discovered-{run_date}.opml"
-    opml.write_text(render_opml(run_date, picks, names), encoding="utf-8")
-    (out / f"feeds-discovered-{run_date}.json").write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    atomic_write(opml, render_opml(run_date, picks, names))
+    atomic_write(out / f"feeds-discovered-{run_date}.json", json.dumps(rows, indent=2, ensure_ascii=False) + "\n")
     return {"status": "ok", "searches": searches, "kagi_usd": round(ledger.spent_this_week(now) - spent_before, 4),
             "candidates": len(candidates), "dropped": dropped, "judged": len(rows), "proposed": len(picks),
             "per_interest": {names[i]: sum(1 for r in picks if r["best"] == i) for i in names},

@@ -374,16 +374,23 @@ def _fetch_reddit(vault: Path, now: datetime, out: Path | None = None) -> tuple[
 # [earned: 2026-09-28 — measured: 15 threads a query, 11 of 14 new to the radar]
 REDDIT_TAVILY_EVERY_HOURS = 12
 REDDIT_TAVILY_RESULTS = 15
+REDDIT_TAVILY_LOW_YIELD_RUNS = 3  # consecutive zero-result searches before a subreddit is called out
 _REDDIT_ID_RE = re.compile(r"^/r/([^/]+)/comments/([a-z0-9]+)", re.I)
 
 
 def _reddit_via_tavily(vault: Path, out: Path, subs: list[str], now: datetime) -> tuple[str, str, list[dict]]:
-    budget = float(profile_value(vault, "tavily_weekly_budget_usd", tavily.DEFAULT_WEEKLY_BUDGET_USD))
-    ledger = tavily.ledger(out, budget)
+    from radar import profile_number  # lazy: radar imports this module
+
+    # Sensors run only from the Signal Radar routine (cloud/signal.prompt.md): its Tavily calls
+    # belong in the signal ledger, not the pipeline's. [earned: 2026-09-28 week review — landed in
+    # tavily-ledger.jsonl instead, so signal.prompt.md had to commit the pipeline's own ledger too]
+    budget = profile_number(vault, "tavily_weekly_budget_usd", tavily.DEFAULT_WEEKLY_BUDGET_USD)
+    ledger = tavily.ledger(out, budget, signal=True)
     since = now - timedelta(hours=REDDIT_TAVILY_EVERY_HOURS)
     recent = {r["query"] for r in ledger.all_rows() if datetime.fromisoformat(r["at"]) >= since}
     rows: dict[str, dict] = {}
     asked = 0
+    low_yield: list[str] = []
     for sub in subs:
         query = f"r/{sub}"
         if query in recent:
@@ -404,10 +411,30 @@ def _reddit_via_tavily(vault: Path, out: Path, subs: list[str], now: datetime) -
                 continue
             rows[m.group(2)] = _row("reddit", f"r/{sub}", m.group(2), hit["title"].removesuffix(f" : r/{sub}"),
                                     hit["url"], "via Tavily, no score", "", None, [])
+        if not found and _empty_streak(ledger, query, now) >= REDDIT_TAVILY_LOW_YIELD_RUNS:
+            low_yield.append(sub)
     note = f"via Tavily: {asked} subreddit(s) asked, {len(rows)} thread(s), no scores"
     if asked == 0:
         note = f"via Tavily: every subreddit asked in the last {REDDIT_TAVILY_EVERY_HOURS} h"
+    # A subreddit's search returning nothing several runs running is worth knowing about — a dead
+    # query or a domain filter gone stale — without one bad sub silencing the whole note.
+    # [earned: 2026-09-28 week review, yield visibility]
+    if low_yield:
+        note += f"; 0 threads for {REDDIT_TAVILY_LOW_YIELD_RUNS}+ runs: {', '.join(low_yield)}"
     return "partial", note, list(rows.values())
+
+
+def _empty_streak(ledger: tavily.Ledger, query: str, now: datetime) -> int:
+    """How many of this query's most recent recorded searches (this one included) returned zero
+    results, from the ledger's own `results` field — no separate state file needed."""
+    rows = sorted((r for r in ledger.all_rows() if r.get("query") == query), key=lambda r: r["at"])
+    streak = 0
+    for r in rows:
+        if r.get("results", 0) == 0:
+            streak += 1
+        else:
+            streak = 0
+    return streak
 
 
 # ---------------------------------------------------------------------------
@@ -677,8 +704,13 @@ def collect(vault: Path, out: Path, now: datetime, judge_fn: Any = None, only: l
     unjudged.sort(key=lambda k: -(items[k]["score"] if items[k]["score"] is not None else -1.0))
     candidates = unjudged[:MAX_JUDGE_PER_RUN]
     judged_n = 0
+    judge_error = ""
     if judge_fn is not None and candidates:
-        results = judge_fn([items[k] for k in candidates]) or {}
+        try:
+            results = judge_fn([items[k] for k in candidates]) or {}
+        except Exception as e:  # the day's already-fetched items must still be written (house rule)
+            results = {}
+            judge_error = f"{type(e).__name__}: {e}"[:200]
         for i, key in enumerate(candidates):
             if i in results:
                 items[key]["p"] = results[i].get("p")
@@ -689,5 +721,8 @@ def collect(vault: Path, out: Path, now: datetime, judge_fn: Any = None, only: l
                                        "items": items}, indent=2, ensure_ascii=False) + "\n")
     _prune(sensors_dir, today)
 
-    return {"status": "ok", "sources": sources, "judged": judged_n, "file": str(day_file),
-            "usage": {"unjudged": len(unjudged), "capped": len(unjudged) > MAX_JUDGE_PER_RUN, "judged": judged_n}}
+    result: dict[str, Any] = {"status": "ok", "sources": sources, "judged": judged_n, "file": str(day_file),
+                              "usage": {"unjudged": len(unjudged), "capped": len(unjudged) > MAX_JUDGE_PER_RUN, "judged": judged_n}}
+    if judge_error:
+        result["judge_error"] = judge_error
+    return result

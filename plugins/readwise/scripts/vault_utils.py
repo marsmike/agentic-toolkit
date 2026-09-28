@@ -94,7 +94,7 @@ def read_profile(vault: Path) -> dict:
         fm, _ = read_frontmatter(path, strict=True)
     except UnparseableFrontmatter as exc:
         slug = f"{PROFILE_PLUGIN_NAME}-profile-unreadable"
-        if not (vault / "00_Memory" / "dlq" / f"{time.strftime('%Y-%m-%d')}-{slug}.md").exists():
+        if not (vault / "00_Memory" / "dlq" / f"{time.strftime('%Y-%m-%d', time.gmtime())}-{slug}.md").exists():
             write_dlq_note(
                 vault,
                 slug=slug,
@@ -268,7 +268,7 @@ def write_dlq_note(
     """
     dlq_dir = vault / "00_Memory" / "dlq"
     dlq_dir.mkdir(parents=True, exist_ok=True)
-    today = time.strftime("%Y-%m-%d")
+    today = time.strftime("%Y-%m-%d", time.gmtime())
     if (existing := same_dlq_note_today(dlq_dir, today, slug, what_happened)) is not None:
         return existing
     dest = unique_path(dlq_dir, f"{today}-{slug}")

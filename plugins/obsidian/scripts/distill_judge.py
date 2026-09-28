@@ -13,7 +13,7 @@ domains it is about, and where it belongs. A batch adds one request of pairwise 
 add anything B lacks".
 
 Everything printed is advisory input to the distill skill's Phase 1 handoff
-(skills/distill/references/workflow.md). This script writes nothing to the vault except a
+(skills/distill/references/dossier.md). This script writes nothing to the vault except a
 dead-letter note when a configured backend fails outright. No backend or no key is the
 normal pre-adoption state: the block says SKIPPED and the skill proceeds as before.
 
@@ -72,8 +72,9 @@ VIEWS = 1
 
 
 def url_hits(capture: dict, vault: Path, exclude: list[str]) -> dict[str, str]:
-    """workflow.md step 2, in Python: {note rel path: origin} for every active note that
-    mentions one of the capture's URLs. Only a note whose `source:` is the capture's *own*
+    """The dossier's `already_distilled`/`related[].url_hit` fields (references/dossier.md), in
+    Python: {note rel path: origin} for every active note that mentions one of the capture's
+    URLs. Only a note whose `source:` is the capture's *own*
     source (its frontmatter URL) is "frontmatter", i.e. provenance; a note whose source is a
     URL the capture merely links in its body is "body-cited", and a note that mentions a
     capture URL in prose is "body". [earned: 2026-09-22 acceptance run — a capture linking

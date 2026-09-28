@@ -37,6 +37,7 @@ import interests as interests_mod
 import judge
 import reader
 from judgments import policy
+from vault_utils import atomic_write
 
 CLIP_LOCATIONS = ("new", "later", "shortlist", "archive")
 # Delivered, not clipped: newsletters land in the library on their own. [earned: 2026-09-23
@@ -208,12 +209,12 @@ def replay(vault: Path, out: Path, since: datetime, until: datetime, feed_sample
     feed_strong = sum(1 for j in neg_judged if max(j["p"].values()) >= t["T_STRONG"])
 
     out.mkdir(parents=True, exist_ok=True)
-    with (out / "replay-rows.jsonl").open("w", encoding="utf-8") as f:
-        for n, it in enumerate(items):
-            f.write(json.dumps({"label": labels[n], "title": it.title, "feed": it.feed, "url": it.url,
-                           "category": (clips + feed)[n].category, "saved_at": it.saved_at,
-                           "p": judged.get(n, {}).get("p"), "kind": judged.get(n, {}).get("kind"),
-                           "bm25": round(scores["bm25"][n], 4)}, ensure_ascii=False) + "\n")
+    rows_text = "".join(json.dumps({"label": labels[n], "title": it.title, "feed": it.feed, "url": it.url,
+                                    "category": (clips + feed)[n].category, "saved_at": it.saved_at,
+                                    "p": judged.get(n, {}).get("p"), "kind": judged.get(n, {}).get("kind"),
+                                    "bm25": round(scores["bm25"][n], 4)}, ensure_ascii=False) + "\n"
+                        for n, it in enumerate(items))
+    atomic_write(out / "replay-rows.jsonl", rows_text)
     report = {
         "status": "ok", "since": since.isoformat(), "until": until.isoformat(), **counts,
         "judged": len(keep), "unjudged": len(items) - len(keep),
@@ -226,7 +227,7 @@ def replay(vault: Path, out: Path, since: datetime, until: datetime, feed_sample
         "usage": {**run.as_dict(), "wall_s": wall_s,
                   "usd_per_feed_item": round(run.usd / max(1, len(items)), 7)},
     }
-    (out / "replay-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    atomic_write(out / "replay-report.json", json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     return report
 
 

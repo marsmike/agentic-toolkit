@@ -29,7 +29,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from vault_utils import atomic_write, contained, read_frontmatter, require_vault
+from vault_utils import append_jsonl, atomic_write, contained, read_frontmatter, read_jsonl, require_vault
 
 LOG = Path("00_Memory") / "imports.jsonl"
 INGESTED = Path("00_Memory") / "readwise-ingested.jsonl"
@@ -74,24 +74,15 @@ def describe(vault: Path, row: dict) -> dict:
 def record(vault: Path, run: str, rows: list[dict]) -> dict:
     """Append this run's imports to the log (every run, an empty one too: a quiet run is a fact)."""
     entry = {"run": run, "items": [describe(vault, r) for r in rows]}
-    path = vault / LOG
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    append_jsonl(vault / LOG, entry)
     return entry
 
 
 def load(vault: Path) -> list[dict]:
     runs: dict[str, dict] = {}
-    path = vault / LOG
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(entry, dict) and entry.get("run"):
-                runs.setdefault(entry["run"], {"run": entry["run"], "items": []})["items"] += entry.get("items") or []
+    for entry in read_jsonl(vault / LOG):
+        if entry.get("run"):
+            runs.setdefault(entry["run"], {"run": entry["run"], "items": []})["items"] += entry.get("items") or []
     return sorted(runs.values(), key=lambda r: r["run"], reverse=True)
 
 

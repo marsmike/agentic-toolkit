@@ -49,8 +49,7 @@ def spread(x: float, y: float, size: float) -> tuple[float, float]:
     return x * f * size, y * f * size * 0.62
 
 
-def graph_svg(width: int, height: int, size: float, rotate: float = -8) -> str:
-    g = json.loads(GRAPH.read_text(encoding="utf-8"))
+def graph_svg(g: dict, width: int, height: int, size: float, rotate: float = -8) -> str:
     pts = [spread(n["x"], n["y"], size) for n in g["nodes"]]
     focus, neighbors = g["focus"], set(g["neighbors"])
     hits = {h["node"] for h in g["hits"]}
@@ -338,7 +337,7 @@ h2 {{ font-family: {DISPLAY}; font-weight: 700; font-size: 29px; letter-spacing:
 .bottom b {{ color: {C['accent']}; font-weight: 400; }}
 </style></head>
 <body>
-<div class="hero">{graph_svg(980, 470, 430)}</div>
+<div class="hero">{graph_svg(g, 980, 470, 430)}</div>
 <div class="top">
   <div class="eyebrow">AGENTIC-TOOLKIT · CHEAT SHEET</div>
   <h1>Your vault is the <em>platform.</em></h1>

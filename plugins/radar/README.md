@@ -99,8 +99,8 @@ from the environment or the key file `~/.env`, read by each script itself (`READ
   tags and notes only. Never a delete, never back into the feed.
 - Writes into the vault: `00_Memory/radar/` (scan, discover, sensors, signal) and `01_Capture/` (weekly). Nothing
   in `02_`–`04_`.
-- Evals (`evals/run.py`): scan, replay, discover and reports, offline with stubbed network, against
-  a sandbox copy of `./vault`; registered in CI.
+- Evals (`evals/run.py`): scan, replay, discover, reports, gaps, scout, sensors, pulse and signal —
+  all nine, offline with stubbed network, against a sandbox copy of `./vault`; registered in CI.
 
 ## Not yet
 

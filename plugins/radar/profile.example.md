@@ -80,5 +80,7 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
 ## Secrets
 
 No credential belongs in this file — see `contract/PROFILE.md`'s Secrets section. Keys come from
-the environment or the key file (`~/.env`, read by the script itself): `READWISE_TOKEN`, `KAGI_API_KEY`, and `TOOLKIT_RADAR_JUDGMENT_API_KEY` (or
+the environment or the key file (`~/.env`, read by the script itself): `READWISE_TOKEN`, `KAGI_API_KEY`, `TAVILY_API_KEY` (read by the Tavily CLI `tvly`,
+never by this plugin directly — the Signal Radar's name check and the Reddit sensor's fallback),
+and `TOOLKIT_RADAR_JUDGMENT_API_KEY` (or
 `OPENROUTER_API_KEY`). Without one, the command that needs it prints `SKIPPED` and sends nothing.

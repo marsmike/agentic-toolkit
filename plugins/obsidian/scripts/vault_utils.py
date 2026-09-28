@@ -159,7 +159,7 @@ def read_profile(vault: Path) -> dict:
         fm, _ = read_frontmatter(path, strict=True)
     except UnparseableFrontmatter as exc:
         slug = f"{PROFILE_PLUGIN_NAME}-profile-unreadable"
-        if not (vault / "00_Memory" / "dlq" / f"{time.strftime('%Y-%m-%d')}-{slug}.md").exists():
+        if not (vault / "00_Memory" / "dlq" / f"{time.strftime('%Y-%m-%d', time.gmtime())}-{slug}.md").exists():
             write_dlq_note(
                 vault,
                 slug=slug,
@@ -273,6 +273,15 @@ def read_frontmatter(path: Path, strict: bool = False) -> tuple[dict, str]:
     return dict(data), text[match.end():]
 
 
+def one_line(text: object, limit: int) -> str:
+    """Collapsed whitespace, truncated to `limit` with a trailing "…" — a generated page's
+    description/summary cell, never mid-word-wrapped or carrying a stray newline. Shared by the
+    page builders (`index_build.py`'s summary, `map_build.py`'s description), each with its own
+    limit."""
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
 def write_frontmatter(path: Path, frontmatter: dict, body: str) -> None:
     """Write frontmatter + body back atomically. Unknown/extra keys are preserved verbatim
     since callers only ever mutate a dict they first read with read_frontmatter."""
@@ -294,6 +303,44 @@ def atomic_write(path: Path, content: str) -> None:
             except OSError:
                 pass
         raise
+
+
+def read_jsonl(path: Path) -> list[dict]:
+    """Every line of a JSONL file as a dict, in order; a blank line, a line that isn't valid JSON,
+    or one that decodes to something other than an object is dropped rather than raised. Shared by
+    every reader of this plugin's own ledgers and logs (`00_Memory/*.jsonl`). A caller that must
+    keep a corrupt line's *position* — `pipeline_run.py`'s ledger row counts, sliced by index since
+    a run's `begin` — cannot use this and keeps its own loop."""
+    if not path.is_file():
+        return []
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def append_jsonl(path: Path, row: dict) -> None:
+    """One JSON object as a line, appended (creating the parent folder on the first write)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def git_output(vault: Path, *args: str) -> str:
+    """One read-only `git` call's stdout, or `""` on any failure (not a repo, no such ref, a
+    decode-hiccup in a binary file's log). For a caller that needs the exit code or stderr too —
+    `pipeline_run.py`'s own writes and its secret scan — that shallow a wrapper is not enough; this
+    one is for the several read-only call sites (`report_build.py`, `watchdog.py`) that only ever
+    wanted the text."""
+    run = subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, errors="replace", check=False)
+    return run.stdout if run.returncode == 0 else ""
 
 
 # ---------------------------------------------------------------------------
@@ -494,7 +541,7 @@ def write_dlq_note(
     """
     dlq_dir = vault / "00_Memory" / "dlq"
     dlq_dir.mkdir(parents=True, exist_ok=True)
-    today = time.strftime("%Y-%m-%d")
+    today = time.strftime("%Y-%m-%d", time.gmtime())  # UTC: the pipeline and every writer's `now` are UTC too
     if (existing := same_dlq_note_today(dlq_dir, today, slug, what_happened)) is not None:
         return existing
     dest = dlq_dir / f"{today}-{slug}.md"

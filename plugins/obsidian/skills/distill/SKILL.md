@@ -57,10 +57,13 @@ copy vanished from every cloud run while the note kept linking a file that exist
 long wrong page passes ingest's length check — a treg.to docs link once captured 16 KB of an
 unrelated LinkedIn feed), is distilled from its source: fetch the page with
 `S fetch_source.py 01_Capture/<capture>.md` (the capture's own `source`, through the Tavily CLI
-`tvly extract`; WebFetch only when it reports tvly missing), write from that, and say so in the note ("*Text: fetched from the source on <date>; Reader
+`tvly extract`, retried once at `--extract-depth advanced` when a keyed basic extraction comes back
+empty — a JS-rendered page often needs it; WebFetch only when it reports tvly missing), write from
+that, and say so in the note ("*Text: fetched from the source on <date>; Reader
 saved only a sign-up page*"). The dossier's triage judged that wrong text, not the article;
 ignore its discard score. If nothing can be retrieved (the unattended run fetches only from the
-domains it is allowed; a refused fetch counts), a clip still ends as a short note or an
+domains it is allowed; a keyed call over the week's `tavily_weekly_budget_usd` is refused the same
+way; a refused fetch counts), a clip still ends as a short note or an
 L1 enrichment (what it is, who published it, the link), never dropped.
 [earned: 2026-09-24, two clips held "Create a free account" and "This page does not exist"; a
 third, longer than ingest's wall check, held someone else's LinkedIn feed]
