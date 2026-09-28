@@ -50,10 +50,27 @@ def _ours(path: Path, target: Path | None) -> bool:
     return SHIM_MARKER in head or LEGACY_SHIM_MARKER in head
 
 
-def _place(dest: Path, force: bool, write, target: Path | None = None) -> dict:
+def _unchanged(dest: Path, target: Path | None, expected_text: str | None) -> bool:
+    """Would `write` actually change `dest`? A symlink already pointing at `target` (checked by
+    `_ours` before we ever get here) needs no re-link; a shim whose on-disk text already matches
+    what we'd write needs no rewrite. [battle-test 2026-09-28: `unisphere link` run twice with
+    nothing changed reported "updated" for every link, not "unchanged"]"""
+    if target is not None:
+        return dest.is_symlink() and Path(os.readlink(dest)) == target
+    if expected_text is not None:
+        try:
+            return not dest.is_symlink() and dest.read_text(encoding="utf-8", errors="replace") == expected_text
+        except OSError:
+            return False
+    return False
+
+
+def _place(dest: Path, force: bool, write, target: Path | None = None, expected_text: str | None = None) -> dict:
     if dest.exists() or dest.is_symlink():
         if not force and not _ours(dest, target):
             return {"path": str(dest), "action": "skipped", "note": "exists and is not ours — rerun with --force to replace"}
+        if _unchanged(dest, target, expected_text):
+            return {"path": str(dest), "action": "unchanged"}
         dest.unlink()
         action = "updated"
     else:
@@ -63,15 +80,26 @@ def _place(dest: Path, force: bool, write, target: Path | None = None) -> dict:
 
 
 def link(repo_root: Path, bin_dir: Path, vault_path: Path | None, force: bool = False) -> dict:
-    bin_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        bin_dir.mkdir(parents=True, exist_ok=True)
+    except (FileExistsError, NotADirectoryError):
+        # A parent OSError subclass, so cli.py's generic `except OSError: str(exc)` still catches
+        # this — but str() on a plain message (vs. one built from an errno) never shows
+        # "[Errno 17] File exists: '…'". [battle-test 2026-09-28: `--bin-dir` naming a file gave
+        # the raw Python errno text instead of a plain sentence]
+        raise OSError(f"{bin_dir} exists and is not a directory — pass a different --bin-dir")
+    except PermissionError:
+        raise OSError(f"{bin_dir} is not writable — check its permissions or pass a different --bin-dir")
     results = []
 
+    shim_content = shim_text(repo_root, vault_path)
+
     def write_shim(dest: Path) -> None:
-        dest.write_text(shim_text(repo_root, vault_path), encoding="utf-8")
+        dest.write_text(shim_content, encoding="utf-8")
         dest.chmod(0o755)
 
     shim = bin_dir / "unisphere"
-    results.append({"name": "unisphere", **_place(shim, force, write_shim)})
+    results.append({"name": "unisphere", **_place(shim, force, write_shim, expected_text=shim_content)})
 
     targets = {name: engines.binary_path(name) for name in engines.ENGINES}
     if OBSIDIAN_APP_CLI.is_file():
