@@ -9,6 +9,7 @@ todoist_sections: Doing,Next,Waiting
 promote_location: later
 promote_per_day: 5
 kagi_weekly_budget_usd: 1.00
+tavily_weekly_budget_usd: 2.00
 sensors: hn,hf,github,reddit,rss,kagi_news
 sensor_kagi_news: AI,Technology,Linux & OSS,Music Technology,Science
 sensor_subreddits: LocalLLaMA,ClaudeAI,ClaudeCode,singularity,MachineLearning,synthesizers,WeAreTheMusicMakers,audioengineering
@@ -46,6 +47,10 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
 - **`kagi_weekly_budget_usd`** — `discover` stops searching once the week's Kagi spend (measured
   from the account balance, kept in `00_Memory/radar/kagi-ledger.jsonl` and, for the Signal Radar,
   `kagi-ledger-signal.jsonl`; one budget over both) would pass this.
+- **`tavily_weekly_budget_usd`** — the same for Tavily, called only through the `tvly` CLI: the
+  Signal Radar's name check and the Reddit sensor's fallback stop once the week's spend (list price,
+  $0.008 a credit, one credit a search; `tavily-ledger.jsonl` and `tavily-ledger-signal.jsonl`)
+  would pass this. The free 1,000 credits a month cover the default use.
 - **`sensors`** — which momentum sources `sensors` pulls (default all six: `hn`, `hf`, `github`,
   `reddit`, `rss`, `kagi_news`). **`sensor_kagi_news`** — Kagi News categories by name, as its
   index at news.kagi.com/kite.json lists them (AI, Technology, Music Technology, Apple, …). **`sensor_subreddits`**, **`sensor_github_topics`** — comma lists;
@@ -61,8 +66,11 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
 - To the judgment backend (OpenRouter by default): item titles, summaries and site names; feed
   titles, descriptions and recent item titles; interest names and glosses. Never your queries,
   never vault content.
-- To Kagi (`discover`, `gaps`): the interests' queries; (`signal --kagi`): up to six entity
-  names a day, each at most once a week.
+- To Kagi (`discover`, `gaps`): the interests' queries; (`signal --check`, only when Tavily
+  cannot run): up to six entity names a day, each at most once a week.
+- To Tavily, through the `tvly` CLI (`signal --check`): up to six entity names a day, each at most
+  once a week; (`sensors`, only when Reddit refuses the request): `r/<subreddit>` for each
+  subreddit, each at most every 12 hours. Weekly budget `tavily_weekly_budget_usd` (default 2.00).
 - To Hacker News (Algolia), Hugging Face, GitHub, Reddit, Kagi News and the `sensor_feeds` hosts (`sensors`):
   plain GETs of public listings; the GitHub topics and subreddit names are in the URLs.
 - To Reader: the location, tags and note of items the radar has recorded (archive, or Later with

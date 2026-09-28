@@ -12,7 +12,7 @@ graph — offline (gaiafield and Kagi stubbed).
 4. filters   — an item the judge found irrelevant for every interest is no blip; a thing seen
                every day until five days ago and not since is "fading"
 5. sources   — the sensors' "blocked" Reddit status reaches the page; the graph reports ok
-6. kagi      — with a key, at most KAGI_CHECKS_PER_DAY names are asked, a second run the same day
+6. check     — Tavily unavailable: Kagi answers, at most CHECKS_PER_DAY names are asked, a second run the same day
                asks none again, and a hit joins the blip as family "kagi"; its calls go to its own
                ledger file, and the pipeline's spend in the other one counts against the same budget
 7. writes    — signal.json, Signal-Radar.html and Signal-Radar.md in the radar dir, the page
@@ -151,12 +151,23 @@ def run(vault: Path) -> dict:
     import interests
     import kagi
     import signal_radar
+    import tavily
     import vault_graph
 
     problems: list[str] = []
     saved_env = {k: os.environ.pop(k, None) for k in ENV_KEYS}
-    real = (vault_graph._run, kagi._request)
+    real = (vault_graph._run, kagi._request, tavily._run)
     kagi_calls: list[str] = []
+    tavily_calls: list[list[str]] = []
+    tavily_state = {"available": False}
+
+    def tavily_stub(args):
+        if not tavily_state["available"]:
+            raise tavily.NoKey("TAVILY_API_KEY is not set")
+        tavily_calls.append(args)
+        return {"results": [{"url": f"https://www.reddit.com/r/LocalLLaMA/comments/t{len(tavily_calls)}/zither/",
+                             "title": "Zither is out", "content": "", "score": 0.9}]}
+    tavily._run = tavily_stub
 
     def kagi_stub(url, body=None):
         kagi_calls.append(url)
@@ -228,14 +239,17 @@ def run(vault: Path) -> dict:
         if r["status"] != "ok":
             problems.append(f"writes: status {r['status']}")
 
-        # 6: Kagi, twice on the same day
+        # 6: the check with Tavily unavailable falls back to Kagi, twice on the same day
         os.environ["KAGI_API_KEY"] = "stub-kagi-not-a-secret"
-        signal_radar.write(sandbox, out, NOW, use_kagi=True)
+        signal_radar.write(sandbox, out, NOW, check=True)
         first = len(kagi_calls)
         data = json.loads((out / "signal.json").read_text(encoding="utf-8"))
-        signal_radar.write(sandbox, out, NOW + timedelta(hours=3), use_kagi=True)
-        if not 1 <= first <= signal_radar.KAGI_CHECKS_PER_DAY or len(kagi_calls) != first:
-            problems.append(f"kagi: expected 1..{signal_radar.KAGI_CHECKS_PER_DAY} calls once, got {first} then {len(kagi_calls)}")
+        signal_radar.write(sandbox, out, NOW + timedelta(hours=3), check=True)
+        if not 1 <= first <= signal_radar.CHECKS_PER_DAY or len(kagi_calls) != first:
+            problems.append(f"kagi: expected 1..{signal_radar.CHECKS_PER_DAY} calls once, got {first} then {len(kagi_calls)}")
+        ks = next((x for x in data["sources"] if x["family"] == "kagi"), {})
+        if "Tavily skipped" not in ks.get("detail", "") or tavily_calls:
+            problems.append(f"check: Kagi answers only because Tavily was skipped, and says so, got {ks}")
         z = next((b for b in data["blips"] if b["key"] == "zither"), None)
         if not z or "kagi" not in z["families"]:
             problems.append(f"kagi: a hit should join zither as family kagi, got {z and z['families']}")
@@ -247,10 +261,27 @@ def run(vault: Path) -> dict:
                                                            "query": "gaps", "usd": 0.999, "balance": 5.0}) + "\n", encoding="utf-8")
         (out / "signal-kagi.jsonl").unlink()  # nothing asked yet: the next check would ask again
         calls = len(kagi_calls)
-        data = signal_radar.build(sandbox, out, NOW + timedelta(days=1, hours=1), use_kagi=True)
+        data = signal_radar.build(sandbox, out, NOW + timedelta(days=1, hours=1), check=True)
         ks = next((x for x in data["sources"] if x["family"] == "kagi"), {})
         if len(kagi_calls) != calls or ks.get("status") != "skipped" or "budget" not in ks.get("detail", ""):
             problems.append(f"kagi: the pipeline's spend must count against the Signal Radar's budget, got {ks}")
+
+        # 6c: Tavily available: it asks (through tvly), Kagi is not called, its own ledger and log
+        tavily_state["available"] = True
+        calls = len(kagi_calls)
+        data = signal_radar.build(sandbox, out, NOW + timedelta(days=2, hours=1), check=True)
+        ts = next((x for x in data["sources"] if x["family"] == "tavily"), {})
+        asked = {c[1].strip('"') for c in tavily_calls}
+        z = next((b for b in data["blips"] if b["name"] in asked), None)
+        if not tavily_calls or len(tavily_calls) > signal_radar.CHECKS_PER_DAY or len(kagi_calls) != calls:
+            problems.append(f"tavily: expected 1..{signal_radar.CHECKS_PER_DAY} tvly calls and no Kagi call, "
+                            f"got {len(tavily_calls)} and {len(kagi_calls) - calls}")
+        if ts.get("status") != "ok" or not z or "tavily" not in z["families"]:
+            problems.append(f"tavily: a hit should join the asked name ({asked}) as family tavily, got {ts} {z and z['families']}")
+        if tavily_calls and not {"--depth", "basic", "--time-range", "week"} <= set(tavily_calls[0]):
+            problems.append(f"tavily: the check is a basic search over the week, got {tavily_calls[0]}")
+        if not (out / "tavily-ledger-signal.jsonl").is_file() or not (out / "signal-tavily.jsonl").is_file():
+            problems.append("tavily: the Signal Radar must write tavily-ledger-signal.jsonl and signal-tavily.jsonl")
 
         # 8: no graph
         def no_graph(args, timeout=None):
@@ -261,7 +292,7 @@ def run(vault: Path) -> dict:
         if data["graph"]["status"] != "skipped" or not q or q["in_vault"] < 1 or q["graph"]["neighborhood"] != 0:
             problems.append(f"no graph: expected skipped with the file anchor kept, got {data['graph']['status']} {q and q['in_vault']}")
     finally:
-        vault_graph._run, kagi._request = real
+        vault_graph._run, kagi._request, tavily._run = real
         for k, v in saved_env.items():
             os.environ.pop(k, None)
             if v is not None:

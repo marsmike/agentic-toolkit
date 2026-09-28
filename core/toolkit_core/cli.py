@@ -338,7 +338,7 @@ def _render_status(result: dict) -> str:
         level = "ok" if c.get("ready") else "info"
         detail = c.get("version") or ""
         if c.get("auth_mode"):
-            detail += f" · logged in ({c['auth_mode']})"
+            detail += " · authenticated" if c["auth_mode"] == "authenticated" else f" · logged in ({c['auth_mode']})"
         if c.get("note"):
             detail = (detail + " · " if detail else "") + c["note"]
         where = "" if c.get("on_path") or not c.get("path") else st.dim("  (not on PATH — unisphere link)")
@@ -633,6 +633,16 @@ CATALOG = {
 }
 
 COMPANIONS = [
+    {
+        "cli": "tvly",
+        "use_for": "Tavily, the toolkit's one way to the web beyond the vault: search, extract a page, crawl or map "
+                   "a site, deep research. The radar and distill call it through their scripts.",
+        "not_for": "Anything in the vault — use unisphere search / unisphere graph.",
+        "setup": "uv tool install tavily-cli; it reads TAVILY_API_KEY (unisphere link needs nothing more).",
+        "discover": "tvly --help",
+        "agent_tips": ["pass --json for parseable output", "search: --depth basic (1 credit), --time-range, "
+                       "--include-domains", "extract: tvly extract <url> --format markdown --json"],
+    },
     {
         "cli": "obsidian",
         "use_for": "The running Obsidian app: open a note, the daily note, search in the app, run an Obsidian command, "

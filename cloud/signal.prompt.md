@@ -10,6 +10,9 @@ SETUP
    Engines: uv run --locked unisphere engines install
    (gaiafield is the knowledge graph every signal is anchored in. If the install fails, go on: the
    page then reports the graph as "skipped". Say so in FINISH.)
+   Tavily CLI (the one way to use Tavily, pinned): tvly --version 2>/dev/null || uv tool install tavily-cli==0.1.8
+   (`tvly` lands in ~/.local/bin, where the scripts look. It reads TAVILY_API_KEY; the scripts
+   hand it the key themselves. If the install fails, go on: the Tavily steps report SKIPPED.)
 2. Vault: use the session's TheVoid checkout (the directory holding AGENTS.md and 00_Memory/):
      export TOOLKIT_VAULT=<that path>
    Put it on a tracking `main` with exactly this sequence; it prints VAULT-NOT-RESET rather than
@@ -22,14 +25,15 @@ SETUP
    Then cd back to the agentic-toolkit checkout.
 3. Keys: check by name only, never print a value:
      python3 -c "import os; print({k: bool(os.environ.get(k)) for k in ('OPENROUTER_API_KEY','KAGI_API_KEY','TAVILY_API_KEY')})"
-   Without OPENROUTER_API_KEY new items stay unjudged; without KAGI_API_KEY there is no Kagi check.
-   Neither stops the run. GitHub's search API is blocked by this session's proxy; the GitHub source
+   Without OPENROUTER_API_KEY new items stay unjudged; without TAVILY_API_KEY (or tvly) the name
+   check falls back to Kagi and Reddit stays "blocked"; without both keys there is no name check.
+   None of this stops the run. GitHub's search API is blocked by this session's proxy; the GitHub source
    then reads GitHub Trending and reports "partial", which is normal.
 
 RUN
 1. uv run --locked --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py sensors --json
    A source reported blocked, partial, skipped or failed is normal; go on.
-2. uv run --locked --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py signal --kagi --json
+2. uv run --locked --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py signal --check --json
    If it fails or its status is not "ok", stop here: commit nothing, publish nothing, report it.
 3. Commit this routine's own files and nothing else (the one git allowed here besides SETUP 2; the
    list is the Signal Radar's row in cloud/README.md "Two routines, one vault", and a file not

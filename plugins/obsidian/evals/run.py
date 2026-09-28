@@ -47,6 +47,7 @@ EVAL_MODULES = (
     "eval_watchdog",
     "eval_retire_capture",
     "eval_search_heading_weight",
+    "eval_fetch_source",
 )
 
 

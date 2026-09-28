@@ -6,7 +6,7 @@
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py discover [--interest ID ...]
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py feeds|trend|weekly
     uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py scout [--dry-run]
-    uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py sensors | signal [--kagi]
+    uv run --project plugins/radar/scripts python3 plugins/radar/scripts/radar.py sensors | signal [--check]
 
 `scan` fetches feed items saved since `--since`, drops those already seen (canonical URL, or the
 same title from the same feed: a repost under a new address) and a new feed's back catalogue
@@ -625,7 +625,7 @@ def main(argv: list[str] | None = None) -> int:
     snp.add_argument("--out", type=Path, default=None)
     snp.add_argument("--json", action="store_true")
     sgp = sub.add_parser("signal", help="named things with a signal strength; writes the Signal Radar page and note")
-    sgp.add_argument("--kagi", action="store_true", help="corroborate the newest names with Kagi news (a few a day)")
+    sgp.add_argument("--check", action="store_true", help="check the newest names on the week's web: Tavily (tvly), else Kagi news (a few a day)")
     sgp.add_argument("--out", type=Path, default=None)
     sgp.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
@@ -639,7 +639,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "sensors":
         result = sensors_cmd(vault, args.out or vault / RADAR_DIR, now, args.only)
     elif args.cmd == "signal":
-        result = signal_radar.write(vault, args.out or vault / RADAR_DIR, now, args.kagi)
+        result = signal_radar.write(vault, args.out or vault / RADAR_DIR, now, args.check)
     elif args.cmd == "kagi":
         result = kagi_cmd(vault, args.out or vault / RADAR_DIR, args.mode, args.text)
     elif args.cmd == "gaps":

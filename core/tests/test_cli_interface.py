@@ -35,7 +35,7 @@ def test_every_command_is_in_the_catalogue(capsys):
     for c in data["commands"]:
         assert c["summary"] and c["json"] and c["example"].startswith("unisphere ")
         assert all(a["name"] != "json" for a in c["arguments"])
-    assert {c["cli"] for c in data["companions"]} == {"obsidian", "td"}
+    assert {c["cli"] for c in data["companions"]} == {"tvly", "obsidian", "td"}
     assert set(data["conventions"]["exit_codes"]) == {"0", "1", "2"}
 
 

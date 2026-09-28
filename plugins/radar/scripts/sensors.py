@@ -32,6 +32,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 
+import tavily
 from entities import hf_family
 from judgments.urls import _canonical
 from vault_utils import atomic_write, profile_value, secret
@@ -120,7 +121,7 @@ def _row(source: str, origin: str, id_: str, title: str, url: str, summary: str,
 HN_BASE = "https://hn.algolia.com/api/v1"
 
 
-def _fetch_hn(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
+def _fetch_hn(vault: Path, now: datetime, out: Path | None = None) -> tuple[str, str, list[dict]]:
     since = int((now - timedelta(hours=48)).timestamp())
     urls = [f"{HN_BASE}/search?tags=front_page&hitsPerPage=60",
             f"{HN_BASE}/search_by_date?{urllib.parse.urlencode({'tags': 'story', 'numericFilters': f'points>40,created_at_i>{since}', 'hitsPerPage': 100})}"]
@@ -160,7 +161,7 @@ def _fetch_hn(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
 HF_BASE = "https://huggingface.co/api"
 
 
-def _fetch_hf(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
+def _fetch_hf(vault: Path, now: datetime, out: Path | None = None) -> tuple[str, str, list[dict]]:
     endpoints = [(f"{HF_BASE}/models?sort=trendingScore&direction=-1&limit=60", "Hugging Face"),
                  (f"{HF_BASE}/spaces?sort=trendingScore&direction=-1&limit=20", "HF Spaces")]
     rows: dict[str, dict] = {}
@@ -253,7 +254,7 @@ def _fetch_github_trending(now: datetime) -> tuple[list[dict], str]:
     return list(rows.values()), "; ".join(problems)
 
 
-def _fetch_github(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
+def _fetch_github(vault: Path, now: datetime, out: Path | None = None) -> tuple[str, str, list[dict]]:
     headers = _github_headers()
     since = (now - timedelta(days=GITHUB_WINDOW_DAYS)).date().isoformat()
     topics = _profile_list(vault, "sensor_github_topics", DEFAULT_GITHUB_TOPICS)
@@ -348,16 +349,63 @@ def _reddit_listing(sub: str) -> tuple[bool, list[dict]]:
     return True, []
 
 
-def _fetch_reddit(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
+def _fetch_reddit(vault: Path, now: datetime, out: Path | None = None) -> tuple[str, str, list[dict]]:
     subs = _profile_list(vault, "sensor_subreddits", DEFAULT_SUBREDDITS)
     rows: dict[str, dict] = {}
-    for sub in subs:
+    for i, sub in enumerate(subs):
         blocked, sub_rows = _reddit_listing(sub)
         if blocked:
-            return "blocked", f"r/{sub}: blocked on both hosts", list(rows.values())
+            detail = f"r/{sub}: blocked on both hosts"
+            if out is None:
+                return "blocked", detail, list(rows.values())
+            status, note, found = _reddit_via_tavily(vault, out, subs[i:], now)
+            for r in found:
+                rows.setdefault(r["id"], r)
+            return status, f"{detail}; {note}", list(rows.values())
         for r in sub_rows:
             rows[r["id"]] = r
     return "ok", "", list(rows.values())
+
+
+# Reddit refuses cloud addresses, so the cloud routine never saw a Reddit thread: when the listing is
+# blocked, Tavily's search over reddit.com brings the day's threads of each subreddit instead —
+# titles and links, no scores (Tavily does not carry them), each subreddit at most every
+# REDDIT_TAVILY_EVERY_HOURS so a day's eight runs stay inside the free credits.
+# [earned: 2026-09-28 — measured: 15 threads a query, 11 of 14 new to the radar]
+REDDIT_TAVILY_EVERY_HOURS = 12
+REDDIT_TAVILY_RESULTS = 15
+_REDDIT_ID_RE = re.compile(r"reddit\.com/r/([^/]+)/comments/([a-z0-9]+)", re.I)
+
+
+def _reddit_via_tavily(vault: Path, out: Path, subs: list[str], now: datetime) -> tuple[str, str, list[dict]]:
+    budget = float(profile_value(vault, "tavily_weekly_budget_usd", tavily.DEFAULT_WEEKLY_BUDGET_USD))
+    ledger = tavily.ledger(out, budget)
+    since = now - timedelta(hours=REDDIT_TAVILY_EVERY_HOURS)
+    recent = {r["query"] for r in ledger.all_rows() if datetime.fromisoformat(r["at"]) >= since}
+    rows: dict[str, dict] = {}
+    asked = 0
+    for sub in subs:
+        query = f"r/{sub}"
+        if query in recent:
+            continue
+        try:
+            found = tavily.search(query, ledger, max_results=REDDIT_TAVILY_RESULTS, time_range="day",
+                                  include_domains=("reddit.com",), now=now)
+        except (tavily.NoKey, tavily.NoCli) as e:
+            return "blocked", f"Tavily skipped: {e}", list(rows.values())
+        except tavily.TavilyError as e:
+            return ("partial" if rows else "blocked"), f"Tavily: {str(e)[:120]}", list(rows.values())
+        asked += 1
+        for hit in found:
+            m = _REDDIT_ID_RE.search(hit["url"])
+            if not m or m.group(1).lower() != sub.lower():
+                continue
+            rows[m.group(2)] = _row("reddit", f"r/{sub}", m.group(2), hit["title"].removesuffix(f" : r/{sub}"),
+                                    hit["url"], "via Tavily, no score", "", None, [])
+    note = f"via Tavily: {asked} subreddit(s) asked, {len(rows)} thread(s), no scores"
+    if asked == 0:
+        note = f"via Tavily: every subreddit asked in the last {REDDIT_TAVILY_EVERY_HOURS} h"
+    return "partial", note, list(rows.values())
 
 
 # ---------------------------------------------------------------------------
@@ -443,7 +491,7 @@ def parse_feed_items(raw: bytes) -> tuple[str, list[dict]]:
     return title, items
 
 
-def _fetch_rss(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
+def _fetch_rss(vault: Path, now: datetime, out: Path | None = None) -> tuple[str, str, list[dict]]:
     feeds = _profile_list(vault, "sensor_feeds", DEFAULT_FEEDS)
     cutoff = now - timedelta(days=RSS_WINDOW_DAYS)
     rows: dict[str, dict] = {}
@@ -481,7 +529,7 @@ def _fetch_rss(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
     return ("partial" if problems else "ok"), "; ".join(problems), list(rows.values())
 
 
-def _fetch_kagi_news(vault: Path, now: datetime) -> tuple[str, str, list[dict]]:
+def _fetch_kagi_news(vault: Path, now: datetime, out: Path | None = None) -> tuple[str, str, list[dict]]:
     """Kagi News: the day's stories clustered by event, per category. A cluster is one row; its
     score is how many independent domains carry the story, which is breadth measured for us. Free,
     no key, no Kagi API budget. [earned: 2026-09-27, owner — "Kagi can also tell us what is
@@ -594,7 +642,7 @@ def collect(vault: Path, out: Path, now: datetime, judge_fn: Any = None, only: l
             sources[name] = {"status": "skipped", "items": 0, "new": 0, "detail": "disabled via profile `sensors`"}
             continue
         try:
-            status, detail, fetched = FETCHERS[name](vault, now)
+            status, detail, fetched = FETCHERS[name](vault, now, out)
         except Exception as e:  # a source must never take the run down (house rule)
             status, detail, fetched = "failed", f"{type(e).__name__}: {e}"[:200], []
         new_count = 0

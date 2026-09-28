@@ -3,7 +3,7 @@ mentions of named things (`entities.py`), and each thing gets a signal strength 
 independent sources carry it, how fast it is growing, how much engagement it draws, how relevant
 the judge found it and whether the owner's own vault already has it.
 
-Streams, all read from files, none fetched here except the optional Kagi check:
+Streams, all read from files, none fetched here except the optional web check:
 - feed items the scan judged (`state.jsonl`), family by origin: reddit, arxiv, github or feed;
 - the sensors' day files (`sensors/YYYY-MM-DD.json`, `sensors.py`): Hacker News, Hugging Face,
   GitHub, Reddit with scores, plain RSS; each item counts once, on the day it was first seen;
@@ -11,14 +11,16 @@ Streams, all read from files, none fetched here except the optional Kagi check:
 - the owner's knowledge graph (`vault_graph.py`, gaiafield): the notes of any date a thing is
   anchored in, how large their linked neighbourhood is, the hubs it connects to, and the hubs the
   week's new notes are thickening;
-- Kagi news, once a day for the few new names with the least corroboration (`KAGI_CHECKS_PER_DAY`,
-  ledger and weekly budget as everywhere; `signal-kagi.jsonl` remembers what was asked).
+- the web check, once a day for the few new names with the least corroboration (`CHECKS_PER_DAY`,
+  ledger and weekly budget as everywhere): Tavily's week of the web through the `tvly` CLI, or Kagi
+  news when Tavily is not available; `signal-tavily.jsonl` / `signal-kagi.jsonl` remember what was
+  asked, and both count while their answers are a week old.
 
 Writes `00_Memory/radar/signal.json` (the data), `Signal-Radar.html` (the page the routine
 publishes as an artifact and the vault keeps) and `Signal-Radar.md` (the same, as a note), all in
 the radar dir. Nothing else in the vault changes.
 
-What leaves the machine: with `--kagi`, up to KAGI_CHECKS_PER_DAY entity names a day, to Kagi.
+What leaves the machine: with `--check`, up to CHECKS_PER_DAY entity names a day, to Tavily (or Kagi).
 """
 from __future__ import annotations
 
@@ -36,6 +38,7 @@ import interests as interests_mod
 import kagi
 import reports
 import signal_render
+import tavily
 import vault_graph
 import vault_pulse
 from judgments.urls import _canonical
@@ -49,12 +52,12 @@ MAX_BLIPS = 60
 MAX_SECTORS = 6
 MIN_RELEVANCE = 0.35     # a judged thing below this for every interest is not the owner's business
 BLIND_SPOT_STRENGTH = 30
-KAGI_CHECKS_PER_DAY = 6
+CHECKS_PER_DAY = 6
 # Weights of the strength parts; they sum to 1.
 WEIGHTS = {"breadth": 0.25, "velocity": 0.20, "engagement": 0.20, "relevance": 0.10, "volume": 0.15, "vault": 0.10}
 STAGE_HOT = 70
 FAMILY_LABELS = {"hn": "Hacker News", "hf": "Hugging Face", "github": "GitHub", "reddit": "Reddit", "rss": "Blogs & news",
-                 "arxiv": "arXiv", "feed": "Reader feeds", "kagi": "Kagi news", "kagi_news": "Kagi News",
+                 "arxiv": "arXiv", "feed": "Reader feeds", "kagi": "Kagi news", "tavily": "Tavily web", "kagi_news": "Kagi News",
                  "vault": "Your vault"}
 
 
@@ -351,36 +354,35 @@ def assign_sectors(blips: list[dict], names: dict[str, str]) -> list[dict]:
     return sectors
 
 
-def kagi_check(vault: Path, out: Path, candidates: list[dict], now: datetime) -> tuple[list[dict], dict]:
-    """Kagi news for the newest, least corroborated names, at most KAGI_CHECKS_PER_DAY a day and
-    each name once a week. Returns mentions (family "kagi") for every answer on record."""
-    log = out / "signal-kagi.jsonl"
+class _Skip(Exception):
+    """The backend cannot run (no key, no CLI, over budget): the check is skipped, not failed."""
+
+
+def _name_check(out: Path, candidates: list[dict], now: datetime, family: str, log_name: str,
+                ask: Any = None) -> tuple[list[dict], dict]:
+    """One backend's check: ask `ask(name)` about the newest, least corroborated names, at most
+    CHECKS_PER_DAY a day and each name once a week, logging every answer in `log_name`; then every
+    answer on record from the last week becomes a mention of `family`. `ask=None` only reads."""
+    log = out / log_name
     rows = [json.loads(ln) for ln in log.read_text(encoding="utf-8").splitlines() if ln.strip()] if log.is_file() else []
     today = now.date().isoformat()
     week_ago = (now.date() - timedelta(days=7)).isoformat()
     asked_today = sum(1 for r in rows if r["day"] == today)
     recent_keys = {r["key"] for r in rows if r["day"] >= week_ago}
-    ledger = kagi.ledger(out, float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)),
-                         signal=True)
-    status = {"family": "kagi", "label": FAMILY_LABELS["kagi"], "status": "ok", "items": 0, "detail": ""}
-    for b in sorted(candidates, key=lambda b: (len(b["families"]), -b["strength"])):
-        if asked_today >= KAGI_CHECKS_PER_DAY:
+    status = {"family": family, "label": FAMILY_LABELS[family], "status": "ok", "items": 0, "detail": ""}
+    for b in sorted(candidates, key=lambda b: (len(b["families"]), -b["strength"])) if ask else []:
+        if asked_today >= CHECKS_PER_DAY:
             break
         if b["key"] in recent_keys:
             continue
         try:
-            found = kagi.news(b["name"], ledger, now)
-        except kagi.NoKey:
-            status.update(status="skipped", detail="KAGI_API_KEY is not set")
+            hits = ask(b["name"])
+        except _Skip as e:
+            status.update(status="skipped", detail=str(e)[:160])
             break
-        except kagi.OverBudget as e:
-            status.update(status="skipped", detail=str(e))
-            break
-        except kagi.KagiError as e:
+        except (kagi.KagiError, tavily.TavilyError) as e:
             status.update(status="failed", detail=str(e)[:160])
             break
-        hits = [{"title": f["title"], "url": f["url"], "published": f.get("published", "")} for f in found
-                if _day(f.get("published")) and _day(f.get("published")) >= week_ago]
         row = {"day": today, "key": b["key"], "name": b["name"], "hits": hits[:5]}
         rows.append(row)
         with log.open("a", encoding="utf-8") as fh:
@@ -391,14 +393,55 @@ def kagi_check(vault: Path, out: Path, candidates: list[dict], now: datetime) ->
         if r["day"] < week_ago:
             continue
         for h in r["hits"]:
-            mentions.append({"at": _day(h["published"]) or r["day"], "family": "kagi", "origin": "Kagi news",
-                             "title": h["title"], "url": h["url"], "summary": "", "score": None, "p": None,
-                             "entities": [r["name"]]})
+            mentions.append({"at": _day(h.get("published")) or r["day"], "family": family,
+                             "origin": FAMILY_LABELS[family], "title": h["title"], "url": h["url"], "summary": "",
+                             "score": None, "p": None, "entities": [r["name"]]})
     status["items"] = len(mentions)
     return mentions, status
 
 
-def build(vault: Path, out: Path, now: datetime, use_kagi: bool = False) -> dict[str, Any]:
+def _tavily_ask(vault: Path, out: Path, now: datetime) -> Any:
+    ledger = tavily.ledger(out, float(profile_value(vault, "tavily_weekly_budget_usd", tavily.DEFAULT_WEEKLY_BUDGET_USD)),
+                           signal=True)
+
+    def ask(name: str) -> list[dict]:
+        try:
+            found = tavily.search(f'"{name}"', ledger, max_results=5, time_range="week", now=now)
+        except (tavily.NoKey, tavily.NoCli, tavily.OverBudget) as e:
+            raise _Skip(str(e)) from e
+        # time_range=week filters on Tavily's side; its results carry no date, so they count today.
+        return [{"title": f["title"], "url": f["url"], "published": ""} for f in found]
+    return ask
+
+
+def _kagi_ask(vault: Path, out: Path, now: datetime) -> Any:
+    ledger = kagi.ledger(out, float(profile_value(vault, "kagi_weekly_budget_usd", kagi.DEFAULT_WEEKLY_BUDGET_USD)),
+                         signal=True)
+    week_ago = (now.date() - timedelta(days=7)).isoformat()
+
+    def ask(name: str) -> list[dict]:
+        try:
+            found = kagi.news(name, ledger, now)
+        except (kagi.NoKey, kagi.OverBudget) as e:
+            raise _Skip(str(e)) from e
+        return [{"title": f["title"], "url": f["url"], "published": f.get("published", "")} for f in found
+                if _day(f.get("published")) and _day(f.get("published")) >= week_ago]
+    return ask
+
+
+def web_check(vault: Path, out: Path, candidates: list[dict], now: datetime) -> tuple[list[dict], list[dict]]:
+    """The name check: Tavily through `tvly`, Kagi news when Tavily cannot run. Returns the
+    mentions of both backends still on record and the status of the one that asked."""
+    t_ms, t_status = _name_check(out, candidates, now, "tavily", "signal-tavily.jsonl", _tavily_ask(vault, out, now))
+    if t_status["status"] == "skipped":
+        k_ms, k_status = _name_check(out, candidates, now, "kagi", "signal-kagi.jsonl", _kagi_ask(vault, out, now))
+        k_status["detail"] = "; ".join(x for x in (f"Tavily skipped: {t_status['detail']}", k_status["detail"]) if x)
+        return t_ms + k_ms, [k_status]
+    k_ms, _ = _name_check(out, candidates, now, "kagi", "signal-kagi.jsonl")
+    return t_ms + k_ms, [t_status]
+
+
+def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[str, Any]:
     today = now.date()
     since = (today - timedelta(days=RECENT_DAYS + BASELINE_DAYS)).isoformat()
     state = reports_rows(out)
@@ -438,14 +481,14 @@ def build(vault: Path, out: Path, now: datetime, use_kagi: bool = False) -> dict
         sources = [x for x in sources if x["family"] != fam]
         sources.append({"family": fam, "label": FAMILY_LABELS.get(fam, fam), "status": s.get("status", "ok"),
                         "items": s.get("items", 0), "detail": s.get("detail", "")})
-    if use_kagi:
+    if check:
         cands = [b for b in blips if b["stage"] in ("new", "rising")]
-        kagi_ms, kstatus = kagi_check(vault, out, cands, now)
-        if kagi_ms:
-            add_eng_pct(kagi_ms)
-            ents = collect(mentions + kagi_ms + vault_ms, outside_keys, vocab)
+        check_ms, check_status = web_check(vault, out, cands, now)
+        if check_ms:
+            add_eng_pct(check_ms)
+            ents = collect(mentions + check_ms + vault_ms, outside_keys, vocab)
             blips = [b for b in (score(e, today, anchor_of, horizons, alias) for e in ents.values()) if b]
-        sources.append(kstatus)
+        sources.extend(check_status)
     sources.append({"family": "vault", "label": FAMILY_LABELS["vault"], "status": "ok", "items": len(vault_ms), "detail": ""})
     sources.append({"family": "graph", "label": "Knowledge graph", "status": graph_section["status"],
                     "items": graph_section.get("nodes") or 0, "detail": graph_section.get("detail", "")})
@@ -493,8 +536,8 @@ def reports_rows(out: Path) -> list[dict]:
     return rows
 
 
-def write(vault: Path, out: Path, now: datetime, use_kagi: bool = False) -> dict[str, Any]:
-    data = build(vault, out, now, use_kagi)
+def write(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[str, Any]:
+    data = build(vault, out, now, check)
     atomic_write(out / "signal.json", json.dumps(data, indent=1, ensure_ascii=False) + "\n")
     atomic_write(out / "Signal-Radar.html", signal_render.render_html(data))
     atomic_write(out / "Signal-Radar.md", signal_render.render_md(data))

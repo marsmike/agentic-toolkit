@@ -23,7 +23,7 @@ R discover [--interest ID] [--seed URL]   # new feeds via Kagi, as an OPML to im
 R gaps [--promote] --json              # weekly: what the feeds missed (Kagi news), judged
 R scout --dry-run --json               # by hand: new sources — feeds, APIs, services, tools, datasets
 R sensors --json                      # momentum sources: HN, Hugging Face, GitHub, Reddit, RSS
-R signal [--kagi] --json              # Signal Radar: named things with a signal strength
+R signal [--check] --json              # Signal Radar: named things with a signal strength
 ```
 
 **Daily.** Run `scan`, read `00_Memory/radar/<today>.md`, and reply with a five-line briefing:
@@ -62,8 +62,10 @@ little for being in the vault already. It writes `00_Memory/radar/Signal-Radar.h
 page), `Signal-Radar.md` and `signal.json`. Brief from `signal.json`: the `early` list first
 (first seen in the last 72 h and already in two sources), then hot and rising blips, then
 `blind_spots` (strong outside, absent from the vault) and the vault's rising tags. Stages and
-numbers are the script's; do not re-rank. `--kagi` asks Kagi news about at most six new names a
-day, inside the weekly budget.
+numbers are the script's; do not re-rank. `--check` searches the week's web for at most six new
+names a day, through the Tavily CLI (`tvly`), or Kagi news when Tavily cannot run; inside each
+backend's weekly budget. Any other Tavily use goes through `tvly` too (`tvly search|extract|crawl|map
+… --json`), never a hand-written API call.
 
 **Curating.** `discover` writes an OPML with the reason on every feed. Reader has no subscription
 API: the human imports it (or subscribes feed by feed), after reading the list.

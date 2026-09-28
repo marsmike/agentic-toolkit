@@ -23,7 +23,7 @@ MD_TOP_TAGS = 8
 
 STAGE_LABEL = {"new": "New", "rising": "Rising", "hot": "Hot", "steady": "Steady", "fading": "Fading"}
 FAMILY_LABEL = {"hn": "Hacker News", "hf": "Hugging Face", "github": "GitHub", "reddit": "Reddit",
-                "rss": "Blogs & news", "arxiv": "arXiv", "feed": "Reader feeds", "kagi": "Kagi news", "kagi_news": "Kagi News",
+                "rss": "Blogs & news", "arxiv": "arXiv", "feed": "Reader feeds", "kagi": "Kagi news", "tavily": "Tavily web", "kagi_news": "Kagi News",
                 "graph": "Knowledge graph", "vault": "Your vault"}
 
 
