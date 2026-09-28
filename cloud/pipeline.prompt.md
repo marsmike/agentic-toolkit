@@ -53,9 +53,12 @@ RUN, in the skill's order
 - pipeline_run.py queue --json exactly so (no --batch), then distill every capture in the batch
   (--auto); end reports any the run left untouched. Rebuild the
   index after each note and before distill_check.
-- Todoist fallback, only if `td` is not on PATH: for each interest in
-  $TOOLKIT_VAULT/Config/toolkit/radar.md that has a todoist_task_id and got strong items today,
-  add ONE comment to that task with the Todoist connector:
+- Todoist fallback, only if `td` is not on PATH: read `todoist_project_id`/`todoist_sections`
+  from $TOOLKIT_VAULT/Config/toolkit/radar.md (empty `todoist_project_id` means nothing to do),
+  list the open top-level tasks in those sections of that project with the Todoist connector —
+  each task IS an interest (its id is the `todoist_task_id`, per
+  plugins/radar/scripts/interests.py's `from_todoist`) — and for each one that got strong items
+  today, add ONE comment to that task with the Todoist connector:
     "[radar YYYY-MM-DD] N strong feed item(s) for this epic:" plus up to 5 "- [title](url) (p=0.xx)"
   Skip a task if 00_Memory/radar/todoist.jsonl already has {"task": id, "date": today}.
   After posting, append that line to the file.

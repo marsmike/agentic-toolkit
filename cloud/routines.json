@@ -62,7 +62,7 @@
       "notifications": {
         "email": false,
         "push": false,
-        "_": "the prompt sends one push only when the check fails, and the Sunday digest"
+        "_": "the prompt sends one push only when the check fails, and the Sunday digest — via PushNotification, which the routines platform grants to every routine implicitly, whatever allowed_tools lists (confirmed live: the 2026-09-28 05:28 UTC Signal Radar run called PushNotification and got 'Mobile push requested'; see cloud/README.md)"
       }
     },
     {
@@ -84,7 +84,7 @@
       "notifications": {
         "email": false,
         "push": false,
-        "_": "the prompt sends one push, the 05:28 UTC morning brief"
+        "_": "the prompt sends one push, the 05:28 UTC morning brief — via PushNotification, which the routines platform grants implicitly (see the watchdog routine's note above and cloud/README.md)"
       },
       "connectors": []
     }

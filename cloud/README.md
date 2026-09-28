@@ -16,7 +16,7 @@ alone and every change to it is a reviewed commit:
 | `watchdog.prompt.md` | The watchdog routine's prompt, likewise. |
 | `signal.prompt.md` | The Signal Radar routine's prompt, likewise. |
 | `setup.sh` | The environment's setup script: paste it into the environment on claude.ai. |
-| `routines.json` | The two routines' settings (ids, schedules, models, tools, sources), no secrets. A snapshot to rebuild from; the routines API holds the live state. |
+| `routines.json` | The three routines' settings (ids, schedules, models, tools, sources), no secrets. A snapshot to rebuild from; the routines API holds the live state. |
 
 ## Pipeline routine
 
@@ -64,10 +64,11 @@ no connectors; no per-run notifications. GitHub's search API is out of reach fro
 (the session proxy binds api.github.com to the attached repositories, token or not), so there the
 GitHub source reads GitHub Trending instead and reports `partial`.
 
-## Two routines, one vault
+## Two writers, one vault
 
-The pipeline and the Signal Radar run in separate sessions and both push TheVoid; each rebases over
-the other at commit time, which is conflict-free only while no file has two writers:
+Of the three routines, two write to the vault — the pipeline and the Signal Radar (the watchdog
+only reads). They run in separate sessions and both push TheVoid; each rebases over the other at
+commit time, which is conflict-free only while no file has two writers:
 
 | Files in `00_Memory/radar/` | Written by |
 |---|---|
@@ -142,7 +143,11 @@ pipeline routine, so `uv` and the git credential are there; no keys are needed.
 - **Model:** Opus 5.5 (`claude-opus-5-5`), set in the routine's `session_context.model`.
 - **Tools:** `session_context.allowed_tools` holds Bash, Read, Write, Edit, Glob, Grep, WebFetch,
   WebSearch and **Artifact** (the REPORT step). [earned: 2026-09-25, owner's request — the last
-  run's report as an artifact]
+  run's report as an artifact] `PushNotification` is never in any routine's `allowed_tools` — not
+  an oversight: the routines platform grants it to every routine implicitly, so the watchdog's and
+  Signal Radar's prompts can "send ONE push notification" without it being listed. Confirmed live,
+  not just inferred: the 2026-09-28 05:28 UTC Signal Radar run called `PushNotification` and got
+  back "Mobile push requested".
 
 ## Environment setup script (`setup.sh`)
 
