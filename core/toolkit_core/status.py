@@ -296,7 +296,7 @@ def _problems(result: dict) -> list[dict]:
         # Uncommitted local changes are not flagged: this is a dev checkout, and the vault's own
         # checkout treats "behind" as the only unhealthy state too — see the `v["checkout"]` check
         # below.
-        add("toolkit", f"checkout is {tk['behind']} commit(s) behind its upstream — git pull")
+        add("toolkit", f"checkout is {tk['behind']} commit(s) behind its upstream — git -C {tk['path']} pull")
     for row in result["engines"]["engines"]:
         if not row["installed_tag"]:
             add("engines", f"{row['engine']} not installed — unisphere engines install")
@@ -318,7 +318,7 @@ def _problems(result: dict) -> list[dict]:
         if v["dlq"].get("open"):
             add("vault", f"{v['dlq']['note']}: {', '.join(Path(n).stem for n in v['dlq']['open_notes'][:5])}")
         if v["checkout"].get("behind"):
-            add("vault", f"checkout is {v['checkout']['behind']} commit(s) behind its upstream — git pull")
+            add("vault", f"checkout is {v['checkout']['behind']} commit(s) behind its upstream — git -C {v['path']} pull")
     p = result["pipeline"]
     for item in p.get("problems") or []:
         add("pipeline", item.get("detail", str(item)))

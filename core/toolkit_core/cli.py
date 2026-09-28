@@ -308,7 +308,7 @@ def _render_status(result: dict) -> str:
         level, tail = {
             "current": ("ok", "current"),
             "outdated": ("warn", f"{r['latest']} available — claude plugin update {r['plugin']}@{status.MARKETPLACE}"),
-            "orphaned": ("warn", "no longer in the marketplace — claude plugin uninstall"),
+            "orphaned": ("warn", f"no longer in the marketplace — claude plugin uninstall {r['plugin']}@{status.MARKETPLACE}"),
             "not-installed": ("info", "not installed"),
         }[r["state"]]
         rows.append(f"{st.mark(level)} {r['plugin']:<10} {' / '.join(versions):<8} {st.level(tail, level)}"

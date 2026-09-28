@@ -192,6 +192,40 @@ def test_status_u_shadows_shows_true_utc_not_the_offset_as_is():
     assert "21:42 UTC" not in out
 
 
+def test_status_text_orphaned_plugin_hint_names_the_plugin(tmp_path):
+    """`_render_status`'s PLUGINS row for an "orphaned" plugin used to say just "claude plugin
+    uninstall" with no plugin name — `_problems()`'s JSON-facing hint (same data) already
+    included "{plugin}@{marketplace}"; the text a person actually reads was missing the one thing
+    they'd need to copy-paste the command. [battle-test 2026-09-28]"""
+    result = {
+        "toolkit": {"found": False},
+        "engines": {"engines": [], "checked_latest": False},
+        "plugins": {"plugins": [{"plugin": "imagine", "state": "orphaned", "latest": None, "installs": [
+            {"scope": "user", "version": "abc1234"}]}]},
+        "vault": {"found": True, "path": str(tmp_path), "source": "test", "notes": 0, "inbox": 0,
+                  "graph": {}, "dlq": {}, "checkout": {}},
+        "pipeline": {}, "companions": [], "ok": True,
+    }
+    out = cli._render_status(result)
+    assert f"claude plugin uninstall imagine@{status.MARKETPLACE}" in out
+
+
+def test_status_behind_checkout_hints_name_the_directory(tmp_path):
+    """A "behind its upstream" hint (toolkit checkout or vault checkout) used to say a bare
+    "git pull" with no `-C <path>` — copy-pasted from a shell sitting anywhere else, that pulls
+    (or fails against) the wrong repo. [battle-test 2026-09-28]"""
+    base = {"engines": {"engines": [], "checked_latest": False}, "plugins": {"plugins": []},
+            "pipeline": {}}
+    toolkit_problems = status._problems({**base, "toolkit": {"found": True, "behind": 1, "path": "/tk"},
+                                          "vault": {"found": True, "dlq": {}, "checkout": {}}})
+    assert f"git -C /tk pull" in toolkit_problems[0]["detail"]
+
+    vault_problems = status._problems({**base, "toolkit": {"found": False},
+                                        "vault": {"found": True, "path": "/v", "dlq": {},
+                                                  "checkout": {"behind": 1}}})
+    assert f"git -C /v pull" in vault_problems[0]["detail"]
+
+
 # --- search and graph ---------------------------------------------------------------------
 
 needs_engines = pytest.mark.skipif(
@@ -352,9 +386,10 @@ def test_toolkit_checkout_behind_is_a_problem_uncommitted_is_not():
     `unisphere status` unhealthy even though it printed `CHECKOUT !`]"""
     base = {"engines": {"engines": [], "checked_latest": False}, "plugins": {"plugins": []},
             "vault": {"found": True, "dlq": {}, "checkout": {}}, "pipeline": {}}
-    behind = status._problems({**base, "toolkit": {"found": True, "behind": 2, "uncommitted": 0}})
+    behind = status._problems({**base, "toolkit": {"found": True, "behind": 2, "uncommitted": 0, "path": "/tk"}})
     assert behind and behind[0]["section"] == "toolkit" and "2 commit(s) behind" in behind[0]["detail"]
-    assert not status._problems({**base, "toolkit": {"found": True, "behind": 0, "uncommitted": 3}})
+    assert "git -C /tk pull" in behind[0]["detail"]
+    assert not status._problems({**base, "toolkit": {"found": True, "behind": 0, "uncommitted": 3, "path": "/tk"}})
     assert not status._problems({**base, "toolkit": {"found": False}})
     assert not status._problems(base)  # no "toolkit" key at all — must not raise
 
