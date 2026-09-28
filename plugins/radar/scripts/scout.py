@@ -49,6 +49,7 @@ from judgments import policy
 from judgments import questions as Q
 from judgments.state import in_chunks
 from judgments.urls import _canonical
+from vault_utils import utc_timestamp
 
 LAUNCH_ANGLES = ("new API", "new service launch", "open-source release", "new dataset")
 CANDIDATES_PER_REQUEST = 8
@@ -276,6 +277,7 @@ def render_scout(week: str, picks: list[dict], now: datetime) -> str:
         f"description: Radar scout week {week} — {len(picks)} new source(s) worth knowing about",
         f"source: candidates mined from feed items, your own clips and Kagi launch queries, ISO week {week}",
         f"created: {now.date().isoformat()}",
+        f'ingested_at: "{utc_timestamp()}"',
         "kind: radar-scout",
         "via: radar",
         "status: draft",
@@ -284,6 +286,8 @@ def render_scout(week: str, picks: list[dict], now: datetime) -> str:
         "---",
         "",
         f"# Radar scout {week}",
+        "",
+        f"*Generated {now.strftime('%Y-%m-%d %H:%M')} UTC.*",
         "",
         f"{len(picks)} new source(s) this week, ranked by value against your interests.",
         "",

@@ -80,6 +80,7 @@ def render_md(data: dict[str, Any]) -> str:
     markdown links (someone else's URL)."""
     generated = str(data.get("generated") or "")
     created = generated[:10] or "1970-01-01"
+    generated_label = generated[:16].replace("T", " ") + " UTC" if len(generated) >= 16 and generated[10] == "T" else generated
     blips = data.get("blips") or []
     early_keys = data.get("early") or []
     blind_keys = data.get("blind_spots") or []
@@ -104,7 +105,7 @@ def render_md(data: dict[str, Any]) -> str:
         "",
         "# Signal Radar",
         "",
-        f"Generated {generated}. Full page: [[Signal-Radar.html|Signal Radar (HTML)]].",
+        f"Generated {generated_label}. Full page: [[Signal-Radar.html|Signal Radar (HTML)]].",
         "",
     ]
 

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from _sandbox import make_sandbox, teardown_sandbox
 
-REQUIRED_FRONTMATTER_FIELDS = ("source", "origin", "readwise_doc_id", "category", "tags")
+REQUIRED_FRONTMATTER_FIELDS = ("source", "origin", "readwise_doc_id", "category", "tags", "ingested_at")
 
 
 def run(vault: Path) -> dict:
@@ -48,6 +48,9 @@ def run(vault: Path) -> dict:
             problems.append(f"expected category 'book', got {fm.get('category')!r}")
         if not isinstance(fm.get("tags"), list):
             problems.append(f"tags is not a list: {fm.get('tags')!r}")
+        import re as _re
+        if not _re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", str(fm.get("ingested_at") or "")):
+            problems.append(f"ingested_at not UTC-Z: {fm.get('ingested_at')!r}")
         if path1.parent != sandbox_vault / "01_Capture":
             problems.append(f"capture not written flat under 01_Capture/: {path1}")
         if not path1.name.startswith("Readwise-"):

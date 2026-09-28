@@ -18,7 +18,8 @@ from _sandbox import make_sandbox, teardown_sandbox
 
 NAME = "imports_log"
 ARCH = "05_Archive/Readwise-Captures-2026-09"
-CAP = "---\nsource: https://example.org/{n}\ncategory: article\nvia: clip\n---\n\n# Title {n}\n"
+CAP = ("---\nsource: https://example.org/{n}\ncategory: article\nvia: clip\n"
+       'ingested_at: "2026-09-24T08:00:00Z"\n---\n\n# Title {n}\n')
 
 
 def run(vault: Path) -> dict:
@@ -42,7 +43,8 @@ def run(vault: Path) -> dict:
             "- `Readwise-Article-drop--FULLCAPTURE.md` — **dropped** (never distilled): radar noise. Retired 2026-09-25.\n"
             "- `Readwise-Article-dup--FULLCAPTURE.md` — **duplicate** of `04_Resources/Eval-Imports-Note.md`, kept whole here. Retired 2026-09-25.\n",
             encoding="utf-8")
-        (sandbox / "04_Resources" / "Eval-Imports-Note.md").write_text("---\nstatus: distilled\n---\n# N\n", encoding="utf-8")
+        (sandbox / "04_Resources" / "Eval-Imports-Note.md").write_text(
+            '---\nstatus: distilled\ndistilled_at: "2026-09-25T12:00:00Z"\n---\n# N\n', encoding="utf-8")
         c = lambda n: {"doc_id": n, "capture": f"01_Capture/Readwise-Article-{n}.md", "via": "clip"}  # noqa: E731
         imports_log.record(sandbox, "2026-09-24 10:00", [c("dist"), c("drop"), c("gone")])
         imports_log.record(sandbox, "2026-09-25 10:00", [c("dup"), c("wait"), c("hand"),
@@ -53,8 +55,11 @@ def run(vault: Path) -> dict:
         first = rows[0]["items"][0]
         if first.get("title") != "Title dist" or first.get("source") != "https://example.org/dist":
             problems.append(f"record: {first}")
+        if first.get("ingested_at") != "2026-09-24T08:00:00Z":
+            problems.append(f"record: ingested_at not carried from the capture: {first.get('ingested_at')!r}")
 
-        fates = {it.get("doc_id"): it["fate"] for r in imports_log.resolved(sandbox) for it in r["items"]}
+        items = {it.get("doc_id"): it for r in imports_log.resolved(sandbox) for it in r["items"]}
+        fates = {k: it["fate"] for k, it in items.items()}
         want = {"dist": "distilled", "drop": "dropped", "gone": "missing", "dup": "duplicate", "wait": "waiting",
                 "hand": "archived", "k": "known"}
         got = {k: fates.get(k, {}).get("status") for k in want}
@@ -62,8 +67,16 @@ def run(vault: Path) -> dict:
             problems.append(f"fates: {got}")
         if fates.get("dist", {}).get("notes") != ["04_Resources/Eval-Imports-Note"]:
             problems.append(f"fates: distilled notes {fates.get('dist')}")
+        if fates.get("dist", {}).get("distilled_at") != "2026-09-25T12:00:00Z":
+            problems.append(f"fates: distilled_at not read from the note, got {fates.get('dist')}")
 
         page = imports_log.render(sandbox)
+        if not re.search(r"\*Generated \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\.\*", page):
+            problems.append("page: missing its own 'Generated ... UTC' header line")
+        if "ingested 2026-09-24 08:00 UTC" not in page:
+            problems.append("page: a capture's own ingested timestamp is not shown per item")
+        if "distilled 2026-09-25 12:00 UTC" not in page:
+            problems.append("page: a distilled note's own distilled timestamp is not shown per item")
         heads = re.findall(r"^## (\S+ \S+)$", page, re.M)
         if heads != ["2026-09-25 10:00", "2026-09-24 10:00"]:
             problems.append(f"page: sections {heads}")

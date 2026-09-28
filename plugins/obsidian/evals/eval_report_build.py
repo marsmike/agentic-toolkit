@@ -42,11 +42,11 @@ def run(vault: Path) -> dict:
         arch.mkdir(parents=True, exist_ok=True)
         (arch / "Readwise-Tweet-x--FULLCAPTURE.md").write_text(
             "---\nsource: https://x.com/a/status/42?s=12\ncategory: tweet\nvia: clip\nlinks:\n- https://github.com/acme/widget\n- javascript:alert(1)\n"
-            "media:\n- 04_Resources/Attachments/Tweets/t-1.jpg\n---\n\n# <b>Bold</b> & widgets\n", encoding="utf-8")
+            'media:\n- 04_Resources/Attachments/Tweets/t-1.jpg\ningested_at: "2026-09-24T09:15:00Z"\n---\n\n# <b>Bold</b> & widgets\n', encoding="utf-8")
         (arch / "README.md").write_text("- `Readwise-Tweet-x--FULLCAPTURE.md` — new note on the widget. Distilled 2026-09-25.\n",
                                         encoding="utf-8")
         (sandbox / "04_Resources" / "Eval-Report-Widget.md").write_text(
-            "---\nstatus: distilled\nsource: https://twitter.com/a/status/42\n---\n# W\n", encoding="utf-8")
+            '---\nstatus: distilled\nsource: https://twitter.com/a/status/42\ndistilled_at: "2026-09-25T13:00:00Z"\n---\n# W\n', encoding="utf-8")
         for args in (("init", "-q"), ("config", "user.email", "e@x.org"), ("config", "user.name", "e"), ("add", "-A"),
                      ("commit", "-q", "-m", "base")):
             _git(sandbox, *args)
@@ -95,6 +95,12 @@ def run(vault: Path) -> dict:
             problems.append("notes: the note written this run is not listed")
         if "notes in the vault" not in page or 'aria-label="Notes distilled per day' not in page:
             problems.append("vitals: note count or chart missing")
+        if not re.search(r"Generated \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", page):
+            problems.append("timestamps: the page's own 'Generated ... UTC' line is missing")
+        if "ingested 2026-09-24 09:15 UTC" not in page:
+            problems.append("timestamps: the item's own ingested timestamp is missing")
+        if "distilled 2026-09-25 13:00 UTC" not in page:
+            problems.append("timestamps: the item's own distilled timestamp is missing")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)

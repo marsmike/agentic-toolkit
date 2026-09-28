@@ -221,6 +221,7 @@ def run(vault: Path) -> dict:
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
     import pipeline_run as pr
+    from vault_utils import read_frontmatter
 
     problems: list[str] = []
     sandbox, saved = None, os.environ.get("TOOLKIT_VAULT")
@@ -389,6 +390,42 @@ def run(vault: Path) -> dict:
 
         # 7. a routine's own files: commit only the named paths
         problems += _commit_phase(pr, sandbox)
+
+        # 8. stamp_distilled_notes: the `end` safety net beside retire_capture.py's own stamping —
+        # a distilled note missing distilled_at/ingested_at, changed but not yet committed, gets
+        # both: distilled_at to now, ingested_at carried from its own already-archived capture
+        # (matched by source); a note with its own value is left alone
+        arch_dir = sandbox / "05_Archive" / "Readwise-Captures-2026-09"
+        arch_dir.mkdir(parents=True, exist_ok=True)
+        (arch_dir / "Stamp-Safety-Net--FULLCAPTURE.md").write_text(
+            '---\nsource: https://example.org/stamp-safety-net\ningested_at: "2026-09-01T09:00:00Z"\n---\n\nbody\n',
+            encoding="utf-8")
+        untouched_note = sandbox / "04_Resources" / "Eval-Stamp-Untracked.md"
+        untouched_note.write_text(
+            "---\ndescription: not part of this run's diff\nstatus: distilled\n"
+            "source: https://example.org/stamp-safety-net-other\nprocessed_date: 2026-09-24\n---\n\nBody.\n",
+            encoding="utf-8")
+        _git(sandbox, "add", "-A")
+        _git(sandbox, "commit", "-q", "-m", "eval fixture: pre-existing note")
+        target = sandbox / "04_Resources" / "Eval-Stamp-Safety-Net.md"
+        target.write_text(
+            "---\ndescription: safety-net stamped note\nstatus: distilled\n"
+            "source: https://example.org/stamp-safety-net\nprocessed_date: 2026-09-24\n---\n\nBody.\n", encoding="utf-8")
+        rows_in = [{"doc_id": "safety1", "capture": "01_Capture/Stamp-Safety-Net.md"}]
+        stamped = pr.stamp_distilled_notes(sandbox, rows_in)
+        if stamped != ["04_Resources/Eval-Stamp-Safety-Net.md"]:
+            problems.append(f"phase 8: stamp_distilled_notes should stamp only the changed note, got {stamped}")
+        fm, _ = read_frontmatter(target)
+        import re as _re
+        if not _re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", str(fm.get("distilled_at") or "")):
+            problems.append(f"phase 8: distilled_at not stamped in the right format: {fm.get('distilled_at')!r}")
+        if fm.get("ingested_at") != "2026-09-01T09:00:00Z":
+            problems.append(f"phase 8: ingested_at not carried from the matching archived capture: {fm.get('ingested_at')!r}")
+        if pr.stamp_distilled_notes(sandbox, rows_in):
+            problems.append("phase 8: not idempotent — a second call re-stamped an already-stamped note")
+        untouched_fm, _ = read_frontmatter(untouched_note)
+        if untouched_fm.get("distilled_at") or untouched_fm.get("ingested_at"):
+            problems.append("phase 8: a note outside this run's working-tree diff must not be touched")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)

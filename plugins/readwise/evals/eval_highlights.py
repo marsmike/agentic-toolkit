@@ -89,6 +89,9 @@ def run(vault: Path) -> dict:
                     "> Sustained fifty tokens a second for code" not in body or "*my note:* check this on the M5" not in body \
                     or "*Note (2026-09-12):* Try this on the M5 Max" not in body:
                 problems.append(f"capture/note: content of {p_cap}")
+            import re as _re
+            if not _re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", str(fm.get("ingested_at") or "")):
+                problems.append(f"capture: highlights capture needs a UTC-Z ingested_at, got {fm.get('ingested_at')!r}")
             # Numeric order across a string "7" and ints 1, 2; the note (no location, 0) comes first.
             marks = ["Try this on the M5 Max", "Sustained fifty tokens", "The second highlight", "and then much more"]
             if [body.find(m) for m in marks] != sorted(body.find(m) for m in marks) or -1 in [body.find(m) for m in marks]:

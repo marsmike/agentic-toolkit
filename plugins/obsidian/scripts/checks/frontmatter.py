@@ -94,6 +94,23 @@ def audit(note_path: Path, frontmatter: dict, body: str, vault: Path) -> list[Is
                 description="Distilled note missing processed_date field",
                 proposed_fix="Add processed_date",
             ))
+        # distilled_at/ingested_at are stamped deterministically (retire_capture.py, pipeline_run.py's
+        # `end`) — a note missing either predates that stamping or reached `distilled` some other way.
+        # Never guessed here: the real value needs the note's own capture or git history, which is
+        # exactly what `backfill_timestamps.py --dry-run` proposes. [earned: 2026-09-28 — the owner
+        # asked for the ingest and distill date and time on every report and note]
+        if not frontmatter.get("distilled_at"):
+            issues.append(Issue(
+                note=note_path, check="frontmatter", severity="warning",
+                description="Distilled note missing distilled_at field",
+                proposed_fix="Run scripts/backfill_timestamps.py --apply, or set distilled_at by hand",
+            ))
+        if not frontmatter.get("ingested_at"):
+            issues.append(Issue(
+                note=note_path, check="frontmatter", severity="warning",
+                description="Distilled note missing ingested_at field",
+                proposed_fix="Run scripts/backfill_timestamps.py --apply, or set ingested_at by hand",
+            ))
 
     return issues
 

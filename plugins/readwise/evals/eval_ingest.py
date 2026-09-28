@@ -129,6 +129,11 @@ def run(vault: Path) -> dict:
             problems.append("phase 2: an item saved before the four-week window must be neither captured nor recorded")
         if ledger.get("tw2", {}).get("duplicate_of") != "tw1" or "tw1" not in ledger:
             problems.append(f"phase 2: the ledger must record tw2 as duplicate_of tw1, got {ledger.get('tw2')}")
+        import re as _re
+        ts_re = _re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+        bad_ts = {doc: fm.get("ingested_at") for doc, fm in caps.items() if not ts_re.match(str(fm.get("ingested_at") or ""))}
+        if bad_ts:
+            problems.append(f"phase 2: every capture kind needs a UTC-Z ingested_at, bad/missing: {bad_ts}")
         changed = {p for p, m in snap(sandbox).items() if before.get(p) != m} - {"04_Resources/Known-Post.md"}
         if any(not (p.startswith("01_Capture/") or p.startswith("00_Memory/")) for p in changed):
             problems.append(f"phase 2: ingest wrote outside 01_Capture/ and 00_Memory/: {sorted(changed)}")

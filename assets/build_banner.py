@@ -32,6 +32,8 @@ from __future__ import annotations
 import json
 import math
 import random
+import shutil
+import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -356,6 +358,74 @@ def render(p: dict, mode: str, *, w: int, h: int, cx: float, cy: float, ring_inn
     return "".join(out)
 
 
+def render_icon(p: dict, *, size: int = 512) -> str:
+    """The brand mark alone, no graph and no wordmark: one tilted wormhole ring framing
+    one core (accent-gold, "you are here") planet, on the dark palette. Deliberately not
+    graph data and not light/dark-paired — Quartz's Favicon and CustomOgImages plugins
+    both read exactly one docs-site/static/icon.png, and a mark has to still read at the
+    16px a browser tab actually shows. Reuses the same gradients/proportions as `render`'s
+    ring and hub-planet so the mark and the banners read as the same object at any size.
+    """
+    cx = cy = size / 2
+    ring_inner_rx = size * 0.34
+    ring_ry = ring_inner_rx * 0.68
+    ring_outer_rx = ring_inner_rx * 1.18
+    ring_outer_ry = ring_outer_rx * 0.68
+    tilt = -18
+    planet_r = size * 0.135
+
+    out: list[str] = [
+        f'<svg width="{size}" height="{size}" viewBox="0 0 {size} {size}" '
+        f'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="unisphere">'
+        f'<style>:root {{ color-scheme: dark; }}</style>'
+    ]
+    defs = [
+        f'<linearGradient id="wormhole" x1="0" y1="0" x2="1" y2="1">'
+        f'<stop offset="0%" stop-color="{p["wormhole1"]}"/>'
+        f'<stop offset="100%" stop-color="{p["wormhole2"]}"/></linearGradient>',
+        f'<radialGradient id="core"><stop offset="0%" stop-color="{p["accent"]}" stop-opacity="0.55"/>'
+        f'<stop offset="100%" stop-color="{p["accent"]}" stop-opacity="0"/></radialGradient>',
+        f'<radialGradient id="planet" cx="35%" cy="32%" r="75%">'
+        f'<stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>'
+        f'<stop offset="35%" stop-color="{p["accent"]}"/>'
+        f'<stop offset="100%" stop-color="{p["bg"]}" stop-opacity="0.6"/></radialGradient>',
+        f'<filter id="haze" x="-60%" y="-60%" width="220%" height="220%">'
+        f'<feGaussianBlur stdDeviation="{size * 0.012:.1f}"/></filter>',
+    ]
+    out.append("<defs>" + "".join(defs) + "</defs>")
+
+    # rounded-square badge background, like an app icon
+    out.append(f'<rect x="0" y="0" width="{size}" height="{size}" rx="{size * 0.18:.1f}" fill="{p["bg"]}"/>')
+    for x, y, r, o in stars(2718, 26, size, size):
+        out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r:.1f}" fill="{p["star"]}" opacity="{o}"/>')
+
+    # the ring: soft haze + crisp line (outer), a faint dashed inner ring, tilted, double
+    out.append(
+        f'<ellipse cx="{cx:.1f}" cy="{cy:.1f}" rx="{ring_outer_rx:.1f}" ry="{ring_outer_ry:.1f}" '
+        f'transform="rotate({tilt} {cx:.1f} {cy:.1f})" fill="none" stroke="url(#wormhole)" '
+        f'stroke-width="{ring_inner_rx * 0.16:.1f}" opacity="0.18" filter="url(#haze)"/>'
+    )
+    out.append(
+        f'<ellipse cx="{cx:.1f}" cy="{cy:.1f}" rx="{ring_outer_rx:.1f}" ry="{ring_outer_ry:.1f}" '
+        f'transform="rotate({tilt} {cx:.1f} {cy:.1f})" fill="none" stroke="url(#wormhole)" '
+        f'stroke-width="{size * 0.014:.1f}" opacity="0.9"/>'
+    )
+    out.append(
+        f'<ellipse cx="{cx:.1f}" cy="{cy:.1f}" rx="{ring_inner_rx:.1f}" ry="{ring_ry:.1f}" '
+        f'transform="rotate({tilt} {cx:.1f} {cy:.1f})" fill="none" stroke="url(#wormhole)" '
+        f'stroke-width="{size * 0.007:.1f}" stroke-dasharray="{size * 0.006:.1f} {size * 0.018:.1f}" opacity="0.45"/>'
+    )
+
+    # the core world: atmosphere glow, then the planet itself, occluding the ring's middle
+    out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{planet_r * 3.0:.1f}" fill="url(#core)"/>')
+    out.append(
+        f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{planet_r:.1f}" fill="url(#planet)" '
+        f'stroke="{p["accent"]}" stroke-width="{size * 0.004:.1f}"/>'
+    )
+    out.append("</svg>")
+    return "".join(out)
+
+
 def main() -> None:
     assets = REPO / "assets"
 
@@ -384,6 +454,30 @@ def main() -> None:
     for name in ("banner-dark.svg", "banner-light.svg", "social-preview.svg"):
         n = len((assets / name).read_bytes())
         print(f"{name}: {n:,} bytes")
+
+    # docs-site: Quartz's Favicon and CustomOgImages plugins both read exactly one
+    # docs-site/static/icon.png (see docs-site/quartz.config.ts's Plugin.Favicon()/
+    # Plugin.CustomOgImages() and .github/workflows/docs.yml). icon.svg is kept
+    # alongside as the readable source; icon.png is the rasterized file Quartz
+    # actually needs, produced with rsvg-convert (already used for repo image work
+    # the same way docs/cheatsheet/build.py shells out to headless Chrome) rather
+    # than a new Python image dependency.
+    static_dir = REPO / "docs-site" / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    icon_svg = render_icon(PALETTE["dark"], size=512)
+    (static_dir / "icon.svg").write_text(icon_svg, encoding="utf-8")
+    print(f"icon.svg: {len(icon_svg.encode('utf-8')):,} bytes")
+
+    rsvg = shutil.which("rsvg-convert")
+    icon_png = static_dir / "icon.png"
+    if rsvg:
+        subprocess.run(
+            [rsvg, "-w", "512", "-h", "512", "-o", str(icon_png), str(static_dir / "icon.svg")],
+            check=True,
+        )
+        print(f"icon.png: {icon_png.stat().st_size:,} bytes")
+    else:
+        print("icon.png: SKIPPED (rsvg-convert not found on PATH — rasterize icon.svg by hand)")
 
 
 if __name__ == "__main__":

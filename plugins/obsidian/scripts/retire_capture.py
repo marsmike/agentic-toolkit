@@ -30,6 +30,11 @@ Nothing is ever deleted: a duplicate is archived whole like any other capture, i
 naming what it duplicates. [earned: 2026-09-25, owner's request — keep every clipping in the
 vault; deleting duplicates and stubs was the one way a clipping could leave without a trace]
 
+Before the capture moves, every `--note` it names is stamped with `distilled_at` (now, UTC) and
+the capture's own `ingested_at` (carried over) — deterministically, never left to the skill to
+write, and never overwriting a value the note already carries. [earned: 2026-09-28 — the owner
+asked for the ingest and distill date and time on every report and note]
+
 Prints one JSON object: the result on success, `{"error": ...}` on refusal (exit 1).
 """
 from __future__ import annotations
@@ -44,7 +49,7 @@ from pathlib import Path
 from typing import Any
 
 from distill_check import check
-from vault_utils import inside, read_frontmatter, require_vault
+from vault_utils import inside, read_frontmatter, require_vault, utc_timestamp, write_frontmatter
 
 OWNER_SOURCES = {"clip"}  # kept in step with distill_judge.OWNER_SOURCES; duplicated to
 # avoid importing distill_judge's judgment-backend machinery into a script that must run
@@ -95,6 +100,31 @@ def _validate_notes(notes: list[str], capture: Path, vault: Path) -> list[str]:
     return resolved
 
 
+def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None) -> list[str]:
+    """Deterministically stamp `distilled_at` (now) and carry `ingested_at` from the capture onto
+    every note it became — never left to the skill/LLM to write, and never overwritten if a note
+    already carries one (an earlier enrichment's own timestamp stands). Called before the capture
+    is retired, while its own frontmatter (and `ingested_at`) is still readable.
+    contract/VAULT_SCHEMA.md. [earned: 2026-09-28 — the owner asked for the ingest and distill
+    date and time on every report and note]"""
+    now = utc_timestamp()
+    stamped = []
+    for rel in notes:
+        path = vault / rel
+        fm, body = read_frontmatter(path)
+        changed = False
+        if not fm.get("distilled_at"):
+            fm["distilled_at"] = now
+            changed = True
+        if not fm.get("ingested_at") and capture_ingested_at:
+            fm["ingested_at"] = capture_ingested_at
+            changed = True
+        if changed:
+            write_frontmatter(path, fm, body)
+            stamped.append(rel)
+    return stamped
+
+
 def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropped: str | None,
            duplicate_of: str | None = None) -> dict[str, Any]:
     if sum(map(bool, (line, dropped, duplicate_of))) != 1:
@@ -121,6 +151,7 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         raise RetireRefused("--line needs at least one --note: a distilled capture names the note it became")
 
     resolved_notes = _validate_notes(notes, capture, vault)
+    stamped = _stamp_notes(vault, resolved_notes, fm.get("ingested_at") if isinstance(fm.get("ingested_at"), str) else None)
 
     origin = _origin(capture.stem)
     today = time.strftime("%Y-%m-%d")
@@ -150,6 +181,7 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         "archived_to": dest.relative_to(vault).as_posix(),
         "manifest": readme.relative_to(vault).as_posix(),
         "notes": resolved_notes,
+        "stamped": stamped,
         "via": via,
         "mode": "duplicate" if duplicate_of else "dropped" if dropped else "line",
     }

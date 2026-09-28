@@ -28,7 +28,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -43,6 +43,7 @@ from vault_utils import (
     profile_value,
     read_frontmatter,
     require_vault,
+    utc_timestamp,
 )
 
 OUT = "Dashboard.html"
@@ -91,6 +92,8 @@ def notes(vault: Path, since: str) -> list[dict]:
             "source": source if source.startswith("http") else "",
             "type": source_type(source),
             "author": one_line(fm.get("author") or "", 60),
+            "ingested_at": fm.get("ingested_at") if isinstance(fm.get("ingested_at"), str) else "",
+            "distilled_at": fm.get("distilled_at") if isinstance(fm.get("distilled_at"), str) else "",
         })
     return sorted(out, key=lambda n: (n["day"], n["title"].lower()), reverse=True)
 
@@ -127,7 +130,10 @@ def inbox(vault: Path) -> int:
 def build(vault: Path, today: date) -> dict:
     since = (today - timedelta(days=WINDOW_DAYS - 1)).isoformat()
     imports = imports_log.resolved(vault)
-    return {"vault": vault.name, "built": datetime.now().astimezone().isoformat(timespec="minutes"),
+    # UTC, `Z`-suffixed like ingested_at/distilled_at (contract/VAULT_SCHEMA.md); the template's own
+    # JS parses it with `new Date()` and shows it in the viewer's local time by design, the same way
+    # "today" in this page is the viewer's today, not the build machine's.
+    return {"vault": vault.name, "built": utc_timestamp(),
             "today": today.isoformat(), "window": WINDOW_DAYS, "inbox": inbox(vault),
             "report": str(profile_value(vault, "report_artifact_url") or ""),
             "notes": notes(vault, since), "runs": runs(vault, since, imports),

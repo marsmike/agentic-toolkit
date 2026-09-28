@@ -29,7 +29,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-from vault_utils import append_jsonl, atomic_write, contained, read_frontmatter, read_jsonl, require_vault
+from vault_utils import (
+    append_jsonl,
+    atomic_write,
+    contained,
+    format_ts,
+    read_frontmatter,
+    read_jsonl,
+    require_vault,
+    utc_timestamp,
+)
 
 LOG = Path("00_Memory") / "imports.jsonl"
 INGESTED = Path("00_Memory") / "readwise-ingested.jsonl"
@@ -67,6 +76,7 @@ def describe(vault: Path, row: dict) -> dict:
             "source": fm.get("source") if isinstance(fm.get("source"), str) else None,
             "category": fm.get("category"), "author": str(fm.get("author") or "")[:80] or None,
             "enrichment": fm.get("enrichment"), "media": len(fm.get("media") or []) or None,
+            "ingested_at": fm.get("ingested_at") if isinstance(fm.get("ingested_at"), str) else None,
         }.items() if v}
     return item
 
@@ -118,7 +128,14 @@ def fate(vault: Path, item: dict, manifests: dict[str, str], attempts: dict[str,
     status = "duplicate" if "**duplicate**" in line else "dropped" if "**dropped**" in line else "distilled"
     detail = re.sub(r"\[\[([^\]|\\]+)\\?\|([^\]]+)\]\]", r"\2", line)
     detail = re.sub(r"\[\[([^\]]+)\]\]", lambda m: m.group(1).rsplit("/", 1)[-1], detail)
-    return {"status": status, "notes": notes, "detail": re.sub(r"\s+", " ", detail)[:300]}
+    distilled_at = None
+    if status == "distilled" and notes:
+        note_path = vault / f"{notes[0]}.md"
+        if note_path.is_file():
+            nfm, _ = read_frontmatter(note_path)
+            distilled_at = nfm.get("distilled_at") if isinstance(nfm.get("distilled_at"), str) else None
+    return {"status": status, "notes": notes, "detail": re.sub(r"\s+", " ", detail)[:300],
+            **({"distilled_at": distilled_at} if distilled_at else {})}
 
 
 def resolved(vault: Path) -> list[dict]:
@@ -140,11 +157,14 @@ def _bullet(it: dict) -> str:
     head = f"[{title}]({it['source']})" if str(it.get("source") or "").startswith("http") else title
     extras = [x for x in (it.get("author"), it.get("via"),
                           f"enrichment {it['enrichment']}" if it.get("enrichment") else None,
-                          f"{it['media']} image(s)" if it.get("media") else None) if x]
+                          f"{it['media']} image(s)" if it.get("media") else None,
+                          f"ingested {format_ts(it['ingested_at'])}" if it.get("ingested_at") else None) if x]
     notes = " · ".join(f"[[{n}|{n.rsplit('/', 1)[-1]}]]" for n in f["notes"])
     where = {"distilled": f"→ {notes}" if notes else f"→ {f['detail']}", "known": f"→ already in the vault: {notes}",
              "dropped": f"→ dropped: {f['detail']}", "duplicate": f"→ duplicate ({f['detail']})",
              "waiting": f"→ waiting ({f['detail']})", "archived": f"→ archived ({f['detail']})", "missing": f"→ ⚠ **missing**: {f['detail']}"}[f["status"]]
+    if f["status"] == "distilled" and f.get("distilled_at"):
+        where += f" (distilled {format_ts(f['distilled_at'])})"
     return f"- **{kind}** {head}" + (f" — {', '.join(extras)}" if extras else "") + f" {where}"
 
 
@@ -155,6 +175,7 @@ def render(vault: Path) -> str:
              for s in ("distilled", "known", "dropped", "duplicate", "archived", "waiting", "missing")}
     out = ["---", "description: What every pipeline run imported from Readwise and what became of each item, newest run first.",
            "status: generated", "---", "", "# Imports", "", HEADER, "",
+           f"*Generated {format_ts(utc_timestamp())}.*", "",
            f"{len(items)} items in {len(runs)} runs: " + ", ".join(f"{n} {s}" for s, n in count.items() if n) + "."]
     missing = [(r["run"], it) for r in runs for it in r["items"] if it["fate"]["status"] == "missing"]
     if missing:

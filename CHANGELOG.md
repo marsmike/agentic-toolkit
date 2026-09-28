@@ -4,6 +4,20 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Every capture and note carries when it came in and when it was distilled (obsidian 3.2.0,
+  readwise 3.1.0, radar 3.3.0).** Two contract fields, `ingested_at` and `distilled_at` (ISO 8601
+  UTC, `2026-09-28T18:59:34Z`): every capture writer stamps `ingested_at`; `retire_capture.py`
+  stamps `distilled_at` and carries the capture's `ingested_at` into the note, with a safety net
+  in the pipeline's `end`, so neither depends on the model. The run report, Imports, Now, the
+  dashboard, the Log, the radar's daily, weekly and scout notes, the Signal Radar and the
+  watchdog digest show when they were generated and, per item, when it was ingested and
+  distilled; a date without a known time is shown as estimated, never given one. Log.md times
+  are UTC now. `backfill_timestamps.py` proposes both fields for older notes from git history,
+  marked `*_estimated`, and writes only with `--apply`. The docs site wears the brand palette,
+  fonts, a starfield in dark mode and the brand icon.
+  [earned: 2026-09-28 — the owner asked for the ingest and distill date and time on every report
+  and note]
+
 - **unisphere explains itself, and the project wears its theme.** Help in the manner of gh,
   kubectl and brew: bare `unisphere` shows commands grouped by task, global flags, examples,
   the environment it reads and where to learn more; every command has a description, flags with

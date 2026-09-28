@@ -39,7 +39,7 @@ from typing import Any
 from clips import Clip
 from interests import Interest
 from judgments import policy
-from vault_utils import atomic_write
+from vault_utils import atomic_write, utc_timestamp
 
 FEED_UNSUBSCRIBE_WEEKS = 4
 FEED_UNSUBSCRIBE_MIN_ITEMS = 40
@@ -320,6 +320,7 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
         f"description: Radar week {week} — {len(wk_rows)} feed items judged, {strong_n} strong, {worth_n} worth reading",
         f"source: Reader feed items judged by the radar, ISO week {week}",
         f"created: {now.date().isoformat()}",
+        f'ingested_at: "{utc_timestamp()}"',
         "kind: radar-digest",
         "via: radar",
         "status: draft",
@@ -328,6 +329,8 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
         "---",
         "",
         f"# Radar week {week}",
+        "",
+        f"*Generated {now.strftime('%Y-%m-%d %H:%M')} UTC.*",
         "",
         f"{len(wk_rows)} feed items judged against {len(names)} interests: **{strong_n} strong, {worth_n} worth reading.**",
         "",

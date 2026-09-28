@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import socket
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 from vault_utils import require_vault
 
@@ -29,8 +29,8 @@ def main() -> int:
     vault = require_vault()
     log_path = vault / "Log.md"
     host = socket.gethostname().split(".")[0]
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-    line = f"- {ts} [{host}] {action} | {title}\n"
+    ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
+    line = f"- {ts} UTC [{host}] {action} | {title}\n"
 
     with log_path.open("a", encoding="utf-8") as f:
         f.write(line)

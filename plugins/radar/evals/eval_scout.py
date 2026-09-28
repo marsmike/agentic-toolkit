@@ -265,6 +265,11 @@ def run(vault: Path) -> dict:
         frontmatter = text[3:fm_end]
         if "via: radar" not in frontmatter or "kind: radar-scout" not in frontmatter:
             problems.append(f"phase 4: frontmatter should be via: radar, kind: radar-scout, got {frontmatter}")
+        import re as _re
+        if not _re.search(r'ingested_at: "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"', frontmatter):
+            problems.append(f"phase 4: scout capture needs a UTC-Z ingested_at, got {frontmatter}")
+        if "*Generated " not in text or " UTC.*" not in text:
+            problems.append("phase 4: the scout capture needs its own 'Generated ... UTC' line")
         if len(discover_calls) != n_discover + 1 or discover_calls[-1]["seeds"] != ["https://feedsite.example.org"]:
             problems.append(f"phase 4: exactly the feed-kind pick should seed discover, got {discover_calls[n_discover:]}")
         if len(judge_calls) <= n_judge:

@@ -46,6 +46,31 @@ def test_distilled_notes_carry_source_and_processed_date():
     assert not failures, "\n".join(failures)
 
 
+def test_ingested_and_distilled_at_are_utc_z_when_present():
+    """`ingested_at`/`distilled_at`, when present, are ISO 8601 UTC with a time and `Z`
+    (contract/VAULT_SCHEMA.md's `2026-09-28T18:59:34Z` shape) — never a bare date, never a local
+    offset. Presence itself is not asserted here: `./vault`'s existing distilled notes predate
+    this pair, and backfilling them (`plugins/obsidian/scripts/backfill_timestamps.py`) is a
+    separate decision the owner makes, not part of this change. [earned: 2026-09-28 — the owner
+    asked for the ingest and distill date and time on every report and note]"""
+    import re
+
+    skip_if_example_vault_empty()
+    ts_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+    failures = []
+    for note_path in EXAMPLE_VAULT.rglob("*.md"):
+        text = note_path.read_text(encoding="utf-8")
+        frontmatter, _, had_frontmatter = parse_frontmatter(text)
+        if not had_frontmatter:
+            continue
+        for field in ("ingested_at", "distilled_at"):
+            value = frontmatter.get(field)
+            if value is not None and not ts_re.match(str(value)):
+                rel = note_path.relative_to(EXAMPLE_VAULT)
+                failures.append(f"{rel}: {field}={value!r} is not UTC ISO-8601 with Z")
+    assert not failures, "\n".join(failures)
+
+
 def test_resources_carry_description_and_kind():
     skip_if_example_vault_empty()
     resources_dir = EXAMPLE_VAULT / "04_Resources"

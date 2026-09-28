@@ -154,6 +154,11 @@ def run(vault: Path) -> dict:
             problems.append("phase 3: the capture's frontmatter does not parse")
         if fm.get("status") != "draft" or fm.get("kind") != "radar-digest" or fm.get("via") != "radar" or not fm.get("description"):
             problems.append(f"phase 3: frontmatter should be a draft radar-digest with a description, got {fm}")
+        import re as _re
+        if not _re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", str(fm.get("ingested_at") or "")):
+            problems.append(f"phase 3: the weekly capture needs a UTC-Z ingested_at, got {fm.get('ingested_at')!r}")
+        if "*Generated " not in body or " UTC.*" not in body:
+            problems.append("phase 3: the weekly capture needs its own 'Generated ... UTC' line")
         if "### 1. Agent Memory (rising)" not in body:
             problems.append("phase 3: the rising interest should come first and be marked")
         if "[[04_Resources/Known-Note]]" not in body or "[[00_Memory" in body:

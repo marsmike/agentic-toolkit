@@ -49,7 +49,8 @@ def run(vault: Path) -> dict:
             "Eval-Dash-Tweet": NOTE.format(d="Evil </script><script>alert(1)</script> tweet", p=today.isoformat(),
                                            extra="source: https://x.com/a/status/1\nkind: tool-landmark\ntags:\n- domain/ai-ml\n"),
             "Eval-Dash-Paper": NOTE.format(d="paper", p=(today - timedelta(days=3)).isoformat(),
-                                           extra="source: https://arxiv.org/abs/2601.1\n"),
+                                           extra='source: https://arxiv.org/abs/2601.1\ningested_at: "2026-09-01T08:00:00Z"\n'
+                                                 'distilled_at: "2026-09-25T13:00:00Z"\n'),
             "Eval-Dash-Old": NOTE.format(d="old", p=(today - timedelta(days=200)).isoformat(), extra=""),
             "Eval-Dash-Estimated": NOTE.format(d="est", p=today.isoformat(), extra="processed_date_estimated: true\n"),
             "Eval-Dash-Unknown": NOTE.format(d="unk", p="unknown", extra=""),
@@ -126,8 +127,12 @@ def run(vault: Path) -> dict:
             problems.append(f"fields: tweet {t.get('type')}, {t.get('kind')}, {t.get('domains')}")
         if (p.get("type"), p.get("kind")) != ("paper", "unsorted"):
             problems.append(f"fields: paper {p.get('type')}, {p.get('kind')}")
+        if (p.get("ingested_at"), p.get("distilled_at")) != ("2026-09-01T08:00:00Z", "2026-09-25T13:00:00Z"):
+            problems.append(f"fields: paper timestamps {p.get('ingested_at')}, {p.get('distilled_at')}")
         if dashboard_build.source_type("") != "own":
             problems.append("fields: no source is not 'own'")
+        if not re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", str(data.get("built") or "")):
+            problems.append(f"timestamps: data['built'] is not UTC-Z, got {data.get('built')!r}")
         if [(r["distilled"], r["dropped"], r["failed"]) for r in data["runs"]] != [(7, 1, 2)]:
             problems.append(f"runs: {data['runs']}")
 

@@ -532,7 +532,8 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
     week = reports.week_of(today.isoformat())
     trend = reports.trend(state, week) if state else {}
     data = {
-        "generated": now.isoformat(timespec="seconds"),
+        # UTC, `Z`-suffixed — the same `ingested_at`/`distilled_at` format (contract/VAULT_SCHEMA.md).
+        "generated": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "vault_name": vault.name,
         "window_days": WINDOW_DAYS,
         "sources": sources,

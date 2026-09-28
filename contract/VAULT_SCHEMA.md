@@ -62,7 +62,11 @@ them holding still. Check whether an existing field fits before adding a new one
 | `description` | One-sentence purpose | Resources, Areas |
 | `source` | Provenance — URL or citation | Every distilled note |
 | `status` | Lifecycle stage, see below | Every distilled note |
-| `processed_date` | ISO date the note was distilled | Every distilled note |
+| `processed_date` | ISO date the note was distilled (back-compat; equals `distilled_at`'s date) | Every distilled note |
+| `ingested_at` | ISO 8601 UTC timestamp, with time and `Z` (e.g. `2026-09-28T18:59:34Z`) — when the item entered the vault as a capture | Every capture; every distilled note (carried over from its capture(s), earliest if several) |
+| `ingested_at_estimated` | `true` when `ingested_at` was inferred (e.g. by `backfill_timestamps.py` from git history) rather than recorded at capture time — mirrors `processed_date_estimated` | Opt-in, on an estimated `ingested_at` |
+| `distilled_at` | ISO 8601 UTC timestamp, with time and `Z` — when the note was distilled from its capture(s) | Every distilled note |
+| `distilled_at_estimated` | `true` when `distilled_at` was inferred the same way — the same convention, one flag per field | Opt-in, on an estimated `distilled_at` |
 | `kind` | Note kind (`concept`, `guide`, `research-finding`, `profile`, plus project- and domain-specific values) | Resources |
 | `topics` | Structured topical taxonomy | Resources |
 | `methodology` | Methodology family, when applicable | Resources |
@@ -71,6 +75,12 @@ them holding still. Check whether an existing field fits before adding a new one
 | `author`, `published` | Original author / publish date | External material |
 | `created` | Note creation date | Most notes |
 | `enrichment_targets` | Notes/profiles to notify when this note is enriched | Opt-in |
+
+`ingested_at` and `distilled_at` are always set deterministically in code — a writer script or a
+retirement step stamps `datetime.now(UTC)` at the moment it acts, never left to an LLM to guess
+(`processed_date` stays as the date-only back-compat field, and `processed_date_estimated` stays
+as its own estimated flag — unchanged by this pair). [earned: 2026-09-28 — the owner asked for the
+ingest and distill date and time on every report and note]
 
 ## Note lifecycle
 

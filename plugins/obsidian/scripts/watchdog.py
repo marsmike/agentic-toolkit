@@ -160,7 +160,7 @@ def week_stats(vault: Path, now: datetime) -> dict:
 
 def weekly_digest(week: dict, now: datetime) -> str:
     """One push notification a week with the numbers, cut to NOTIFY_CHARS."""
-    parts = [f"TheVoid, week to {now.date().isoformat()}:",
+    parts = [f"TheVoid, week to {now.date().isoformat()} ({now.strftime('%H:%M')} UTC):",
              f"{week['runs']} of ~{week['runs_expected']} runs, {week['distilled']} distilled, {week['imported']} imported"
              + (f", {week['failed']} failed" if week["failed"] else ""),
              f"radar: {week['radar_judged']} judged, {week['radar_strong']} strong, {week['radar_promoted']} promoted"

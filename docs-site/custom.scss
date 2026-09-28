@@ -1,0 +1,44 @@
+@use "./base.scss";
+
+/**
+ * agentic-toolkit docs site: custom.scss (see docs/BRAND.md and quartz.config.ts).
+ *
+ * Copied over quartz's own quartz/styles/custom.scss at build time (see
+ * .github/workflows/docs.yml) — it is NOT part of the vendored quartz checkout.
+ */
+
+// Typography: docs/BRAND.md's system stacks (the same ones the explainer video and cheat
+// sheet already use), not Quartz's default Google Fonts family. quartz.config.ts sets
+// `fontOrigin: "local"` (so Quartz never fetches Google Fonts) and a single system name per
+// slot as a local fallback; the full stacks live here as the real values. `!important` is
+// required, not stylistic: Quartz's own generated `:root` font-variable block (`--headerFont`
+// etc., see quartz/util/theme.ts's `joinStyles`) is emitted *after* this file in the same
+// bundle, so a plain same-specificity `:root` rule here would lose the cascade to it.
+:root {
+  --headerFont: -apple-system, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  --bodyFont: -apple-system, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  --titleFont: -apple-system, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  --codeFont: ui-monospace, "SF Mono", Menlo, monospace !important;
+}
+
+// Dark mode only: a faint, deterministic starfield behind the page — docs/BRAND.md, "The
+// frame": "A starfield (faint, deterministic, never distracting) sits behind everything."
+// Ten fixed dots (no randomness, no image request) in one repeating tile, each the brand
+// `ink` token at low opacity — never a new color, and never opaque enough to touch text
+// contrast (every dot covers well under 1% of any line of reading text; the existing
+// darkgray/dark-on-bg ratios in quartz.config.ts are unaffected).
+:root[saved-theme="dark"] body {
+  background-image: radial-gradient(1.6px 1.6px at 15% 22%, rgba(238, 241, 255, 0.45), transparent),
+    radial-gradient(1.2px 1.2px at 42% 8%, rgba(238, 241, 255, 0.32), transparent),
+    radial-gradient(1.8px 1.8px at 68% 35%, rgba(238, 241, 255, 0.4), transparent),
+    radial-gradient(1.1px 1.1px at 88% 12%, rgba(238, 241, 255, 0.28), transparent),
+    radial-gradient(1.4px 1.4px at 25% 62%, rgba(238, 241, 255, 0.36), transparent),
+    radial-gradient(1.1px 1.1px at 55% 78%, rgba(238, 241, 255, 0.24), transparent),
+    radial-gradient(1.6px 1.6px at 80% 68%, rgba(238, 241, 255, 0.4), transparent),
+    radial-gradient(1.2px 1.2px at 6% 88%, rgba(238, 241, 255, 0.28), transparent),
+    radial-gradient(1.3px 1.3px at 95% 90%, rgba(238, 241, 255, 0.32), transparent),
+    radial-gradient(1px 1px at 33% 45%, rgba(238, 241, 255, 0.24), transparent);
+  background-repeat: repeat;
+  background-size: 340px 340px;
+  background-attachment: fixed;
+}

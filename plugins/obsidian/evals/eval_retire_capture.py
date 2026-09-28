@@ -22,6 +22,10 @@ and its folder's manifest together, under a lock.
 8. duplicate      — a clip that repeats another is archived whole with --duplicate-of (never
                   deleted), the line names what it duplicates; a target that isn't in the vault
                   refuses and moves nothing
+9. stamping       — retiring a capture with `ingested_at` stamps the note it names with
+                  `distilled_at` (now, UTC `Z`) and carries the capture's own `ingested_at`
+10. no overwrite  — a note that already carries `distilled_at`/`ingested_at` keeps its own values
+                  through retirement
 
 Offline: judgment keys are removed so distill_check's soft findability/preservation calls (which
 need a backend) never run; retire_capture only needs the hard gates, which don't.
@@ -40,10 +44,12 @@ KEY_ENVS = ("TOOLKIT_OBSIDIAN_JUDGMENT_API_KEY", "OPENROUTER_API_KEY")
 SOURCE = "https://example.org/retire-eval-article"
 
 
-def _capture(via: str | None) -> str:
+def _capture(via: str | None, ingested_at: str | None = None) -> str:
     lines = ["---", f"source: {SOURCE}", "origin: readwise"]
     if via is not None:
         lines.append(f"via: {via}")
+    if ingested_at is not None:
+        lines.append(f'ingested_at: "{ingested_at}"')
     lines += ["---", "", "# Retire eval capture", "", f"*Source: [{SOURCE}]({SOURCE})*", "",
               "## Full Text", "", "A claim with a number: 100% of gates catch what they are shown to catch."]
     return "\n".join(lines) + "\n"
@@ -73,6 +79,26 @@ processed_date: 2026-09-24
 # Retire eval note without an index line
 """
 
+STAMP_INGESTED_AT = "2026-09-01T10:00:00Z"
+ALREADY_STAMPED_DISTILLED_AT = "2020-01-01T00:00:00Z"
+ALREADY_STAMPED_INGESTED_AT = "2019-12-31T00:00:00Z"
+
+ALREADY_STAMPED_NOTE = f"""---
+description: A note that already carries its own timestamps.
+status: distilled
+source: {SOURCE}
+processed_date: 2026-09-24
+distilled_at: "{ALREADY_STAMPED_DISTILLED_AT}"
+ingested_at: "{ALREADY_STAMPED_INGESTED_AT}"
+---
+
+# Retire eval note with its own timestamps
+
+*Source: [Retire eval capture]({SOURCE})*
+
+Body text with the claim carried over.
+"""
+
 
 def run(vault: Path) -> dict:
     import sys
@@ -80,6 +106,7 @@ def run(vault: Path) -> dict:
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
     import retire_capture as rc
+    import vault_utils
 
     problems: list[str] = []
     saved = {k: os.environ.pop(k, None) for k in KEY_ENVS}
@@ -122,10 +149,20 @@ def run(vault: Path) -> dict:
         (sandbox / "04_Resources" / "Retire-Eval-Good-2.md").write_text(
             GOOD_NOTE.replace(SOURCE, SOURCE + "-2"), encoding="utf-8")
         (sandbox / "04_Resources" / "Retire-Eval-Bad.md").write_text(BAD_NOTE, encoding="utf-8")
+        (sandbox / "01_Capture" / "Readwise-Retire-Stamp.md").write_text(
+            _capture("clip", STAMP_INGESTED_AT).replace(SOURCE, SOURCE + "-stamp"), encoding="utf-8")
+        (sandbox / "04_Resources" / "Retire-Eval-Stamp.md").write_text(
+            GOOD_NOTE.replace(SOURCE, SOURCE + "-stamp"), encoding="utf-8")
+        (sandbox / "01_Capture" / "Readwise-Retire-Keep.md").write_text(
+            _capture("clip", STAMP_INGESTED_AT).replace(SOURCE, SOURCE + "-keep"), encoding="utf-8")
+        (sandbox / "04_Resources" / "Retire-Eval-Keep.md").write_text(
+            ALREADY_STAMPED_NOTE.replace(SOURCE, SOURCE + "-keep"), encoding="utf-8")
         index = sandbox / "Index.md"
         index.write_text(index.read_text(encoding="utf-8") +
                          "\n- [[04_Resources/Retire-Eval-Good|Retire Eval Good]] — fixture\n"
-                         "- [[04_Resources/Retire-Eval-Good-2|Retire Eval Good 2]] — fixture\n",
+                         "- [[04_Resources/Retire-Eval-Good-2|Retire Eval Good 2]] — fixture\n"
+                         "- [[04_Resources/Retire-Eval-Stamp|Retire Eval Stamp]] — fixture\n"
+                         "- [[04_Resources/Retire-Eval-Keep|Retire Eval Keep]] — fixture\n",
                          encoding="utf-8")
 
         def cap(name: str) -> Path:
@@ -220,6 +257,30 @@ def run(vault: Path) -> dict:
         if r["mode"] != "duplicate" or not (sandbox / r["archived_to"]).is_file() or \
                 "**duplicate** of `04_Resources/Retire-Eval-Good.md`, kept whole here." not in text:
             problems.append(f"phase 8: duplicate not archived as expected: {r}")
+
+        # --- 9. stamping: distilled_at stamped now, ingested_at carried from the capture ---
+        import re as _re
+
+        stamp_note_path = sandbox / "04_Resources" / "Retire-Eval-Stamp.md"
+        r = rc.retire(cap("Readwise-Retire-Stamp.md"), sandbox, ["04_Resources/Retire-Eval-Stamp.md"],
+                      "→ [[Retire-Eval-Stamp]].", None)
+        if r.get("stamped") != ["04_Resources/Retire-Eval-Stamp.md"]:
+            problems.append(f"phase 9: retire() did not report the note as stamped: {r.get('stamped')}")
+        stamped_fm, _ = vault_utils.read_frontmatter(stamp_note_path)
+        if not _re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", str(stamped_fm.get("distilled_at") or "")):
+            problems.append(f"phase 9: distilled_at not stamped in the right format: {stamped_fm.get('distilled_at')!r}")
+        if stamped_fm.get("ingested_at") != STAMP_INGESTED_AT:
+            problems.append(f"phase 9: ingested_at not carried from the capture: {stamped_fm.get('ingested_at')!r}")
+
+        # --- 10. no overwrite: a note with its own timestamps keeps them ---
+        keep_note_path = sandbox / "04_Resources" / "Retire-Eval-Keep.md"
+        r = rc.retire(cap("Readwise-Retire-Keep.md"), sandbox, ["04_Resources/Retire-Eval-Keep.md"],
+                      "→ [[Retire-Eval-Keep]].", None)
+        if r.get("stamped"):
+            problems.append(f"phase 10: a note with its own timestamps was reported stamped: {r.get('stamped')}")
+        keep_fm, _ = vault_utils.read_frontmatter(keep_note_path)
+        if keep_fm.get("distilled_at") != ALREADY_STAMPED_DISTILLED_AT or keep_fm.get("ingested_at") != ALREADY_STAMPED_INGESTED_AT:
+            problems.append(f"phase 10: existing timestamps were overwritten: {keep_fm.get('distilled_at')!r}, {keep_fm.get('ingested_at')!r}")
     finally:
         for k, v in saved.items():
             if v is not None:

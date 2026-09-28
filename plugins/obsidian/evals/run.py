@@ -48,6 +48,7 @@ EVAL_MODULES = (
     "eval_retire_capture",
     "eval_search_heading_weight",
     "eval_fetch_source",
+    "eval_backfill_timestamps",
 )
 
 

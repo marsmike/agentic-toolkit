@@ -16,11 +16,20 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
 
 MARKETPLACE_MARKER = Path(".claude-plugin") / "marketplace.json"
+
+
+def utc_timestamp() -> str:
+    """Now, as the vault's one `ingested_at`/`distilled_at` format: ISO 8601 UTC, seconds, `Z`
+    (e.g. `2026-09-28T18:59:34Z`) — never a local offset, never left to an LLM to write.
+    contract/VAULT_SCHEMA.md. [earned: 2026-09-28 — the owner asked for the ingest and distill
+    date and time on every report and note]"""
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 # PARA folders, in the order they appear in contract/VAULT_SCHEMA.md.
 PARA_FOLDERS = (

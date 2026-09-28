@@ -62,6 +62,10 @@ jobs:
           if [ -f repo/docs-site/custom.scss ]; then
             cp repo/docs-site/custom.scss quartz/quartz/styles/custom.scss
           fi
+          # The brand icon (assets/build_banner.py); without it Quartz falls back to its own logo.
+          if [ -f repo/docs-site/static/icon.png ]; then
+            cp repo/docs-site/static/icon.png quartz/quartz/static/icon.png
+          fi
 
       # Publish everything except:
       #   - 00_Memory/  — agent self-memory (journal, DLQ); not public docs surface

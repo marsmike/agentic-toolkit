@@ -31,7 +31,16 @@ from urllib.parse import quote, urlsplit
 
 import imports_log
 import radar_ledger
-from vault_utils import atomic_write, contained, git_output, profile_value, read_frontmatter, require_vault
+from vault_utils import (
+    atomic_write,
+    contained,
+    format_ts,
+    git_output,
+    profile_value,
+    read_frontmatter,
+    require_vault,
+    utc_timestamp,
+)
 
 OUT = Path("00_Memory") / "last-run-report.html"
 STATE = Path("00_Memory") / "pipeline-state.json"
@@ -317,17 +326,30 @@ def _item_html(vault: Path, it: dict, gh: str, by_source: dict[str, list[str]]) 
     src = _web(it.get("source"))
     head = f'<a class="title" href="{escape(src)}">{title}</a>' if src else f'<span class="title">{title}</span>'
     links, media = _capture_facts(vault, it.get("capture", ""))
+    ingested_at = it.get("ingested_at")
     meta = [escape(x) for x in (it.get("author"), _host(src) if src else None, it.get("via"),
-                                f"enrichment {it['enrichment']}" if it.get("enrichment") else None) if x]
+                                f"enrichment {it['enrichment']}" if it.get("enrichment") else None,
+                                f"ingested {format_ts(ingested_at)}" if ingested_at else None) if x]
     if media:
         meta.append(f"{media} image{'s' if media != 1 else ''} kept")
     found = list(dict.fromkeys([n if n.endswith(".md") else n + ".md" for n in f["notes"]] + by_source.get(_key(src), [])))
-    notes = [_note_link(vault, n, gh) for n in found if (vault / n).is_file()]
+    found = [n for n in found if (vault / n).is_file()]
+    notes = [_note_link(vault, n, gh) for n in found]
+    became = escape(f["detail"])
+    # The first found note's own `distilled_at` — not `f["distilled_at"]` alone, which only ever
+    # comes from a manifest line's `[[wikilink]]`: a note reached only through `by_source` (its
+    # capture's manifest line was plain prose) still has its own timestamp worth showing.
+    distilled_at = f.get("distilled_at")
+    if not distilled_at and f["status"] == "distilled" and found:
+        nfm, _ = read_frontmatter(vault / found[0])
+        distilled_at = nfm.get("distilled_at") if isinstance(nfm.get("distilled_at"), str) else None
+    if distilled_at and f["status"] == "distilled":
+        became += f" (distilled {escape(format_ts(distilled_at))})"
     out = [f'<li class="item"><div class="row"><span class="kind">{escape(kind)}</span>'
            f'<span class="status s-{f["status"]}">{STATUS.get(f["status"], f["status"])}</span></div>{head}']
     if meta:
         out.append(f'<div class="meta">{" · ".join(meta)}</div>')
-    out.append(f'<div class="became">→ {escape(f["detail"])}</div>')
+    out.append(f'<div class="became">→ {became}</div>')
     if notes:
         out.append(f'<div class="notelinks">{"".join(notes)}</div>')
     if links:
@@ -443,8 +465,8 @@ def render(vault: Path, run: str | None = None, today: date | None = None) -> st
     out.append("</section>")
     every = " · ".join(f'<a href="{escape(gh + p)}">{p}</a>' if gh else p for p in ("Imports.md", "Dashboard.html", "Index.md"))
     out.append(f"<footer><span><b>agentic-toolkit</b> reads, links and files, so the vault keeps up without you.</span>"
-               f"<span>Rebuilt and republished after every successful run; the previous report is replaced. "
-               f"The long view: {every}.</span></footer></div>")
+               f"<span>Generated {escape(format_ts(utc_timestamp()))}. Rebuilt and republished after every successful run; "
+               f"the previous report is replaced. The long view: {every}.</span></footer></div>")
     return "\n".join(out) + "\n"
 
 

@@ -32,11 +32,13 @@ from vault_utils import (
     atomic_write,
     contained,
     discover_notes,
+    format_ts,
     one_line,
     read_frontmatter,
     read_jsonl,
     require_vault,
     root_active_notes,
+    utc_timestamp,
 )
 
 NOW = "Now.md"
@@ -176,7 +178,7 @@ def build(vault: Path, today: date) -> tuple[dict[str, str], dict]:
     peak = max((c for _, c in chart), default=0) or 1
 
     out = ["---", f"generated_by: {GENERATOR}", "cssclasses:", "  - dashboard", "---", "# Now", "", HEADER, "",
-           f"*Week since {since.isoformat()} · {_last_run(vault)}*", "",
+           f"*Generated {format_ts(utc_timestamp())} · Week since {since.isoformat()} · {_last_run(vault)}*", "",
            "[[Maps/Overview|Maps]] · [[Boards/Pipeline|Pipeline board]] · [[Index]] · [[Log]]", ""]
     out += _callout("success", f"New this week ({len(new)})", _capped([f"- {_link(p)}" for p in new]) or ["- (none)"])
     out += _callout("info", f"Enriched this week ({len(enriched)})",

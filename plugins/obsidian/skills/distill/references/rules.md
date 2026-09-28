@@ -89,6 +89,15 @@ maintenance that would repair it. Use `(none — <context>)` for source, and tod
 date for `processed_date` (the note is being processed right now; that's the honest
 value).
 
+Don't write `distilled_at` or `ingested_at` yourself either — not even a real value. Both are
+ISO 8601 UTC timestamps with a time component (`2026-09-28T18:59:34Z`), and `retire_capture.py`
+is the one place in this skill's flow that stamps them: `distilled_at` to the moment it retires
+the capture, `ingested_at` carried over from the capture's own frontmatter. A hand-written value
+here would race the script's own stamp and, since neither is ever overwritten once set, could
+freeze in a wrong or approximate time. If you're filing a conversation insight (the one capture
+this skill writes itself), set the *capture's* `ingested_at` from `date -u +%Y-%m-%dT%H:%M:%SZ`
+when you write it — that one has no script to stamp it for you.
+
 ## Dead-letter queue — when to stop instead of guessing
 
 Distill is conversational by design (the checkpoint), but even after

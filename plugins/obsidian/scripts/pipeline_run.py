@@ -19,9 +19,12 @@ oldest first, at most `--batch` (profile `pipeline_batch`, default 25). A captur
 MAX_ATTEMPTS runs is left out and written to the DLQ once: it needs a human, and it must not
 block the queue.
 
-`end` records failures, rebuilds Index.md, the maps and Now.md (`index_build.py`, `map_build.py`,
-`now_build.py`), appends one Log.md line, and releases the lock. If the vault is a git repository
-it commits (the undo for an unattended run), then pulls and pushes when there is an upstream.
+`end` records failures, stamps `distilled_at`/`ingested_at` on any distilled note this run
+touched that `retire_capture.py` didn't already stamp (`stamp_distilled_notes`, a safety net —
+invariant 6 runs `retire_capture.py`, which stamps deterministically, for every capture), rebuilds
+Index.md, the maps and Now.md (`index_build.py`, `map_build.py`, `now_build.py`), appends one
+Log.md line, and releases the lock. If the vault is a git repository it commits (the undo for an
+unattended run), then pulls and pushes when there is an upstream.
 Before any commit the staged diff is scanned for key-shaped strings; a hit refuses the commit and
 writes a DLQ note that names the file and the kind of key, never the value (status `refused`).
 """
@@ -42,7 +45,19 @@ from pathlib import Path
 from typing import Any
 
 import imports_log
-from vault_utils import atomic_write, contained, inside, profile_value, read_frontmatter, require_vault, write_dlq_note
+from vault_utils import (
+    atomic_write,
+    contained,
+    inside,
+    profile_value,
+    read_frontmatter,
+    require_vault,
+    utc_timestamp,
+    write_dlq_note,
+    write_frontmatter,
+)
+
+NOTE_DIRS = ("02_Projects", "03_Areas", "04_Resources")
 
 LOCK = Path("00_Memory") / "pipeline.lock"
 PUSH_ATTEMPTS = 3
@@ -279,6 +294,53 @@ def lost_media(vault: Path, rows: list[dict]) -> dict[str, list[str]]:
     return {"ignored": ignored, "missing": missing}
 
 
+def stamp_distilled_notes(vault: Path, rows_in: list[dict]) -> list[str]:
+    """Safety net beside `retire_capture.py`'s own stamping (invariant 6 runs it for every
+    capture this run distilled): any `02_Projects`/`03_Areas`/`04_Resources` note the working
+    tree shows added or changed, `status: distilled`, still missing `distilled_at` gets it here
+    too, deterministically — never left unset because a note reached that status by some other
+    path. `ingested_at` is filled the same way when this run's own imported captures
+    (00_Memory/imports.jsonl rows, `capture` resolved through the archive by imports_log) name a
+    `source` the note also carries; a note with no matching capture is left for the next
+    `backfill_timestamps.py` pass rather than guessed. Neither field is ever overwritten.
+    contract/VAULT_SCHEMA.md. [earned: 2026-09-28 — the owner asked for the ingest and distill
+    date and time on every report and note]"""
+    by_source: dict[str, str] = {}
+    for row in rows_in:
+        cap = imports_log._capture_file(vault, str(row.get("capture") or ""))
+        if cap is None:
+            continue
+        cfm, _ = read_frontmatter(cap)
+        ia, src = cfm.get("ingested_at"), cfm.get("source")
+        if isinstance(ia, str) and ia and isinstance(src, str) and src:
+            by_source[src] = ia
+    now = utc_timestamp()
+    stamped = []
+    for line in _git(vault, "status", "--porcelain", "--untracked-files=all", "--", *NOTE_DIRS).stdout.splitlines():
+        code, rel = line[:2], line[3:].strip().strip('"')
+        if not rel.endswith(".md") or ("A" not in code and "M" not in code and "?" not in code):
+            continue
+        path = vault / rel
+        if not path.is_file():
+            continue
+        fm, body = read_frontmatter(path)
+        if fm.get("status") != "distilled":
+            continue
+        changed = False
+        if not fm.get("distilled_at"):
+            fm["distilled_at"] = now
+            changed = True
+        if not fm.get("ingested_at"):
+            src = fm.get("source")
+            if isinstance(src, str) and src in by_source:
+                fm["ingested_at"] = by_source[src]
+                changed = True
+        if changed:
+            write_frontmatter(path, fm, body)
+            stamped.append(rel)
+    return stamped
+
+
 def _dlq_once(vault: Path, slug: str, **note: Any) -> Path | None:
     """One open DLQ note per recurring problem: a run every three hours must not stack them. Returns
     the note actually written, or None when an active one already covers this and nothing new was
@@ -427,10 +489,14 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     # and gets a DLQ note. [earned: 2026-09-23, PR #20 and #24 reviews]
     # What this run imported goes in the log before the pages that show it are built.
     lost: dict[str, list[str]] = {"ignored": [], "missing": []}
+    rows_in: list[dict] = []
     if marks is not None:
         rows_in = _rows(vault / LEDGERS["ingested"])[marks.get("ingested", 0):]
         imports_log.record(vault, now.strftime("%Y-%m-%d %H:%M"), rows_in)
         lost = lost_media(vault, rows_in)
+    # Safety net alongside retire_capture.py's own deterministic stamping (invariant 6 runs it for
+    # every capture) — before the navigation generators read these notes.
+    stamped_timestamps = stamp_distilled_notes(vault, rows_in)
     if lost["ignored"] or lost["missing"]:
         _dlq_once(vault, slug="media-not-in-git", title="Images a capture names will not leave this machine",
                   what_happened=(f"git-ignored: {', '.join(lost['ignored'])}. " if lost["ignored"] else "")
@@ -468,6 +534,8 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
         result["build_failed"] = failed_builds
     if lost["ignored"] or lost["missing"]:
         result["lost_media"] = lost
+    if stamped_timestamps:
+        result["stamped_timestamps"] = stamped_timestamps
     # The lock is held through commit and push (and never staged), so no other run starts its
     # pull while this one is still writing to git. [earned: 2026-09-23, PR #24 review]
     try:

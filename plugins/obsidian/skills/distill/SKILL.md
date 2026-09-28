@@ -107,7 +107,11 @@ worker renamed a note to dodge the secrets entry]
    review. Skip only on an explicit `--auto`; the `pipeline` skill runs with `--auto`, and the
    vault's git commit per run is the undo.
 2. **Every note carries its source**, and never the string `unknown`: `(none — <context>)`
-   when there is none, today's date for `processed_date`.
+   when there is none, today's date for `processed_date`. `distilled_at` and `ingested_at`
+   (ISO 8601 UTC, with time and `Z`) are never yours to write: `retire_capture.py` stamps both,
+   deterministically, the moment it retires the capture the note came from — `distilled_at` to
+   now, `ingested_at` carried over from the capture's own. Leave them out of a note you're
+   writing; they land when you retire the capture.
 3. **Advice never writes.** Dossier rows, inferred edges, adjudications: candidates for your
    decision, never applied by a script.
 4. **L1 is the default; L2 and L3 need a cited sentence** in the note being enriched. Never
@@ -146,4 +150,7 @@ worker renamed a note to dodge the secrets entry]
 Placement, enrichment levels and the DLQ convention in detail: [rules.md](references/rules.md).
 Modes: triage the inbox (run the dossier over `01_Capture/*.md`, decide distill / quick-file /
 discard per capture; a discard is always yours to make, and never a clip's), or file a conversation insight as a
-capture first and distill it like any other.
+capture first and distill it like any other. Filing one is the one capture this skill writes by
+hand (every other capture comes from a plugin's own ingest script) — set its `ingested_at` from
+the clock, never a guess: `date -u +%Y-%m-%dT%H:%M:%SZ`, into the new capture's frontmatter,
+before you distill it.

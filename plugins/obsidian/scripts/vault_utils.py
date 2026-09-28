@@ -23,6 +23,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +44,26 @@ PARA_FOLDERS = ("00_Memory", "01_Capture", "02_Projects", "03_Areas", "04_Resour
 ACTIVE_CONTENT_FOLDERS = ("02_Projects", "03_Areas", "04_Resources")
 ARCHIVE_FOLDER = "05_Archive"
 EXCLUDE_DIRS = {"assets", "node_modules", "out", "public", "src", ".obsidian", ".smart-env", ".trash"}
+
+
+def utc_timestamp() -> str:
+    """Now, as the vault's one `ingested_at`/`distilled_at` format: ISO 8601 UTC, seconds, `Z`
+    (e.g. `2026-09-28T18:59:34Z`) — never a local offset, never left to an LLM to write.
+    contract/VAULT_SCHEMA.md. [earned: 2026-09-28 — the owner asked for the ingest and distill
+    date and time on every report and note]"""
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def format_ts(raw: object, estimated: bool = False) -> str:
+    """A stored `ingested_at`/`distilled_at` (or a legacy date-only value) as a page's own human
+    label: `YYYY-MM-DD HH:MM UTC` when a time is on it, else just the date — and `estimated` when
+    the caller knows the value was inferred (`processed_date_estimated`'s own convention), never a
+    fabricated time. "" for nothing stored. contract/VAULT_SCHEMA.md."""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    label = s[:16].replace("T", " ") + " UTC" if len(s) >= 16 and s[10] == "T" and s.endswith("Z") else s[:10]
+    return f"{label} (estimated)" if estimated else label
 
 # Canonical aliased index entry: `- [[rel/path/Name|Name]] — summary ⚙?`. Tolerates the
 # bare `- [[Name]] — summary` form too.

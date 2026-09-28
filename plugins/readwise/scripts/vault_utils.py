@@ -16,6 +16,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,14 @@ import yaml
 
 MARKETPLACE_MARKER = Path(".claude-plugin") / "marketplace.json"
 PROFILE_PLUGIN_NAME = "readwise"
+
+
+def utc_timestamp() -> str:
+    """Now, as the vault's one `ingested_at`/`distilled_at` format: ISO 8601 UTC, seconds, `Z`
+    (e.g. `2026-09-28T18:59:34Z`) — never a local offset, never left to an LLM to write.
+    contract/VAULT_SCHEMA.md. [earned: 2026-09-28 — the owner asked for the ingest and distill
+    date and time on every report and note]"""
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 # ---------------------------------------------------------------------------
 # Vault resolution (contract/PROFILE.md)

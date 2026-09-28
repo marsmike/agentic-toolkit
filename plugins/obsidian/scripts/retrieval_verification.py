@@ -29,6 +29,7 @@ from vault_utils import (
     discover_notes,
     read_frontmatter,
     require_vault,
+    utc_timestamp,
     write_dlq_note,
 )
 
@@ -125,6 +126,7 @@ def append_inbox_summary(report: dict, vault: Path, report_path: Path) -> Path:
         f"description: Retrieval-verification run summary, {report['sampled']} notes sampled, {len(flagged)} flagged.\n"
         "status: draft\n"
         f"created: {time.strftime('%Y-%m-%d')}\n"
+        f"ingested_at: {utc_timestamp()}\n"
         "tags:\n  - domain/toolkit-meta\n"
         "---\n\n"
         f"# Retrieval verification — {time.strftime('%Y-%m-%d')}\n\n" + "\n".join(lines) + "\n"

@@ -32,7 +32,7 @@ from typing import Any
 
 import pdf_extract
 import tweet_enrich
-from vault_utils import find_capture_by_doc_id, unique_path, write_dlq_note, write_frontmatter
+from vault_utils import find_capture_by_doc_id, unique_path, utc_timestamp, write_dlq_note, write_frontmatter
 
 STUB_CHARS = 200        # less real text than this is not the article (a short X post via RSS has ~270)
 STUB_CEILING = 1500     # a known wall phrase in a text shorter than this marks a stub
@@ -185,6 +185,7 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
         "source": source_url,
         "origin": "readwise",
         "readwise_doc_id": doc_id,
+        "ingested_at": utc_timestamp(),
         "category": category,
         "author": author or None,
         "saved_at": saved_at or None,
@@ -258,6 +259,7 @@ def write_highlights_capture(vault: Path, parent: dict[str, Any], highlights: li
         "source": source_url or None, "origin": "readwise", "category": "highlights",
         "readwise_parent_id": str(parent.get("id") or "") or None,
         "readwise_highlight_ids": [str(h["id"]) for h in highlights],
+        "ingested_at": utc_timestamp(),
         "author": author or None, "saved_at": day, "created": day, "via": "clip",
         "tags": ["readwise", "highlights"],
     }.items() if v}
@@ -313,6 +315,7 @@ def write_book_capture(vault: Path, book: dict[str, Any], highlights: list[dict[
         "source": book.get("source_url") or book.get("readwise_url") or "",
         "origin": "readwise",
         "readwise_doc_id": doc_id,
+        "ingested_at": utc_timestamp(),
         "category": "book",
         "author": author or None,
         "tags": ["readwise", "book"],

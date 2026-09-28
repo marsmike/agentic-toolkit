@@ -97,6 +97,10 @@ def run(vault: Path) -> dict:
         now = (sandbox / "Now.md").read_text(encoding="utf-8")
         board = (sandbox / "Boards" / "Pipeline.md").read_text(encoding="utf-8")
 
+        import re as _re
+        if not _re.search(r"\*Generated \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", now):
+            problems.append("phase 0: Now.md is missing its own 'Generated ... UTC' header line")
+
         # 1. week
         new, enr = _callout(now, "New this week"), _callout(now, "Enriched this week")
         if "Eval-Pipeline-New" not in new or "Eval-Hand-Note" in new or enriched.stem not in enr:

@@ -274,7 +274,7 @@ def _md_link(row: dict) -> str:
     return f"[{title}]({row['url']})" if row.get("url") else title
 
 
-def render_daily(run_date: str, rows: list[dict], interests: list[Interest], usage: dict) -> str:
+def render_daily(run_date: str, rows: list[dict], interests: list[Interest], usage: dict, now: datetime | None = None) -> str:
     names = {it.id: it.name for it in interests}
     strong_n = sum(1 for r in rows if r["strong"])
     worth_n = sum(1 for r in rows if r["worth"])
@@ -290,6 +290,8 @@ def render_daily(run_date: str, rows: list[dict], interests: list[Interest], usa
         "---",
         "",
         f"# Radar {run_date}",
+        "",
+        f"*Generated {(now or datetime.now(UTC)).strftime('%Y-%m-%d %H:%M')} UTC.*",
         "",
         f"{len(rows)} feed items judged against {len(interests)} interests ({', '.join(models) or 'no backend'}; "
         f"questions {', '.join(qv) or '-'}). **{strong_n} strong, {worth_n} worth reading.** "
@@ -569,7 +571,7 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
 
     day_rows = [r for r in read_jsonl(out / "state.jsonl") if r.get("run") == run_date]
     note = out / f"{run_date}.md"
-    atomic_write(note, render_daily(run_date, day_rows, interests, run.as_dict()))
+    atomic_write(note, render_daily(run_date, day_rows, interests, run.as_dict(), now))
     recorded |= {k for i in judged for k in keys_of(items[i])}
     commented = comment_epics(out, rows, interests, run_date) if todoist else {}
     return {**result, **archived(), **commented, "status": "ok", "judged": len(rows), "unjudged": len(items) - len(rows),
