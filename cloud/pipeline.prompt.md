@@ -30,7 +30,7 @@ SETUP
    If the final push is refused with "not in this session's authorized repository set", report
    exactly that: TheVoid must be attached to the routine as a source.
 3. Keys: check by name only, never print a value:
-     python3 -c "import os; print({k: bool(os.environ.get(k)) for k in ('OPENROUTER_API_KEY','READWISE_TOKEN','KAGI_API_KEY')})"
+     python3 -c "import os; print({k: bool(os.environ.get(k)) for k in ('OPENROUTER_API_KEY','READWISE_TOKEN','KAGI_API_KEY','TAVILY_API_KEY')})"
    A missing key means that source prints SKIPPED. That is fine; go on.
 4. Read $TOOLKIT_VAULT/AGENTS.md, then plugins/obsidian/skills/pipeline/SKILL.md, and follow
    the pipeline skill exactly (use the obsidian:pipeline skill if it is loaded; otherwise follow

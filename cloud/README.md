@@ -119,11 +119,12 @@ pipeline routine, so `uv` and the git credential are there; no keys are needed.
 - **Environment variables** (the environment's `.env` field; visible to everyone who uses the
   environment, so keep it yours alone): `TOOLKIT_VAULT_REMOTE=https://github.com/marsmike/TheVoid.git`
   (used only by the `cloud-vault.sh` fallback), `OPENROUTER_API_KEY`, `READWISE_TOKEN`,
-  `KAGI_API_KEY`, `TODOIST_API_TOKEN` (read by `td`); optional
+  `KAGI_API_KEY`, `TAVILY_API_KEY` (web search; the radar's Reddit discovery once it is wired),
+  `TODOIST_API_TOKEN` (read by `td`); optional
   `TOOLKIT_OBSIDIAN_PIPELINE_BATCH` (leave it unset for the default of 25). `GH_TOKEN` is not
   needed once TheVoid is attached. Never in a file in a repo.
 - **Setup script:** `setup.sh`, pasted into the environment; it assumes no repository exists yet.
-- **Network access:** the run calls `openrouter.ai`, `readwise.io`, `kagi.com`, `api.todoist.com`,
+- **Network access:** the run calls `openrouter.ai`, `readwise.io`, `kagi.com`, `api.tavily.com`, `api.todoist.com`,
   `huggingface.co` (gaiafield's model, once, and the radar's trending models), GitHub (`api.github.com`
   for the radar's new-repo search, refused by the session proxy in the cloud, and
   `mshibanami.github.io` for the GitHub Trending feed it falls back to), `hn.algolia.com`,
