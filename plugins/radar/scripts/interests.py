@@ -2,8 +2,10 @@
 
 Two sources, merged:
 - the interests note (profile key `interests_note`, default `03_Areas/Trend Radar Profile.md`):
-  frontmatter `interests:`, a list of `{name, gloss, tags, queries}`. `gloss` is one sentence
-  saying what the interest *is*; `queries` are search strings for discovery;
+  frontmatter `interests:`, a list of `{name, gloss, tags, queries, aliases}`. `gloss` is one
+  sentence saying what the interest *is*; `queries` are search strings for discovery; `aliases`
+  are old names this interest was renamed from (slugged the same way as its id) — `alias_map()`
+  is how a state row judged under an old id still counts toward the renamed interest;
 - Portfolio epics through the `td` CLI, when `todoist_project_id` is set: top-level open tasks in
   the sections named by `todoist_sections` (default Doing, Next, Waiting), the first sentence of
   the description's `What:` line as gloss. Off when the key is unset or `td` is absent.
@@ -16,7 +18,7 @@ import json
 import re
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from vault_utils import UnparseableFrontmatter, profile_value, read_frontmatter
@@ -34,6 +36,10 @@ class Interest:
     queries: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
     todoist_task_id: str | None = None
+    # Old names this interest was renamed from (profile `aliases:`, slugged the same way as `id`):
+    # a state row judged under the old id still counts toward this one. [earned: 2026-09-28, the
+    # owner's four Obsidian-plugin renames dropping their history from the weekly digest]
+    alias_ids: frozenset[str] = frozenset()
 
     def state(self) -> dict[str, str]:
         """The only part of an interest a judgment backend sees."""
@@ -53,7 +59,7 @@ def _unique(interests: list[Interest]) -> list[Interest]:
         while iid in seen:
             iid, n = f"{it.id}-{n}", n + 1
         seen.add(iid)
-        out.append(it if iid == it.id else Interest(iid, it.name, it.gloss, it.queries, it.tags, it.todoist_task_id))
+        out.append(it if iid == it.id else replace(it, id=iid))
     return out
 
 
@@ -77,6 +83,7 @@ def from_note(vault: Path) -> list[Interest]:
             gloss=str(entry.get("gloss") or "").strip(),
             queries=tuple(str(q) for q in entry.get("queries") or []),
             tags=tuple(str(t) for t in entry.get("tags") or []),
+            alias_ids=frozenset(slug(str(a)) for a in entry.get("aliases") or [] if str(a).strip()),
         ))
     return out
 
@@ -124,3 +131,17 @@ def from_todoist(vault: Path) -> list[Interest]:
 
 def load(vault: Path) -> list[Interest]:
     return _unique(from_note(vault) + from_todoist(vault))
+
+
+def alias_map(interests: list[Interest]) -> dict[str, str]:
+    """Every id a state row might carry (current, or an old name before a rename) → the interest
+    it counts toward today. The one place this resolution happens: `reports.py`, `signal_radar.py`
+    and anything else that groups judged rows by interest id should look a stored id up here
+    (`.get(iid)`) instead of assuming the id is still current — `None` means the id names no live
+    interest (the interest itself was retired, not just renamed). A current id always wins if an
+    alias somehow claims it too. [earned: 2026-09-28, the owner's Obsidian-plugin renames]"""
+    m = {it.id: it.id for it in interests}
+    for it in interests:
+        for old in it.alias_ids:
+            m.setdefault(old, it.id)
+    return m

@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from clips import Clip
-from interests import Interest
+from interests import Interest, alias_map
 from judgments import policy
 from vault_utils import atomic_write, utc_timestamp
 
@@ -104,7 +104,11 @@ def bands(row: dict) -> tuple[set[str], set[str]]:
 # ---------------------------------------------------------------------------
 
 
-def feeds(rows: list[dict], now: datetime) -> list[dict[str, Any]]:
+def feeds(rows: list[dict], now: datetime, amap: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    """`amap` (`interests_mod.alias_map()`) resolves a row's possibly-old interest id before it is
+    counted, so a renamed interest's per-feed yield does not fragment across its old and new id;
+    an id it cannot resolve (retired) is dropped rather than counted under its own stale id.
+    `amap=None` skips resolution. [earned: 2026-09-28, the owner's Obsidian-plugin renames]"""
     by_feed: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
         by_feed[r.get("feed") or "?"].append(r)
@@ -117,7 +121,7 @@ def feeds(rows: list[dict], now: datetime) -> list[dict[str, Any]]:
             w, s = bands(r)
             worth += bool(w)
             strong += bool(s)
-            strong_by_interest.update(s)
+            strong_by_interest.update(s if amap is None else {amap[i] for i in s if i in amap})
             if s and r["run"] > last_strong:
                 last_strong = r["run"]
         first = min(r["run"] for r in fr)
@@ -142,15 +146,23 @@ def feeds(rows: list[dict], now: datetime) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def trend(rows: list[dict], week: str) -> dict[str, dict[str, Any]]:
-    """Per interest: this week's scanned/strong, the baseline and whether it is rising."""
+def trend(rows: list[dict], week: str, amap: dict[str, str] | None = None) -> dict[str, dict[str, Any]]:
+    """Per interest: this week's scanned/strong, the baseline and whether it is rising. `amap`
+    (typically `interests_mod`'s `alias_map()`, possibly widened by `signal_radar.resolve_ids()`)
+    resolves a row's possibly-old interest id to the one it counts toward today; an id it cannot
+    resolve is dropped, not kept as its own id, so a retired interest's rows do not linger as a
+    phantom trend line. `amap=None` skips resolution and keeps every id as-is. [earned: 2026-09-28,
+    the owner's Obsidian-plugin renames losing history from trend/weekly]"""
     weekly: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(lambda: [0, 0]))
     for r in rows:
         wk = week_of(arrived(r))
         _, s = bands(r)
         for iid in r.get("p") or {}:
-            weekly[iid][wk][0] += 1
-            weekly[iid][wk][1] += iid in s
+            key = iid if amap is None else amap.get(iid)
+            if key is None:
+                continue
+            weekly[key][wk][0] += 1
+            weekly[key][wk][1] += iid in s
     out = {}
     before = baseline_weeks(week)
     for iid, weeks in weekly.items():
@@ -302,6 +314,10 @@ def _vault_ref(path: str | None) -> str:
 def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: datetime, per_interest: int = 3,
                   gaps: dict | None = None, clips: Sequence[Clip] = ()) -> str:
     names = {i.id: i.name for i in interests}
+    # A row judged before a rename still carries the old interest id in its `p`/strong set; map it
+    # to the interest it counts toward today instead of silently dropping it (the old
+    # `s & names.keys()` did exactly that). [earned: 2026-09-28, the owner's Obsidian-plugin renames]
+    amap = alias_map(interests)
     wk_rows = [r for r in rows if week_of(arrived(r)) == week]
     strong_rows = {iid: [] for iid in names}
     worth_n = strong_n = 0
@@ -309,9 +325,9 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
         w, s = bands(r)
         worth_n += bool(w)
         strong_n += bool(s)
-        for iid in s & names.keys():
+        for iid in {amap[i] for i in s if i in amap}:
             strong_rows[iid].append(r)
-    tr = trend(rows, week)
+    tr = trend(rows, week, amap)
     rising = [iid for iid in names if tr.get(iid, {}).get("rising")]
     ordered = sorted((i for i in names if strong_rows[i]), key=lambda i: (i not in rising, -len(strong_rows[i])))
 
@@ -345,14 +361,20 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
         lines.append("Nothing rose above its baseline this week.")
     else:
         lines.append("No baseline yet: trends need two earlier weeks of scans.")
+    def p_for(r: dict, iid: str) -> float:
+        # A row's own `p` dict still carries whatever id it was judged under (possibly an old one
+        # a rename retired); look it up through the same resolution that put the row in `iid`'s
+        # bucket, rather than assuming `iid` itself is a key.
+        return max((v for k, v in (r.get("p") or {}).items() if amap.get(k, k) == iid), default=0.0)
+
     lines += ["", "## Key items", ""]
     n = 0
     for iid in ordered:
-        top = sorted(strong_rows[iid], key=lambda r: -r["p"][iid])[:per_interest]
+        top = sorted(strong_rows[iid], key=lambda r: -p_for(r, iid))[:per_interest]
         n += 1
         lines += [f"### {n}. {names[iid]}{' (rising)' if iid in rising else ''}", ""]
         for r in top:
-            lines.append(f"- {_link(r)} — {r.get('feed') or '?'} · {r.get('kind') or '?'} · p={r['p'][iid]:.2f}{_vault_ref(r.get('in_vault'))}")
+            lines.append(f"- {_link(r)} — {r.get('feed') or '?'} · {r.get('kind') or '?'} · p={p_for(r, iid):.2f}{_vault_ref(r.get('in_vault'))}")
         if len(strong_rows[iid]) > per_interest:
             lines.append(f"- … and {len(strong_rows[iid]) - per_interest} more strong items")
         lines.append("")
@@ -364,7 +386,7 @@ def render_weekly(week: str, rows: list[dict], interests: list[Interest], now: d
     lines += ["## Repos to evaluate", ""]
     lines += [f"- [{t or u}]({u})" for u, t in repos] or ["None this week."]
     lines += ["", "## Feeds", "", "| Feed | scanned | worth | strong | advice |", "|---|---:|---:|---:|---|"]
-    for f in feeds(rows, now):
+    for f in feeds(rows, now, amap):
         wk = [r for r in wk_rows if (r.get("feed") or "?") == f["feed"]]
         if wk or f["advice"]:
             w = sum(1 for r in wk if bands(r)[0])

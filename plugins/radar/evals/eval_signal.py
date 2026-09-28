@@ -10,7 +10,10 @@ graph — offline (gaiafield and Kagi stubbed).
                which ran days before, is new, in the early list and a blind spot (no note has it);
                the same RSS article also arriving through Reader is one mention, not a third family
 4. filters   — an item the judge found irrelevant for every interest is no blip; a thing seen
-               every day until five days ago and not since is "fading"
+               every day until five days ago and not since is "fading"; "Windows 11", judged
+               relevant to Audio Plugins by exactly one incidental mention (real case, 2026-09-28:
+               a Native Instruments forum post about a DJ controller driver), is still a blip but
+               falls to Other rather than being sector-pinned by that one mention
 5. sources   — the sensors' "blocked" Reddit status reaches the page; the graph reports ok
 6. check     — Tavily unavailable: Kagi answers, at most CHECKS_PER_DAY names are asked, a second run the same day
                asks none again, and a hit joins the blip as family "kagi"; its calls go to its own
@@ -21,12 +24,22 @@ graph — offline (gaiafield and Kagi stubbed).
                carries its data and the note wikilinks the anchor note; nothing else in the vault
                changes but the radar dir
 8. no graph  — without gaiafield the graph is "skipped" and the anchor still comes from the files
+9. vocab/early (pure, no sandbox) — "Sonnet 5.5" on one mention keeps its sector because "Sonnet"
+               is a sibling of "Opus"/"Fable", already in that interest's own query; "SpaceX" on
+               one judged mention across three families is Other and must not card in Early
+               warning; an Other thing with high relevance, or two independently-judged mentions,
+               still cards; a real-sector thing always cards (real cases, 2026-09-28 second pass)
+10. alias    (pure, no sandbox) — a state row judged under an id the profile's `aliases:` retired
+               (real case, 2026-09-28: "AI Agents & Multi-Agent Systems" -> "AI Agents, Harnesses
+               & Reliability") folds into the renamed interest's sector, not a phantom sector of
+               its own; an id naming no live interest (current or aliased) resolves to nothing
 """
 from __future__ import annotations
 
 import json
 import os
 import subprocess
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -82,6 +95,19 @@ def _rows(local: str, audio: str) -> list[dict]:
         rows.append({"run": _day(n), "feed": "reddit.com", "title": f"Progress on Grimoire 2 build {n}",
                      "url": f"https://www.reddit.com/r/LocalLLaMA/comments/g{n}/x/", "kind": "news",
                      "p": {local: 0.7, audio: 0.05}, "backend": "jev"})
+    # A generic OS name with exactly one incidental high score (real case, 2026-09-28: a Native
+    # Instruments forum post about a DJ controller driver, judged relevant to Audio Plugins because
+    # the post is, scores "Windows 11" itself along with it): one corroborating mention is not
+    # enough to earn a sector, so this must land in Other rather than under Audio Plugins.
+    # day 6, not day 0: old enough to never be "new"/"rising" (so it never competes for a
+    # web-check slot in the later phases below), young enough to still be inside this window.
+    rows.append({"run": _day(6), "feed": "Hacker News", "title": "Windows 11½",
+                 "url": "https://definitelynotwindows.com/", "kind": "news",
+                 "p": {local: 0.04, audio: 0.03}, "backend": "jev"})
+    rows.append({"run": _day(6), "feed": "Native Instruments Community",
+                 "title": "[SOLVED] Rane SL3 working on Windows 11 with Traktor Pro 3",
+                 "url": "https://community.native-instruments.com/discussion/1/x", "kind": "news",
+                 "p": {local: 0.04, audio: 0.72}, "backend": "jev"})
     return rows
 
 
@@ -149,6 +175,70 @@ def _entity_checks(problems: list[str]) -> None:
         problems.append("entities: a GitHub release address names its repo")
 
 
+def _sector_and_early_checks(problems: list[str]) -> None:
+    """Pure function-level checks (no sandbox) for the 2026-09-28 review's second pass, real cases:
+    "Sonnet 5.5" (one mention, p=0.8 on Claude Code & Anthropic Ecosystem, whose own query already
+    reads "Opus Fable pricing") should keep that sector; "SpaceX"/"Windows 11"/"Soup" (one mention
+    each, no name match) should stay Other and, since Other, also stay out of Early warning unless
+    they separately clear a high relevance or two independently-judged mentions."""
+    import signal_radar as sr
+    from interests import Interest
+
+    claude_code = Interest(id="claude-code", name="Claude Code & Anthropic Ecosystem",
+                           gloss="Claude Code as a daily engineering environment.", queries=("Opus Fable pricing",))
+    music = Interest(id="music", name="Music Production & DJing", gloss="Synths, DAWs and DJ gear for producers.")
+    sonnet = {"name": "Sonnet 5.5", "_interests": Counter({"claude-code": 0.8}), "_interest_support": Counter({"claude-code": 1})}
+    windows = {"name": "Windows 11", "_interests": Counter({"music": 0.72}), "_interest_support": Counter({"music": 1})}
+    sr.assign_sectors([sonnet, windows], {"claude-code": claude_code.name, "music": music.name}, [claude_code, music])
+    if sonnet["sector"] != "claude-code":
+        problems.append(f"vocab: Sonnet 5.5 (an Opus/Fable sibling) should keep claude-code on one mention, got {sonnet['sector']!r}")
+    if windows["sector"] != "other":
+        problems.append(f"vocab: Windows 11 names nothing in music's vocabulary, still needs two mentions, got {windows['sector']!r}")
+
+    base = {"stage": "new", "first_seen": "2026-01-01", "families": ["hn", "kagi_news", "reddit"]}
+    spacex_shape = {**base, "sector": "other", "parts": {"relevance": 0.58}, "_interest_support": Counter({"ai-agents": 1, "frontier": 1})}
+    high_relevance = {**base, "sector": "other", "parts": {"relevance": 0.85}, "_interest_support": Counter({"x": 1})}
+    two_sources = {**base, "sector": "other", "parts": {"relevance": 0.58}, "_interest_support": Counter({"x": 2})}
+    real_sector = {**base, "sector": "claude-code", "parts": {"relevance": 0.3}, "_interest_support": Counter({"claude-code": 1})}
+    if sr._early_eligible(spacex_shape):
+        problems.append("early: an Other thing named by three families but only one judged mention (SpaceX's shape) must not card")
+    if not sr._early_eligible(high_relevance):
+        problems.append("early: an Other thing with relevance >= EARLY_OTHER_MIN_RELEVANCE should still card")
+    if not sr._early_eligible(two_sources):
+        problems.append("early: an Other thing with two independently-judged mentions should still card")
+    if not sr._early_eligible(real_sector):
+        problems.append("early: a real-sector thing needs no extra bar — assign_sectors already corroborated it")
+
+
+def _alias_checks(problems: list[str]) -> None:
+    """Real case, 2026-09-28: the owner renamed four interests in the Obsidian plugin ("AI Agents &
+    Multi-Agent Systems" -> "AI Agents, Harnesses & Reliability" among them) and the profile note
+    gained an `aliases:` list of the old names. A row judged before the rename still carries the
+    old id; it must fold into the renamed interest (not sit as its own phantom sector, not drop to
+    Other), and an id that is neither current nor aliased (a truly retired interest) must resolve
+    to nothing."""
+    import signal_radar as sr
+    from interests import Interest
+
+    renamed = Interest(id="ai-agents-harnesses-reliability", name="AI Agents, Harnesses & Reliability",
+                       alias_ids=frozenset({"ai-agents-multi-agent-systems"}))
+    other = Interest(id="music-production-djing", name="Music Production & DJing")
+    names = {renamed.id: renamed.name, other.id: other.name}
+    amap = sr.interests_mod.alias_map([renamed, other])
+    resolved = sr.resolve_ids({"ai-agents-multi-agent-systems", "genuinely-retired-interest"}, names, amap)
+    if resolved.get("ai-agents-multi-agent-systems") != "ai-agents-harnesses-reliability":
+        problems.append(f"alias: an old id with an explicit alias should resolve to its renamed interest, got {resolved}")
+    if "genuinely-retired-interest" in resolved:
+        problems.append(f"alias: an id naming no live interest (current or aliased) must not resolve, got {resolved}")
+
+    mentions = [{"p": {"ai-agents-multi-agent-systems": 0.8}}, {"p": {"ai-agents-multi-agent-systems": 0.75}}]
+    weight, support = sr._interest_weights(mentions, resolved)
+    blip = {"name": "Some Agent Tool", "_interests": weight, "_interest_support": support}
+    sr.assign_sectors([blip], names, [renamed, other])
+    if blip["sector"] != "ai-agents-harnesses-reliability":
+        problems.append(f"alias: two mentions judged under the old id should earn the renamed interest's sector, got {blip['sector']!r}")
+
+
 def run(vault: Path) -> dict:
     import interests
     import kagi
@@ -184,6 +274,8 @@ def run(vault: Path) -> dict:
     sandbox = None
     try:
         _entity_checks(problems)
+        _sector_and_early_checks(problems)
+        _alias_checks(problems)
         sandbox = make_sandbox(vault)
         (sandbox / "03_Areas" / "Sig-Interests.md").write_text(INTERESTS_NOTE, encoding="utf-8")
         (sandbox / "04_Resources" / "Qwen-Notes.md").write_text(QWEN_NOTE, encoding="utf-8")
@@ -215,6 +307,13 @@ def run(vault: Path) -> dict:
                 problems.append(f"join: an older note makes qwen38 not new, got {q['stage']} {q['first_seen']}")
             if q["sector"] != local:
                 problems.append(f"join: qwen38 belongs to {local}, got {q['sector']}")
+        w11 = blips.get("windows11")
+        if not w11:
+            problems.append(f"misfile: expected a windows11 blip (relevance clears the bar once), got {sorted(blips)}")
+        elif w11["sector"] != "other":
+            problems.append("misfile: windows11 has only one mention that scores Audio Plugins "
+                            f"(a Native Instruments forum post that happens to name it) — one is not a sector, "
+                            f"got {w11['sector']}")
         z = blips.get("zither")
         if not z or z["stage"] != "new" or "zither" not in data["early"] or "zither" not in data["blind_spots"] \
                 or set(z["families"]) != {"hn", "rss"} or z["mentions"] != 2:

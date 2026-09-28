@@ -281,6 +281,7 @@ def score(e: Entity, today: date, anchor_of=None, horizons: dict[str, str] | Non
         stage = "steady"
     spark = Counter(m["at"] for m in outside)
     items = sorted(week, key=lambda m: (m.get("eng_pct") or 0, max((m.get("p") or {}).values(), default=0)), reverse=True)
+    interest_weight, interest_support = _interest_weights(e.mentions, alias)
     return {
         "key": e.key, "name": display_name(e), "stage": stage, "strength": strength,
         "parts": {k: round(v, 3) for k, v in parts.items()}, "families": families, "mentions": len(week),
@@ -291,13 +292,17 @@ def score(e: Entity, today: date, anchor_of=None, horizons: dict[str, str] | Non
                    "score": m.get("score")} for m in items[:6]],
         "vault_notes": anchored["notes"][:4],
         "graph": {"neighborhood": anchored["neighborhood"], "hubs": anchored["hubs"]},
-        "_interests": _interest_weights(e.mentions, alias),
+        "_interests": interest_weight,
+        "_interest_support": interest_support,
     }
 
 
 def current_ids(old_ids, names: dict[str, str]) -> dict[str, str]:
-    """An interest renamed since its items were judged keeps its old id in state.jsonl; map it to
-    the current id sharing its first two words, so one interest is one sector."""
+    """Backup guess for a rename with no `aliases:` entry yet: the current id sharing its first two
+    slug words. Only a fallback now — `interests_mod.alias_map()` (the profile's own `aliases:`)
+    is tried first and is what a real rename should carry, since this heuristic can miss one (it
+    matched "AI Agents" renames fine, but "Obsidian & Knowledge Management" -> "Obsidian & Agentic
+    Knowledge Management" shares only its first word, not its first two)."""
     out = {}
     for old in old_ids:
         if old in names:
@@ -309,15 +314,49 @@ def current_ids(old_ids, names: dict[str, str]) -> dict[str, str]:
     return out
 
 
-def _interest_weights(mentions: list[dict], alias: dict[str, str] | None = None) -> Counter:
+def resolve_ids(old_ids, names: dict[str, str], amap: dict[str, str]) -> dict[str, str]:
+    """Every id a state/sensor row's `p` dict might carry -> the live interest it counts toward:
+    `amap` (`interests_mod.alias_map()`, the profile's explicit `aliases:`) first, `current_ids`'
+    heuristic as a backup for a rename that has no alias entry yet. An id neither resolves is
+    dropped — a truly retired interest, not carried forward as its own phantom sector. [earned:
+    2026-09-28, the owner's Obsidian-plugin renames]"""
+    out = dict(amap)
+    out.update(current_ids([i for i in old_ids if i not in out], names))
+    return out
+
+
+def _interest_weights(mentions: list[dict], alias: dict[str, str] | None = None) -> tuple[Counter, Counter]:
+    """(summed weight, distinct-mention support) per interest, both keyed the same way. `support`
+    is how many different mentions cleared the bar for that interest — one mention naming several
+    interests at once (a single ambiguous item scoring 0.5+ on two of them) supports each of those
+    once, not zero; it is `assign_sectors` that then asks for more than one such mention before it
+    trusts the sector, which this alone does not decide.
+
+    `alias` (typically `resolve_ids()`'s output) resolves a row's possibly-old interest id to the
+    one it counts toward today; an id it cannot resolve is dropped rather than kept as itself, so
+    a retired interest's rows never become their own phantom sector. `alias=None` (no map given at
+    all, distinct from an empty-but-real one) skips resolution entirely and keeps every id as-is —
+    the identity behaviour a caller with no rename bookkeeping still gets."""
+    def resolve(iid: str) -> str | None:
+        return iid if alias is None else alias.get(iid)
+
     w: Counter = Counter()
+    n: Counter = Counter()
     for m in mentions:
         for iid, p in (m.get("p") or {}).items():
             if p >= 0.5:
-                w[(alias or {}).get(iid, iid)] += p
+                key = resolve(iid)
+                if key is None:
+                    continue
+                w[key] += p
+                n[key] += 1
         for iid in m.get("interests") or []:
-            w[iid] += 1.0
-    return w
+            key = resolve(iid)
+            if key is None:
+                continue
+            w[key] += 1.0
+            n[key] += 1
+    return w, n
 
 
 def pretty_id(iid: str) -> str:
@@ -335,11 +374,59 @@ def short_name(name: str) -> str:
     return " ".join(words)
 
 
-def assign_sectors(blips: list[dict], names: dict[str, str]) -> list[dict]:
+# A sector is what an entity IS, not which single item it happened to be mentioned in: one
+# incidental co-occurrence (a DJ-gear driver post that mentions "Windows 11", one ambiguous
+# reddit thread that scores both "AI Agents" and "Frontier Models") should not pin a sector on its
+# own. Require at least two distinct mentions to agree before trusting a specific interest; a
+# generic tech or celebrity name that only ever clears the bar once falls back to Other instead of
+# being early-warned under a sector it is not really about. [earned: 2026-09-28, review —
+# "Windows 11" under Music Production from one Native Instruments forum post, "SpaceX" under AI
+# Agents from one reddit thread that also happened to name Anthropic]
+MIN_SECTOR_SUPPORT = 2
+
+# A single strong mention still earns a sector when the entity's own NAME — not just the article
+# that mentioned it — is what the interest is about: a literal word from the interest's own gloss,
+# tags or queries, or a sibling in a well-known model family the interest already names a member
+# of. Small and non-exhaustive on purpose (in the spirit of entities.py's BRANDS/FILLER lists): a
+# family or word absent here just falls back to the two-mention rule like anything else. [earned:
+# 2026-09-28, "Sonnet 5.5" fell to Other on one mention despite p=0.8 on Claude Code & Anthropic
+# Ecosystem, the interest whose own query already reads "Opus Fable pricing"]
+MODEL_FAMILIES = (
+    {"claude", "opus", "sonnet", "haiku", "fable"},
+    {"gpt", "chatgpt", "o1", "o3", "o4"},
+    {"gemini", "gemma"},
+    {"qwen"}, {"deepseek"}, {"llama"}, {"mistral"}, {"grok"}, {"kimi"}, {"mimo"}, {"minimax"},
+)
+
+
+def _interest_vocab(it: "interests_mod.Interest") -> set[str]:
+    """Lowercase, non-generic words from an interest's own name, gloss, tags and queries."""
+    text = " ".join([it.name, it.gloss, *it.tags, *it.queries])
+    words = {w.lower() for w in re.findall(r"[A-Za-z][A-Za-z0-9+#.'-]*", text)}
+    return words - entities.GENERIC
+
+
+def _head_word(name: str) -> str:
+    """The name's first word, casefolded: "sonnet" from "Sonnet 5.5", "qwen" from "Qwen3.8"."""
+    m = re.match(r"[A-Za-z][A-Za-z+#'-]*", name)
+    return m.group(0).lower() if m else name.lower()
+
+
+def _named_for(entity_name: str, vocab: set[str]) -> bool:
+    head = _head_word(entity_name)
+    if head in vocab:
+        return True
+    return any(head in fam and fam & vocab for fam in MODEL_FAMILIES)
+
+
+def assign_sectors(blips: list[dict], names: dict[str, str], interest_list: "list[interests_mod.Interest]" = ()) -> list[dict]:
+    vocabs = {it.id: _interest_vocab(it) for it in interest_list}
     counts: Counter = Counter()
     for b in blips:
-        top = b["_interests"].most_common(1)
-        b["sector"] = top[0][0] if top else "other"
+        support = b.get("_interest_support") or Counter()
+        candidates = [iid for iid, _ in b["_interests"].most_common()
+                      if support.get(iid, 0) >= MIN_SECTOR_SUPPORT or _named_for(b["name"], vocabs.get(iid, set()))]
+        b["sector"] = candidates[0] if candidates else "other"
         counts[b["sector"]] += 1
     keep = [iid for iid, _ in counts.most_common() if iid != "other"][:MAX_SECTORS]
     for b in blips:
@@ -469,6 +556,26 @@ def web_check(vault: Path, out: Path, candidates: list[dict], now: datetime) -> 
     return t_ms + k_ms, [t_status]
 
 
+# A card is a stronger claim than a dot on the scope: something with a real sector is already
+# corroborated (assign_sectors required two mentions to agree, or a name match), so the existing
+# new/recent/multi-source-or-engaged gate is enough. An Other-sector thing — no interest it clearly
+# belongs to — needs to earn its place instead of riding in on raw source count: a celebrity or
+# generic-tech name picked up by three outlets (SpaceX: hn, kagi_news, reddit) is still noise if
+# only one of those mentions was ever judged relevant to anything. "Independent sources" here means
+# mentions that separately cleared the judge's bar for some interest (_interest_support), not just
+# distinct families. [earned: 2026-09-28, SpaceX/Windows 11/Soup filling half the early-warning
+# cards once the two-mention sector rule correctly parked them in Other]
+EARLY_OTHER_MIN_RELEVANCE = 0.8  # the judge's own "strong" bar (judgments/policy.py T_STRONG)
+EARLY_OTHER_MIN_SOURCES = 2
+
+
+def _early_eligible(b: dict) -> bool:
+    if b["sector"] != "other":
+        return True
+    support = b.get("_interest_support") or {}
+    return b["parts"]["relevance"] >= EARLY_OTHER_MIN_RELEVANCE or max(support.values(), default=0) >= EARLY_OTHER_MIN_SOURCES
+
+
 def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[str, Any]:
     today = now.date()
     since = (today - timedelta(days=RECENT_DAYS + BASELINE_DAYS)).isoformat()
@@ -484,8 +591,9 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
     for m in mentions:
         for n in entities.of(m["title"], m["url"], m.get("entities"), vocab):
             outside_keys.setdefault(entities.key(n), n)
-    names = {it.id: it.name for it in interests_mod.load(vault)}
-    alias = current_ids({i for m in mentions for i in (m.get("p") or {})}, names)
+    interest_list = interests_mod.load(vault)
+    names = {it.id: it.name for it in interest_list}
+    alias = resolve_ids({i for m in mentions for i in (m.get("p") or {})}, names, interests_mod.alias_map(interest_list))
     ents = collect(mentions + vault_ms, outside_keys, vocab)
     graph, by_key, notes, graph_section = vault_graph.build(vault, now)
 
@@ -523,14 +631,16 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
 
     blips.sort(key=lambda b: (-b["strength"], b["key"]))
     blips = blips[:MAX_BLIPS]
-    sectors = assign_sectors(blips, names)
-    for b in blips:
-        del b["_interests"]
+    sectors = assign_sectors(blips, names, interest_list)
     early_from = (now - timedelta(hours=EARLY_HOURS)).date().isoformat()
     early = [b["key"] for b in blips if b["stage"] == "new" and b["first_seen"] >= early_from
-             and (len(b["families"]) >= 2 or (b["parts"]["engagement"] >= 0.9 and b["parts"]["relevance"] >= 0.6))]
+             and (len(b["families"]) >= 2 or (b["parts"]["engagement"] >= 0.9 and b["parts"]["relevance"] >= 0.6))
+             and _early_eligible(b)]
+    for b in blips:
+        del b["_interests"]
+        del b["_interest_support"]
     week = reports.week_of(today.isoformat())
-    trend = reports.trend(state, week) if state else {}
+    trend = reports.trend(state, week, alias) if state else {}
     data = {
         # UTC, `Z`-suffixed — the same `ingested_at`/`distilled_at` format (contract/VAULT_SCHEMA.md).
         "generated": now.strftime("%Y-%m-%dT%H:%M:%SZ"),

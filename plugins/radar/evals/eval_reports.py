@@ -119,6 +119,26 @@ def run(vault: Path) -> dict:
     if reports.trend(rows + late, prev)["a"]["scanned"] != reports.trend(rows, prev)["a"]["scanned"] + 50:
         problems.append("phase 1: an item belongs to the week it arrived in the feed, not the week of the scan")
 
+    # 1b. aliases — a rename carries its judged history forward; a truly retired interest does not
+    from interests import alias_map
+    renamed = Interest(id="new-name", name="New Name", alias_ids=frozenset({"old-name"}))
+    amap = alias_map([renamed])
+    if amap.get("old-name") != "new-name":
+        problems.append(f"phase 1b: alias_map should resolve old-name -> new-name, got {amap.get('old-name')!r}")
+    if "retired-id" in amap:
+        problems.append("phase 1b: an id naming no live interest must not resolve")
+    alias_run = (START + timedelta(days=7 * 5 + 2)).isoformat()  # the same week `week` covers
+    alias_rows = [{"run": alias_run, "feed": "Main", "title": f"old-id item {n}", "url": f"https://example.org/alias/{n}",
+                   "kind": "news", "backend": "jev", "p": {"old-name": 0.9 if n < 20 else 0.1}} for n in range(100)]
+    tr_alias = reports.trend(alias_rows, week, amap)
+    if "old-name" in tr_alias or tr_alias.get("new-name", {}).get("strong") != 20:
+        problems.append(f"phase 1b: trend should fold old-name's rows into new-name, got {tr_alias}")
+    digest = reports.render_weekly(week, alias_rows, [renamed], NOW)
+    if "New Name" not in digest:
+        problems.append("phase 1b: weekly digest should show the renamed interest's history under its new name")
+    if "old-name" in digest:
+        problems.append("phase 1b: the old id must not leak into the digest as its own section")
+
     # 2. feeds
     f = {x["feed"]: x for x in reports.feeds(rows, NOW)}
     if "consider unsubscribing" not in f["Quiet"]["advice"]:
