@@ -146,6 +146,24 @@ cd /tmp/quartz && npm i && npx quartz build --serve
 - [`crates/`](crates/) — the Rust engines
 - [`docs/PLAN.md`](docs/PLAN.md) — why everything is the way it is, with citations
 
+## The toolkit CLI
+
+One front door for people and agents. Every command reads well in a terminal and takes `--json`
+for a stable object (exit 0 ok, 1 problem or error, 2 usage):
+
+```bash
+toolkit status                         # engines, plugins, vault, pipeline, companion CLIs: all current?
+toolkit search agent memory            # ranked full-text search (farsight)
+toolkit graph neighbors Agent-Memory   # links to and from a note; also: stats, path A B, candidates
+toolkit commands --json                # the catalogue an agent starts from: arguments, JSON, examples
+toolkit link --vault ~/my-vault        # put toolkit, the engines and Obsidian's CLI on ~/.local/bin
+```
+
+`toolkit link` writes a shim that runs this checkout (a `git pull` updates it) with your vault as the
+default `TOOLKIT_VAULT`. Two companion CLIs sit next to it, and `status` checks both: Obsidian's own
+(the running app; Obsidian 1.12+, turned on in Settings → General → Advanced) and Todoist's `td`
+(tasks). `toolkit commands` tells an agent which tool owns what.
+
 ## Scripting the toolkit (headless)
 
 The plugins' skills shell out to scripts and engine binaries, so a headless

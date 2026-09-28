@@ -1,15 +1,24 @@
-"""The `toolkit` CLI: vault init, doctor, profile. JSON output on --json."""
+"""The `toolkit` CLI: one front door to the vault, its engines and the plugins, for people and agents.
+
+People get readable, coloured text (colour only on a TTY; NO_COLOR is honoured). Agents pass
+`--json` to any command for a stable object, and start from `toolkit commands --json`: every
+command, its arguments, what its JSON carries, and the companion CLIs next to it. Exit codes:
+0 ok, 1 a problem or an error (the JSON says which), 2 a usage error.
+"""
 
 from __future__ import annotations
 
 import argparse
 import datetime
 import json
+import re
+import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from toolkit_core import demo, engines, knowledge, profile, vault
+from toolkit_core import demo, engines, knowledge, profile, status, ui, vault
+from toolkit_core import link as linker
 
 
 def _json_default(obj):
@@ -127,7 +136,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     para_status = vault.para_folder_status(vault_path) if exists else dict.fromkeys(vault.PARA_FOLDERS, False)
     counts = vault.note_counts(vault_path) if exists else dict.fromkeys(vault.PARA_FOLDERS, 0)
     parse_errors = vault.frontmatter_parse_errors(vault_path) if exists else []
-    dlq = vault.dlq_status(vault_path) if exists else {"present": False, "count": 0, "note": "no DLQ entries"}
+    dlq = vault.dlq_status(vault_path) if exists else {"present": False, "count": 0, "open": 0, "open_notes": [], "note": "no DLQ entries"}
     graph = knowledge.graph_status(vault_path) if exists else {"present": False, "note": "vault does not exist"}
 
     repo_root = resolution.repo_root or vault.find_repo_root(Path(__file__).resolve().parent)
@@ -226,6 +235,492 @@ def cmd_demo(args: argparse.Namespace) -> int:
     return demo.run(as_json=args.json)
 
 
+# --- status ----------------------------------------------------------------------------
+
+
+def _render_status(result: dict) -> str:
+    st = ui.Style()
+    tk = result["toolkit"]
+    head = st.bold("agentic-toolkit")
+    if tk.get("found"):
+        head += f" {tk.get('version') or ''} " + st.dim(f"· {tk.get('branch')}@{tk.get('head')} · {tk['path']}")
+    out = [head, ""]
+
+    def checkout_note(info: dict) -> str:
+        bits = []
+        if info.get("uncommitted"):
+            bits.append(f"{info['uncommitted']} uncommitted")
+        if info.get("behind"):
+            bits.append(f"{info['behind']} behind")
+        if info.get("ahead"):
+            bits.append(f"{info['ahead']} ahead")
+        return ", ".join(bits)
+
+    if tk.get("found") and checkout_note(tk):
+        out += ui.section(st, "CHECKOUT", [f"{st.mark('warn')} {checkout_note(tk)}"])
+
+    rows = []
+    eng = result["engines"]
+    for r in eng["engines"]:
+        installed = (r["installed_tag"] or "").split("-v", 1)[-1] or "not installed"
+        if not r["installed_tag"]:
+            level, tail = "bad", "toolkit engines install"
+        elif r["up_to_date"]:
+            level, tail = "ok", "latest"
+        elif r["latest_tag"]:
+            level, tail = "warn", f"{r['latest_tag'].split('-v', 1)[-1]} available — toolkit engines update"
+        else:
+            level, tail = "info", "latest not checked"
+        where = "" if r.get("on_path") else st.dim("  (not on PATH — toolkit link)")
+        rows.append(f"{st.mark(level)} {r['engine']:<10} {installed:<8} {st.level(tail, level)}{where}")
+    if eng.get("cloud_pin"):
+        rows.append(f"{st.mark('info')} {st.dim('cloud setup clones ' + eng['cloud_pin'])}")
+    out += ui.section(st, "ENGINES", rows)
+
+    rows = []
+    for r in result["plugins"]["plugins"]:
+        # A plugin installed from a git commit reports the full sha as its version; seven characters identify it.
+        versions = sorted({str(i["version"])[:7] if re.fullmatch(r"[0-9a-f]{12,40}", str(i["version"])) else str(i["version"])
+                           for i in r["installs"]}) or ["—"]
+        scopes = ", ".join(sorted({str(i["scope"]) for i in r["installs"]}))
+        level, tail = {
+            "current": ("ok", "current"),
+            "outdated": ("warn", f"{r['latest']} available — claude plugin update {r['plugin']}@{status.MARKETPLACE}"),
+            "orphaned": ("warn", "no longer in the marketplace — claude plugin uninstall"),
+            "not-installed": ("info", "not installed"),
+        }[r["state"]]
+        rows.append(f"{st.mark(level)} {r['plugin']:<10} {' / '.join(versions):<8} {st.level(tail, level)}"
+                    + (st.dim(f"  ({scopes})") if scopes else ""))
+    if any(r["installs"] for r in result["plugins"]["plugins"]):
+        rows.append(f"{st.mark('info')} {st.dim('a running Claude Code loads updated plugins after a restart')}")
+    out += ui.section(st, "PLUGINS", rows)
+
+    v = result["vault"]
+    if not v["found"]:
+        rows = [f"{st.mark('bad')} no vault at {v['path']} — set TOOLKIT_VAULT"]
+    else:
+        rows = [f"{st.mark('info')} {v['path']} " + st.dim(f"(via {v['source']})"),
+                f"{st.mark('info')} {v['notes']} notes · {v['inbox']} in the inbox"]
+        g = v["graph"]
+        if g.get("nodes") is not None:
+            level = "warn" if g.get("stale") else "ok"
+            rows.append(f"{st.mark(level)} graph {g['nodes']} nodes · {g['edges']} edges · {g['dangling_edges']} dangling"
+                        + (st.dim("  (stale — refreshed by the next graph call)") if g.get("stale") else ""))
+        else:
+            rows.append(f"{st.mark('info')} graph: {g.get('note')}")
+        dlq = v["dlq"]
+        rows.append(f"{st.mark('warn' if dlq.get('open') else 'ok')} {dlq.get('note')}")
+        note = checkout_note(v.get("checkout") or {})
+        if note:
+            rows.append(f"{st.mark('warn')} checkout: {note}")
+    out += ui.section(st, "VAULT", rows)
+
+    p = result["pipeline"]
+    if p.get("present"):
+        if not p.get("checked"):
+            rows = [f"{st.mark('warn')} {p['note']}"]
+        else:
+            f = p.get("facts", {})
+            rows = []
+            if f.get("last_run"):
+                rows.append(f"{st.mark('ok' if p.get('ok') else 'warn')} last run {f['last_run'][:16].replace('T', ' ')} UTC"
+                            + st.dim(f" ({f.get('age_hours')} h ago) — {f.get('last_summary', '')}"))
+            if f.get("signal_last"):
+                rows.append(f"{st.mark('info')} radar {f['signal_last']}" + st.dim(f" ({f.get('signal_age_hours')} h ago)"))
+            rows += [f"{st.mark('bad')} {item.get('detail')}" for item in p.get("problems", [])]
+        out += ui.section(st, "PIPELINE", rows)
+
+    rows = []
+    for c in result["companions"]:
+        level = "ok" if c.get("ready") else "info"
+        detail = c.get("version") or ""
+        if c.get("auth_mode"):
+            detail += f" · logged in ({c['auth_mode']})"
+        if c.get("note"):
+            detail = (detail + " · " if detail else "") + c["note"]
+        where = "" if c.get("on_path") or not c.get("path") else st.dim("  (not on PATH — toolkit link)")
+        rows.append(f"{st.mark(level)} {c['cli']:<10} {detail}{where}")
+    out += ui.section(st, "COMPANIONS", rows)
+
+    out.append("")
+    if result["ok"]:
+        out.append(f"{st.mark('ok')} {st.level('all current and healthy', 'ok')}")
+    else:
+        out.append(st.level(f"{len(result['problems'])} to look at:", "warn"))
+        out += [f"  {st.mark('warn')} {st.dim(pr['section'] + ':')} {pr['detail']}" for pr in result["problems"]]
+    return "\n".join(out)
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    result = status.collect(offline=args.offline)
+    _emit(result, args.json, _render_status)
+    return 0 if result["ok"] else 1
+
+
+# --- search and graph (farsight, gaiafield) -------------------------------------------
+
+
+def _vault_or_fail(args: argparse.Namespace) -> Path | None:
+    resolution = vault.resolve_vault()
+    if resolution.path is None or not resolution.path.is_dir():
+        where = resolution.path or "(none)"
+        _emit({"ok": False, "error": f"no vault at {where}: set TOOLKIT_VAULT"}, args.json, lambda r: f"error: {r['error']}")
+        return None
+    return resolution.path
+
+
+def _engine_json(binary: str | None, name: str, argv: list[str], timeout: int) -> tuple[object, str | None]:
+    """Run an engine with --json; (parsed, None) or (None, error)."""
+    if binary is None:
+        return None, f"{name} not installed — toolkit engines install"
+    try:
+        proc = subprocess.run([binary, *argv, "--json"], capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f"{name} failed: {exc}"
+    if proc.returncode != 0:
+        return None, (proc.stderr.strip() or proc.stdout.strip() or f"{name} exited {proc.returncode}")
+    try:
+        return json.loads(proc.stdout), None
+    except json.JSONDecodeError as exc:
+        return None, f"{name} returned no JSON: {exc}"
+
+
+def _note_lines(st: ui.Style, rank: str, note: dict, extra: str = "") -> list[str]:
+    title = note.get("title") or Path(note.get("path", "?")).stem
+    lines = [f"{st.dim(rank)} {st.bold(title)}{extra}", f"{' ' * len(rank)} {st.accent(note.get('path', ''))}"]
+    if note.get("description"):
+        lines += ui.wrap(note["description"], len(rank) + 1)
+    return lines
+
+
+def _render_search(result: dict) -> str:
+    st = ui.Style()
+    hits = result["results"]
+    if not hits:
+        return f"no notes match {result['query']!r}"
+    out = [st.dim(f"{len(hits)} note(s) for {result['query']!r} in {result['vault']}"), ""]
+    for i, hit in enumerate(hits, 1):
+        out += _note_lines(st, f"{i:>2}.", hit, st.dim(f"  score {hit.get('score', 0):.2f}"))
+        out.append("")
+    return "\n".join(out).rstrip()
+
+
+def cmd_search(args: argparse.Namespace) -> int:
+    vault_path = _vault_or_fail(args)
+    if vault_path is None:
+        return 1
+    query = " ".join(args.terms)
+    hits, error = _engine_json(knowledge.farsight_binary(), "farsight",
+                               ["query", *args.terms, "--vault", str(vault_path), "--k", str(args.limit)],
+                               knowledge.QUERY_TIMEOUT)
+    if error:
+        _emit({"ok": False, "error": error}, args.json, lambda r: f"error: {r['error']}")
+        return 1
+    _emit({"ok": True, "query": query, "vault": str(vault_path), "results": hits}, args.json, _render_search)
+    return 0
+
+
+def _render_graph(result: dict) -> str:
+    st = ui.Style()
+    op, data = result["op"], result["result"]
+    if op == "stats":
+        out = [f"{st.bold(str(data.get('nodes')))} nodes · {data.get('edges')} edges · "
+               f"{data.get('dangling_edges')} dangling · {data.get('boundary_violations')} boundary violations", ""]
+        top = data.get("top_linked") or []
+        if top:
+            out.append(st.dim("most linked"))
+            out += [f"  {r.get('in_degree', 0):>4}  {r.get('title')}  {st.dim(r.get('path', ''))}" for r in top]
+        inferred = {k: v for k, v in data.items() if k.startswith("inferred") or k.startswith("ambiguous")}
+        if inferred:
+            out += ["", st.dim("inference: " + ", ".join(f"{k}={v}" for k, v in inferred.items()))]
+        return "\n".join(out)
+    if op == "path":
+        if not data.get("connected"):
+            return f"{data.get('from')} and {data.get('to')} are not connected"
+        chain = data.get("path") or []
+        return "\n".join([st.dim(f"{len(chain) - 1} hop(s)")] + [
+            f"  {'  ' * i}{'└ ' if i else ''}{st.bold(Path(p).stem)}  {st.dim(p)}" for i, p in enumerate(chain)])
+    rows = data if isinstance(data, list) else []
+    if not rows:
+        return f"no {op} for {result.get('note')!r}" + (" (run `gaiafield infer` first)" if op == "candidates" else "")
+    out = [st.dim(f"{len(rows)} {op} of {result.get('note')}"), ""]
+    for i, row in enumerate(rows, 1):
+        extra = ""
+        if "depth" in row:
+            extra = st.dim(f"  depth {row['depth']}" + (f" · {row['direction']}" if row.get("direction") else "")
+                           + (f" · {row['edge_type']}" if row.get("edge_type") else ""))
+        elif "score" in row or "similarity" in row:
+            extra = st.dim(f"  {row.get('label', '')} {row.get('score', row.get('similarity', 0)):.2f}".rstrip())
+        out += _note_lines(st, f"{i:>2}.", row, extra)
+        out.append("")
+    return "\n".join(out).rstrip()
+
+
+def _render_graph_error(result: dict) -> str:
+    st = ui.Style()
+    out = [f"error: {result['error']}"]
+    if result.get("suggestions"):
+        out.append(st.dim("did you mean:"))
+        out += [f"  {st.bold(h['title'] or '')}  {st.dim(h['path'] or '')}" for h in result["suggestions"]]
+    return "\n".join(out)
+
+
+def cmd_graph(args: argparse.Namespace) -> int:
+    vault_path = _vault_or_fail(args)
+    if vault_path is None:
+        return 1
+    binary = knowledge.gaiafield_binary()
+    base = ["--vault", str(vault_path)]
+    if not args.no_index:
+        # Incremental and cheap; a query against a stale graph would answer about yesterday's vault.
+        _, error = _engine_json(binary, "gaiafield", ["index", *base], knowledge.INDEX_TIMEOUT)
+        if error:
+            _emit({"ok": False, "error": f"index: {error}"}, args.json, lambda r: f"error: {r['error']}")
+            return 1
+    op = args.graph_command
+    if op == "stats":
+        argv, note = ["stats", *base], None
+    elif op == "neighbors":
+        argv, note = ["neighbors", args.note, *base, "--depth", str(args.depth), "--direction", args.direction], args.note
+        if args.include_inferred:
+            argv.append("--include-inferred")
+    elif op == "path":
+        argv, note = ["path", args.source, args.target, *base], None
+        if args.include_inferred:
+            argv.append("--include-inferred")
+    else:
+        argv, note = ["candidates", args.note, *base, "--k", str(args.limit)], args.note
+        if args.include_ambiguous:
+            argv.append("--include-ambiguous")
+    data, error = _engine_json(binary, "gaiafield", argv, knowledge.STATS_TIMEOUT)
+    if error:
+        result = {"ok": False, "error": error}
+        missing = re.search(r'No indexed note matches "(.+)"', error)
+        if missing:
+            # A dead end helps no one: offer the notes a search for the same words finds.
+            asked = missing.group(1)
+            hits, _ = _engine_json(knowledge.farsight_binary(), "farsight",
+                                   ["query", *asked.replace("-", " ").split(), "--vault", str(vault_path), "--k", "5"],
+                                   knowledge.QUERY_TIMEOUT)
+            result["suggestions"] = [{"path": h.get("path"), "title": h.get("title")} for h in hits or []]
+        _emit(result, args.json, _render_graph_error)
+        return 1
+    result = {"ok": True, "op": op, "vault": str(vault_path), "result": data}
+    if note:
+        result["note"] = note
+    _emit(result, args.json, _render_graph)
+    return 0
+
+
+# --- link --------------------------------------------------------------------------------
+
+
+def _render_link(result: dict) -> str:
+    st = ui.Style()
+    out = []
+    for r in result["links"]:
+        level = {"created": "ok", "updated": "ok", "skipped": "warn"}[r["action"]]
+        target = st.dim(f" → {r['target']}") if r.get("target") else ""
+        note = st.dim(f"  ({r['note']})") if r.get("note") else ""
+        out.append(f"  {st.mark(level)} {r['name']:<10} {r['action']:<8} {r['path']}{target}{note}")
+    if result["vault"]:
+        out.append(st.dim(f"  toolkit defaults to TOOLKIT_VAULT={result['vault']} (an exported value wins)"))
+    if not result["on_path"]:
+        out.append(f"  {st.mark('warn')} {result['bin_dir']} is not on PATH — add it to your shell profile")
+    return "\n".join(out)
+
+
+def cmd_link(args: argparse.Namespace) -> int:
+    resolution = vault.resolve_vault()
+    repo_root = resolution.repo_root or vault.find_repo_root(Path(__file__).resolve().parent)
+    if repo_root is None:
+        _emit({"ok": False, "error": "run from an agentic-toolkit checkout"}, args.json, lambda r: f"error: {r['error']}")
+        return 1
+    vault_path = Path(args.vault).expanduser().resolve() if args.vault else (
+        resolution.path if resolution.source.startswith("env:") else None)
+    bin_dir = Path(args.bin_dir).expanduser() if args.bin_dir else linker.default_bin_dir()
+    result = linker.link(repo_root, bin_dir, vault_path, force=args.force)
+    _emit(result, args.json, _render_link)
+    return 0 if result["ok"] else 1
+
+
+# --- commands: the catalogue ------------------------------------------------------------
+
+# What each command returns, for the catalogue. Every leaf command must have an entry
+# (core/tests/test_cli_interface.py enforces it), so the catalogue cannot drift from the parser.
+CATALOG = {
+    "status": {
+        "summary": "Is everything current and healthy? Engines, plugins, vault, pipeline, companion CLIs.",
+        "json": "{ok, problems[{section, detail}], toolkit, engines{engines[], cloud_pin}, plugins{plugins[{plugin, latest, "
+                "state, installs[]}]}, vault{notes, inbox, dlq, graph}, pipeline{ok, problems, facts}, companions[]}",
+        "example": "toolkit status --json",
+        "exit": "1 when problems is non-empty",
+    },
+    "search": {
+        "summary": "Ranked full-text (BM25) search over the vault's active notes (farsight).",
+        "json": "{ok, query, vault, results[{path, score, title, description}]}",
+        "example": "toolkit search agent memory --limit 5 --json",
+    },
+    "graph stats": {
+        "summary": "Graph size, dangling links, boundary violations and the most-linked notes (gaiafield).",
+        "json": "{ok, op, vault, result{nodes, edges, dangling_edges, boundary_violations, top_linked[]}}",
+        "example": "toolkit graph stats --json",
+    },
+    "graph neighbors": {
+        "summary": "Notes linked to or from a note, out to a depth (gaiafield). NOTE is a path or a bare note name.",
+        "json": "{ok, op, vault, note, result[{path, title, description, depth}]}",
+        "example": "toolkit graph neighbors Gaiafield --depth 2 --json",
+    },
+    "graph path": {
+        "summary": "Shortest link path between two notes (gaiafield).",
+        "json": "{ok, op, vault, result{from, to, connected, path[]}}",
+        "example": "toolkit graph path Alex-Vega Gaiafield --json",
+    },
+    "graph candidates": {
+        "summary": "Same-topic notes with no link to this one yet — link suggestions (gaiafield infer must have run).",
+        "json": "{ok, op, vault, note, result[{path, title, score, label}]}",
+        "example": "toolkit graph candidates Gaiafield --json",
+    },
+    "doctor": {
+        "summary": "The vault's structure: PARA folders, note counts, frontmatter errors, profiles, DLQ, graph.",
+        "json": "{ok, vault_path, para_folders, note_counts, frontmatter_parse_errors[], profiles, dlq, graph}",
+        "example": "toolkit doctor --json",
+    },
+    "profile": {
+        "summary": "A plugin's resolved profile (defaults merged with the vault's Config/toolkit/<plugin>.md). Always JSON.",
+        "json": "{ok, plugin, vault_path, profile}",
+        "example": "toolkit profile obsidian",
+    },
+    "engines status": {
+        "summary": "Installed vs. latest release of each engine (farsight, gaiafield).",
+        "json": "{ok, engines[{engine, installed_tag, latest_tag, up_to_date, installed_path}]}",
+        "example": "toolkit engines status --json",
+    },
+    "engines install": {
+        "summary": "Download, verify (sha256) and install the latest engine releases.",
+        "json": "{ok, results[{engine, ok, action, tag, path}]}",
+        "example": "toolkit engines install",
+    },
+    "engines update": {
+        "summary": "Same as engines install: bring every engine to its latest release.",
+        "json": "{ok, results[{engine, ok, action, tag, path}]}",
+        "example": "toolkit engines update --json",
+    },
+    "vault init": {
+        "summary": "Scaffold a new vault (PARA folders and AGENTS.md) at PATH.",
+        "json": "{ok, path}",
+        "example": "toolkit vault init ~/Notes",
+    },
+    "demo": {
+        "summary": "Sixty seconds of first-hand value on the example vault: scan, search, graph, candidates.",
+        "json": "{ok, steps[]}",
+        "example": "toolkit demo",
+    },
+    "link": {
+        "summary": "Put toolkit, the engines and Obsidian's CLI on PATH (~/.local/bin); --vault sets toolkit's default vault.",
+        "json": "{ok, bin_dir, on_path, vault, links[{name, path, action, target}]}",
+        "example": "toolkit link --vault ~/Documents/TheVoid",
+    },
+    "commands": {
+        "summary": "This catalogue: every command, its arguments, its JSON, and the companion CLIs.",
+        "json": "{ok, conventions, commands[{name, summary, arguments[], json, example}], companions[]}",
+        "example": "toolkit commands --json",
+    },
+}
+
+COMPANIONS = [
+    {
+        "cli": "obsidian",
+        "use_for": "The running Obsidian app: open a note, the daily note, search in the app, run an Obsidian command, "
+                   "read or change a note through Obsidian so plugins and the UI see it.",
+        "not_for": "Search and link analysis over the vault files — use toolkit search / toolkit graph (no app needed).",
+        "setup": "Obsidian 1.12+: Settings → General → Advanced → Command line interface; toolkit link puts it on PATH.",
+        "discover": "obsidian help",
+    },
+    {
+        "cli": "td",
+        "use_for": "Todoist: today's and upcoming tasks, adding and completing tasks, projects, labels.",
+        "not_for": "Notes — tasks live in Todoist, knowledge in the vault; link one from the other by URL.",
+        "setup": "npm install -g @doist/todoist-cli, then td auth login.",
+        "discover": "td --help",
+        "agent_tips": ["pass --json (or --ndjson) for parseable output", "use `td task add` with flags, not `td add`",
+                       "--ids-only on list commands when only ids are needed"],
+    },
+]
+
+
+def _leaf_commands(parser: argparse.ArgumentParser, prefix: str = "") -> list[tuple[str, argparse.ArgumentParser]]:
+    sub = next((a for a in parser._actions if isinstance(a, argparse._SubParsersAction)), None)
+    if sub is None:
+        return [(prefix, parser)]
+    leaves = []
+    for name, child in sub.choices.items():
+        leaves += _leaf_commands(child, f"{prefix} {name}".strip())
+    return leaves
+
+
+def _arguments(parser: argparse.ArgumentParser) -> list[dict]:
+    out = []
+    for action in parser._actions:
+        if isinstance(action, (argparse._HelpAction, argparse._SubParsersAction)) or action.dest == "json":
+            continue
+        arg = {"name": action.dest if not action.option_strings else action.option_strings[-1],
+               "positional": not action.option_strings, "help": action.help or ""}
+        if action.nargs in ("+", "*"):
+            arg["repeatable"] = True
+        if isinstance(action, argparse._StoreTrueAction):
+            arg["flag"] = True
+        elif action.option_strings and action.default is not None:
+            arg["default"] = action.default
+        if action.choices:
+            arg["choices"] = list(action.choices)
+        out.append(arg)
+    return sorted(out, key=lambda a: not a["positional"])
+
+
+def catalog(parser: argparse.ArgumentParser) -> dict:
+    commands = []
+    for name, sub in _leaf_commands(parser):
+        entry = CATALOG[name]
+        commands.append({"name": name, "summary": entry["summary"], "arguments": _arguments(sub),
+                         "json": entry["json"], "example": entry["example"],
+                         **({"exit": entry["exit"]} if "exit" in entry else {})})
+    return {
+        "ok": True,
+        "conventions": {
+            "json": "add --json to any command for one JSON object on stdout; text output is for people and may change",
+            "exit_codes": {"0": "ok", "1": "a problem or an error — the JSON carries ok:false and error or problems",
+                           "2": "usage error"},
+            "vault": "TOOLKIT_VAULT, else ./vault at the repo root",
+            "errors": "{ok: false, error: <message>}",
+        },
+        "commands": commands,
+        "companions": COMPANIONS,
+    }
+
+
+def _render_catalog(result: dict) -> str:
+    st = ui.Style()
+    out = [st.bold("toolkit") + st.dim(" — every command takes --json for agents"), ""]
+    wide = max(len(c["name"]) for c in result["commands"])
+    for c in result["commands"]:
+        args = " ".join(a["name"].upper() if a["positional"] else f"[{a['name']}]" for a in c["arguments"])
+        out.append(f"  {st.accent(c['name'].ljust(wide))}  {c['summary']}")
+        if args:
+            out.append(f"  {' ' * wide}  {st.dim(args)}")
+    out += ["", st.bold("companion CLIs")]
+    for c in result["companions"]:
+        out.append(f"  {st.accent(c['cli'].ljust(wide))}  {c['use_for']}")
+        out.append(f"  {' ' * wide}  {st.dim('setup: ' + c['setup'])}")
+    out += ["", st.dim("agents: toolkit commands --json · exit 0 ok, 1 problem/error, 2 usage")]
+    return "\n".join(out)
+
+
+def cmd_commands(args: argparse.Namespace) -> int:
+    _emit(catalog(_build_parser()), args.json, _render_catalog)
+    return 0
+
+
 # --- argument parsing ------------------------------------------------------------------
 
 
@@ -233,28 +728,64 @@ def _build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="emit JSON output")
 
-    parser = argparse.ArgumentParser(prog="toolkit", parents=[common])
+    parser = argparse.ArgumentParser(
+        prog="toolkit", parents=[common],
+        description="The agentic-toolkit CLI. People read the text; agents add --json and start from `toolkit commands --json`.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    vault_parser = subparsers.add_parser("vault", parents=[common])
+    vault_parser = subparsers.add_parser("vault", parents=[common], help="create a vault")
     vault_subparsers = vault_parser.add_subparsers(dest="vault_command", required=True)
-    init_parser = vault_subparsers.add_parser("init", parents=[common])
-    init_parser.add_argument("path")
+    init_parser = vault_subparsers.add_parser("init", parents=[common], help=CATALOG["vault init"]["summary"])
+    init_parser.add_argument("path", help="where to create the vault")
     init_parser.add_argument("--force", action="store_true", help="init into a non-empty directory")
 
-    subparsers.add_parser("doctor", parents=[common])
+    subparsers.add_parser("doctor", parents=[common], help=CATALOG["doctor"]["summary"])
 
-    profile_parser = subparsers.add_parser("profile", parents=[common])
-    profile_parser.add_argument("plugin")
+    profile_parser = subparsers.add_parser("profile", parents=[common], help=CATALOG["profile"]["summary"])
+    profile_parser.add_argument("plugin", help="a plugin name, e.g. obsidian")
 
-    engines_parser = subparsers.add_parser("engines", parents=[common])
+    engines_parser = subparsers.add_parser("engines", parents=[common], help="the Rust engines (farsight, gaiafield)")
     engines_subparsers = engines_parser.add_subparsers(dest="engines_command", required=True)
     for name in ("install", "update"):
-        sub = engines_subparsers.add_parser(name, parents=[common])
+        sub = engines_subparsers.add_parser(name, parents=[common], help=CATALOG[f"engines {name}"]["summary"])
         sub.add_argument("--force", action="store_true", help="re-download even if already at the latest release")
-    engines_subparsers.add_parser("status", parents=[common])
+    engines_subparsers.add_parser("status", parents=[common], help=CATALOG["engines status"]["summary"])
 
-    subparsers.add_parser("demo", parents=[common])
+    subparsers.add_parser("demo", parents=[common], help=CATALOG["demo"]["summary"])
+
+    status_parser = subparsers.add_parser("status", parents=[common], help=CATALOG["status"]["summary"])
+    status_parser.add_argument("--offline", action="store_true", help="skip the GitHub check for newer engine releases")
+
+    search_parser = subparsers.add_parser("search", parents=[common], help=CATALOG["search"]["summary"])
+    search_parser.add_argument("terms", nargs="+", help="query words")
+    search_parser.add_argument("--limit", type=int, default=10, help="max results")
+
+    graph_parser = subparsers.add_parser("graph", parents=[common], help="the vault's link graph (gaiafield)")
+    graph_subparsers = graph_parser.add_subparsers(dest="graph_command", required=True)
+    graph_common = argparse.ArgumentParser(add_help=False, parents=[common])
+    graph_common.add_argument("--no-index", action="store_true", help="query the graph as stored, without refreshing it")
+    graph_subparsers.add_parser("stats", parents=[graph_common], help=CATALOG["graph stats"]["summary"])
+    sub = graph_subparsers.add_parser("neighbors", parents=[graph_common], help=CATALOG["graph neighbors"]["summary"])
+    sub.add_argument("note", help="a vault-relative path or a bare note name")
+    sub.add_argument("--depth", type=int, default=1, help="how many links out")
+    sub.add_argument("--direction", choices=("in", "out", "both"), default="both", help="links to it, from it, or both")
+    sub.add_argument("--include-inferred", action="store_true", help="also inferred (similarity) edges")
+    sub = graph_subparsers.add_parser("path", parents=[graph_common], help=CATALOG["graph path"]["summary"])
+    sub.add_argument("source", help="the note to start from")
+    sub.add_argument("target", help="the note to reach")
+    sub.add_argument("--include-inferred", action="store_true", help="also traverse inferred edges")
+    sub = graph_subparsers.add_parser("candidates", parents=[graph_common], help=CATALOG["graph candidates"]["summary"])
+    sub.add_argument("note", help="a vault-relative path or a bare note name")
+    sub.add_argument("--limit", type=int, default=10, help="max candidates")
+    sub.add_argument("--include-ambiguous", action="store_true", help="also the AMBIGUOUS band")
+
+    link_parser = subparsers.add_parser("link", parents=[common], help=CATALOG["link"]["summary"])
+    link_parser.add_argument("--vault", help="default TOOLKIT_VAULT for the toolkit shim (an exported value wins)")
+    link_parser.add_argument("--bin-dir", help="where to link (default ~/.local/bin)")
+    link_parser.add_argument("--force", action="store_true", help="replace files there that toolkit did not write")
+
+    subparsers.add_parser("commands", parents=[common], help=CATALOG["commands"]["summary"])
 
     return parser
 
@@ -276,6 +807,9 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_engines_status(args)
     if args.command == "demo":
         return cmd_demo(args)
+    handlers = {"status": cmd_status, "search": cmd_search, "graph": cmd_graph, "link": cmd_link, "commands": cmd_commands}
+    if args.command in handlers:
+        return handlers[args.command](args)
 
     parser.print_help()
     return 1

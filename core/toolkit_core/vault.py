@@ -219,16 +219,29 @@ def frontmatter_parse_errors(vault_path: Path) -> list[dict]:
 
 
 def dlq_status(vault_path: Path) -> dict:
-    """Status of the dead-letter queue at 00_Memory/dlq/ (contract/ROUTING.md's DLQ concept)."""
+    """Status of the dead-letter queue at 00_Memory/dlq/ (contract/ROUTING.md's DLQ concept).
+    `count` is every entry; `open` those not marked `status: resolved` — the ones that need a
+    person. [earned: 2026-09-28, doctor reported "5 DLQ entries" when all five were resolved]"""
     dlq_path = Path(vault_path) / "00_Memory" / "dlq"
     if not dlq_path.is_dir():
-        return {"present": False, "count": 0, "note": "no DLQ entries"}
-    count = len(list(dlq_path.rglob("*.md")))
-    return {
-        "present": True,
-        "count": count,
-        "note": "no DLQ entries" if count == 0 else f"{count} DLQ entr{'y' if count == 1 else 'ies'}",
-    }
+        return {"present": False, "count": 0, "open": 0, "open_notes": [], "note": "no DLQ entries"}
+    entries = sorted(dlq_path.rglob("*.md"))
+    open_notes = []
+    for entry in entries:
+        try:
+            frontmatter, _ = read_note(entry)
+        except (OSError, FrontmatterError):
+            frontmatter = {}
+        if str(frontmatter.get("status", "")).strip().lower() != "resolved":
+            open_notes.append(entry.relative_to(vault_path).as_posix())
+    count, n_open = len(entries), len(open_notes)
+    if count == 0:
+        note = "no DLQ entries"
+    elif n_open == 0:
+        note = f"no open DLQ entries ({count} resolved)"
+    else:
+        note = f"{n_open} open DLQ entr{'y' if n_open == 1 else 'ies'}"
+    return {"present": True, "count": count, "open": n_open, "open_notes": open_notes, "note": note}
 
 
 # --- Capture-inbox append ------------------------------------------------------------
