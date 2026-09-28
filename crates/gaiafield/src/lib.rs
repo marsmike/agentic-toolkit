@@ -335,6 +335,10 @@ pub struct RawLink {
 }
 
 /// Extract every `[[...]]` occurrence from `body`, taking the part before `|` as the target.
+/// Inside a Markdown table the separator is written `\|` (Obsidian's documented escape), so a
+/// backslash ending the target belongs to the separator, not the name. [earned: 2026-09-28 —
+/// 106 table links in the owner's vault, 13 of them in the generated Maps/Overview, were
+/// dangling edges]
 /// No anchor (`#Heading`) or block-ref (`^id`) syntax appears in this vault's corpus, so it is
 /// deliberately not special-cased here — the removal condition is a planted specimen that needs it.
 pub fn extract_links(body: &str) -> Vec<RawLink> {
@@ -345,7 +349,7 @@ pub fn extract_links(body: &str) -> Vec<RawLink> {
         if bytes[i] == b'[' && bytes[i + 1] == b'[' {
             if let Some(end) = body[i + 2..].find("]]") {
                 let inner = &body[i + 2..i + 2 + end];
-                let target = inner.split('|').next().unwrap_or(inner).trim();
+                let target = inner.split('|').next().unwrap_or(inner).trim().trim_end_matches('\\').trim();
                 if !target.is_empty() {
                     links.push(RawLink {
                         target: target.to_string(),

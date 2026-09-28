@@ -4,6 +4,16 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **gaiafield 0.2.3 and the obsidian plugin read links written inside tables.** In a Markdown
+  table a wikilink is `[[target\|alias]]` (Obsidian's escape for the pipe); gaiafield and six
+  Python readers (vault_lint, map_build, distill_check, imports_log, judgments/capture) took the
+  target with the backslash, so the link never matched its note: dangling edges in the graph,
+  false orphans in the lint, lost edges in the maps. `checks/links.py` alone had been fixed, on
+  2026-09-22. On the owner's vault 0.2.3 resolves 101 more links (dangling 1,580 → 1,479).
+  `core/tests/test_wikilinks.py` covers every reader, the gaiafield test the crate; the cloud
+  setup pins gaiafield-v0.2.3. [earned: 2026-09-28, a double-check of the portfolio commit —
+  106 table links in 15 notes, 13 of them in the generated Maps/Overview]
+
 - **Signal Radar: one article through two pipes is one source.** An item that arrives through Reader
   and through the RSS, GitHub or Reddit sensor (the same publisher feed, twice) is one mention: the
   sensor's row with its score, the judge's relevance from Reader's. Hacker News, Hugging Face and
