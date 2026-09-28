@@ -1265,10 +1265,10 @@ def _top_level_help_text(st: ui.Style) -> str:
 
     docs_url = "https://marsmike.github.io/agentic-toolkit/"
     book = term.glyph("book")
-    out += ["", st.heading("LEARN MORE"),
-            "  unisphere help <command>       more about any command, same as `<command> --help`",
-            "  unisphere commands --json      the full catalogue — arguments, JSON, examples — for an agent",
-            f"  {(book + ' ') if book else ''}{term.link(docs_url)}"]
+    out += ["", st.heading("LEARN MORE")]
+    out += ui.wrap_field("  unisphere help <command>       ", "more about any command, same as `<command> --help`")
+    out += ui.wrap_field("  unisphere commands --json      ", "the full catalogue — arguments, JSON, examples — for an agent")
+    out += [f"  {(book + ' ') if book else ''}{term.link(docs_url)}"]
     return "\n".join(out)
 
 
