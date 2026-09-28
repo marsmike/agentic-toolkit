@@ -21,7 +21,7 @@ SETUP
        && git checkout -q -B main origin/main && git status -sb | head -1 || echo VAULT-NOT-RESET
    Then cd back to the agentic-toolkit checkout.
 3. Keys: check by name only, never print a value:
-     python3 -c "import os; print({k: bool(os.environ.get(k)) for k in ('OPENROUTER_API_KEY','KAGI_API_KEY')})"
+     python3 -c "import os; print({k: bool(os.environ.get(k)) for k in ('OPENROUTER_API_KEY','KAGI_API_KEY','TAVILY_API_KEY')})"
    Without OPENROUTER_API_KEY new items stay unjudged; without KAGI_API_KEY there is no Kagi check.
    Neither stops the run. GitHub's search API is blocked by this session's proxy; the GitHub source
    then reads GitHub Trending and reports "partial", which is normal.
