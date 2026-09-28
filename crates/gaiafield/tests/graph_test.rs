@@ -960,3 +960,12 @@ fn fetch_model_fills_a_directory_without_a_vault() {
     assert!(String::from_utf8_lossy(&refused.stderr).contains("give --dir or set TOOLKIT_GAIAFIELD_MODEL_DIR"));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+
+#[test]
+fn table_escaped_wikilink_targets_drop_the_backslash() {
+    // `[[target\|alias]]` is how a link is written inside a Markdown table.
+    let body = "| [[02_Projects/x/b\\|b]] | 1 |\nplain [[c|see c]] and [[d]]";
+    let targets: Vec<String> = gaiafield::extract_links(body).into_iter().map(|l| l.target).collect();
+    assert_eq!(targets, vec!["02_Projects/x/b", "c", "d"]);
+}

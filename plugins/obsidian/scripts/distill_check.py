@@ -35,7 +35,7 @@ from vault_utils import discover_notes, read_frontmatter, require_vault, vault_f
 
 NEVER_LINK = ("01_Capture/", "05_Archive/")
 IMAGE_HOSTS = ("readwise-assets", "substackcdn", "pbs.twimg.com", "images.unsplash", "cdn-images", "gravatar")
-WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)")
+WIKILINK_RE = re.compile(r"\[\[([^\]|#\\]+)")
 
 
 def _substantive_urls(capture: dict) -> list[str]:

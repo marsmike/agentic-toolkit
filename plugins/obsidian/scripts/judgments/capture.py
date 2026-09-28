@@ -44,7 +44,7 @@ def read_capture(path: Path) -> dict[str, Any]:
         "body": body.strip()[:CAPTURE_CHARS],
     }
 
-WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)")
+WIKILINK_RE = re.compile(r"\[\[([^\]|#\\]+)")
 
 FULL_TEXT_HEADING_RE = re.compile(r"^#{1,6}\s*Full Text\s*$", re.I | re.M)
 

@@ -27,7 +27,7 @@ from pathlib import Path
 
 from vault_utils import ACTIVE_CONTENT_FOLDERS, EXCLUDE_DIRS, git_ignored, require_vault, root_active_notes
 
-WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
+WIKILINK_RE = re.compile(r"\[\[([^\]|\\]+)(?:\\?\|[^\]]+)?\]\]")
 INDEX_ENTRY_RE = re.compile(r"^\s*-\s*\[\[([^\]|]+)(?:\|[^\]]+)?\]\]\s*—\s*(.*?)\s*$")
 
 
