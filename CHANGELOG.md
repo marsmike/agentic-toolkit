@@ -4,6 +4,15 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **gaiafield 0.2.4: parallel indexers wait for each other.** The pipeline distills in parallel
+  workers, and each one's `distill_check` runs `gaiafield index` on the same `graph.db`; SQLite had
+  no busy timeout, so the second writer failed at once with "database is locked" and filed a DLQ
+  note. `open_db` now waits up to 30 s, and one index pass is one `BEGIN IMMEDIATE` transaction,
+  so two passes queue instead of interleaving their per-note delete/insert pairs (which would
+  duplicate edges). `concurrent_indexers_serialize_on_one_database` runs six indexers at once and
+  fails on 0.2.3; the cloud setup pins gaiafield-v0.2.4. [earned: 2026-09-28, the 09:58 pipeline
+  run — three distill workers, `2026-09-28-gaiafield-index-failed` in the DLQ]
+
 - **gaiafield 0.2.3 and the obsidian plugin read links written inside tables.** In a Markdown
   table a wikilink is `[[target\|alias]]` (Obsidian's escape for the pipe); gaiafield and six
   Python readers (vault_lint, map_build, distill_check, imports_log, judgments/capture) took the

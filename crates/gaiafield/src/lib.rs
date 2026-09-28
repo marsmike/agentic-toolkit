@@ -564,6 +564,10 @@ pub fn open_db(db_path: &Path) -> rusqlite::Result<Connection> {
         let _ = std::fs::create_dir_all(parent);
     }
     let conn = Connection::open(db_path)?;
+    // Several processes may open one graph at once (parallel distill workers each run
+    // `gaiafield index`): wait for the other writer instead of failing with "database is
+    // locked". [earned: 2026-09-28, the 09:58 pipeline run's three distill workers]
+    conn.busy_timeout(std::time::Duration::from_secs(30))?;
     conn.execute_batch(
         "
         CREATE TABLE IF NOT EXISTS nodes (
@@ -639,7 +643,28 @@ pub struct IndexReport {
 /// mtime+size are unchanged; otherwise only new/changed notes are re-extracted and removed
 /// notes' rows (and their outgoing edges) are deleted — the default incremental path.
 /// When the resolution scope changes, unchanged sources' links are also re-extracted.
+///
+/// The pass is one write transaction, taken up front (`BEGIN IMMEDIATE`): two concurrent
+/// indexers queue on the busy timeout instead of interleaving their per-note delete/insert
+/// pairs, which would duplicate edges. Inside a caller's transaction it joins that one.
 pub fn index(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<IndexReport> {
+    if !conn.is_autocommit() {
+        return index_pass(vault, conn, full);
+    }
+    conn.execute_batch("BEGIN IMMEDIATE")?;
+    // A failed COMMIT (BUSY while a reader holds on) must not leave the connection inside the
+    // transaction, or the next `index` on it would join the abandoned one.
+    let result = index_pass(vault, conn, full).and_then(|report| {
+        conn.execute_batch("COMMIT")?;
+        Ok(report)
+    });
+    if result.is_err() && !conn.is_autocommit() {
+        let _ = conn.execute_batch("ROLLBACK");
+    }
+    result
+}
+
+fn index_pass(vault: &Path, conn: &Connection, full: bool) -> rusqlite::Result<IndexReport> {
     if full {
         conn.execute_batch("DELETE FROM nodes; DELETE FROM edges;")?;
     }

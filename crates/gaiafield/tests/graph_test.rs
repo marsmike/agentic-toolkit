@@ -104,6 +104,50 @@ fn index_recovers_expected_node_count_and_density() {
     let _ = std::fs::remove_dir_all(db.parent().unwrap());
 }
 
+/// Concurrent indexers on one database — parallel distill workers each run `gaiafield index` —
+/// all succeed and leave the same graph a single run does: no "database is locked", no edges
+/// duplicated by interleaved delete/insert pairs. [earned: 2026-09-28, the 09:58 pipeline run]
+#[test]
+fn concurrent_indexers_serialize_on_one_database() {
+    let db = fresh_db_path("concurrent");
+    let reference = fresh_db_path("concurrent-ref");
+    let expected = index_full(&reference);
+    gaiafield::open_db(&db).expect("create db");
+
+    let workers = 6;
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(workers));
+    let handles: Vec<_> = (0..workers)
+        .map(|_| {
+            let (db, barrier) = (db.clone(), barrier.clone());
+            std::thread::spawn(move || {
+                let conn = gaiafield::open_db(&db).expect("open db");
+                barrier.wait();
+                gaiafield::index(&vault_path(), &conn, true).map(|r| r.edges)
+            })
+        })
+        .collect();
+    for h in handles {
+        let edges = h
+            .join()
+            .expect("indexer thread panicked")
+            .expect("index should not fail");
+        assert_eq!(
+            edges, expected.edges,
+            "an indexer saw a partial or duplicated graph"
+        );
+    }
+
+    let conn = gaiafield::open_db(&db).expect("reopen db");
+    let edges: i64 = conn
+        .query_row("SELECT COUNT(*) FROM edges", [], |r| r.get(0))
+        .expect("count edges");
+    assert_eq!(edges as usize, expected.edges);
+
+    for path in [&db, &reference] {
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+}
+
 /// (b) Exactly one dangling edge, and it's the planted
 /// `[[Nonexistent-Note-For-Linting-Demo]]` in `Vault-Maintenance-and-Linting.md`.
 #[test]

@@ -31,7 +31,7 @@ git config --global user.email >/dev/null || git config --global user.email "nor
 # The binaries land in $XDG_DATA_HOME/agentic-toolkit/bin, default ~/.local/share/agentic-toolkit/bin,
 # sha256-verified, and the environment's cache keeps them across runs. The routine's SETUP runs the
 # same command again: a no-op when they are present.
-TOOLKIT_PIN=gaiafield-v0.2.3
+TOOLKIT_PIN=gaiafield-v0.2.4
 TOOLKIT_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/agentic-toolkit"
 if command -v uv >/dev/null 2>&1; then
   tmp=$(mktemp -d)
