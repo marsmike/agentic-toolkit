@@ -106,6 +106,9 @@ def run(vault: Path) -> dict:
                           "http://train.py. Run http://prepare.py first. See "
                           "https://github.com/karpathy/autoresearch") != ["https://github.com/karpathy/autoresearch"]:
         problems.append("safety: an unlisted code-extension filename linked as a domain was taken as linked content")
+    # ...while a real site on a live TLD that doubles as a file extension still counts.
+    if te.external_links("Try http://bun.sh and https://docs.rs today") != ["http://bun.sh", "https://docs.rs"]:
+        problems.append("safety: a real bare domain on .sh/.rs was dropped as a filename")
     if te.external_links("see https://[not-a-host and https://github.com/acme/widget") != ["https://github.com/acme/widget"]:
         problems.append("safety: a malformed URL was not ignored")
     blocker = Path(__import__("tempfile").mkdtemp()) / "not-a-dir"

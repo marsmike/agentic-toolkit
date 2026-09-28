@@ -244,15 +244,14 @@ def expand(texts: list[str], resolver: Callable[[str], str | None]) -> tuple[lis
 # .py Paraguay, .sh Saint Helena): such a link names a file, not a page the tweet points at.
 # [earned: 2026-09-25 correction run — "CLAUDE.md" and "TASKS.md" resolved to unrelated sites]
 #
-# .ai/.io are real gTLD-like ccTLDs plenty of products use as their whole bare domain (docs.ai,
-# cursor.sh), so those two stay gated by FILE_WORDS below. The rest (.md/.py/.sh/.rs/.js/.ts/.go/
-# .rb/.pl/.cc) are essentially never a real product's bare domain, so any word paired with one of
-# them is a filename regardless of what the word is — no allowlist can keep up with every source
-# filename a tweet happens to mention. [earned: 2026-09-28 battle test — a real tweet linkified
-# "program.md", "train.py" and "prepare.py"; none of those three stems were in FILE_WORDS, so an
-# allowlist-only check let all three through as if they were linked content]
-CODE_ONLY_EXTS = {"md", "py", "sh", "rs", "js", "ts", "go", "rb", "pl", "cc"}
-AMBIGUOUS_EXTS = {"ai", "io"}
+# .js/.ts/.rb/.go are no top-level domain at all, and a bare .md or .py site is next to unheard
+# of, so any word with one of those is a filename — no allowlist keeps up with every file a tweet
+# mentions. .sh/.rs/.pl/.cc/.ai/.io are live domains real projects use bare (bun.sh, docs.rs, a
+# Polish .pl shop, cursor.sh), so those stay gated by FILE_WORDS below. [earned: 2026-09-28
+# battle test — a real tweet linkified "program.md", "train.py" and "prepare.py"; none of those
+# stems were in FILE_WORDS, so all three went through as if they were linked content]
+CODE_ONLY_EXTS = {"md", "py", "js", "ts", "go", "rb"}
+AMBIGUOUS_EXTS = {"sh", "rs", "pl", "cc", "ai", "io"}
 FILENAME_HOST = re.compile(r"^[A-Za-z0-9_-]+\.(" + "|".join(CODE_ONLY_EXTS | AMBIGUOUS_EXTS) + r")$")
 FILE_WORDS = {"claude", "agents", "readme", "tasks", "skill", "skills", "memory", "todo", "plan", "notes", "gemini",
               "changelog", "contributing", "design", "spec", "soul", "main", "index", "app", "setup", "config", "run",
