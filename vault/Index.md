@@ -1,6 +1,6 @@
 # Vault Index
 
-*Last rebuild: 2026-09-24 · 83 entries · 1 without a description (⚙)*
+*Last rebuild: 2026-09-28 · 83 entries · 1 without a description (⚙)*
 
 ## Vault root
 
@@ -87,7 +87,7 @@
 - [[04_Resources/Guides/Scripting-the-Toolkit-Headless|Scripting-the-Toolkit-Headless]] — Running the toolkit's skills in a non-interactive claude -p session — the --allowedTools shape that actually works, and the gotchas that each cost a debugging round.
 - [[04_Resources/Guides/Test-Corpus-Map|Test-Corpus-Map]] — Where every deliberately-planted test case in this vault lives, and the three link clusters plus bridge notes this vault's density was built to demonstrate.
 - [[04_Resources/Guides/The-Distill-Workflow|The-Distill-Workflow]] — The end-to-end procedure for turning a raw capture into an integrated vault note — analyze, checkpoint, write, enrich.
-- [[04_Resources/Guides/Troubleshooting-Toolkit-Doctor|Troubleshooting-Toolkit-Doctor]] — Reading toolkit doctor output — active vault, profile completeness, the graph/inference section, and DLQ surfacing — to debug config that isn't behaving as expected.
+- [[04_Resources/Guides/Troubleshooting-Toolkit-Doctor|Troubleshooting-Toolkit-Doctor]] — Reading unisphere doctor output — active vault, profile completeness, the graph/inference section, and DLQ surfacing — to debug config that isn't behaving as expected.
 - [[04_Resources/Guides/Using-Your-Own-Vault|Using-Your-Own-Vault]] — Pointing the toolkit at a real personal vault via TOOLKIT_VAULT, and how tests stay isolated from it regardless.
 - [[04_Resources/Guides/Vault-Maintenance-and-Linting|Vault-Maintenance-and-Linting]] — Vault health checks — metadata normalization, orphaned notes, stale pages, and broken wikilinks — and what a lint pass should and shouldn't auto-fix.
 - [[04_Resources/Guides/Writing-a-Plugin|Writing-a-Plugin]] — The shape a new plugin must follow to be curated onto the platform — depends only on core/contract, reads profiles the standard way, ships evals.
@@ -103,4 +103,4 @@
 - [[04_Resources/Tools/Obsidian-Plugin|Obsidian-Plugin]] — The core-wave plugin — distill workflow, capture handling, and the retrieval-verification maintenance skill, ported from the v1 monorepo.
 - [[04_Resources/Tools/Readwise-Plugin|Readwise-Plugin]] — Pulls Readwise highlights into 01_Capture/ with origin-prefixed filenames — the second core-wave plugin, feeding the same distill pipeline the obsidian plugin owns.
 - [[04_Resources/Tools/Tech-Radar|Tech-Radar]] — Renders the toolkit's own state-of-the-art positioning into docs/ as a public radar view — second-wave plugin, and the carrier of this vault's unknown-frontmatter-keys test case.
-- [[04_Resources/Tools/Toolkit-CLI|Toolkit-CLI]] — The core Python CLI — vault init, doctor, and profile resolution — the surface every plugin and every new user touches first.
+- [[04_Resources/Tools/Toolkit-CLI|Toolkit-CLI]] — unisphere, the core CLI — status, search, graph, doctor, vault init, profile — one front door for people (readable text) and agents (--json), the surface every plugin and every new user touches first.

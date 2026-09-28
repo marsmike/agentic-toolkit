@@ -30,7 +30,7 @@ Probe for the capability itself, side-effect-free, before relying on it:
   which false-positived on a v1 binary whose help text happened to describe something adjacent —
   turning a normal "this binary predates inference" state into a spurious DLQ entry. Exit-0 plus
   whole-word subcommand matching fixed it.
-- `toolkit doctor`'s graph section (`core/toolkit_core/knowledge.py`) reads the *shape* of
+- `unisphere doctor`'s graph section (`core/toolkit_core/knowledge.py`) reads the *shape* of
   `gaiafield stats --json`'s output to distinguish three states: no `model` key at all means a v1
   binary that predates inference entirely; the key present but empty means a v2 binary that hasn't
   run `gaiafield infer` yet; populated means the normal reporting case. No version number is parsed

@@ -1,4 +1,4 @@
-"""`toolkit engines install` against a fake release (review-01 SEC-2), with no network: the
+"""`unisphere engines install` against a fake release (review-01 SEC-2), with no network: the
 release list and every download are served from memory."""
 
 from __future__ import annotations

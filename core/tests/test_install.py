@@ -26,7 +26,7 @@ def installer_env(tmp_path):
         "curl": """#!/bin/sh
 printf '%s\\n' '/bin/cp "$STUB_UV" "$HOME/.local/bin/uv"'
 """,
-        "toolkit": '#!/bin/sh\nprintf "toolkit %s\\n" "$*" >> "$INSTALL_LOG"\n',
+        "unisphere": '#!/bin/sh\nprintf "unisphere %s\\n" "$*" >> "$INSTALL_LOG"\n',
         "uv-stub": '#!/bin/sh\nprintf "uv %s\\n" "$*" >> "$INSTALL_LOG"\n',
     }
     for name, content in stubs.items():
@@ -85,7 +85,7 @@ def test_piped_installer_reads_answer_from_terminal(installer_env, answer):
             assert proc.returncode == 0, output.decode()
             calls = Path(installer_env["INSTALL_LOG"]).read_text()
             assert "uv tool install --force git+https://github.com/marsmike/agentic-toolkit#subdirectory=core" in calls
-            assert "toolkit engines install" in calls
+            assert "unisphere engines install" in calls
         else:
             assert proc.returncode == 1
             assert not Path(installer_env["INSTALL_LOG"]).exists()

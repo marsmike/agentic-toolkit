@@ -40,7 +40,7 @@ _NOISE_TAG = re.compile(r"^(domain|readwise|status|source|via|kind|maturity)/|^w
 
 def binary() -> str | None:
     """Mirrors the obsidian plugin's `graph.gaiafield_binary` (plugins stay self-contained):
-    `TOOLKIT_GAIAFIELD_BIN`, then PATH, then the `toolkit engines install` directory."""
+    `TOOLKIT_GAIAFIELD_BIN`, then PATH, then the `unisphere engines install` directory."""
     env = os.environ.get("TOOLKIT_GAIAFIELD_BIN")
     if env:
         return env
@@ -76,7 +76,7 @@ class Graph:
             self.in_degree = {r["path"]: r.get("in_degree", 0) for r in stats.get("top_linked") or []}
             self.ok = True
         except FileNotFoundError:
-            self.status = {"status": "skipped", "detail": "no gaiafield binary (toolkit engines install)"}
+            self.status = {"status": "skipped", "detail": "no gaiafield binary (unisphere engines install)"}
             self.ok = False
         except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as e:
             self.status = {"status": "failed", "detail": str(e)[:200]}

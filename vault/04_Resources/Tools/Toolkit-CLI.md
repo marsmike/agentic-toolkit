@@ -1,5 +1,5 @@
 ---
-description: The core Python CLI — vault init, doctor, and profile resolution — the surface every plugin and every new user touches first.
+description: unisphere, the core CLI — status, search, graph, doctor, vault init, profile — one front door for people (readable text) and agents (--json), the surface every plugin and every new user touches first.
 status: active
 created: 2026-02-06
 kind: tool-landmark
@@ -12,16 +12,31 @@ tags:
 
 # Toolkit CLI
 
-`core`'s command-line surface, three commands wide by design (see
-[[Scope-Discipline-for-Curated-Systems]] for why that's a feature, not a gap):
+`core`'s command-line surface is `unisphere` (named for the Commonwealth's network everything
+connects through, next to [[Farsight]] and [[Gaiafield]]; it was `toolkit` until 2026-09-28). Every
+command prints readable text for people and one JSON object with `--json` for agents; exit 0 is
+ok, 1 a problem or an error, 2 a usage error. It stays narrow by design (see
+[[Scope-Discipline-for-Curated-Systems]]): it fronts the engines and reports state, and the
+plugins do the work.
 
-- **`toolkit vault init <path>`** — scaffolds a new vault from this example vault's template:
+- **`unisphere status`** — one answer to "is everything current and healthy?": the engines
+  against their latest release, each Claude Code plugin install against the checkout's version,
+  the vault, graph and open DLQ entries, the pipeline's watchdog verdict, and the companion CLIs
+  (Obsidian's own, Todoist's `td`). Exit 1 when something needs a look.
+- **`unisphere search <words>`** and **`unisphere graph stats|neighbors|path|candidates`** —
+  [[Farsight]] and [[Gaiafield]] behind readable output; a note that does not exist answers with
+  the notes a search finds.
+- **`unisphere commands --json`** — the catalogue an agent starts from: every command, its
+  arguments, what its JSON carries, and which companion CLI owns what.
+- **`unisphere link`** — puts `unisphere`, the engines and Obsidian's CLI on `~/.local/bin`.
+
+- **`unisphere vault init <path>`** — scaffolds a new vault from this example vault's template:
   the PARA folders, `Templates/`, and a `AGENTS.md` copied from `contract/templates/VAULT_AGENTS.md`.
   `path` is a required positional argument — there is no default. That's deliberate, not an
   oversight: this repo's own `./vault` is the example/test-corpus vault (see
   [[Test-Corpus-Map]]), so a default that quietly pointed `init` at `./vault` would risk
   scaffolding a stranger's real vault on top of it.
-- **`toolkit doctor`** — reports which vault is active and how it was resolved (env var vs.
+- **`unisphere doctor`** — reports which vault is active and how it was resolved (env var vs.
   fallback), PARA folder/note counts, frontmatter parse errors, profile completeness per plugin,
   and surfaces any dead-letter entries waiting for review (see
   [[Dead-Letter-Queues-for-Automation]]). Since R3 it also reports a graph section — node/edge/
@@ -31,7 +46,7 @@ tags:
   infer` has run, distinguishing a v1 binary ("engine lacks inference") from a v2 binary that just
   hasn't been inferred yet ("not inferred") via [[Capability-Probing]] rather than a version
   string. Doctor only ever reports this state — it never runs `index` or `infer` itself.
-- **`toolkit profile`** — inspects a plugin's resolved profile: which of env var, vault note, or
+- **`unisphere profile`** — inspects a plugin's resolved profile: which of env var, vault note, or
   shipped default supplied each setting. See [[Fill-From-Obsidian-Profiles]].
 
 ## Resolution order it implements

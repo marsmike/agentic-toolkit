@@ -27,14 +27,14 @@ trap 'rm -rf "$WORK"' EXIT
 echo "workdir: $WORK"
 
 # Stage 1 — only the doctor half of the README quick start.
-# The README quick start is clone + `uv run toolkit doctor` + `claude plugin marketplace
+# The README quick start is clone + `uv run unisphere doctor` + `claude plugin marketplace
 # add .` + `claude plugin install obsidian@agentic-toolkit`; the marketplace-add/install
 # part needs an isolated CLAUDE_CONFIG_DIR (never the developer's own), so it doesn't run
 # until Stage 4 (--live) below. Stages 1-3 without --live verify the doctor/engine half
 # only, not the full quick start end to end.
 git clone -q "https://github.com/$REPO.git" "$WORK/repo"
 cd "$WORK/repo"
-uv run toolkit doctor
+uv run unisphere doctor
 
 # Stage 2 — released engine binaries, as a stranger downloads them
 mkdir -p bin

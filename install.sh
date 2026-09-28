@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # agentic-toolkit bootstrap. What this does, in order:
 #   1. Installs `uv` (asking first) if it isn't already on PATH.
-#   2. Installs the `toolkit` CLI from GitHub via `uv tool install`.
-#   3. Downloads the engine binaries (`toolkit engines install`) — sha256-recorded,
+#   2. Installs the `unisphere` CLI from GitHub via `uv tool install`.
+#   3. Downloads the engine binaries (`unisphere engines install`) — sha256-recorded,
 #      size-verified (no published checksum to verify against exists yet).
 # Safe to re-run any time — every step below is idempotent. No sudo, ever.
 #
@@ -43,16 +43,16 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "-- installing the toolkit CLI (uv tool install) --"
+echo "-- installing the unisphere CLI (uv tool install) --"
 uv tool install --force "git+${REPO_URL}#subdirectory=core"
 
-echo "-- fetching engine binaries (toolkit engines install) --"
-toolkit engines install
+echo "-- fetching engine binaries (unisphere engines install) --"
+unisphere engines install
 
 cat <<EOF
 
 Done. Try it now:
-  toolkit demo
+  unisphere demo
 
 Next step — add the Claude Code plugins:
   claude plugin marketplace add marsmike/agentic-toolkit

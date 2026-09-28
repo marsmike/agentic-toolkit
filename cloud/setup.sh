@@ -25,19 +25,21 @@ git config --global credential.https://github.com.helper \
 git config --global user.name >/dev/null || git config --global user.name "Claude (pipeline routine)"
 git config --global user.email >/dev/null || git config --global user.email "noreply@anthropic.com"
 
-# The engines (farsight, gaiafield): the vault's search and graph. `toolkit engines install` lives in
+# The engines (farsight, gaiafield): the vault's search and graph. `unisphere engines install` lives in
 # the toolkit repo, which does not exist yet at this point, so a shallow clone pinned to a reviewed
 # release tag runs it (never the mutable default branch; move the pin when engines are released).
 # The binaries land in $XDG_DATA_HOME/agentic-toolkit/bin, default ~/.local/share/agentic-toolkit/bin,
 # sha256-verified, and the environment's cache keeps them across runs. The routine's SETUP runs the
 # same command again: a no-op when they are present.
+# The command runs as `python -m toolkit_core.cli`, not by its script name: the CLI was renamed
+# (toolkit → unisphere, 2026-09-28), and the module path works in every tag on either side of that.
 TOOLKIT_PIN=gaiafield-v0.2.4
 TOOLKIT_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/agentic-toolkit"
 if command -v uv >/dev/null 2>&1; then
   tmp=$(mktemp -d)
   if git clone -q --depth 1 --branch "$TOOLKIT_PIN" https://github.com/marsmike/agentic-toolkit "$tmp/toolkit" \
-     && (cd "$tmp/toolkit" && uv run --locked toolkit engines install); then
-    echo "engines: $(cd "$tmp/toolkit" && uv run --locked toolkit engines status 2>/dev/null | tr -s ' ' | tr '\n' ';')"
+     && (cd "$tmp/toolkit" && uv run --locked python -m toolkit_core.cli engines install); then
+    echo "engines: $(cd "$tmp/toolkit" && uv run --locked python -m toolkit_core.cli engines status 2>/dev/null | tr -s ' ' | tr '\n' ';')"
   else
     echo "engines not installed here; the routine's SETUP installs them"
   fi

@@ -3,7 +3,7 @@
 Sections: the toolkit checkout, the engines (installed vs. latest release, the cloud pin), the Claude
 Code plugins installed from this marketplace (per scope, vs. the version in this checkout), the
 vault (notes, graph, DLQ), the pipeline (the obsidian plugin's watchdog verdict, when the vault
-runs one) and the companion CLIs agents use next to `toolkit` (Obsidian's, Todoist's `td`).
+runs one) and the companion CLIs agents use next to `unisphere` (Obsidian's, Todoist's `td`).
 
 Every check collapses its failure into data: a `problems` list of {section, detail} the caller can
 render or branch on, and `ok` is true only when that list is empty. Nothing here writes anything.
@@ -179,7 +179,7 @@ def _first_line(proc: subprocess.CompletedProcess | None) -> str:
 
 
 def companions_section() -> dict:
-    """The CLIs an agent reaches for next to `toolkit`: Obsidian's own (the running app) and
+    """The CLIs an agent reaches for next to `unisphere`: Obsidian's own (the running app) and
     Todoist's `td` (tasks). Presence, version and readiness only — never account details."""
     rows = []
 

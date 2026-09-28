@@ -7,7 +7,7 @@ SETUP
      export TOOLKIT_REPO="$PWD"
      export TOOLKIT_GAIAFIELD_MODEL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/agentic-toolkit/models/potion-base-8M"
    If `uv` is missing: pip install uv
-   Engines: uv run --locked toolkit engines install
+   Engines: uv run --locked unisphere engines install
    (gaiafield is the knowledge graph every signal is anchored in. If the install fails, go on: the
    page then reports the graph as "skipped". Say so in FINISH.)
 2. Vault: use the session's TheVoid checkout (the directory holding AGENTS.md and 00_Memory/):
@@ -63,7 +63,7 @@ notification at all.
 FINISH with one line: per source from step 1 (`hn ok 113, hf ok 78, github partial, …`), step 2's
 blips / early / blind_spots, the commit and whether it was pushed, whether the page was published,
 whether a brief was sent, and the engines (`gaiafield <version>` from
-`uv run --locked toolkit engines status`, or "engines missing"). No number the scripts did not print.
+`uv run --locked unisphere engines status`, or "engines missing"). No number the scripts did not print.
 
 HARD RULES
 - Never run git in the vault yourself beyond SETUP 2: step 3's command is the only committer, and

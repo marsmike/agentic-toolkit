@@ -17,7 +17,7 @@ For locating the vault itself:
 1. `TOOLKIT_VAULT` environment variable.
 2. `./vault` — the bundled example vault, as fallback.
 
-`toolkit doctor` reports which vault is active and which step of each resolution order supplied
+`unisphere doctor` reports which vault is active and which step of each resolution order supplied
 the answer.
 
 ## Secrets

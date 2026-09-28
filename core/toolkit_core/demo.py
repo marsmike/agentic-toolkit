@@ -1,7 +1,7 @@
-"""`toolkit demo` — 60 seconds to first-hand value, zero setup.
+"""`unisphere demo` — 60 seconds to first-hand value, zero setup.
 
 Every line this prints comes from actually running something: a real filesystem scan
-(always, no engines required) and, once `toolkit engines install` has put binaries where
+(always, no engines required) and, once `unisphere engines install` has put binaries where
 `knowledge.py`'s discovery chain looks, real farsight/gaiafield calls against a real
 vault. There is no "as if installed" canned output — if the engines aren't there yet,
 this says so once and stops after the pure-Python step, honestly.
@@ -36,14 +36,14 @@ _SAMPLE_NOTES = {
     ),
     "03_Areas/Demo-Area.md": (
         "# Demo Area\n\n"
-        "A tiny scaffolded area so `toolkit demo` has something real to query — see "
+        "A tiny scaffolded area so `unisphere demo` has something real to query — see "
         "[[Knowledge-Graphs]] and [[BM25-Search]].\n"
     ),
 }
 
 _DEMO_AGENTS_MD = (
     "# demo vault\n\n"
-    "Scaffolded on the fly by `toolkit demo` (no repo checkout was found on disk). Not a "
+    "Scaffolded on the fly by `unisphere demo` (no repo checkout was found on disk). Not a "
     "real vault — this whole directory is temporary and safe to delete.\n"
 )
 
@@ -58,7 +58,7 @@ def _bundled_repo_vault() -> Path | None:
 
 def _scaffold_demo_vault() -> tuple[Path, Path]:
     """A handful of tiny sample notes, generated inline, scaffolded via the same
-    `vault.scaffold_vault` a real `toolkit vault init` uses. Returns
+    `vault.scaffold_vault` a real `unisphere vault init` uses. Returns
     `(vault_path, temp_root_to_clean_up)`."""
     temp_root = Path(tempfile.mkdtemp(prefix="agentic-toolkit-demo-"))
     template_path = temp_root / "_agents_md_template.md"
@@ -110,7 +110,7 @@ def _collect(vault_path: Path, vault_source: str) -> dict:
     active_total = sum(counts.get(f, 0) for f in ("02_Projects", "03_Areas", "04_Resources"))
     add_step(
         "1/4 vault scan",
-        "pure Python, no engines required — the same scan `toolkit doctor` runs",
+        "pure Python, no engines required — the same scan `unisphere doctor` runs",
         [f"{active_total} active note(s) across 02_Projects/03_Areas/04_Resources"],
     )
 
@@ -121,7 +121,7 @@ def _collect(vault_path: Path, vault_source: str) -> dict:
     if not engines_installed:
         add_step(
             "engines",
-            'not installed — run: toolkit engines install',
+            'not installed — run: unisphere engines install',
             ["the steps below need the Rust binaries; the vault scan above never did"],
         )
         return {

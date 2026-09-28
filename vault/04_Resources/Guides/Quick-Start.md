@@ -19,7 +19,7 @@ no setup beyond the clone. This guide is the shortest path proving that.
 1. Clone the repo. `./vault` — this vault — is already present; nothing to initialize.
 2. Add the marketplace and install a plugin: `claude plugin marketplace add <path-to-repo>`, then
    install `obsidian` (see [[Obsidian-Plugin]]).
-3. Run `toolkit doctor` (see [[Toolkit-CLI]]) — it should report `./vault` as the active vault,
+3. Run `unisphere doctor` (see [[Toolkit-CLI]]) — it should report `./vault` as the active vault,
    resolved by fallback (no `TOOLKIT_VAULT` set), and profile completeness for the plugin just
    installed.
 4. Invoke the plugin's distill skill against something in `01_Capture/` — any of the three example

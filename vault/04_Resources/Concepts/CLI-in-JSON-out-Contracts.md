@@ -30,7 +30,7 @@ not just "whatever the current code happens to emit."
 
 ## Where it shows up in this toolkit
 
-[[Farsight]] and [[Gaiafield]] are both CLI-in/JSON-out; `toolkit doctor` and `toolkit vault init`
+[[Farsight]] and [[Gaiafield]] are both CLI-in/JSON-out; `unisphere doctor` and `unisphere vault init`
 follow the same contract from the Python side. No plugin reads an engine's internal index files or
 database directly — only its documented CLI output.
 

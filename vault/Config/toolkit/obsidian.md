@@ -29,7 +29,7 @@ tags:
 
 This is what `$VAULT/Config/toolkit/obsidian.md` looks like once a real vault has one. It is not
 consulted by the shipped default — the plugin falls back to its own default when this file is
-absent — but a `toolkit vault init` run copies a version of this shape into a new vault so the
+absent — but a `unisphere vault init` run copies a version of this shape into a new vault so the
 placeholders are obvious.
 
 ## How the fields are used

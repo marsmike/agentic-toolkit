@@ -1,5 +1,5 @@
 ---
-description: Reading toolkit doctor output — active vault, profile completeness, the graph/inference section, and DLQ surfacing — to debug config that isn't behaving as expected.
+description: Reading unisphere doctor output — active vault, profile completeness, the graph/inference section, and DLQ surfacing — to debug config that isn't behaving as expected.
 status: active
 created: 2026-02-21
 kind: guide
@@ -10,9 +10,9 @@ tags:
   - domain/toolkit-meta
 ---
 
-# Troubleshooting `toolkit doctor`
+# Troubleshooting `unisphere doctor`
 
-`toolkit doctor` (see [[Toolkit-CLI]]) is the first thing to run when something isn't resolving
+`unisphere doctor` (see [[Toolkit-CLI]]) is the first thing to run when something isn't resolving
 the way it's expected to. It reports four things, and most config confusion traces to one of
 them:
 

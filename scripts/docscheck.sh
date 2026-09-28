@@ -41,15 +41,15 @@ else
   echo "ok: documented shipped plugins match marketplace.json ($(echo "$mp_plugins" | tr '\n' ' '))"
 fi
 
-# --- (b) `toolkit vault init` with no path must exit nonzero (no default — locked) ---
-echo "== docscheck: 'toolkit vault init' has no default path =="
+# --- (b) `unisphere vault init` with no path must exit nonzero (no default — locked) ---
+echo "== docscheck: 'unisphere vault init' has no default path =="
 
-if (cd "$REPO_ROOT" && uv run toolkit vault init) >/dev/null 2>&1; then
-  echo "FAIL: 'toolkit vault init' with no path unexpectedly succeeded — Toolkit-CLI.md" \
+if (cd "$REPO_ROOT" && uv run unisphere vault init) >/dev/null 2>&1; then
+  echo "FAIL: 'unisphere vault init' with no path unexpectedly succeeded — Toolkit-CLI.md" \
        "documents this as a required positional with no default"
   fail=1
 else
-  echo "ok: 'toolkit vault init' with no path exits nonzero, as documented"
+  echo "ok: 'unisphere vault init' with no path exits nonzero, as documented"
 fi
 
 # --- (c) cheap static stand-in for a full docs-site build: no backtick-in-wikilink-alias ---

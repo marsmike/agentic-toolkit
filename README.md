@@ -47,16 +47,16 @@ matters reaches you.
 No accounts, no API keys — three commands, then a 60-second real demo:
 
 ```bash
-uv tool install git+https://github.com/marsmike/agentic-toolkit#subdirectory=core  # toolkit on PATH
-toolkit engines install                                                            # sha256-recorded binaries
+uv tool install git+https://github.com/marsmike/agentic-toolkit#subdirectory=core  # unisphere on PATH
+unisphere engines install                                                            # sha256-recorded binaries
 claude plugin marketplace add marsmike/agentic-toolkit                             # plugins
-toolkit demo                                                                        # see it work, for real
+unisphere demo                                                                        # see it work, for real
 ```
 
-**From source**: `git clone https://github.com/marsmike/agentic-toolkit && cd agentic-toolkit && uv run toolkit engines install && uv run toolkit demo` — then `claude plugin marketplace add ./` in place of the line above.
+**From source**: `git clone https://github.com/marsmike/agentic-toolkit && cd agentic-toolkit && uv run unisphere engines install && uv run unisphere demo` — then `claude plugin marketplace add ./` in place of the line above.
 
 Then read the [Quick Start](https://marsmike.github.io/agentic-toolkit/04_Resources/Guides/Quick-Start)
-and scaffold your own vault with `uv run toolkit vault init ~/my-vault`
+and scaffold your own vault with `uv run unisphere vault init ~/my-vault`
 (`export TOOLKIT_VAULT=~/my-vault` — tests/CI never touch your vault, only the bundled one).
 
 **🔧 Intermediate — "I want to build on this."**
@@ -140,7 +140,7 @@ cd /tmp/quartz && npm i && npx quartz build --serve
 ## Layout
 
 - [`contract/`](contract/) — the constitution: vault schema, profile convention, knowledge API, model routing
-- [`core/`](core/) — the `toolkit` CLI (`vault init` · `doctor` · `profile`) and Python library
+- [`core/`](core/) — the `unisphere` CLI (`status` · `search` · `graph` · `doctor` · `vault init` · …) and Python library
 - [`vault/`](vault/) — the example vault: docs, demo, test corpus, and eval substrate in one
 - [`plugins/`](plugins/) — curated plugins ([obsidian](plugins/obsidian/), [readwise](plugins/readwise/), [memory](plugins/memory/), [handoff](plugins/handoff/), [radar](plugins/radar/)), added one release at a time
 - [`crates/`](crates/) — the Rust engines
@@ -149,16 +149,15 @@ cd /tmp/quartz && npm i && npx quartz build --serve
 ## The unisphere CLI
 
 `unisphere` is the one front door for people and agents, named for the Commonwealth's network that
-everything connects through (the engines are farsight and gaiafield). `toolkit` is its alias: every
-older command line keeps working. Every command reads well in a terminal and takes `--json` for a
-stable object (exit 0 ok, 1 problem or error, 2 usage):
+everything connects through (the engines are farsight and gaiafield). Every command reads well in a
+terminal and takes `--json` for a stable object (exit 0 ok, 1 problem or error, 2 usage):
 
 ```bash
 unisphere status                         # engines, plugins, vault, pipeline, companion CLIs: all current?
 unisphere search agent memory            # ranked full-text search (farsight)
 unisphere graph neighbors Agent-Memory   # links to and from a note; also: stats, path A B, candidates
 unisphere commands --json                # the catalogue an agent starts from: arguments, JSON, examples
-uv run unisphere link --vault ~/my-vault # put unisphere, toolkit, the engines and Obsidian's CLI on ~/.local/bin
+uv run unisphere link --vault ~/my-vault # put unisphere, the engines and Obsidian's CLI on ~/.local/bin
 ```
 
 `unisphere link` writes a shim that runs this checkout (a `git pull` updates it) with your vault as
