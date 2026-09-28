@@ -13,6 +13,7 @@ R12 — a `CLAUDE.md` next to it would silently win and hide this file]
 | Tuning judgments, auditing descriptions | `docs/MAINTAINING.md` |
 | Running the pipeline as a Claude cloud routine | `cloud/README.md` |
 | Why anything is the way it is | `docs/PLAN.md` |
+| Which command does what, as JSON (search, graph, status, companion CLIs) | run `unisphere commands --json` (alias `toolkit`) |
 
 ## Skills
 

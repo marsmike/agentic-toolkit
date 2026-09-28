@@ -4,6 +4,22 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **`unisphere` (alias `toolkit`) is one front door, for people and for agents.** Named for the
+  Commonwealth's unisphere, next to farsight and gaiafield; `toolkit` keeps working. `status` answers "is
+  everything current and healthy?" in one panel: engines against their latest release and the
+  cloud pin, every Claude Code plugin install against this checkout's version (outdated and
+  orphaned installs named, with the command that fixes them), the vault, its graph and open DLQ
+  entries, the pipeline's watchdog verdict, and the companion CLIs (Obsidian's, Todoist's `td`).
+  `search` and `graph stats|neighbors|path|candidates` put farsight and gaiafield
+  behind readable output; a note that does not exist answers with the notes a search finds.
+  `unisphere commands --json` is the catalogue agents start from, derived from the parser so it
+  cannot drift; `unisphere link` puts `unisphere`, `toolkit`, the engines and Obsidian's CLI on `~/.local/bin`.
+  Text is coloured only on a TTY and honours NO_COLOR; every command takes `--json`. `doctor` and
+  `status` count only open DLQ entries (resolved ones stay listed in the total).
+  [earned: 2026-09-28 — checking that the latest versions were active took a dozen commands across
+  three tools, `gaiafield` was "command not found" in the owner's shell, and doctor reported five
+  DLQ entries when all five were resolved]
+
 - **Links in the published pages open outside the artifact frame (obsidian 3.0.2, radar 3.1.1).**
   claude.ai renders an artifact in a frame, and a link without a target navigated the frame: GitHub,
   X and Reddit refuse to be framed and obsidian:// cannot open there, so the click showed "This

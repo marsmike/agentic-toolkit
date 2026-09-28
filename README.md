@@ -146,6 +146,26 @@ cd /tmp/quartz && npm i && npx quartz build --serve
 - [`crates/`](crates/) — the Rust engines
 - [`docs/PLAN.md`](docs/PLAN.md) — why everything is the way it is, with citations
 
+## The unisphere CLI
+
+`unisphere` is the one front door for people and agents, named for the Commonwealth's network that
+everything connects through (the engines are farsight and gaiafield). `toolkit` is its alias: every
+older command line keeps working. Every command reads well in a terminal and takes `--json` for a
+stable object (exit 0 ok, 1 problem or error, 2 usage):
+
+```bash
+unisphere status                         # engines, plugins, vault, pipeline, companion CLIs: all current?
+unisphere search agent memory            # ranked full-text search (farsight)
+unisphere graph neighbors Agent-Memory   # links to and from a note; also: stats, path A B, candidates
+unisphere commands --json                # the catalogue an agent starts from: arguments, JSON, examples
+uv run unisphere link --vault ~/my-vault # put unisphere, toolkit, the engines and Obsidian's CLI on ~/.local/bin
+```
+
+`unisphere link` writes a shim that runs this checkout (a `git pull` updates it) with your vault as
+the default `TOOLKIT_VAULT`. Two companion CLIs sit next to it, and `status` checks both: Obsidian's
+own (the running app; Obsidian 1.12+, turned on in Settings → General → Advanced) and Todoist's `td`
+(tasks). `unisphere commands` tells an agent which tool owns what.
+
 ## Scripting the toolkit (headless)
 
 The plugins' skills shell out to scripts and engine binaries, so a headless

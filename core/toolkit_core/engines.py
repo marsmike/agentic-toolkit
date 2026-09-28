@@ -369,16 +369,18 @@ def _installed_binary_problem(entry: dict, path: Path) -> str | None:
     return None
 
 
-def status_all() -> list[dict]:
-    """Installed vs. latest for every known engine — read-only, never downloads."""
+def status_all(fetch: bool = True) -> list[dict]:
+    """Installed vs. latest for every known engine — read-only, never downloads. With
+    `fetch=False` no network call is made and `latest_tag` stays None (`toolkit status --offline`)."""
     manifest = read_manifest()
     triple = target_triple()
     fetch_error: str | None = None
-    try:
-        releases = _fetch_releases()
-    except EngineError as exc:
-        releases = []
-        fetch_error = str(exc)
+    releases: list[dict] = []
+    if fetch:
+        try:
+            releases = _fetch_releases()
+        except EngineError as exc:
+            fetch_error = str(exc)
 
     rows = []
     for engine in ENGINES:
