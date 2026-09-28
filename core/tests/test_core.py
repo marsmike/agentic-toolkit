@@ -74,9 +74,15 @@ def test_vault_init_scaffolds_and_refuses_nonempty(tmp_path, agents_md_template)
     occupied = tmp_path / "occupied"
     occupied.mkdir()
     (occupied / "existing.txt").write_text("keep", encoding="utf-8")
-    with pytest.raises(vault.VaultInitError):
+    with pytest.raises(vault.VaultInitError) as excinfo:
         vault.scaffold_vault(occupied, agents_md_template)
     assert (occupied / "existing.txt").read_text(encoding="utf-8") == "keep"
+    # The message reaches the CLI user verbatim (cli.py's `vault init` handler just str()s
+    # the exception) — it must name the actual `--force` flag, never the Python kwarg
+    # spelling `force=True` [battle-test 2026-09-28].
+    message = str(excinfo.value)
+    assert "--force" in message
+    assert "force=True" not in message
 
 
 def test_profile_resolution_precedence(tmp_path, monkeypatch):

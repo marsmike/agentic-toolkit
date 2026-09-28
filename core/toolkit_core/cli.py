@@ -999,12 +999,19 @@ class _Parser(argparse.ArgumentParser):
             kwargs.pop("color", None)
             super().__init__(*args, **kwargs)
 
+    # Matches argparse's own "the following arguments are required: <dest>" message when the
+    # missing argument is one of this file's `add_subparsers(dest=...)` calls (`command`,
+    # `vault_command`, `graph_command`, `engines_command`) — never a real positional's dest
+    # (`note`, `path`, `plugin`, ...), which argparse phrases the same way but whose name IS the
+    # right word to show a user. [battle-test 2026-09-28: `unisphere vault`/`graph`/`engines`
+    # with no subcommand leaked "vault_command"/"graph_command"/"engines_command" — an internal
+    # Python variable name, not anything a user typed or would recognise]
+    _MISSING_SUBCOMMAND_RE = re.compile(r"^the following arguments are required: (\w*_?command)$")
+
     def error(self, message: str) -> None:  # type: ignore[override]
+        if self._MISSING_SUBCOMMAND_RE.match(message):
+            message = "a subcommand is required"
         raise _UsageError(self, message)
-
-
-def _sub(parser: argparse.ArgumentParser):
-    return parser.add_subparsers(dest="command", required=True)
 
 
 def _build_parser() -> argparse.ArgumentParser:

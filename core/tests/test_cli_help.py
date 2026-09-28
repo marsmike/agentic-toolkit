@@ -101,6 +101,28 @@ def test_missing_required_argument_is_short_not_a_full_dump(capsys):
     assert err.count("\n") <= 3  # one-liner + usage + hint, not argparse's own multi-block dump
 
 
+@pytest.mark.parametrize(
+    ("group", "choices"),
+    [
+        ("vault", "{init}"),
+        ("graph", "{stats,neighbors,path,candidates}"),
+        ("engines", "{install,update,status}"),
+    ],
+)
+def test_missing_subcommand_names_no_internal_dest(capsys, group, choices):
+    """A parent command with no subcommand (`unisphere vault`/`graph`/`engines`) used to leak
+    argparse's internal `add_subparsers(dest=...)` variable name ("vault_command",
+    "graph_command", "engines_command") straight into the error line — an implementation detail,
+    not anything the user typed or would recognise. The USAGE line right below it already lists
+    the real choices, so the one-liner just needs to say a subcommand is missing.
+    [battle-test 2026-09-28]"""
+    code, err = run_err(capsys, group)
+    assert code == 2
+    assert err.startswith("error: a subcommand is required\n")
+    assert "_command" not in err
+    assert choices in err  # the real choices still show, in the USAGE line
+
+
 # --- version --------------------------------------------------------------------------------
 
 

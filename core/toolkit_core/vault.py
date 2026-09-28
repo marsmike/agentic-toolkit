@@ -293,7 +293,7 @@ def scaffold_vault(path: Path, agents_md_template: Path, force: bool = False) ->
     """
     path = Path(path)
     if path.exists() and path.is_dir() and any(path.iterdir()) and not force:
-        raise VaultInitError(f"{path} is not empty; pass force=True (--force) to init anyway")
+        raise VaultInitError(f"{path} is not empty; pass --force to init anyway")
     if path.exists() and path.is_file():
         raise VaultInitError(f"{path} exists and is a file, not a directory")
 
