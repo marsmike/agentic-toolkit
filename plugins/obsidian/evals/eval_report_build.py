@@ -77,6 +77,11 @@ def run(vault: Path) -> dict:
         import re
         if not page.startswith("<title>") or re.search(r"<(!doctype|html|head|body|script)[\s>]", page, re.I):
             problems.append("contract: page must start with <title> and carry no document tags or script")
+        # Both pages are published as artifacts (a frame): links must open at the top level, where
+        # GitHub, X, Reddit and obsidian:// are not blocked. [earned: 2026-09-28]
+        dashboard = (Path(report_build.__file__).parent / "dashboard_template.html").read_text(encoding="utf-8")
+        if '<base target="_blank">' not in page.split("<style", 1)[0] or '<base target="_blank">' not in dashboard.split("</head>", 1)[0]:
+            problems.append("links: report and dashboard need <base target=\"_blank\"> in their head")
         for want in ('href="https://x.com/a/status/42?s=12"', 'href="https://github.com/acme/widget"', "Eval Report Widget", "1 image kept"):
             if want not in page:
                 problems.append(f"items: missing {want!r}")

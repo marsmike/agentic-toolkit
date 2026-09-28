@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Links in the published pages open outside the artifact frame (obsidian 3.0.2, radar 3.1.1).**
+  claude.ai renders an artifact in a frame, and a link without a target navigated the frame: GitHub,
+  X and Reddit refuse to be framed and obsidian:// cannot open there, so the click showed "This
+  content is blocked". The run report, the dashboard and Signal Radar carry `<base target="_blank">`;
+  in-page links (blip names) keep working, they cancel the navigation. The report and signal evals
+  fail without it. [earned: 2026-09-28, the owner clicking links in the published run report]
+
 - **gaiafield 0.2.4: parallel indexers wait for each other.** The pipeline distills in parallel
   workers, and each one's `distill_check` runs `gaiafield index` on the same `graph.db`; SQLite had
   no busy timeout, so the second writer failed at once with "database is locked" and filed a DLQ

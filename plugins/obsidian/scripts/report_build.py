@@ -45,6 +45,11 @@ DAYS = 30
 STATUS = {"distilled": "Distilled", "known": "Already in vault", "dropped": "Dropped", "duplicate": "Duplicate",
           "archived": "Archived", "waiting": "Waiting", "missing": "Missing"}
 
+# The page is published as a claude.ai artifact, which renders it in a frame: a link that navigates
+# the frame is blocked by sites that refuse framing (GitHub, X, Reddit) and by obsidian://. Every
+# link opens at the top level instead. [earned: 2026-09-28, "Dieser Inhalt ist blockiert" on click]
+BASE = '<base target="_blank">'
+
 STYLE = """
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -393,7 +398,7 @@ def render(vault: Path, run: str | None = None, today: date | None = None) -> st
 
     big = [("hot", stats["notes"], "notes in the vault"), ("", stats["week"], "distilled in the last 7 days"),
            ("", stats["imported"], "clippings logged"), ("", stats["media"], "images kept")]
-    out = [f"<title>Last Pipeline Run</title>{STYLE}<div class=\"wrap\">",
+    out = [f"<title>Last Pipeline Run</title>{BASE}{STYLE}<div class=\"wrap\">",
            f'<header class="hero"><div class="brand">{MARK}<span><b>agentic-toolkit</b> · run report · The Void</span></div>',
            f"<h1>{h1}</h1><p>{sub}</p>",
            f'<p>Run <b class="num">{escape(when)} UTC</b> · {last.get("distilled", 0)} distilled, {last.get("dropped", 0)} dropped, '

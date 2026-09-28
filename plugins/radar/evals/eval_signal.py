@@ -217,6 +217,8 @@ def run(vault: Path) -> dict:
         md = (out / "Signal-Radar.md").read_text(encoding="utf-8")
         if "Zither" not in html or "application/json" not in html:
             problems.append("writes: the page must embed its data")
+        if '<base target="_blank">' not in html.split("</head>", 1)[0]:
+            problems.append("writes: links must open at the top level (<base target=\"_blank\">), not in the artifact frame")
         if "[[04_Resources/Qwen-Notes" not in md:
             problems.append("writes: the note must wikilink the anchor note")
         changed = {p for p, v in snapshot(sandbox).items() if before.get(p) != v}
