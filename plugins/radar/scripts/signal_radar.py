@@ -298,8 +298,11 @@ def score(e: Entity, today: date, anchor_of=None, horizons: dict[str, str] | Non
 
 
 def current_ids(old_ids, names: dict[str, str]) -> dict[str, str]:
-    """An interest renamed since its items were judged keeps its old id in state.jsonl; map it to
-    the current id sharing its first two words, so one interest is one sector."""
+    """Backup guess for a rename with no `aliases:` entry yet: the current id sharing its first two
+    slug words. Only a fallback now — `interests_mod.alias_map()` (the profile's own `aliases:`)
+    is tried first and is what a real rename should carry, since this heuristic can miss one (it
+    matched "AI Agents" renames fine, but "Obsidian & Knowledge Management" -> "Obsidian & Agentic
+    Knowledge Management" shares only its first word, not its first two)."""
     out = {}
     for old in old_ids:
         if old in names:
@@ -311,23 +314,48 @@ def current_ids(old_ids, names: dict[str, str]) -> dict[str, str]:
     return out
 
 
+def resolve_ids(old_ids, names: dict[str, str], amap: dict[str, str]) -> dict[str, str]:
+    """Every id a state/sensor row's `p` dict might carry -> the live interest it counts toward:
+    `amap` (`interests_mod.alias_map()`, the profile's explicit `aliases:`) first, `current_ids`'
+    heuristic as a backup for a rename that has no alias entry yet. An id neither resolves is
+    dropped — a truly retired interest, not carried forward as its own phantom sector. [earned:
+    2026-09-28, the owner's Obsidian-plugin renames]"""
+    out = dict(amap)
+    out.update(current_ids([i for i in old_ids if i not in out], names))
+    return out
+
+
 def _interest_weights(mentions: list[dict], alias: dict[str, str] | None = None) -> tuple[Counter, Counter]:
     """(summed weight, distinct-mention support) per interest, both keyed the same way. `support`
     is how many different mentions cleared the bar for that interest — one mention naming several
     interests at once (a single ambiguous item scoring 0.5+ on two of them) supports each of those
     once, not zero; it is `assign_sectors` that then asks for more than one such mention before it
-    trusts the sector, which this alone does not decide."""
+    trusts the sector, which this alone does not decide.
+
+    `alias` (typically `resolve_ids()`'s output) resolves a row's possibly-old interest id to the
+    one it counts toward today; an id it cannot resolve is dropped rather than kept as itself, so
+    a retired interest's rows never become their own phantom sector. `alias=None` (no map given at
+    all, distinct from an empty-but-real one) skips resolution entirely and keeps every id as-is —
+    the identity behaviour a caller with no rename bookkeeping still gets."""
+    def resolve(iid: str) -> str | None:
+        return iid if alias is None else alias.get(iid)
+
     w: Counter = Counter()
     n: Counter = Counter()
     for m in mentions:
         for iid, p in (m.get("p") or {}).items():
             if p >= 0.5:
-                key = (alias or {}).get(iid, iid)
+                key = resolve(iid)
+                if key is None:
+                    continue
                 w[key] += p
                 n[key] += 1
         for iid in m.get("interests") or []:
-            w[iid] += 1.0
-            n[iid] += 1
+            key = resolve(iid)
+            if key is None:
+                continue
+            w[key] += 1.0
+            n[key] += 1
     return w, n
 
 
@@ -565,7 +593,7 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
             outside_keys.setdefault(entities.key(n), n)
     interest_list = interests_mod.load(vault)
     names = {it.id: it.name for it in interest_list}
-    alias = current_ids({i for m in mentions for i in (m.get("p") or {})}, names)
+    alias = resolve_ids({i for m in mentions for i in (m.get("p") or {})}, names, interests_mod.alias_map(interest_list))
     ents = collect(mentions + vault_ms, outside_keys, vocab)
     graph, by_key, notes, graph_section = vault_graph.build(vault, now)
 
@@ -612,7 +640,7 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
         del b["_interests"]
         del b["_interest_support"]
     week = reports.week_of(today.isoformat())
-    trend = reports.trend(state, week) if state else {}
+    trend = reports.trend(state, week, alias) if state else {}
     data = {
         # UTC, `Z`-suffixed — the same `ingested_at`/`distilled_at` format (contract/VAULT_SCHEMA.md).
         "generated": now.strftime("%Y-%m-%dT%H:%M:%SZ"),

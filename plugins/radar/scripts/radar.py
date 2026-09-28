@@ -583,12 +583,14 @@ def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, fo
     rows = read_jsonl(out / "state.jsonl")
     if not rows:
         return {"status": "empty", "detail": f"no radar state in {out}; run `scan` first"}
+    interest_list = interests_mod.load(vault)
+    amap = interests_mod.alias_map(interest_list)
     if cmd == "feeds":
-        return {"status": "ok", "feeds": reports.feeds(rows, now)}
+        return {"status": "ok", "feeds": reports.feeds(rows, now, amap)}
     if cmd == "trend":
         wk = week or reports.week_of(now.date().isoformat())
         wk_clips, clips_skipped = clips_mod.load(vault, reports.clip_window_start(wk))
-        return {"status": "ok", "week": wk, "interests": reports.trend(rows, wk),
+        return {"status": "ok", "week": wk, "interests": reports.trend(rows, wk, amap),
                 "terms": reports.emerging_terms(rows, wk, wk_clips),
                 **({"clips_skipped": clips_skipped} if clips_skipped else {})}
     wk = week or reports.last_complete_week(now.date())
@@ -597,7 +599,7 @@ def report(vault: Path, out: Path, cmd: str, now: datetime, week: str | None, fo
         # capture. [earned: 2026-09-23, first live week: the last complete week predates the radar]
         return {"status": "empty", "week": wk, "detail": f"no scans in {wk}; nothing to digest"}
     wk_clips, clips_skipped = clips_mod.load(vault, reports.clip_window_start(wk))
-    text = reports.render_weekly(wk, rows, interests_mod.load(vault), now, gaps=gaps_mod.load_week(out, wk), clips=wk_clips)
+    text = reports.render_weekly(wk, rows, interest_list, now, gaps=gaps_mod.load_week(out, wk), clips=wk_clips)
     try:
         path = reports.write_weekly(vault, wk, text, force, out / "weekly.jsonl")
     except FileExistsError as e:

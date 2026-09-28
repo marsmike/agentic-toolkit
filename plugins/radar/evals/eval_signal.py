@@ -29,6 +29,10 @@ graph — offline (gaiafield and Kagi stubbed).
                one judged mention across three families is Other and must not card in Early
                warning; an Other thing with high relevance, or two independently-judged mentions,
                still cards; a real-sector thing always cards (real cases, 2026-09-28 second pass)
+10. alias    (pure, no sandbox) — a state row judged under an id the profile's `aliases:` retired
+               (real case, 2026-09-28: "AI Agents & Multi-Agent Systems" -> "AI Agents, Harnesses
+               & Reliability") folds into the renamed interest's sector, not a phantom sector of
+               its own; an id naming no live interest (current or aliased) resolves to nothing
 """
 from __future__ import annotations
 
@@ -206,6 +210,35 @@ def _sector_and_early_checks(problems: list[str]) -> None:
         problems.append("early: a real-sector thing needs no extra bar — assign_sectors already corroborated it")
 
 
+def _alias_checks(problems: list[str]) -> None:
+    """Real case, 2026-09-28: the owner renamed four interests in the Obsidian plugin ("AI Agents &
+    Multi-Agent Systems" -> "AI Agents, Harnesses & Reliability" among them) and the profile note
+    gained an `aliases:` list of the old names. A row judged before the rename still carries the
+    old id; it must fold into the renamed interest (not sit as its own phantom sector, not drop to
+    Other), and an id that is neither current nor aliased (a truly retired interest) must resolve
+    to nothing."""
+    import signal_radar as sr
+    from interests import Interest
+
+    renamed = Interest(id="ai-agents-harnesses-reliability", name="AI Agents, Harnesses & Reliability",
+                       alias_ids=frozenset({"ai-agents-multi-agent-systems"}))
+    other = Interest(id="music-production-djing", name="Music Production & DJing")
+    names = {renamed.id: renamed.name, other.id: other.name}
+    amap = sr.interests_mod.alias_map([renamed, other])
+    resolved = sr.resolve_ids({"ai-agents-multi-agent-systems", "genuinely-retired-interest"}, names, amap)
+    if resolved.get("ai-agents-multi-agent-systems") != "ai-agents-harnesses-reliability":
+        problems.append(f"alias: an old id with an explicit alias should resolve to its renamed interest, got {resolved}")
+    if "genuinely-retired-interest" in resolved:
+        problems.append(f"alias: an id naming no live interest (current or aliased) must not resolve, got {resolved}")
+
+    mentions = [{"p": {"ai-agents-multi-agent-systems": 0.8}}, {"p": {"ai-agents-multi-agent-systems": 0.75}}]
+    weight, support = sr._interest_weights(mentions, resolved)
+    blip = {"name": "Some Agent Tool", "_interests": weight, "_interest_support": support}
+    sr.assign_sectors([blip], names, [renamed, other])
+    if blip["sector"] != "ai-agents-harnesses-reliability":
+        problems.append(f"alias: two mentions judged under the old id should earn the renamed interest's sector, got {blip['sector']!r}")
+
+
 def run(vault: Path) -> dict:
     import interests
     import kagi
@@ -242,6 +275,7 @@ def run(vault: Path) -> dict:
     try:
         _entity_checks(problems)
         _sector_and_early_checks(problems)
+        _alias_checks(problems)
         sandbox = make_sandbox(vault)
         (sandbox / "03_Areas" / "Sig-Interests.md").write_text(INTERESTS_NOTE, encoding="utf-8")
         (sandbox / "04_Resources" / "Qwen-Notes.md").write_text(QWEN_NOTE, encoding="utf-8")
