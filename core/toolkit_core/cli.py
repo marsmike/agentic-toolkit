@@ -1401,9 +1401,22 @@ def main(argv: list[str] | None = None) -> int:
         return _unknown_command_error(path, rest[0], sub.choices, st)
 
     try:
-        args = parser.parse_args(argv)
+        args, extras = parser.parse_known_args(argv)
     except _UsageError as exc:
         return _usage_error(exc, st)
+    if extras:
+        # `parser.parse_args()` would raise this "unrecognized arguments" error itself, but
+        # always attributed to the top-level parser regardless of which subparser actually
+        # rejected the flag (an argparse quirk: only the outermost parse_args() call checks for
+        # leftovers, so self.error() always means the outermost self). `node` is the deepest
+        # subparser `_walk_command` actually resolved for this argv, so its own usage/prog shows
+        # up in the error instead of unisphere's top-level one. [battle-test 2026-09-28:
+        # `unisphere search --unknown-flag foo` showed the top-level USAGE listing every command,
+        # not `unisphere search`'s]
+        try:
+            node.error(f"unrecognized arguments: {' '.join(extras)}")
+        except _UsageError as exc:
+            return _usage_error(exc, st)
 
     if args.command == "vault" and args.vault_command == "init":
         return cmd_vault_init(args)

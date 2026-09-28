@@ -123,6 +123,23 @@ def test_missing_subcommand_names_no_internal_dest(capsys, group, choices):
     assert choices in err  # the real choices still show, in the USAGE line
 
 
+def test_unrecognized_flag_blames_the_subcommand_not_the_top_level(capsys):
+    """`argparse.ArgumentParser.parse_args()` only checks for leftover ("unrecognized
+    arguments") tokens on the OUTERMOST parser it was called on — so a bad flag on a subcommand
+    used to render `unisphere`'s own top-level USAGE (every command listed) instead of that
+    subcommand's. [battle-test 2026-09-28]"""
+    code, err = run_err(capsys, "search", "--unknown-flag", "foo")
+    assert code == 2
+    assert err.startswith("error: unrecognized arguments: --unknown-flag\n")
+    assert "unisphere search " in err
+    assert "{vault,doctor,profile" not in err  # not the top-level USAGE line
+
+    code, err = run_err(capsys, "graph", "neighbors", "X", "--bogus")
+    assert code == 2
+    assert err.startswith("error: unrecognized arguments: --bogus\n")
+    assert "unisphere graph neighbors " in err
+
+
 # --- version --------------------------------------------------------------------------------
 
 
