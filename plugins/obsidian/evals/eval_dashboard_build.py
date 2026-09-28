@@ -57,6 +57,11 @@ def run(vault: Path) -> dict:
         }
         for name, text in notes.items():
             (res / f"{name}.md").write_text(text, encoding="utf-8")
+        # title: a real title's punctuation ("5.5", a colon) never survives the filename slug
+        # ("5-5"); the dashboard must read it from the H1, not derive it from the path.
+        (res / "Eval-Dash-Punct-5-5-Title.md").write_text(
+            f"---\ndescription: punct\nstatus: distilled\nprocessed_date: {today.isoformat()}\n---\n\n"
+            "# Opus 5.5: a punctuated title, not a slug\n", encoding="utf-8")
         for args in (("init", "-q"), ("config", "user.email", "eval@example.org"), ("config", "user.name", "eval"),
                      ("add", "-A"), ("commit", "-q", "-m", "hand edit"),
                      ("commit", "-q", "--allow-empty", "-m", "pipeline 2026-09-25 13:06: 7 distilled, 1 dropped, 2 failed; in: x")):
@@ -114,15 +119,37 @@ def run(vault: Path) -> dict:
         if radar_ledger.load(sandbox, (today - timedelta(days=83)).isoformat(), today)["rising"]:
             problems.append("radar: 4 strong against a median of 3 must not be rising")
         (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        # retired interests: an id the owner has since renamed or dropped from the interests note
+        # must not resurface as a second, stale-slug interest next to its current name.
+        retired_row = {"run": today.isoformat(), "canonical": "example.org/retired", "url": "https://example.org/retired",
+                       "title": "Old slug", "feed": "f", "kind": "paper", "p": {"agent-memory-old": 0.85},
+                       "worth": ["agent-memory-old"], "strong": ["agent-memory-old"], "in_vault": None}
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in [*rows, retired_row]), encoding="utf-8")
+        r3 = radar_ledger.load(sandbox, (today - timedelta(days=83)).isoformat(), today)
+        if "agent-memory-old" in r3["interests"]:
+            problems.append(f"radar: a renamed/retired interest id must not appear as its own entry: {sorted(r3['interests'])}")
+        if r3["interests"].get("retired", {}).get("name") != "Retired interests" or r3["interests"]["retired"]["strong"] < 1:
+            problems.append(f"radar: a retired interest id must collapse into one 'Retired interests' bucket: {r3['interests'].get('retired')}")
+        if any(iid == "agent-memory-old" for w in r3["weeks"].values() for iid in w):
+            problems.append(f"radar: 'Strong per week' must not carry a raw retired id either: {r3['weeks']}")
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
         run = next((r for r in data["runs"] if r.get("run") == "2026-09-25 13:06"), {})
         fates = [(i["title"], i["status"], i["notes"]) for i in run.get("items", [])]
         if fates != [("Wait", "waiting", []), ("04_Resources/Eval-Dash-Paper.md", "known", ["04_Resources/Eval-Dash-Paper.md"]),
                      ("01_Capture/Readwise-Article-gone.md", "missing", [])] or data.get("missing") != 1:
             problems.append(f"imports: {fates}, missing={data.get('missing')}")
-        got = {n["title"]: n for n in data["notes"] if n["title"].startswith("Eval-Dash-")}
-        if set(got) != {"Eval-Dash-Tweet", "Eval-Dash-Paper"}:
+        got = {n["path"]: n for n in data["notes"]
+              if n["path"] in ("04_Resources/Eval-Dash-Tweet.md", "04_Resources/Eval-Dash-Paper.md")}
+        if set(got) != {"04_Resources/Eval-Dash-Tweet.md", "04_Resources/Eval-Dash-Paper.md"}:
             problems.append(f"notes: {sorted(got)}")
-        t, p = got.get("Eval-Dash-Tweet", {}), got.get("Eval-Dash-Paper", {})
+        t, p = got.get("04_Resources/Eval-Dash-Tweet.md", {}), got.get("04_Resources/Eval-Dash-Paper.md", {})
+        # title: the note's own title (frontmatter `title`, else its `# H1`), never the filename
+        # slug — a real title's dots and punctuation don't survive a filename ("5.5" -> "5-5").
+        if t.get("title") != "N" or p.get("title") != "N":
+            problems.append(f"title: both fixtures' body is '# N'; got tweet={t.get('title')!r} paper={p.get('title')!r}")
+        punct = next((n for n in data["notes"] if n["path"] == "04_Resources/Eval-Dash-Punct-5-5-Title.md"), {})
+        if punct.get("title") != "Opus 5.5: a punctuated title, not a slug":
+            problems.append(f"title: must come from the H1, not the filename slug; got {punct.get('title')!r}")
         if (t.get("type"), t.get("kind"), t.get("domains")) != ("tweet", "tool-landmark", ["ai-ml"]):
             problems.append(f"fields: tweet {t.get('type')}, {t.get('kind')}, {t.get('domains')}")
         if (p.get("type"), p.get("kind")) != ("paper", "unsorted"):
