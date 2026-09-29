@@ -1,6 +1,7 @@
 formulas:
   domain: tags.filter(value.startsWith("domain/")).map(value.replace("domain/", "")).join(", ")
-  changed: if(note.updated_at, date(note.updated_at), if(note.distilled_at, date(note.distilled_at), date(note.processed_date)))
+  changed: if(note.updated_at, note.updated_at, if(note.distilled_at, note.distilled_at, note.processed_date)).toString().slice(0, 16).replace("T", " ")
+  distilled: if(note.distilled_at, note.distilled_at, note.processed_date).toString().slice(0, 16).replace("T", " ")
 properties:
   file.name:
     displayName: Title
@@ -19,7 +20,9 @@ properties:
   formula.domain:
     displayName: Domain
   formula.changed:
-    displayName: Changed
+    displayName: Changed (UTC)
+  formula.distilled:
+    displayName: Distilled (UTC)
 views:
   - type: table
     name: Recently changed
@@ -51,13 +54,13 @@ views:
             - file.inFolder("03_Areas")
             - file.inFolder("04_Resources")
     order:
-      - processed_date
+      - formula.distilled
       - file.name
       - formula.domain
       - kind
       - description
     sort:
-      - property: processed_date
+      - property: formula.distilled
         direction: DESC
     limit: 40
   - type: table
