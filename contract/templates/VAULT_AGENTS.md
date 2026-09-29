@@ -3,8 +3,11 @@ Maintainers: this file is installed by `unisphere vault init` as the AGENTS.md o
 It is always loaded, so it carries only hard requirements — rules that must hold even when no
 skill has been invoked. Procedural depth (the full distill workflow, placement heuristics, failure
 modes by name) belongs in a skill's references/, loaded only on invocation. If you're tempted to
-add detail here, it probably belongs in a skill instead. See ../KNOWLEDGE_API.md and
-../VAULT_SCHEMA.md for the rules this file assumes.
+add detail here, it probably belongs in a skill instead. The contract itself lives in the toolkit
+repo, not in this vault — see
+https://github.com/marsmike/agentic-toolkit/blob/main/contract/KNOWLEDGE_API.md and
+https://github.com/marsmike/agentic-toolkit/blob/main/contract/VAULT_SCHEMA.md for the rules this
+file assumes.
 -->
 
 # AGENTS.md — This Vault
@@ -22,7 +25,7 @@ when no skill is running.
 | `02_Projects/` `03_Areas/` `04_Resources/` | Active content — the only folders search/enrichment/index consider. |
 | `05_Archive/` | Frozen. Never create, enrich, or link here from new notes. |
 
-Full schema: `contract/VAULT_SCHEMA.md`.
+Full schema: https://github.com/marsmike/agentic-toolkit/blob/main/contract/VAULT_SCHEMA.md.
 
 ## Distilling captures — non-negotiable
 
@@ -40,5 +43,6 @@ Full schema: `contract/VAULT_SCHEMA.md`.
 
 ## Frontmatter
 
-Unknown keys are allowed — the field table in `contract/VAULT_SCHEMA.md` is a floor, not a
+Unknown keys are allowed — the field table at
+https://github.com/marsmike/agentic-toolkit/blob/main/contract/VAULT_SCHEMA.md is a floor, not a
 ceiling. Don't reject or "fix" a note for carrying a field you don't recognize.
