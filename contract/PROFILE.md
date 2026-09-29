@@ -17,8 +17,10 @@ For locating the vault itself:
 1. `TOOLKIT_VAULT` environment variable.
 2. `./vault` — the bundled example vault, as fallback.
 
-`unisphere doctor` reports which vault is active and which step of each resolution order supplied
-the answer.
+`unisphere doctor` reports which vault is active and which step of the vault's own resolution
+order supplied it (`vault_source`, e.g. `env:TOOLKIT_VAULT` or `default:./vault`). It does not
+report per-key provenance for a plugin's configuration — `resolve_profile` merges env, note and
+default with no record of which one won a given setting.
 
 ## Secrets
 
