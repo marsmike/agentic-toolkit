@@ -10,7 +10,9 @@ routine runs it between pipeline runs and sends one notification only when `ok` 
 [earned: 2026-09-25, owner's request — "alert me if something is not working"]
 
 Exit 1 when there is a problem, so a shell can branch on it. Every check is deterministic: no
-model, no network, only git and files.
+model, no network, only git and files. `health()` is the importable one-word verdict (healthy,
+late, stuck, failing) from the vault's files alone, no git; the week's run counts come from the
+ledger's run rows (`imports_log.runs`), not from `git log`.
 """
 from __future__ import annotations
 
@@ -23,11 +25,12 @@ from pathlib import Path
 
 import imports_log
 import radar_ledger
-from vault_utils import contained, example_vault, git_output, read_frontmatter, require_vault
+from vault_utils import contained, example_vault, git_output, read_frontmatter, require_vault, shallow_history
 
 LOCK = Path("00_Memory") / "pipeline.lock"
 STATE = Path("00_Memory") / "pipeline-state.json"
 DLQ = Path("00_Memory") / "dlq"
+SIGNAL = Path("00_Memory") / "radar" / "signal.json"  # the Signal Radar's own file; `generated` is its UTC time
 MAX_AGE_HOURS = 4.0        # the routine runs every 3 h; one missed run is a problem
 LOCK_STALE_HOURS = 6.0     # pipeline_run's own stale-lock horizon; the lock is never committed, so in a fresh
                            # clone (the cloud routine) a hung run shows up as `stale`, not `hung`
@@ -136,22 +139,73 @@ def check(vault: Path, now: datetime, max_age_hours: float = MAX_AGE_HOURS) -> d
             "notification": notification(problems), "weekly_digest": digest}
 
 
+def health(vault: Path, now: datetime | None = None, max_age_hours: float = MAX_AGE_HOURS) -> dict:
+    """The pipeline in one word, from the vault's own files (no git, so a shallow or missing
+    history changes nothing), for Now.md's health line:
+
+        late      no run in the ledger, or the last one more than `max_age_hours` ago
+        failing   the last run reported a capture that failed
+        stuck     an active DLQ note, or a capture parked after repeated failures
+        healthy   none of these (checked in this order; the first that applies is the word)
+
+    {"ok", "word", "detail", "pipeline_at" (the last run row's UTC time, or None), "radar_at"
+    (00_Memory/radar/signal.json's `generated`, or None)}."""
+    now = now or datetime.now(UTC)
+    last = next(iter(imports_log.load(vault)), None)
+    pipeline_at = str(last.get("at") or f"{last['run'].replace(' ', 'T')}:00Z") if last else None
+    try:
+        radar_at = json.loads((vault / SIGNAL).read_text(encoding="utf-8")).get("generated") or None
+    except (OSError, json.JSONDecodeError, AttributeError):
+        radar_at = None
+    try:
+        parked = json.loads((vault / STATE).read_text(encoding="utf-8")).get("parked") or []
+    except (OSError, json.JSONDecodeError, AttributeError):
+        parked = []
+    dlq = sum(1 for p in contained((vault / DLQ).glob("*.md"), vault)
+              if str(read_frontmatter(p)[0].get("status", "active")) == "active")
+    try:
+        age = (now - datetime.fromisoformat(pipeline_at).astimezone(UTC)).total_seconds() / 3600 if pipeline_at else None
+    except ValueError:
+        age = None
+    if age is None or age > max_age_hours:
+        word, detail = "late", "no pipeline run recorded" if age is None else f"last run {age:.1f} h ago"
+    elif int((last or {}).get("failed") or 0):
+        word, detail = "failing", f"the last run failed {int(last['failed'])} capture(s)"
+    elif dlq or parked:
+        word, detail = "stuck", ", ".join(x for x in (f"{dlq} open DLQ note(s)" if dlq else "",
+                                                      f"{len(parked)} parked capture(s)" if parked else "") if x)
+    else:
+        word, detail = "healthy", f"last run {age:.1f} h ago"
+    return {"ok": word == "healthy", "word": word, "detail": detail, "pipeline_at": pipeline_at, "radar_at": radar_at}
+
+
 def week_stats(vault: Path, now: datetime) -> dict:
     """The last STATS_DAYS calendar days (today and the six before it, one boundary for every
-    source) as numbers: runs and what they distilled (from the `pipeline …` commits),
+    source) as numbers: runs and what they distilled (the ledger's run rows, `imports_log.runs`),
     what came in (the imports log), what the feeds brought (the radar ledgers). Derived every time
     from the vault; nothing is persisted, so the watchdog stays a reader. [earned: 2026-09-25,
-    owner's request — "the monitoring job can collect stats too"]"""
+    owner's request — "the monitoring job can collect stats too"] Only a vault whose ledger has no
+    run row yet counts `pipeline …` commits instead, and `shallow` says when that history is cut
+    short. [earned: 2026-09-29 — a shallow checkout's `git log` undercounts]"""
     first_day = now.date() - timedelta(days=STATS_DAYS - 1)  # today and the six dates before it, for every source
-    since = datetime.combine(first_day, datetime.min.time(), tzinfo=UTC)
-    log = git_output(vault, "log", f"--since={since.isoformat()}", "--grep=^pipeline", "--format=%s")
-    runs = [s for s in log.splitlines() if s.strip()]
-    distilled = sum(_counts(s).get("distilled", 0) for s in runs)
-    failed = sum(_counts(s).get("failed", 0) for s in runs)
+    ledger = imports_log.runs(vault)
+    shallow = False
+    if ledger:
+        runs = [r for r in ledger if first_day.isoformat() <= r["run"][:10] <= now.date().isoformat()]
+        counts = [{k: int(r[k]) for k in ("distilled", "failed")} for r in runs if r["counted"]]
+    else:
+        since = datetime.combine(first_day, datetime.min.time(), tzinfo=UTC)
+        log = git_output(vault, "log", f"--since={since.isoformat()}", "--grep=^pipeline", "--format=%s")
+        runs = [s for s in log.splitlines() if s.strip()]
+        counts = [_counts(s) for s in runs]
+        shallow = bool(runs) and shallow_history(vault)
+    distilled = sum(c.get("distilled", 0) for c in counts)
+    failed = sum(c.get("failed", 0) for c in counts)
     imported = sum(len(r["items"]) for r in imports_log.load(vault) if r["run"][:10] >= first_day.isoformat())
     radar = radar_ledger.load(vault, first_day.isoformat(), now.date())
     top = next(iter(radar["interests"]), "")
     return {"days": STATS_DAYS, "runs": len(runs), "runs_expected": STATS_DAYS * RUNS_PER_DAY, "distilled": distilled,
+            "source": "ledger" if ledger else "git", "shallow": shallow,
             "failed": failed, "imported": imported, "radar_judged": radar["counts"].get("judged", 0),
             "radar_strong": radar["counts"].get("strong", 0), "radar_promoted": radar["counts"].get("promoted", 0),
             "rising": [radar["interests"].get(i, {}).get("name", i) for i in radar["rising"][:3]],
@@ -162,7 +216,8 @@ def weekly_digest(week: dict, now: datetime) -> str:
     """One push notification a week with the numbers, cut to NOTIFY_CHARS."""
     parts = [f"TheVoid, week to {now.date().isoformat()} ({now.strftime('%H:%M')} UTC):",
              f"{week['runs']} of ~{week['runs_expected']} runs, {week['distilled']} distilled, {week['imported']} imported"
-             + (f", {week['failed']} failed" if week["failed"] else ""),
+             + (f", {week['failed']} failed" if week["failed"] else "")
+             + (" (from a shallow git history: at least this many)" if week.get("shallow") else ""),
              f"radar: {week['radar_judged']} judged, {week['radar_strong']} strong, {week['radar_promoted']} promoted"
              + (f"; top: {week['top_interest']}" if week["top_interest"] else "")
              + (f"; rising: {', '.join(week['rising'])}" if week["rising"] else "")]

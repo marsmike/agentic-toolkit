@@ -16,6 +16,11 @@ In a git sandbox with a `pipeline …` commit an hour old:
               `weekly_digest` (≤ 600 chars) and any other time it is empty
 12. wrong-vault — pointed at the toolkit's own example vault, the watchdog reports that (exit 1, its
               own notification) and `pipeline_run.py begin` refuses to run
+13. ledger   — with run rows in 00_Memory/imports.jsonl, `facts.week` counts those rows (a legacy row
+              without counts is still a run), never the commits
+14. health   — `health()` from the files alone: no run is late; a fresh clean run is healthy with its
+              time and the Signal Radar's; an active DLQ note is stuck; a failed capture in the last run
+              is failing; an old last run is late, whatever else is true
 """
 from __future__ import annotations
 
@@ -164,6 +169,45 @@ def run(vault: Path) -> dict:
         if kinds(r) != ["signal-stale"]:
             problems.append(f"signal: a signal commit older than the limit must be signal-stale alone, got {kinds(r)}")
 
+        # 13. ledger: once imports.jsonl has run rows, the week's runs are those rows, not the commits
+        stamp = lambda d: {"run": d.strftime("%Y-%m-%d %H:%M"), "at": d.strftime("%Y-%m-%dT%H:%M:%SZ")}  # noqa: E731
+        rows = [{"kind": "run", **stamp(now - timedelta(days=1)), "distilled": 5, "dropped": 0, "failed": 0, "items": []},
+                {**stamp(now - timedelta(days=2)), "items": [{"doc_id": "x"}]},  # legacy: no counts, no commit
+                {"kind": "run", **stamp(now - timedelta(hours=1)), "distilled": 2, "dropped": 1, "failed": 1, "items": []},
+                {"kind": "run", **stamp(now - timedelta(days=9)), "distilled": 9, "dropped": 0, "failed": 0, "items": []}]
+        (sandbox / "00_Memory" / "imports.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        wk = watchdog.check(sandbox, now)["facts"]["week"]
+        if (wk.get("runs"), wk.get("distilled"), wk.get("failed"), wk.get("imported"), wk.get("source")) != (3, 7, 1, 1, "ledger"):
+            problems.append(f"ledger: the week's runs come from the ledger's run rows, got {wk}")
+
+        # 14. health: one word from the vault's files alone, in its own minimal vault (no git)
+        hv = sandbox.parent / "health"
+        (hv / "00_Memory" / "dlq").mkdir(parents=True)
+        h = watchdog.health(hv, now)
+        if (h["ok"], h["word"], h["pipeline_at"], h["radar_at"]) != (False, "late", None, None):
+            problems.append(f"health: no run recorded is late, got {h}")
+        ledger = hv / "00_Memory" / "imports.jsonl"
+        ledger.write_text(json.dumps({"kind": "run", **stamp(now - timedelta(hours=1)), "distilled": 3, "dropped": 0,
+                                      "failed": 0, "items": []}) + "\n", encoding="utf-8")
+        (hv / "00_Memory" / "radar").mkdir()
+        (hv / "00_Memory" / "radar" / "signal.json").write_text(json.dumps({"generated": "2026-09-29T08:29:53Z"}), encoding="utf-8")
+        h = watchdog.health(hv, now)
+        if (h["ok"], h["word"], h["pipeline_at"], h["radar_at"]) != (True, "healthy", stamp(now - timedelta(hours=1))["at"],
+                                                                    "2026-09-29T08:29:53Z"):
+            problems.append(f"health: a fresh clean run is healthy, got {h}")
+        (hv / "00_Memory" / "dlq" / "x.md").write_text(DLQ.format(d="open", c=now.date().isoformat()), encoding="utf-8")
+        (hv / "00_Memory" / "dlq" / "y.md").write_text(DLQ.format(d="done", c="2026-01-01").replace("active", "resolved"),
+                                                      encoding="utf-8")
+        if watchdog.health(hv, now)["word"] != "stuck":
+            problems.append("health: an active DLQ note is stuck")
+        with ledger.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"kind": "run", **stamp(now - timedelta(minutes=5)), "distilled": 0, "dropped": 0,
+                                 "failed": 2, "items": []}) + "\n")
+        if watchdog.health(hv, now)["word"] != "failing":
+            problems.append("health: a last run with failed captures is failing, before stuck")
+        if watchdog.health(hv, now + timedelta(hours=5))["word"] != "late":
+            problems.append("health: a last run older than the limit is late, before everything else")
+
         # 12. the toolkit's own example vault is never checked as if it were the owner's, and the
         # pipeline's writing commands refuse it
         env = {k: v for k, v in os.environ.items() if k != "TOOLKIT_ALLOW_EXAMPLE_VAULT"}
@@ -184,4 +228,4 @@ def run(vault: Path) -> dict:
         else:
             os.environ["TOOLKIT_VAULT"] = saved
         teardown_sandbox(sandbox)
-    return {"eval": NAME, "pass": not problems, "detail": "; ".join(problems) or "ok, stale, failed, hung, parked, backlog, dlq, exit codes, signal"}
+    return {"eval": NAME, "pass": not problems, "detail": "; ".join(problems) or "ok, stale, failed, hung, parked, backlog, dlq, exit codes, signal, ledger week, health"}

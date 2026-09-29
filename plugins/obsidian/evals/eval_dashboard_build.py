@@ -1,10 +1,13 @@
 """Eval: dashboard_build.py writes a self-contained Dashboard.html from the vault, in a git sandbox.
 
 1. notes    — a note distilled today is in, one outside the 84-day window is out, a backfilled
-              `processed_date_estimated: true` note is out, `processed_date: unknown` is out
+              `processed_date_estimated: true` note is out, `processed_date: unknown` is out, and a
+              note never distilled (`status: review`, no `distilled_at`) is out
 2. fields   — source type by address (x.com → tweet, arxiv → paper, none → own), domains from
               `domain/*` tags, kind (or `unsorted`)
-3. runs     — a `pipeline …` commit's counts are parsed; a hand commit is not a run
+3. runs     — every run row in the ledger is a run, newest first: its own counts and summary, or a
+              legacy row's from its `pipeline …` commit, or "counts not recorded"; a hand commit is
+              not a run
 6. radar    — the radar ledgers reach the payload: worth-or-strong items with their fate, per-interest
               counts named from the interests note, today's counts, and a javascript: url never a link
 5. imports  — a run's imported items reach its run row with their fate and notes, and a clipping
@@ -54,6 +57,8 @@ def run(vault: Path) -> dict:
             "Eval-Dash-Old": NOTE.format(d="old", p=(today - timedelta(days=200)).isoformat(), extra=""),
             "Eval-Dash-Estimated": NOTE.format(d="est", p=today.isoformat(), extra="processed_date_estimated: true\n"),
             "Eval-Dash-Unknown": NOTE.format(d="unk", p="unknown", extra=""),
+            # a real processed_date on a note never distilled: 75 such notes put 92 on a 17-note day
+            "Eval-Dash-Review": NOTE.format(d="review", p=today.isoformat(), extra="").replace("status: distilled", "status: review"),
         }
         for name, text in notes.items():
             (res / f"{name}.md").write_text(text, encoding="utf-8")
@@ -175,6 +180,18 @@ def run(vault: Path) -> dict:
             problems.append(f"timestamps: data['built'] is not UTC-Z, got {data.get('built')!r}")
         if [(r["distilled"], r["dropped"], r["failed"]) for r in data["runs"]] != [(7, 1, 2)]:
             problems.append(f"runs: {data['runs']}")
+        if any(n["path"] == "04_Resources/Eval-Dash-Review.md" for n in data["notes"]):
+            problems.append("notes: a note never distilled (status: review, no distilled_at) counts on its processed_date")
+        # runs come from the ledger's run rows: one with its own counts, one legacy row with neither
+        # counts nor a commit (still a run), and the legacy row the commit above counts
+        imports_log.record(sandbox, f"{today.isoformat()} 06:00", [], at=f"{today.isoformat()}T06:00:03Z", distilled=2,
+                           dropped=0, failed=0, shallow=True, summary="2 distilled, 0 dropped, 0 failed; 4 in the inbox")
+        imports_log.record(sandbox, f"{today.isoformat()} 03:00", [])
+        got = [(r["run"][11:], r["distilled"], r["failed"], r["summary"], r["at"]) for r in dashboard_build.build(sandbox, today)["runs"]]
+        if got != [("06:00", 2, 0, "2 distilled, 0 dropped, 0 failed; 4 in the inbox", f"{today.isoformat()}T06:00:03Z"),
+                   ("03:00", 0, 0, "counts not recorded", f"{today.isoformat()}T03:00:00Z"),
+                   ("13:06", 7, 2, "7 distilled, 1 dropped, 2 failed; in: x", "2026-09-25T13:06:00Z")]:
+            problems.append(f"runs: from the ledger, newest first, got {got}")
 
         page = dashboard_build.render(data)
         if len(re.findall(r"<script\b", page)) != 2:
