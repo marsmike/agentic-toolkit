@@ -33,7 +33,11 @@ vault; deleting duplicates and stubs was the one way a clipping could leave with
 Before the capture moves, every `--note` it names is stamped with `distilled_at` (now, UTC) and
 the capture's own `ingested_at` (carried over) — deterministically, never left to the skill to
 write, and never overwriting a value the note already carries. [earned: 2026-09-28 — the owner
-asked for the ingest and distill date and time on every report and note]
+asked for the ingest and distill date and time on every report and note] Each also gets
+`updated_at` (the same now) every time, new note or enriched one: the only record of when the
+pipeline last changed it, since git resets `file.mtime`. It is stamped under the manifest lock,
+after the already-archived refusal, so a retirement that moves nothing changes no note.
+[earned: 2026-09-29 — the owner asked for "recently changed notes"; a pull touched 133 mtimes]
 
 Prints one JSON object: the result on success, `{"error": ...}` on refusal (exit 1).
 """
@@ -49,7 +53,7 @@ from pathlib import Path
 from typing import Any
 
 from distill_check import check
-from vault_utils import inside, read_frontmatter, require_vault, utc_timestamp, write_frontmatter
+from vault_utils import inside, read_frontmatter, require_vault, set_frontmatter_fields, utc_timestamp
 
 OWNER_SOURCES = {"clip"}  # kept in step with distill_judge.OWNER_SOURCES; duplicated to
 # avoid importing distill_judge's judgment-backend machinery into a script that must run
@@ -100,29 +104,26 @@ def _validate_notes(notes: list[str], capture: Path, vault: Path) -> list[str]:
     return resolved
 
 
-def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None) -> list[str]:
-    """Deterministically stamp `distilled_at` (now) and carry `ingested_at` from the capture onto
-    every note it became — never left to the skill/LLM to write, and never overwritten if a note
-    already carries one (an earlier enrichment's own timestamp stands). Called before the capture
-    is retired, while its own frontmatter (and `ingested_at`) is still readable.
-    contract/VAULT_SCHEMA.md. [earned: 2026-09-28 — the owner asked for the ingest and distill
-    date and time on every report and note]"""
+def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None) -> None:
+    """Deterministically stamp every note the capture became or enriched: `updated_at` to now,
+    always; `distilled_at` to the same now and `ingested_at` carried from the capture, each only
+    where the note has none yet (an earlier distillation's own timestamps stand). Never left to
+    the skill/LLM to write. Called under the manifest lock, after the already-archived refusal and
+    before the capture moves, while its own frontmatter (and `ingested_at`) is still readable.
+    contract/VAULT_SCHEMA.md; the module docstring says what earned each field."""
     now = utc_timestamp()
-    stamped = []
     for rel in notes:
         path = vault / rel
-        fm, body = read_frontmatter(path)
-        changed = False
-        if not fm.get("distilled_at"):
-            fm["distilled_at"] = now
-            changed = True
+        fm, _ = read_frontmatter(path, strict=True)
+        fields = {}
         if not fm.get("ingested_at") and capture_ingested_at:
-            fm["ingested_at"] = capture_ingested_at
-            changed = True
-        if changed:
-            write_frontmatter(path, fm, body)
-            stamped.append(rel)
-    return stamped
+            fields["ingested_at"] = capture_ingested_at
+        if not fm.get("distilled_at"):
+            fields["distilled_at"] = now
+        set_frontmatter_fields(path, {**fields, "updated_at": now})
+        # The edit is textual, so prove it: the note still parses and carries exactly this stamp.
+        if read_frontmatter(path, strict=True)[0].get("updated_at") != now:
+            raise RetireRefused(f"--note {rel} did not take its updated_at stamp; capture not moved")
 
 
 def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropped: str | None,
@@ -150,8 +151,8 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
     if line and not notes:
         raise RetireRefused("--line needs at least one --note: a distilled capture names the note it became")
 
-    resolved_notes = _validate_notes(notes, capture, vault)
-    stamped = _stamp_notes(vault, resolved_notes, fm.get("ingested_at") if isinstance(fm.get("ingested_at"), str) else None)
+    resolved_notes = _validate_notes(list(dict.fromkeys(notes)), capture, vault)
+    ingested_at = fm.get("ingested_at") if isinstance(fm.get("ingested_at"), str) else None
 
     origin = _origin(capture.stem)
     today = time.strftime("%Y-%m-%d")
@@ -164,6 +165,7 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         folder.mkdir(parents=True, exist_ok=True)
         if dest.exists():
             raise RetireRefused(f"already archived: {dest.relative_to(vault).as_posix()}")
+        _stamp_notes(vault, resolved_notes, ingested_at)
         if not readme.exists():
             readme.write_text(_manifest_header(origin, yyyymm, today), encoding="utf-8")
         capture.rename(dest)
@@ -181,7 +183,7 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         "archived_to": dest.relative_to(vault).as_posix(),
         "manifest": readme.relative_to(vault).as_posix(),
         "notes": resolved_notes,
-        "stamped": stamped,
+        "stamped": resolved_notes,
         "via": via,
         "mode": "duplicate" if duplicate_of else "dropped" if dropped else "line",
     }

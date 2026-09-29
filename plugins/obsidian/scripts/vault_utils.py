@@ -363,6 +363,23 @@ def write_frontmatter(path: Path, frontmatter: dict, body: str) -> None:
     atomic_write(path, f"---\n{stream.getvalue()}---\n{body}")
 
 
+def set_frontmatter_fields(path: Path, fields: dict[str, str]) -> None:
+    """Set top-level frontmatter scalars by editing their own lines — each key's line replaced, or
+    appended before the closing `---` — so the rest of the note keeps its exact formatting, where
+    `write_frontmatter` re-serializes (re-wrapping long descriptions, re-quoting values): noise in
+    the diff of a note that only needed one timestamp. Values are single-quoted, as
+    `yaml.safe_dump` would: a bare `2026-09-29T10:00:00Z` reads back as a datetime, not a string."""
+    text = path.read_text(encoding="utf-8")
+    match = _FRONTMATTER_RE.match(text)
+    block = match.group(1) if match else ""
+    for key, value in fields.items():
+        line = f"{key}: '{value}'"
+        block, n = re.subn(rf"^{re.escape(key)}:[^\n]*$", lambda _m, line=line: line, block, count=1, flags=re.M)
+        if not n:
+            block = f"{block}\n{line}" if block else line
+    atomic_write(path, f"---\n{block}\n---\n" + (text[match.end():] if match else text))
+
+
 def atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(path.suffix + ".tmp")

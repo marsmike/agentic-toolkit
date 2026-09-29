@@ -17,6 +17,11 @@ Soft gates (reported, never fail): the capture's other URLs not carried by the n
 thread's reply links are usually fine to drop; a paper or repo is not), findability of each
 --ask question (top three by widened rerank, plain search without a backend), and the
 preservation check against the capture's kept passages (needs a judgment backend).
+
+Not gated: `updated_at`, `distilled_at`, `ingested_at`. This check runs before retire_capture.py
+stamps them, so it cannot demand them; nor can it refuse them, since an enriched note carries
+its own from an earlier retirement and nothing here tells that from a value the skill wrote.
+retire_capture.py overwrites `updated_at` on every note it names and verifies the stamp took.
 """
 from __future__ import annotations
 

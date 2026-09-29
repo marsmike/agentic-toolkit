@@ -11,6 +11,10 @@ One correct note passes every hard gate; each broken variant fails exactly its g
   links         a link into 01_Capture/ · a link into 05_Archive/ · a dangling wikilink
   index         no Index.md line
 
+A note already carrying `updated_at`/`distilled_at`/`ingested_at` (an enriched note, stamped by its
+earlier retirement) passes too: retire_capture.py stamps those after this check, so it gates neither
+their absence nor their presence.
+
 Offline: judgment keys are removed, so only the hard gates run.
 """
 from __future__ import annotations
@@ -94,6 +98,9 @@ VARIANTS: dict[str, tuple[str, dict, str]] = {
     # an existing note enriched by the capture: its own Source line first, the capture's beside it
     "enriched": ("", {**GOOD_FM, "source": "https://earlier.example.org/first"},
                  "*Source: [The note's first source](https://earlier.example.org/first)*\n\n" + GOOD_BODY),
+    # an enriched note carrying the stamps its earlier retirement wrote: not this check's to refuse
+    "stamped": ("", {**GOOD_FM, "distilled_at": "'2026-09-01T10:00:00Z'", "ingested_at": "'2026-08-31T09:00:00Z'",
+                     "updated_at": "'2026-09-01T10:00:00Z'"}, GOOD_BODY),
     "no-source": ("frontmatter", {k: v for k, v in GOOD_FM.items() if k != "source"}, GOOD_BODY),
     "unknown-source": ("frontmatter", {**GOOD_FM, "source": "unknown"}, GOOD_BODY),
     "draft": ("frontmatter", {**GOOD_FM, "status": "draft"}, GOOD_BODY),
@@ -165,5 +172,5 @@ def run(vault: Path) -> dict:
 
     return {"eval": NAME, "pass": not problems,
             "detail": "; ".join(problems) if problems else
-            f"{len(VARIANTS) - 2} broken notes each fail exactly their gate; the good, the enriched "
-            "and the pdf-no-attachment note pass"}
+            f"{len(VARIANTS) - 3} broken notes each fail exactly their gate; the good, the enriched, "
+            "the already-stamped and the pdf-no-attachment note pass"}
