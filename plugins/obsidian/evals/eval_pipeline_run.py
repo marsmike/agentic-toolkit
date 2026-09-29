@@ -2,7 +2,7 @@
 
 1. queue    — the owner's clips come first, then radar/newsletter captures, oldest first, capped
               at the batch size; a second begin while the lock is held is `busy`
-2. end      — Index.md rebuilt, one Log.md line, one git commit carrying the run's summary; the
+2. end      — Index.md and the day's 00_Daily/ note rebuilt, one Log.md line, one git commit carrying the run's summary; the
               lock is released and never committed; what came in is counted from the rows the
               radar and Readwise ledgers gained since begin, never from rows that were there; batch
               captures left in the inbox and not reported failed are named as not attempted
@@ -174,7 +174,7 @@ def _build_failure_phase(pr, sandbox: Path) -> list[str]:
     stubs = Path(tempfile.mkdtemp(prefix="obsidian-plugin-eval-stubs-"))
     saved = pr.SCRIPTS
     try:
-        for name in ("index_build.py", "now_build.py", "dashboard_build.py", "dashboard_template.html", "imports_log.py", "report_build.py", "radar_ledger.py",
+        for name in ("index_build.py", "now_build.py", "daily_build.py", "dashboard_build.py", "dashboard_template.html", "imports_log.py", "report_build.py", "radar_ledger.py",
                      "log_vault.py", "vault_utils.py"):
             shutil.copy(saved / name, stubs / name)
         for name in ("map_build.py", "pipeline_run.py"):
@@ -283,6 +283,9 @@ def run(vault: Path) -> dict:
             problems.append("phase 2: the lock must be released and never committed")
         if "Log.md" not in committed or "pipeline |" not in (sandbox / "Log.md").read_text(encoding="utf-8"):
             problems.append("phase 2: one Log.md line for the run")
+        daily = [p for p in committed if p.startswith("00_Daily/")]
+        if not daily or any("%% daily:start %%" not in (sandbox / p).read_text(encoding="utf-8") for p in daily):
+            problems.append(f"phase 2: end builds and commits the day's daily note (daily_build.py), got {committed}")
 
         # 3. parking
         _begin(pr, sandbox, NOW + timedelta(hours=3))
