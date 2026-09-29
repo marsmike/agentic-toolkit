@@ -299,20 +299,20 @@ def _bullet(vault: Path, it: dict) -> str:
 
 
 def render(vault: Path) -> str:
-    runs = resolved(vault)
-    items = [it for r in runs for it in r["items"]]
+    logged = resolved(vault)
+    items = [it for r in logged for it in r["items"]]
     count = {s: sum(1 for it in items if it["fate"]["status"] == s)
              for s in ("distilled", "known", "dropped", "duplicate", "archived", "waiting", "missing")}
     out = ["---", "description: What every pipeline run imported from Readwise and what became of each item, newest run first.",
            "status: generated", "---", "", "# Imports", "", HEADER, "",
            f"*Generated {format_ts(utc_timestamp())}.*", "",
-           f"{len(items)} items in {len(runs)} runs: " + ", ".join(f"{n} {s}" for s, n in count.items() if n) + ".",
+           f"{len(items)} items in {len(logged)} runs: " + ", ".join(f"{n} {s}" for s, n in count.items() if n) + ".",
            "", f"*The ledger keeps the last {WINDOW_DAYS} days; older runs are in the vault's git history.*"]
-    missing = [(r["run"], it) for r in runs for it in r["items"] if it["fate"]["status"] == "missing"]
+    missing = [(r["run"], it) for r in logged for it in r["items"] if it["fate"]["status"] == "missing"]
     if missing:
         out += ["", "> [!danger] Missing clippings", "> Imported, but in neither the inbox nor the archive:"]
         out += [f"> - {run}: " + _bullet(vault, it)[2:] for run, it in missing]
-    for day, group in groupby(runs, key=lambda r: r["run"][:10]):
+    for day, group in groupby(logged, key=lambda r: r["run"][:10]):
         day_runs = list(group)
         out += ["", f"## {day}", "", f"{day_line(day_totals(day_runs, day))}."]
         quiet: list[str] = []
