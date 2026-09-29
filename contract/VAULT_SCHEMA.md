@@ -38,7 +38,8 @@ not a note's inbound link.
 | Path | Built by | What it is |
 |---|---|---|
 | `Index.md` | `index_build.py` | One line per active note, from its `description` |
-| `Now.md` | `now_build.py` | The homepage: this week's new and enriched notes, radar, stuck work, inbox |
+| `Now.md` | `now_build.py` | The homepage, short enough to read at a glance: a status line (last run, stuck, inbox, the Signal Radar's early warnings), then the live `Recently changed` and `Recently distilled` views, then this week's new and enriched notes, radar and per-day chart folded away |
+| `00_Daily/<YYYY-MM-DD>.md` | `daily_build.py` | One note per UTC day for Obsidian's Daily notes and Calendar: what was distilled, changed, found by the radar and run that day. The generator owns only the block between `%% daily:start %%` and `%% daily:end %%`; text outside it is the owner's and is never touched |
 | `Maps/<domain>.md`, `.canvas` | `map_build.py` | One map per `domain/*` tag on three or more notes (or configured in `maps.md`); `Maps/Overview` lists them |
 | `Boards/Pipeline.md` | `now_build.py` | The same state as Now.md as a Kanban board; drags are overwritten |
 | `Imports.md` | `imports_log.py` | What every run imported and what became of each item (note, dropped, duplicate, waiting, missing), runs newest first; data in `00_Memory/imports.jsonl` |

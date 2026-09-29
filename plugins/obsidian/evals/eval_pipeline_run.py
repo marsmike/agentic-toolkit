@@ -429,6 +429,28 @@ def run(vault: Path) -> dict:
         untouched_fm, _ = read_frontmatter(untouched_note)
         if untouched_fm.get("distilled_at") or untouched_fm.get("ingested_at"):
             problems.append("phase 8: a note outside this run's working-tree diff must not be touched")
+        if not _re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", str(fm.get("updated_at") or "")):
+            problems.append(f"phase 8: updated_at not stamped on a new note: {fm.get('updated_at')!r}")
+        # an enriched note (committed, then changed) shows its committed updated_at: stamped; one
+        # retire_capture.py already re-stamped this run differs from HEAD: left alone
+        for name, head_value in (("Eval-Stamp-Enriched", "2026-09-01T00:00:00Z"), ("Eval-Stamp-Restamped", "2026-09-01T00:00:00Z")):
+            (sandbox / "04_Resources" / f"{name}.md").write_text(
+                f"---\ndescription: {name}\nstatus: distilled\nsource: https://example.org/{name}\n"
+                f"processed_date: 2026-09-24\ndistilled_at: '2026-09-24T00:00:00Z'\nupdated_at: '{head_value}'\n---\n\nBody.\n",
+                encoding="utf-8")
+        _git(sandbox, "add", "-A")
+        _git(sandbox, "commit", "-q", "-m", "eval fixture: enriched candidates")
+        for name in ("Eval-Stamp-Enriched", "Eval-Stamp-Restamped"):
+            path = sandbox / "04_Resources" / f"{name}.md"
+            path.write_text(path.read_text(encoding="utf-8") + "\nEnriched line.\n", encoding="utf-8")
+        restamped = sandbox / "04_Resources" / "Eval-Stamp-Restamped.md"
+        restamped.write_text(restamped.read_text(encoding="utf-8").replace("2026-09-01T00:00:00Z'", "2026-09-29T07:00:00Z'"), encoding="utf-8")
+        stamped = pr.stamp_distilled_notes(sandbox, [])
+        if "04_Resources/Eval-Stamp-Enriched.md" not in stamped or "04_Resources/Eval-Stamp-Restamped.md" in stamped:
+            problems.append(f"phase 8: updated_at safety net stamped the wrong notes: {stamped}")
+        enriched_fm, _ = read_frontmatter(sandbox / "04_Resources" / "Eval-Stamp-Enriched.md")
+        if enriched_fm.get("updated_at") == "2026-09-01T00:00:00Z" or enriched_fm.get("distilled_at") != "2026-09-24T00:00:00Z":
+            problems.append(f"phase 8: enriched note: updated_at not bumped or distilled_at changed: {enriched_fm}")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)

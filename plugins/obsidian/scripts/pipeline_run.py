@@ -54,6 +54,7 @@ from vault_utils import (
     profile_value,
     read_frontmatter,
     require_vault,
+    set_frontmatter_fields,
     utc_timestamp,
     write_dlq_note,
     write_frontmatter,
@@ -307,7 +308,8 @@ def stamp_distilled_notes(vault: Path, rows_in: list[dict]) -> list[str]:
     `source` the note also carries; a note with no matching capture is left for the next
     `backfill_timestamps.py` pass rather than guessed. Neither field is ever overwritten.
     contract/VAULT_SCHEMA.md. [earned: 2026-09-28 — the owner asked for the ingest and distill
-    date and time on every report and note]"""
+    date and time on every report and note] It also stamps `updated_at` on a changed note that
+    still shows its committed value (or none): see the comment at the end."""
     by_source: dict[str, str] = {}
     for row in rows_in:
         cap = imports_log._capture_file(vault, str(row.get("capture") or ""))
@@ -341,6 +343,22 @@ def stamp_distilled_notes(vault: Path, rows_in: list[dict]) -> list[str]:
         if changed:
             write_frontmatter(path, fm, body)
             stamped.append(rel)
+        # `updated_at` says when the pipeline last changed the note. `retire_capture.py` stamps it
+        # for every note it was told about; a note changed some other way (an enrichment the
+        # distiller did not name with --note, a normalizer) still shows `updated_at` as committed
+        # in HEAD, or none, so it gets `now`. A note `retire_capture.py` stamped this run differs
+        # from HEAD and is left alone. [earned: 2026-09-29 — "recently changed" needs one stamp
+        # per changed note, not one per note somebody remembered to name]
+        if "A" not in code and "?" not in code:
+            head = _git(vault, "show", f"HEAD:{rel}").stdout
+            m = re.search(r"^updated_at:\s*['\"]?([^'\"\n]+)", head.split("\n---", 2)[0], flags=re.M)
+            unchanged = bool(m) and str(fm.get("updated_at") or "") == m.group(1).strip()
+        else:
+            unchanged = not fm.get("updated_at")
+        if unchanged:
+            set_frontmatter_fields(path, {"updated_at": now})
+            if rel not in stamped:
+                stamped.append(rel)
     return stamped
 
 

@@ -89,6 +89,7 @@ jobs:
           mkdir -p quartz/content
           rsync -a repo/vault/ quartz/content/ \
             --exclude '00_Memory/' \
+            --exclude '00_Daily/' \
             --exclude '01_Capture/' \
             --exclude '05_Archive/' \
             --exclude '.gaiafield/'

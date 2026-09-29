@@ -4,6 +4,22 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A homepage you can read in five seconds, a "recently changed" list, the Signal Radar inside
+  the vault, and a note per day (obsidian 3.3.0, radar 3.4.0).** `Now.md` was 126 lines of link
+  lists with the live views at the bottom; now it opens with one status line (last run, stuck,
+  inbox, the radar's early warnings as of their own time), then `Recently changed` and
+  `Recently distilled` from `Vault.base`, and folds the long lists away (`> [!tip]-`).
+  `updated_at` (ISO 8601 UTC, like `distilled_at`) is stamped in code by `retire_capture.py` on
+  every note a capture produced or enriched, and by `end`'s safety net on any changed note it
+  missed; `Recently changed` sorts on `updated_at`, then `distilled_at`, then `processed_date`,
+  so nothing is backfilled and a git pull cannot fake it the way `file.mtime` does. The Signal
+  Radar note embeds two SVGs (`Signal-Radar-scope.svg`, `Signal-Radar-momentum.svg`) drawn from
+  `signal.json`, so Obsidian shows what the browser page shows. `daily_build.py` writes one note
+  per UTC day in `00_Daily/` (the folder Daily notes and Calendar already point at), owning only
+  its marked block. `_owned` no longer treats a not-yet-existing generator folder as a file to
+  restore. [earned: 2026-09-29 — the owner could not tell what was going on from Now.md, and its
+  "recently distilled" view sat under 75 lines of lists]
+
 - **Battle-tested against the real vault, Reader, Kagi, Tavily and the cloud runs (obsidian 3.2.1,
   radar 3.3.1, readwise 3.1.1, gaiafield 0.2.6).** Each feature of the week ran on live data in a
   scratch copy; what broke is fixed with a test:

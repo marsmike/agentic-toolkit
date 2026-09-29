@@ -21,8 +21,9 @@ the pipeline; everything a visitor reads is a vault note.
 
 ## What gets published, and what doesn't
 
-The workflow `rsync`s `vault/` into Quartz's `content/` directory, excluding four things:
+The workflow `rsync`s `vault/` into Quartz's `content/` directory, excluding five things:
 
+- `00_Daily/` — the generated daily notes (`daily_build.py`) and the owner's own text in them; not a public docs surface.
 - `00_Memory/` — agent self-memory; not a public docs surface.
 - `01_Capture/` — the raw inbox; not-yet-distilled, not public docs surface.
 - `05_Archive/` — frozen (`contract/VAULT_SCHEMA.md`: "never link here from new notes"); excluded
