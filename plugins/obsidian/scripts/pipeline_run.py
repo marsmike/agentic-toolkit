@@ -270,6 +270,14 @@ def _git(vault: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", "-C", str(vault), *args], capture_output=True, text=True, errors="replace", check=False)
 
 
+def is_shallow(vault: Path) -> bool:
+    """True when the vault checkout has truncated git history. A cloud session's checkout can be
+    shallow, and anything counted from `git log` is then too low: the run says so instead of
+    publishing a smaller number as if it were the count. [earned: 2026-09-29 — Now.md published
+    52 new notes for a week the full history counts as 192]"""
+    return _git(vault, "rev-parse", "--is-shallow-repository").stdout.strip() == "true"
+
+
 def lost_media(vault: Path, rows: list[dict]) -> dict[str, list[str]]:
     """{"ignored": [...], "missing": [...]}: media files the run's captures name that git will not
     carry, or that are not there. An image saved into a git-ignored path leaves a cloud container
@@ -543,9 +551,12 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
                              "Config/toolkit/maps.md), then mark this note resolved.",
                   confidence="high")
         summary += f"; build failed: {', '.join(f['script'] for f in failed_builds)}"
+    shallow = is_shallow(vault)
+    if shallow:
+        summary += "; vault history is shallow, so counts taken from git are too low"
     subprocess.run([sys.executable, str(SCRIPTS / "log_vault.py"), "pipeline", summary], capture_output=True, check=False, env=env)
 
-    result: dict[str, Any] = {"status": "ok", "summary": summary, "commit": None,
+    result: dict[str, Any] = {"status": "ok", "summary": summary, "commit": None, **({"shallow": True} if shallow else {}),
                                **({"failed_not_found": not_found} if not_found else {}),
                                **({"not_attempted": untouched} if untouched else {})}
     if failed_builds:

@@ -16,6 +16,9 @@ SETUP
 2. Vault: use the session's TheVoid checkout, which the routine attaches at /home/user/TheVoid,
    never the toolkit's own vault/ folder (an example vault):
      export TOOLKIT_VAULT=/home/user/TheVoid
+   The checkout can arrive shallow (no history before some commit): anything counted from `git log`
+   is then too low, and `end` says so. Fetch the full history first; it changes no file:
+     git -C "$TOOLKIT_VAULT" rev-parse --is-shallow-repository | grep -q true && git -C "$TOOLKIT_VAULT" fetch -q --unshallow origin || true
    Put it on a tracking `main` with exactly this sequence; it prints VAULT-NOT-RESET rather than
    lose a commit, and then you stop and report that:
      cd "$TOOLKIT_VAULT" && git fetch -q origin main \

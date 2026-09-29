@@ -458,6 +458,16 @@ def run(vault: Path) -> dict:
         enriched_fm, _ = read_frontmatter(sandbox / "04_Resources" / "Eval-Stamp-Enriched.md")
         if enriched_fm.get("updated_at") == "2026-09-01T00:00:00Z" or enriched_fm.get("distilled_at") != "2026-09-24T00:00:00Z":
             problems.append(f"phase 8: enriched note: updated_at not bumped or distilled_at changed: {enriched_fm}")
+        # 9. is_shallow: a full checkout is not shallow; a depth-1 clone of it is, and `end` says so
+        # (a count taken from git history in a shallow checkout is too low)
+        if pr.is_shallow(sandbox):
+            problems.append("phase 9: a full checkout reported as shallow")
+        import tempfile as _tf
+        with _tf.TemporaryDirectory() as tmp:
+            clone = Path(tmp) / "shallow"
+            _git(sandbox, "-c", "protocol.file.allow=always", "clone", "-q", "--depth", "1", f"file://{sandbox}", str(clone))
+            if not pr.is_shallow(clone):
+                problems.append("phase 9: a depth-1 clone was not reported as shallow")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)

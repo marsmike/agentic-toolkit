@@ -4,6 +4,8 @@ nothing, print no environment value.
      export TOOLKIT_VAULT=/home/user/TheVoid
    (the routine attaches the vault there, next to /home/user/agentic-toolkit). Never the toolkit's
    own vault/ folder: that is an example vault, and checking it says nothing about the pipeline.
+   A shallow checkout makes the run counts too low; fetch the full history first (it changes no file):
+     git -C /home/user/TheVoid rev-parse --is-shallow-repository | grep -q true && git -C /home/user/TheVoid fetch -q --unshallow origin || true
    If /home/user/TheVoid does not exist, send ONE push notification "watchdog: no TheVoid checkout
    in this session" and stop.
 2. Run: uv run --locked --project plugins/obsidian/scripts python3 plugins/obsidian/scripts/watchdog.py --json

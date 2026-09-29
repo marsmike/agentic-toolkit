@@ -20,6 +20,9 @@ SETUP
    (so this checkout is the one git may push from), never the toolkit's own vault/ folder (an
    example vault):
      export TOOLKIT_VAULT=/home/user/TheVoid
+   The checkout can arrive shallow (no history before some commit): anything counted from `git log`
+   is then too low, and `end` says so. Fetch the full history first; it changes no file:
+     git -C "$TOOLKIT_VAULT" rev-parse --is-shallow-repository | grep -q true && git -C "$TOOLKIT_VAULT" fetch -q --unshallow origin || true
    The checkout usually arrives on a detached HEAD at origin/main; put it on a tracking `main`
    before anything else, with exactly this sequence (the one git allowed here besides begin/end).
    It resets only when nothing would be lost: HEAD and any existing `main` must already be on
