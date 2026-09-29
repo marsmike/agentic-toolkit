@@ -290,11 +290,25 @@ fn ambiguous_bare_name_lookup_reports_both_weekly_review_candidates() {
 /// note (`updated_at` as the cheap proxy) while every other row is left untouched.
 #[test]
 fn incremental_reindex_touches_only_the_changed_note() {
+    // A scratch copy, never `./vault` itself: rewriting a note truncates it for a moment, and a test
+    // reading the shared vault in parallel (`concurrent_infers_serialize_on_one_database`) then
+    // embedded an empty note and counted 562 inferred edges instead of 560.
+    // [earned: 2026-09-29 — the CI failure on 2bc5cf3 was this, not a race in `infer`]
+    let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+    let scratch = std::env::temp_dir().join(format!(
+        "gaiafield-test-incremental-vault-{}-{}",
+        std::process::id(),
+        n
+    ));
+    copy_dir_recursive(&vault_path(), &scratch);
     let db = fresh_db_path("incremental");
-    index_full(&db);
+    {
+        let conn = gaiafield::open_db(&db).expect("open db");
+        gaiafield::index(&scratch, &conn, true).expect("index should succeed");
+    }
 
     let touched = "04_Resources/Concepts/Atomic-Notes.md";
-    let touched_abs = vault_path().join(touched);
+    let touched_abs = scratch.join(touched);
 
     let before: Vec<(String, i64)> = {
         let conn = gaiafield::open_db(&db).expect("open db");
@@ -312,7 +326,7 @@ fn incremental_reindex_touches_only_the_changed_note() {
     filetime_touch(&touched_abs, now);
 
     let conn = gaiafield::open_db(&db).expect("open db");
-    let report = gaiafield::index(&vault_path(), &conn, false).expect("incremental index");
+    let report = gaiafield::index(&scratch, &conn, false).expect("incremental index");
     assert_eq!(report.added, 0);
     assert_eq!(report.removed, 0);
     assert_eq!(
@@ -348,6 +362,7 @@ fn incremental_reindex_touches_only_the_changed_note() {
     }
 
     let _ = std::fs::remove_dir_all(db.parent().unwrap());
+    let _ = std::fs::remove_dir_all(&scratch);
 }
 
 /// Shared model cache across every test in this binary — and across `cargo test` runs, since it's
