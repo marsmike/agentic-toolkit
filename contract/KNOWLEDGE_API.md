@@ -95,7 +95,7 @@ hand-edited, and is fully regenerated each run — it is navigation over active 
 content itself. The radar is the first plugin that uses both of the first two sinks on a
 schedule: `00_Memory/radar/` daily, `01_Capture/Radar-Week-*.md` weekly.
 
-## Cross-plugin ledgers (v1)
+## Cross-plugin ledgers
 
 Three append-only JSONL files in `00_Memory/` are read by a plugin that did not write them. They
 are data, not code, so the no-import rule below holds, but a reader depends on their row shape:
@@ -107,7 +107,7 @@ a renamed field would have scored every radar item 0 and reported "0 new" with n
 |---|---|---|---|---|
 | judged | `00_Memory/radar/state.jsonl` | radar `radar.py`, one row per judged feed item | obsidian `pipeline_run.py` (row count), `now_build.py` (Radar), `radar_ledger.py` (dashboard, report, watchdog) | `run`, `canonical`, `url`, `title`, `p`, `worth`, `strong`, `in_vault`, `feed`, `kind` |
 | promoted | `00_Memory/radar/promoted.jsonl` | radar `radar.py`, one row per item promoted to Readwise | obsidian `pipeline_run.py` (row count) | `canonical`, `id`, `date` |
-| ingested | `00_Memory/readwise-ingested.jsonl` | readwise `ingest.py`, one row per Readwise document seen | obsidian `pipeline_run.py` (captures by `via`) | `doc_id`, `capture`, `via`, `date` |
+| ingested | `00_Memory/readwise-ingested.jsonl` | readwise `ingest.py`, one row per Readwise document seen | obsidian `pipeline_run.py` (captures by `via`), `report_build.py`, `imports_log.py` | `doc_id`, `capture`, `via`, `date` |
 
 - One JSON object per line, appended, never rewritten. A reader skips blank or unparseable lines
   and ignores fields it does not know.
@@ -121,6 +121,11 @@ a renamed field would have scored every radar item 0 and reported "0 new" with n
 
 ## No cross-plugin imports
 
-Plugins depend on `core` and `contract` only, never on a sibling plugin. Composition across
-plugins happens through vault notes — one plugin writes a note, another reads it — never through
-a direct call from one plugin's code into another's.
+Plugins depend on `core` and `contract` only, never import a sibling's code — no
+`from plugins.<name>` anywhere; a module two plugins both need (e.g. `judge.py`) is duplicated in
+each and held in parity by `core/tests/test_contract.py`, not shared via import. Composition
+across plugins happens through vault notes (one plugin writes a note, another reads it), or by
+running a sibling's entry-point script as a separate process — the same process-boundary
+composition plugins use to call the engines — as the pipeline does with
+`plugins/readwise/scripts/ingest.py` and `plugins/radar/scripts/radar.py`. [earned: 2026-09-28 —
+repo audit E1, owner's decision]

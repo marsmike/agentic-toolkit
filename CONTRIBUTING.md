@@ -18,7 +18,7 @@ By signing off, you certify that you authored the contribution and have the righ
 ## The rules of this repo
 
 - **Everything runs against `./vault`** — the bundled example vault is template, docs, test corpus, and eval substrate in one. Tests and evals never touch a user's vault.
-- **Plugins depend on `core/` and `contract/` only, never on a sibling plugin.** Cross-plugin behavior composes through vault notes.
+- **Plugins depend on `core/` and `contract/` only, never import a sibling's code.** Cross-plugin behavior composes through vault notes, or by running a sibling's entry-point script as a subprocess (the pipeline does this for readwise's `ingest.py` and radar's `radar.py`) — never a direct import.
 - **Evals gate merges.** A plugin change ships with its capability/regression evals green (`plugins/<name>/evals/`). New capabilities start with a low-pass-rate eval and graduate into the regression suite.
 - **Every normative rule carries provenance.** Rules in `contract/` and AGENTS.md cite the dated failure that earned them and name a removal condition. Don't add speculative constraints.
 - **A schema change updates the example vault in the same PR** — CI enforces it.

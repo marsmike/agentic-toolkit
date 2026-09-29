@@ -57,6 +57,11 @@ working on a real vault, or the vault moves to a service with its own access con
 
 ## Hard rules
 
-Plugins depend on `core`/`contract` only, never on a sibling plugin.
+Plugins depend on `core`/`contract` only, never import a sibling's code. Running a sibling's
+entry-point script as a subprocess is composition across a process boundary — the same way
+plugins call the engines — and is allowed; the pipeline does this with `plugins/readwise/scripts/
+ingest.py` and `plugins/radar/scripts/radar.py`. [earned: 2026-09-28 — repo audit E1, owner's
+decision] **Removal condition:** drop the carve-out if the pipeline stops shelling out to a
+sibling plugin's script.
 Tests and evals run against `./vault` only — never against a user's vault.
 Every new rule here cites the dated failure that earned it and names its removal condition.
