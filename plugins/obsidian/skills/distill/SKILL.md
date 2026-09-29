@@ -107,11 +107,12 @@ worker renamed a note to dodge the secrets entry]
    review. Skip only on an explicit `--auto`; the `pipeline` skill runs with `--auto`, and the
    vault's git commit per run is the undo.
 2. **Every note carries its source**, and never the string `unknown`: `(none — <context>)`
-   when there is none, today's date for `processed_date`. `distilled_at` and `ingested_at`
-   (ISO 8601 UTC, with time and `Z`) are never yours to write: `retire_capture.py` stamps both,
-   deterministically, the moment it retires the capture the note came from — `distilled_at` to
-   now, `ingested_at` carried over from the capture's own. Leave them out of a note you're
-   writing; they land when you retire the capture.
+   when there is none, today's date for `processed_date`. `distilled_at`, `ingested_at` and
+   `updated_at` (ISO 8601 UTC, with time and `Z`) are never yours to write: `retire_capture.py`
+   stamps them, deterministically, the moment it retires the capture, on every `--note` it names
+   — `distilled_at` to now and `ingested_at` carried over from the capture's own, both only on a
+   note that has none yet; `updated_at` to now on the new note *and* on every note you enriched
+   (so name each of those as a `--note` too). Leave them out of a note you're writing or enriching; they land when you retire the capture.
 3. **Advice never writes.** Dossier rows, inferred edges, adjudications: candidates for your
    decision, never applied by a script.
 4. **L1 is the default; L2 and L3 need a cited sentence** in the note being enriched. Never

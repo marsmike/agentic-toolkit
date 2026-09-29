@@ -21,11 +21,16 @@ and its folder's manifest together, under a lock.
                   manifest lines (no interleaving, nothing lost)
 8. duplicate      — a clip that repeats another is archived whole with --duplicate-of (never
                   deleted), the line names what it duplicates; a target that isn't in the vault
-                  refuses and moves nothing
+                  refuses and moves nothing; a note a --dropped or --duplicate-of retirement merely
+                  mentions is left byte-identical
 9. stamping       — retiring a capture with `ingested_at` stamps the note it names with
-                  `distilled_at` (now, UTC `Z`) and carries the capture's own `ingested_at`
-10. no overwrite  — a note that already carries `distilled_at`/`ingested_at` keeps its own values
-                  through retirement
+                  `distilled_at` (now, UTC `Z`), `updated_at` equal to it, and carries the
+                  capture's own `ingested_at`
+10. enrichment    — a note that already carries `distilled_at`/`ingested_at` keeps its own values
+                  through retirement, gets a fresh `updated_at`, and every other frontmatter line
+                  (a long description, double-quoted timestamps) is left exactly as written
+11. idempotent    — retiring an already-retired capture refuses and changes no note, and so does
+                  a capture refused as already archived (the stamp waits for that refusal)
 
 Offline: judgment keys are removed so distill_check's soft findability/preservation calls (which
 need a backend) never run; retire_capture only needs the hard gates, which don't.
@@ -84,7 +89,7 @@ ALREADY_STAMPED_DISTILLED_AT = "2020-01-01T00:00:00Z"
 ALREADY_STAMPED_INGESTED_AT = "2019-12-31T00:00:00Z"
 
 ALREADY_STAMPED_NOTE = f"""---
-description: A note that already carries its own timestamps.
+description: A note that already carries its own timestamps, and a description long enough that re-serializing the frontmatter through YAML would wrap it onto a second line.
 status: distilled
 source: {SOURCE}
 processed_date: 2026-09-24
@@ -244,8 +249,13 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 7: expected 4 manifest entries, got {len(lines)}: {lines}")
         if len({ln.split("`")[1] for ln in lines}) != 4:
             problems.append(f"phase 7: manifest entries are not all distinct captures: {lines}")
+        good_text = (sandbox / "04_Resources" / "Retire-Eval-Good.md").read_text(encoding="utf-8")
+        if good_text.count("\nupdated_at: ") != 1:  # retired twice (phases 2, 7): replaced, not appended
+            problems.append(f"phase 7: a twice-enriched note must carry exactly one updated_at line: {good_text[:400]!r}")
 
-        # --- 8. duplicate: kept whole, never deleted ---
+        # --- 8. duplicate: kept whole, never deleted; a note it only mentions is left alone ---
+        good_note_path = sandbox / "04_Resources" / "Retire-Eval-Good.md"
+        good_before = good_note_path.read_text(encoding="utf-8")
         (sandbox / "01_Capture" / "Readwise-Retire-Dup.md").write_text(_capture("clip"), encoding="utf-8")
         try:
             rc.retire(cap("Readwise-Retire-Dup.md"), sandbox, [], None, None, "04_Resources/No-Such-Note.md")
@@ -257,30 +267,60 @@ def run(vault: Path) -> dict:
         if r["mode"] != "duplicate" or not (sandbox / r["archived_to"]).is_file() or \
                 "**duplicate** of `04_Resources/Retire-Eval-Good.md`, kept whole here." not in text:
             problems.append(f"phase 8: duplicate not archived as expected: {r}")
+        if r["stamped"] or good_note_path.read_text(encoding="utf-8") != good_before:
+            problems.append(f"phase 8: a --duplicate-of retirement changed the note it names: {r['stamped']}")
 
-        # --- 9. stamping: distilled_at stamped now, ingested_at carried from the capture ---
+        # --- 9. stamping: distilled_at and updated_at stamped now, ingested_at carried from the capture ---
         import re as _re
 
+        ts_re = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"
         stamp_note_path = sandbox / "04_Resources" / "Retire-Eval-Stamp.md"
         r = rc.retire(cap("Readwise-Retire-Stamp.md"), sandbox, ["04_Resources/Retire-Eval-Stamp.md"],
                       "→ [[Retire-Eval-Stamp]].", None)
         if r.get("stamped") != ["04_Resources/Retire-Eval-Stamp.md"]:
             problems.append(f"phase 9: retire() did not report the note as stamped: {r.get('stamped')}")
         stamped_fm, _ = vault_utils.read_frontmatter(stamp_note_path)
-        if not _re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", str(stamped_fm.get("distilled_at") or "")):
+        if not _re.match(ts_re, str(stamped_fm.get("distilled_at") or "")):
             problems.append(f"phase 9: distilled_at not stamped in the right format: {stamped_fm.get('distilled_at')!r}")
+        if stamped_fm.get("updated_at") != stamped_fm.get("distilled_at"):
+            problems.append(f"phase 9: a new note's updated_at must equal its distilled_at: {stamped_fm.get('updated_at')!r}")
         if stamped_fm.get("ingested_at") != STAMP_INGESTED_AT:
             problems.append(f"phase 9: ingested_at not carried from the capture: {stamped_fm.get('ingested_at')!r}")
 
-        # --- 10. no overwrite: a note with its own timestamps keeps them ---
+        # --- 10. enrichment: its own timestamps and formatting kept, updated_at stamped fresh ---
         keep_note_path = sandbox / "04_Resources" / "Retire-Eval-Keep.md"
+        keep_before = keep_note_path.read_text(encoding="utf-8")
         r = rc.retire(cap("Readwise-Retire-Keep.md"), sandbox, ["04_Resources/Retire-Eval-Keep.md"],
                       "→ [[Retire-Eval-Keep]].", None)
-        if r.get("stamped"):
-            problems.append(f"phase 10: a note with its own timestamps was reported stamped: {r.get('stamped')}")
+        if r.get("stamped") != ["04_Resources/Retire-Eval-Keep.md"]:
+            problems.append(f"phase 10: an enriched note was not reported stamped: {r.get('stamped')}")
         keep_fm, _ = vault_utils.read_frontmatter(keep_note_path)
         if keep_fm.get("distilled_at") != ALREADY_STAMPED_DISTILLED_AT or keep_fm.get("ingested_at") != ALREADY_STAMPED_INGESTED_AT:
             problems.append(f"phase 10: existing timestamps were overwritten: {keep_fm.get('distilled_at')!r}, {keep_fm.get('ingested_at')!r}")
+        updated_at = str(keep_fm.get("updated_at") or "")
+        if not _re.match(ts_re, updated_at) or updated_at <= ALREADY_STAMPED_DISTILLED_AT:
+            problems.append(f"phase 10: an enriched note's updated_at was not stamped now: {updated_at!r}")
+        keep_after = keep_note_path.read_text(encoding="utf-8")
+        if keep_after.replace(f"updated_at: '{updated_at}'\n", "", 1) != keep_before:
+            problems.append(f"phase 10: stamping changed more than the updated_at line: {keep_after[:400]!r}")
+
+        # --- 11. idempotent: a retirement that moves nothing changes no note ---
+        stamp_before = stamp_note_path.read_text(encoding="utf-8")
+        try:
+            rc.retire(cap("Readwise-Retire-Stamp.md"), sandbox, ["04_Resources/Retire-Eval-Stamp.md"], "again", None)
+            problems.append("phase 11: re-retiring an already-retired capture was not refused")
+        except rc.RetireRefused:
+            pass
+        cap("Readwise-Retire-Stamp.md").write_text(
+            _capture("clip", STAMP_INGESTED_AT).replace(SOURCE, SOURCE + "-stamp"), encoding="utf-8")
+        try:
+            rc.retire(cap("Readwise-Retire-Stamp.md"), sandbox, ["04_Resources/Retire-Eval-Stamp.md"], "again", None)
+            problems.append("phase 11: a capture already in the archive was not refused")
+        except rc.RetireRefused as e:
+            if "already archived" not in str(e):
+                problems.append(f"phase 11: refused for the wrong reason: {e}")
+        if stamp_note_path.read_text(encoding="utf-8") != stamp_before:
+            problems.append("phase 11: a refused re-retirement restamped the note")
     finally:
         for k, v in saved.items():
             if v is not None:
@@ -290,4 +330,5 @@ def run(vault: Path) -> dict:
 
     return {"eval": NAME, "pass": not problems,
             "detail": "; ".join(problems) if problems else
-            "lock serializes; move+manifest succeed for --line and --dropped; refuses a dropped clip, a bad --note, a bad mode and --line without --note; appends accumulate"}
+            "lock serializes; move+manifest succeed for --line and --dropped; refuses a dropped clip, a bad --note, a bad mode and --line without --note; appends accumulate; "
+            "new and enriched notes get updated_at and nothing else changes; a refused re-retirement stamps nothing"}
