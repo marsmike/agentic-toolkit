@@ -67,6 +67,7 @@ them holding still. Check whether an existing field fits before adding a new one
 | `ingested_at_estimated` | `true` when `ingested_at` was inferred (e.g. by `backfill_timestamps.py` from git history) rather than recorded at capture time — mirrors `processed_date_estimated` | Opt-in, on an estimated `ingested_at` |
 | `distilled_at` | ISO 8601 UTC timestamp, with time and `Z` — when the note was distilled from its capture(s) | Required going forward: every note distilled in code carries it, and `backfill_timestamps.py` back-dates it (with `distilled_at_estimated: true`) onto every pre-existing distilled note from `processed_date`, which is never itself missing. In practice this one reaches 100% of distilled notes once backfilled. |
 | `distilled_at_estimated` | `true` when `distilled_at` was inferred the same way — the same convention, one flag per field | Opt-in, on an estimated `distilled_at` |
+| `updated_at` | ISO 8601 UTC timestamp, with time and `Z` — when the pipeline last changed the note: set at distillation and again on every L2 enrichment | Required going forward on every note a retired capture produced or changed, stamped in code by `retire_capture.py` (never by the LLM); `pipeline_run.py`'s `end` stamps any changed note it missed. Never backfilled: an older note has none, and the `Recently changed` view falls back to `distilled_at`, then `processed_date` |
 | `kind` | Note kind (`concept`, `guide`, `research-finding`, `profile`, plus project- and domain-specific values) | Resources |
 | `topics` | Structured topical taxonomy | Resources |
 | `methodology` | Methodology family, when applicable | Opt-in — no generator or skill sets it today (unlike `kind`/`topics`, which the distill skill always fills); add it by hand where it earns its keep. |
@@ -76,7 +77,7 @@ them holding still. Check whether an existing field fits before adding a new one
 | `created` | Note creation date | Most notes |
 | `enrichment_targets` | Notes/profiles to notify when this note is enriched | Opt-in |
 
-Going forward, `ingested_at` and `distilled_at` are set deterministically in code — a writer
+Going forward, `ingested_at`, `distilled_at` and `updated_at` are set deterministically in code — a writer
 script or a retirement step stamps `datetime.now(UTC)` at the moment it acts, never left to an
 LLM to guess (`processed_date` stays as the date-only back-compat field, and
 `processed_date_estimated` stays as its own estimated flag — unchanged by this pair). That does

@@ -63,7 +63,7 @@ def test_ingested_and_distilled_at_are_utc_z_when_present():
         frontmatter, _, had_frontmatter = parse_frontmatter(text)
         if not had_frontmatter:
             continue
-        for field in ("ingested_at", "distilled_at"):
+        for field in ("ingested_at", "distilled_at", "updated_at"):
             value = frontmatter.get(field)
             if value is not None and not ts_re.match(str(value)):
                 rel = note_path.relative_to(EXAMPLE_VAULT)
