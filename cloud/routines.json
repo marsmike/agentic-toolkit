@@ -29,7 +29,6 @@
         "Glob",
         "Grep",
         "WebFetch",
-        "WebSearch",
         "Artifact"
       ],
       "sources": [

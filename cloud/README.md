@@ -141,8 +141,9 @@ pipeline routine, so `uv` and the git credential are there; no keys are needed.
 - **Connectors:** Todoist, only as the fallback when `td` is missing.
 - **Schedule:** every 3 hours (`58 */3 * * *` UTC).
 - **Model:** Opus 5.5 (`claude-opus-5-5`), set in the routine's `session_context.model`.
-- **Tools:** `session_context.allowed_tools` holds Bash, Read, Write, Edit, Glob, Grep, WebFetch,
-  WebSearch and **Artifact** (the REPORT step). [earned: 2026-09-25, owner's request — the last
+- **Tools:** `session_context.allowed_tools` holds Bash, Read, Write, Edit, Glob, Grep, WebFetch
+  (distill's fallback when `tvly` reports missing, `plugins/obsidian/skills/distill/SKILL.md`)
+  and **Artifact** (the REPORT step). [earned: 2026-09-25, owner's request — the last
   run's report as an artifact] `PushNotification` is never in any routine's `allowed_tools` — not
   an oversight: the routines platform grants it to every routine implicitly, so the watchdog's and
   Signal Radar's prompts can "send ONE push notification" without it being listed. Confirmed live,
