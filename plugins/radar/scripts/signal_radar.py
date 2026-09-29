@@ -680,7 +680,12 @@ def write(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
     atomic_write(out / "signal.json", json.dumps(data, indent=1, ensure_ascii=False) + "\n")
     atomic_write(out / "Signal-Radar.html", signal_render.render_html(data))
     atomic_write(out / "Signal-Radar.md", signal_render.render_md(data))
+    # The note embeds these two: Obsidian shows an SVG inline, never the .html page.
+    atomic_write(out / signal_render.SCOPE_SVG, signal_render.render_scope_svg(data))
+    atomic_write(out / signal_render.MOMENTUM_SVG, signal_render.render_momentum_svg(data))
+    files = ("signal.json", "Signal-Radar.html", "Signal-Radar.md", signal_render.SCOPE_SVG, signal_render.MOMENTUM_SVG)
     return {"status": "ok", "blips": len(data["blips"]), "early": len(data["early"]),
             "blind_spots": len(data["blind_spots"]), "entities": data["stats"]["entities"],
             "sources": {s["family"]: s["status"] for s in data["sources"]},
-            "html": (out / "Signal-Radar.html").relative_to(vault).as_posix(), "generated": data["generated"]}
+            "html": (out / "Signal-Radar.html").relative_to(vault).as_posix(),
+            "files": [(out / f).relative_to(vault).as_posix() for f in files], "generated": data["generated"]}
