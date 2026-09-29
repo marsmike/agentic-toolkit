@@ -43,7 +43,7 @@ agentic-toolkit/                    # NEW public repo, fresh git history (privac
 
 1. **Profiles ("fill from Obsidian")** — resolution order env → `$VAULT/Config/toolkit/<plugin>.md` → shipped default. Identity lives in the vault, repo ships behavior. Secrets stay in the environment, `~/.env` or a keychain — never in the vault, never in the repo. Each script reads the one key it needs itself (`vault_utils.secret`), so the unattended agent that runs the scripts holds no key. [earned: 2026-09-24, review-01 SEC-1] *Precedent: `Mike.md` "AI Assistant Context Summary", `04_Resources/AboutMe/` style prompts.*
 2. **Eval gates (Graduation Pattern)** — every plugin ships capability evals that start low and graduate into a regression suite; green regression suite gates trunk merges. This resolves the CD-vs-reliability tension. *`Concepts/Graduation-Pattern.md`; SkillsBench: ungated skills degrade −1.3pp; `Reliability-Over-Capability.md`.*
-3. **The public ratchet** — every contract/CLAUDE.md rule cites the dated failure that earned it; changelog links rule → incident → regression case. *Osmani field survey: "every line traces to a specific historical failure."*
+3. **The public ratchet** — every contract/`AGENTS.md` rule cites the dated failure that earned it; changelog links rule → incident → regression case. *Osmani field survey: "every line traces to a specific historical failure."*
 4. **Two hook classes** — *ratchet hooks* (deterministic failures, auto-enforced) vs *stop-and-ask hooks* (judgment calls → decision log/ADR). *web3nomad's judgment-vs-bug counter in the Osmani note; arscontexta fix-vs-report gate.*
 5. **Dead-letter question as acceptance criterion** — every shipped automation names where its failures go; `unisphere doctor` surfaces the DLQ. Confidence labels gate auto-apply vs report (guards gaiafield against "successful corruption"). *arscontexta DLQ claim.*
 6. **Dual-channel descriptions** — retrieval-verification loop (predict-from-description, score 1–5, flag <3) ships as an obsidian-plugin maintenance skill; BM25 queries condensed to 3–5 high-IDF terms. *arscontexta BM25-dilution claims.*
@@ -119,3 +119,30 @@ Out of scope for R0 (subsequent releases): farsight, gaiafield, feinschmiede abs
 - gitleaks + manual scan: no personal data anywhere (the example vault's persona is fictional; profiles are examples only).
 - Every vault citation in `docs/PLAN.md` resolves to a real note in TheVoid.
 - Seven goals each traceable to at least one shipped R0 artifact or explicitly deferred with its release named.
+
+## Where this plan diverged from what shipped (added post-R12, current reality)
+
+This document is the founding artifact and stays as it was written above; this section is the
+one place that says where reality moved on, so a reader doesn't take a founding-stage claim as a
+current one. [earned: 2026-09-28 — repo audit D1/D2/D3]
+
+- **Both engines shipped.** farsight landed in R1, gaiafield in R2 — "no crates built in R0" and
+  "out of scope for R0: farsight, gaiafield" above are both still true *as R0-scope statements*;
+  neither was ever a claim about later releases.
+- **Publishing is done, not pending.** The plan for R0 (above) scaffolded locally as
+  `agentic-toolkit-v2`, describing the eventual GitHub name as something "at publish" would still
+  resolve. It has resolved: the repo is public at `github.com/marsmike/agentic-toolkit` (`git
+  remote -v`), with CI badges, release assets and the docs site all pointing there.
+- **`CLAUDE.md` was replaced by `AGENTS.md` in R12.** R0 did scaffold a router-style `CLAUDE.md`
+  (repo root, `vault/CLAUDE.md`, `contract/templates/VAULT_CLAUDE.md`) exactly as planned above;
+  R12 replaced all three with `AGENTS.md` (see `AGENTS.md`'s own earned note) because Claude Code
+  reads `CLAUDE.md` first when both are present, silently hiding the router. There is no tracked
+  `CLAUDE.md` anywhere in the repo now — `contract/AGENTS.md` never existed as a path either; the
+  file is `AGENTS.md` at the repo root.
+- **techref, feinschliff, `hybrid_search.py`, and the feinschmiede consolidation were never
+  built.** The Engines section's "replaces `obsidian/scripts/hybrid_search.py`" named a file that
+  never existed under that name — the script has been `plugins/obsidian/scripts/search.py` since
+  R0's first commit. "research" landed as `plugins/radar` instead of `techref` (already noted
+  above under Curation waves); `feinschliff` and the feinschmiede-absorption plan were dropped —
+  there is no `fein-*` plugin in this repo, and the marketplace ships five plugins (obsidian,
+  radar, readwise, memory, handoff), not the eight-plugin core wave sketched above.

@@ -29,7 +29,7 @@ a skill's reference material only draws from the budget on the turns it's actual
 
 ## Consequence for this toolkit's own files
 
-The repo's own top-level `CLAUDE.md` is a router, not an answerer — it points into `contract/` and
+The repo's own top-level `AGENTS.md` is a router, not an answerer — it points into `contract/` and
 `docs/` rather than duplicating their content, precisely so it stays cheap on every turn whether or
 not those deeper files are needed.
 

@@ -16,9 +16,9 @@ cosine layer is blended in, backed by a small cache this script builds and owns 
 format — this script does not require or produce that store). Without those packages,
 search.py says so once and returns BM25-only results; it never hangs or errors.
 
-**farsight (docs/PLAN.md) replaces this whole file in R1** — a Rust hybrid BM25+vector
-engine. This script is the R0 placeholder: correct and dependency-light, not the final
-retrieval architecture.
+**farsight (docs/PLAN.md) replaces this file's BM25 path in R1** — a Rust engine, shipped as
+BM25-only so far (vector search is a later increment, not yet built). This script's semantic
+cosine layer below has no farsight equivalent yet and keeps running until one ships.
 
 R1 update: when a `farsight` binary is available (`TOOLKIT_FARSIGHT_BIN` env var, else
 PATH), `search()` shells out to it and returns its results instead of running the BM25
@@ -208,7 +208,7 @@ def semantic_scores(query: str, corpus: list[Doc], vault: Path, rebuild: bool = 
 
 
 # ---------------------------------------------------------------------------
-# farsight preference chain (docs/PLAN.md: farsight replaces this file's BM25 path in R1)
+# farsight preference chain (docs/PLAN.md: farsight replaces this file's BM25 path — shipped R1)
 # ---------------------------------------------------------------------------
 
 

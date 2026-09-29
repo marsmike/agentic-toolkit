@@ -6,9 +6,9 @@ no persisted index.
 
 **gaiafield** (R2) — deterministic knowledge-graph extraction over a vault's wikilinks into
 SQLite (`index`/`neighbors`/`stats`/`path`); see `crates/gaiafield/README.md` for node scope,
-edge resolution rules, and incremental indexing. v1 is deterministic-only — no inferred edge, no
-model call. Inferred/similarity edges above a calibrated threshold, confidence-labeled
-EXTRACTED/INFERRED/AMBIGUOUS, are **R3**, not yet built.
+edge resolution rules, and incremental indexing. v1 (R2) is deterministic-only — no inferred
+edge, no model call. Inferred/similarity edges above a calibrated threshold, confidence-labeled
+EXTRACTED/INFERRED/AMBIGUOUS, are v2, shipped in **R5** (`infer`/`candidates`/`surprise`).
 
 Engines are CLI-in/JSON-out binaries; see `docs/PLAN.md` (Engines) and
 `contract/KNOWLEDGE_API.md` for the interface they must implement.

@@ -149,9 +149,10 @@ jobs:
       - name: Run handoff plugin evals
         run: uv run python plugins/handoff/evals/run.py --json
 
-  # cargo fails on a memberless virtual workspace, so the job skips cleanly
-  # until R1 adds the first crate [earned: adversarial R0 review 2026-07-26 —
-  # "harmless while empty" claim was verifiably false, exit 101].
+  # cargo fails on a memberless virtual workspace, so this guards against that case
+  # (moot since R1/R2 — farsight and gaiafield are both workspace members now — but
+  # kept as a defensive fallback for an empty checkout) [earned: adversarial R0
+  # review 2026-07-26 — "harmless while empty" claim was verifiably false, exit 101].
   rust:
     needs: changes
     if: needs.changes.outputs.rust == 'true'
@@ -161,12 +162,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - name: Build and test (skip while workspace has no members)
+      - name: Build and test
         run: |
           if compgen -G "crates/*/Cargo.toml" > /dev/null; then
             cargo clippy --workspace --all-targets -- -D warnings
             cargo build --workspace
             cargo test --workspace
           else
-            echo "No crates yet — skipping (R1 adds the first crate; see docs/PLAN.md)"
+            echo "No crates found — skipping (the workspace normally has farsight and gaiafield; see docs/PLAN.md)"
           fi
