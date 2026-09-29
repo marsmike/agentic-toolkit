@@ -213,6 +213,10 @@ def run(vault: Path) -> dict:
         # 6. skipped
         if result["skipped"] != 3:
             problems.append(f"phase 6: expected 3 skipped (bad frontmatter + no date + bad clip), got {result['skipped']}")
+        # the two reasons are counted apart, so the page can name each one truthfully
+        if (result.get("unparseable"), result.get("undated")) != (2, 1):
+            problems.append(f"phase 6: expected unparseable=2 (note + clip) and undated=1, got "
+                            f"{result.get('unparseable')}/{result.get('undated')}")
         if any(m["url"].endswith("bad-frontmatter.md") or m["url"].endswith("no-date.md") for m in result["mentions"]):
             problems.append("phase 6: a skipped note must not appear as a mention")
 

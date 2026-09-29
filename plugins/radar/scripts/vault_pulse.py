@@ -3,12 +3,13 @@ are accelerating in HIS notes — read straight from the vault's files, never th
 plugin (AGENTS.md "Hard rules": plugins depend on core/contract only, never a sibling plugin).
 
     from vault_pulse import pulse
-    pulse(vault, now)  # -> {"mentions", "daily", "week", "tags", "domains", "interests", "skipped"}
+    pulse(vault, now)  # -> {"mentions", "daily", "week", "tags", "domains", "interests",
+                       #     "skipped", "unparseable", "undated"}
 
 Content notes are every `*.md` under `02_Projects/`, `03_Areas/`, `04_Resources/` (via `contained`,
-so a symlink out of the vault is not one), dated by frontmatter `created` (fallback
-`processed_date`); a note carrying neither, or frontmatter that doesn't parse, is skipped and
-counted, never guessed at. Clips (`clips.load`) are the second half: what the owner chose to read
+so a symlink out of the vault is not one), dated by frontmatter `created` (fallbacks
+`processed_date`, `distilled_at`, `ingested_at`); a note carrying none is counted `undated`, one
+whose frontmatter doesn't parse `unparseable`, and neither is guessed at. Clips (`clips.load`) are the second half: what the owner chose to read
 himself, no threshold or feed gate in between.
 
 Tag filtering — a tag namespace/pattern check, plus a document-frequency cut on top of it. The
@@ -291,19 +292,19 @@ def pulse(vault: Path, now: datetime, days: int = 56) -> dict[str, Any]:
     today = now.date()
     since = today - timedelta(days=days)
     mentions: list[dict[str, Any]] = []
-    skipped = 0
+    unparseable = undated = 0
 
     for path in _content_paths(vault):
         try:
             fm, body = read_frontmatter(path, strict=True)
         except (UnparseableFrontmatter, OSError):
-            skipped += 1
+            unparseable += 1
             continue
         # `created` first, but a present-and-unparseable `created` (a placeholder like "TBD") must
-        # still fall back to `processed_date` rather than be treated as "found, just bad". [earned:
-        # 2026-09-28 week review]
+        # still fall back to the next date rather than be treated as "found, just bad". [earned:
+        # 2026-09-28 week review] `distilled_at`/`ingested_at` date notes that carry no other date.
         day = None
-        for key in ("created", "processed_date"):
+        for key in ("created", "processed_date", "distilled_at", "ingested_at"):
             raw = str(fm.get(key) or "")[:10]
             if not raw:
                 continue
@@ -313,14 +314,14 @@ def pulse(vault: Path, now: datetime, days: int = 56) -> dict[str, Any]:
             except ValueError:
                 continue
         if day is None:
-            skipped += 1
+            undated += 1
             continue
         if day < since:
             continue
         mentions.append(_note_mention(path, vault, fm, body, day.isoformat()))
 
     the_clips, clips_skipped = clips_mod.load(vault, since)
-    skipped += clips_skipped
+    unparseable += clips_skipped  # clips.load skips a clip only for frontmatter it cannot parse
     for clip in the_clips:
         mentions.append(_clip_mention(clip, vault))
 
@@ -334,5 +335,10 @@ def pulse(vault: Path, now: datetime, days: int = 56) -> dict[str, Any]:
         "tags": _tag_stats(mentions, today),
         "domains": _domain_stats(mentions, today),
         "interests": _interest_stats(mentions, today),
-        "skipped": skipped,
+        # Two different reasons, counted apart: the page names each one truthfully. `skipped` stays
+        # their sum for callers that only want a total. [earned: 2026-09-29 — the Signal Radar said
+        # "173 notes skipped (unparseable frontmatter)" when all 173 parsed and only lacked a date]
+        "skipped": unparseable + undated,
+        "unparseable": unparseable,
+        "undated": undated,
     }

@@ -849,7 +849,12 @@ footer .srclist { margin-top: 6px; }
     kpis.replaceChildren(...tiles.map(([val, label, d]) => el("div", {class: "card kpi span-3"},
       el("div", {class: "v"}, String(val), d ? el("span", {class: "d", style: `color:${d[0] === "▲" ? "var(--good)" : "var(--muted)"}`, text: d}) : null),
       el("div", {class: "l", text: label}))));
-    document.getElementById("vaulthint").textContent = v.skipped ? `${v.skipped} note${v.skipped === 1 ? "" : "s"} skipped (unparseable frontmatter)` : "";
+    const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    const unparsed = v.unparseable ?? 0, undated = v.undated ?? (v.unparseable == null ? v.skipped ?? 0 : 0);
+    document.getElementById("vaulthint").textContent = [
+      undated ? `${plural(undated, "note")} without a date (no created, processed_date or distilled_at) left out` : "",
+      unparsed ? `${plural(unparsed, "note")} skipped: frontmatter does not parse` : "",
+    ].filter(Boolean).join(" · ");
 
     renderVaultBars(v.daily || []);
     renderTags(v.tags || []);
