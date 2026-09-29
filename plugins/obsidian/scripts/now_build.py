@@ -13,10 +13,12 @@ Now.md says what is going on first, and the long lists last, in Markdown any age
     Live views                 Recently changed and Recently distilled, embedded from Vault.base
     Stuck                      parked captures (pipeline-state.json) and open DLQ notes; only if any
     Inbox                      the backlog in 01_Capture/, next captures in queue order; only if any
-    This week (folded)         New / Enriched: notes the `pipeline …` commits of the last 7 days added
-                               or changed, newest first; an added note is new only when it has no
-                               processed_date or a real, non-estimated one in the window (no git:
-                               processed_date, else created, in it). Radar: this week's strong items
+    This week (folded)         New: notes distilled since the window opened (`distilled_at`, else
+                               `processed_date`; never an estimated one). Enriched: notes whose
+                               `updated_at` falls in the window and that are not new; the title says
+                               so when the window opens before the vault's first `updated_at`. Both
+                               newest first, from frontmatter alone: a count never depends on how
+                               much git history a checkout has. Radar: this week's strong items
                                (00_Memory/radar/state.jsonl). Distilled per day: last 14 days.
 
 Embedded views render in Obsidian only; a folded callout (`> [!tip]- …`) is a plain blockquote
@@ -28,14 +30,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
-from map_build import _date, _when
+from map_build import _date
 from pipeline_run import STATE, _order
 from vault_utils import (
     atomic_write,
@@ -48,7 +49,6 @@ from vault_utils import (
     read_jsonl,
     require_vault,
     resolve_title,
-    root_active_notes,
     utc_timestamp,
 )
 
@@ -99,48 +99,55 @@ def _newest_first(paths: list[str], dated: dict[str, str]) -> list[str]:
     return sorted(sorted(paths), key=lambda p: dated.get(p, ""), reverse=True)
 
 
+def _utc(value: object) -> str:
+    """A frontmatter date or timestamp as UTC text (`YYYY-MM-DDTHH:MM:SSZ`, or `YYYY-MM-DD` for a
+    date), "" for nothing or something unreadable. A mirror of `daily_build._utc`: daily_build
+    imports this module, so importing it back would be circular."""
+    if isinstance(value, str):
+        text = value.strip()
+        try:
+            value = datetime.fromisoformat(text) if len(text) > 10 else date.fromisoformat(text)
+        except ValueError:
+            return ""
+    if isinstance(value, datetime):
+        moment = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return value.isoformat() if isinstance(value, date) else ""
+
+
+def _distilled_when(fm: dict) -> str:
+    """When a note was distilled, in UTC: `distilled_at` unless estimated, else `processed_date`
+    unless estimated, else "". The rule of `daily_build.distilled_when` (mirrored, see `_utc`) and
+    of `dashboard_build.notes`, which never counts an estimated date either."""
+    if fm.get("distilled_at_estimated") is not True and (when := _utc(fm.get("distilled_at"))):
+        return when
+    return _utc(fm.get("processed_date")) if fm.get("processed_date_estimated") is not True else ""
+
+
 def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
-    """(new, enriched, source): note paths from the pipeline's commits since `since`."""
-    folders = ("02_Projects", "03_Areas", "04_Resources")
-    git = subprocess.run(["git", "-C", str(vault), "log", f"--since={since.isoformat()}", "--grep=^pipeline",
-                          "--name-status", "--format=tformat:@@", "--", *folders, ":(glob)*.md"],
-                         capture_output=True, text=True, check=False)
-    if git.returncode == 0 and (vault / ".git").exists():
-        # Of the root files a run commits (Index.md, Now.md, Log.md …) only a root `status: active`
-        # note is content (contract/VAULT_SCHEMA.md).
-        root_notes = {p.name for p in root_active_notes(vault)}
-        new, changed = set(), set()
-        for line in git.stdout.splitlines():
-            status, _, path = line.partition("\t")
-            if not path.endswith(".md") or not (vault / path).is_file():
-                continue
-            if "/" not in path and path not in root_notes:
-                continue
-            (new if status.startswith("A") else changed).add(path)
-        # A commit adds a file the first time git sees it, not only when it is distilled: the run
-        # that put the vault into git "added" 1,322 notes, backfilled legacy dates among them.
-        # [earned: 2026-09-26, Now.md "New this week (1322)"]
-        fresh = {}
-        for p in new:
-            fm = read_frontmatter(vault / p)[0]
-            raw = fm.get("processed_date")
-            if raw is None or str(raw).strip() == "":
-                fresh[p] = ""  # never distilled (a root or project note): new, listed last
-            elif fm.get("processed_date_estimated") is not True and (when := _date(raw)) >= since.isoformat():
-                fresh[p] = when
-        # Exclude only what "New this week" actually lists (`fresh`), not every path ever added
-        # since `since` (`new`): a note the pipeline both wrote and later enriched in the same
-        # week — an estimated or pre-window `processed_date` keeps it out of `fresh` — used to
-        # vanish from both lists, since its own creation commit's "A" excluded it here too.
-        # [earned: 2026-09-28 battle test — a same-week L2 enrichment of a note the pipeline had
-        # itself distilled four days earlier never appeared in Now.md at all]
-        return _newest_first(list(fresh), fresh), sorted(changed - set(fresh)), "git"
-    dated = {}
+    """(new, enriched, source): content notes distilled since `since`, and the ones whose
+    `updated_at` falls in the window without being new; each newest first, ties by path.
+
+    Frontmatter alone, never git: the `pipeline …` commits this read before undercounted in a
+    shallow clone, where Now.md said "52 new" for a week the full history put at 192 and the
+    notes' own stamps at ~290. [earned: 2026-09-29, the cloud routine's Now.md]"""
+    day = since.isoformat()
+    new, enriched = {}, {}
     for p in discover_notes(vault):
-        when = _when(read_frontmatter(p)[0])
-        if when >= since.isoformat():
-            dated[p.relative_to(vault).as_posix()] = when
-    return _newest_first(list(dated), dated), [], "processed_date"
+        fm = read_frontmatter(p)[0]
+        rel = p.relative_to(vault).as_posix()
+        if (when := _distilled_when(fm)) and when[:10] >= day:
+            new[rel] = when
+        elif (when := _utc(fm.get("updated_at"))) and when[:10] >= day:
+            enriched[rel] = when
+    return _newest_first(list(new), new), _newest_first(list(enriched), enriched), "frontmatter"
+
+
+def first_updated(vault: Path) -> str:
+    """The UTC day of the earliest `updated_at` among the content notes, "" when none has one:
+    before that day an enrichment left no stamp to count."""
+    days = [when[:10] for p in discover_notes(vault) if (when := _utc(read_frontmatter(p)[0].get("updated_at")))]
+    return min(days, default="")
 
 
 def radar(vault: Path, since: date) -> list[dict]:
@@ -282,9 +289,13 @@ def build(vault: Path, today: date) -> tuple[dict[str, str], dict]:
     out += [f"## This week (since {since.isoformat()})", ""]
     out += _callout("success", f"New this week ({len(new)})", _capped([f"- {_link(vault, p)}" for p in new]) or ["- (none)"],
                     folded=True)
-    out += _callout("info", f"Enriched this week ({len(enriched)})",
-                    _capped([f"- {_link(vault, p)}" for p in enriched]) or [f"- ({'none' if source == 'git' else 'needs git history'})"],
-                    folded=True)
+    # `updated_at` is young: a window that opens before the first stamp undercounts, and the title
+    # says so instead of passing the number off as the whole week.
+    first = first_updated(vault)
+    counted = ("; no note has updated_at yet" if not first else
+               f"; counted since {first}, when updated_at started" if first > since.isoformat() else "")
+    out += _callout("info", f"Enriched this week ({len(enriched)}{counted})",
+                    _capped([f"- {_link(vault, p)}" for p in enriched]) or ["- (none)"], folded=True)
     out += _callout("tip", f"Radar: strong this week ({len(strong)})",
                     _capped([_radar_line(r) for r in strong], RADAR_SHOW) or ["- (none)"], folded=True)
     out += _callout("note", "Distilled per day", ["```text"] + [f"{d[5:]} {'█' * round(20 * c / peak):<20} {c}" for d, c in chart] + ["```"],
