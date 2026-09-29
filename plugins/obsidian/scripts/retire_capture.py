@@ -39,6 +39,14 @@ pipeline last changed it, since git resets `file.mtime`. It is stamped under the
 after the already-archived refusal, so a retirement that moves nothing changes no note.
 [earned: 2026-09-29 — the owner asked for "recently changed notes"; a pull touched 133 mtimes]
 
+After the move it appends one row to the pipeline's ledger, `00_Memory/imports.jsonl`, under that
+ledger's own lock: `{"retired": <capture>, "at", "kind", "notes", "reason", "what", "archived_to"}`,
+`kind` one of `new` (a `--note` got its first `distilled_at` here), `enriched` (every `--note` was
+distilled before), `dropped` or `duplicate`; `reason` is the `--dropped` text or what it duplicates;
+`what` is the `--line`. The manifest line stays the human record; every page reads the row.
+[earned: 2026-09-29 — pages parsed the manifest's prose for what a capture became, and a `--line`
+without a wikilink named no note at all]
+
 Prints one JSON object: the result on success, `{"error": ...}` on refusal (exit 1).
 """
 from __future__ import annotations
@@ -53,7 +61,17 @@ from pathlib import Path
 from typing import Any
 
 from distill_check import check
-from vault_utils import inside, read_frontmatter, require_vault, set_frontmatter_fields, utc_timestamp
+from vault_utils import (
+    append_jsonl,
+    inside,
+    jsonl_lock,
+    read_frontmatter,
+    require_vault,
+    set_frontmatter_fields,
+    utc_timestamp,
+)
+
+LEDGER = Path("00_Memory") / "imports.jsonl"  # imports_log.LOG; not imported, imports_log reads the archive
 
 OWNER_SOURCES = {"clip"}  # kept in step with distill_judge.OWNER_SOURCES; duplicated to
 # avoid importing distill_judge's judgment-backend machinery into a script that must run
@@ -104,14 +122,16 @@ def _validate_notes(notes: list[str], capture: Path, vault: Path) -> list[str]:
     return resolved
 
 
-def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None) -> None:
+def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None) -> bool:
     """Deterministically stamp every note the capture became or enriched: `updated_at` to now,
     always; `distilled_at` to the same now and `ingested_at` carried from the capture, each only
     where the note has none yet (an earlier distillation's own timestamps stand). Never left to
     the skill/LLM to write. Called under the manifest lock, after the already-archived refusal and
     before the capture moves, while its own frontmatter (and `ingested_at`) is still readable.
-    contract/VAULT_SCHEMA.md; the module docstring says what earned each field."""
+    contract/VAULT_SCHEMA.md; the module docstring says what earned each field. True when any note
+    got its first `distilled_at` here: the capture became a new note, not only an enrichment."""
     now = utc_timestamp()
+    first = False
     for rel in notes:
         path = vault / rel
         fm, _ = read_frontmatter(path, strict=True)
@@ -120,10 +140,12 @@ def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None)
             fields["ingested_at"] = capture_ingested_at
         if not fm.get("distilled_at"):
             fields["distilled_at"] = now
+            first = True
         set_frontmatter_fields(path, {**fields, "updated_at": now})
         # The edit is textual, so prove it: the note still parses and carries exactly this stamp.
         if read_frontmatter(path, strict=True)[0].get("updated_at") != now:
             raise RetireRefused(f"--note {rel} did not take its updated_at stamp; capture not moved")
+    return first
 
 
 def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropped: str | None,
@@ -165,18 +187,27 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         folder.mkdir(parents=True, exist_ok=True)
         if dest.exists():
             raise RetireRefused(f"already archived: {dest.relative_to(vault).as_posix()}")
-        _stamp_notes(vault, resolved_notes, ingested_at)
+        first = _stamp_notes(vault, resolved_notes, ingested_at)
         if not readme.exists():
             readme.write_text(_manifest_header(origin, yyyymm, today), encoding="utf-8")
         capture.rename(dest)
         if duplicate_of:
             entry = f"- `{dest.name}` — **duplicate** of `{duplicate_of}`, kept whole here. Retired {today}.\n"
+            kind, reason = "duplicate", f"duplicate of {duplicate_of}"
         elif dropped:
             entry = f"- `{dest.name}` — **dropped** (never distilled): {dropped} Retired {today}.\n"
+            kind, reason = "dropped", dropped.strip()
         else:
             entry = f"- `{dest.name}` — {line} Distilled {today}.\n"
+            kind, reason = "new" if first else "enriched", None
         with readme.open("a", encoding="utf-8") as fh:
             fh.write(entry)
+        row = {"retired": rel, "at": utc_timestamp(), "kind": kind, "notes": resolved_notes,
+               "reason": reason, "what": line.strip() if line else None,
+               "archived_to": dest.relative_to(vault).as_posix(),
+               **({"duplicate_of": duplicate_of} if duplicate_of else {})}
+        with jsonl_lock(vault / LEDGER):
+            append_jsonl(vault / LEDGER, row)
 
     return {
         "capture": rel,
@@ -186,6 +217,7 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         "stamped": resolved_notes,
         "via": via,
         "mode": "duplicate" if duplicate_of else "dropped" if dropped else "line",
+        "kind": kind,
     }
 
 

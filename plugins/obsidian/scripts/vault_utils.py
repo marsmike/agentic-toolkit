@@ -11,19 +11,23 @@ independence rule. Its conventions deliberately mirror `core/toolkit_core/vault.
 """
 from __future__ import annotations
 
+import contextlib
 import copy
+import fcntl
 import functools
+import hashlib
 import io
 import json
 import os
 import re
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +68,35 @@ def format_ts(raw: object, estimated: bool = False) -> str:
         return ""
     label = s[:16].replace("T", " ") + " UTC" if len(s) >= 16 and s[10] == "T" and s.endswith("Z") else s[:10]
     return f"{label} (estimated)" if estimated else label
+
+
+def utc_text(value: object) -> str:
+    """A frontmatter date or timestamp as UTC text: `YYYY-MM-DDTHH:MM:SSZ`, a bare `YYYY-MM-DD`
+    for a date-only value, "" for nothing or something unreadable. YAML reads an unquoted
+    timestamp as a `datetime` (and one with an offset must be moved to UTC before taking its day)."""
+    if isinstance(value, str):
+        text = value.strip()
+        try:
+            value = datetime.fromisoformat(text) if len(text) > 10 else date.fromisoformat(text)
+        except ValueError:
+            return ""
+    if isinstance(value, datetime):
+        moment = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return value.isoformat() if isinstance(value, date) else ""
+
+
+def distilled_when(fm: dict) -> str:
+    """When a note was distilled, in UTC — the one rule every per-day count uses (daily note,
+    Dashboard, run report): only a note that was distilled (it carries `distilled_at`, or `status:
+    distilled`); then `distilled_at` unless estimated, else `processed_date` unless estimated, else "".
+    [earned: 2026-09-29 audit — the Dashboard showed 92 for 2026-09-26, whose runs distilled 17: 75
+    `status: review` notes carry that `processed_date` and were never distilled]"""
+    if not fm.get("distilled_at") and fm.get("status") != "distilled":
+        return ""
+    if fm.get("distilled_at_estimated") is not True and (when := utc_text(fm.get("distilled_at"))):
+        return when
+    return utc_text(fm.get("processed_date")) if fm.get("processed_date_estimated") is not True else ""
 
 # Canonical aliased index entry: `- [[rel/path/Name|Name]] — summary ⚙?`. Tolerates the
 # bare `- [[Name]] — summary` form too.
@@ -421,6 +454,27 @@ def append_jsonl(path: Path, row: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+@contextlib.contextmanager
+def jsonl_lock(path: Path):
+    """An exclusive OS lock for one ledger, on a guard file outside the vault (never committed):
+    every appender and every rewrite of `path` (a prune replaces the file, so a lock on the file
+    itself would not hold across it) takes this first. [earned: 2026-09-29 — parallel distill
+    workers append retirements to 00_Memory/imports.jsonl while `end` may prune it]"""
+    key = hashlib.sha1(str(path.resolve()).encode()).hexdigest()[:16]
+    with open(Path(tempfile.gettempdir()) / f"agentic-toolkit-{key}.jsonl-guard", "a") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(guard, fcntl.LOCK_UN)
+
+
+def shallow_history(vault: Path) -> bool:
+    """Whether the vault's git checkout is shallow: its `git log` is missing older commits, so any
+    number counted from it is a floor, never a total."""
+    return git_output(vault, "rev-parse", "--is-shallow-repository").strip() == "true"
 
 
 def git_output(vault: Path, *args: str) -> str:

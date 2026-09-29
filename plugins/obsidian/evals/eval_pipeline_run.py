@@ -5,7 +5,9 @@
 2. end      — Index.md and the day's 00_Daily/ note rebuilt, one Log.md line, one git commit carrying the run's summary; the
               lock is released and never committed; what came in is counted from the rows the
               radar and Readwise ledgers gained since begin, never from rows that were there; batch
-              captures left in the inbox and not reported failed are named as not attempted
+              captures left in the inbox and not reported failed are named as not attempted; the
+              run's row (counts, UTC time, shallow flag, summary, items) goes in 00_Memory/imports.jsonl
+              and a row older than the ledger's 84 days goes out
 3. parking  — a capture that failed twice leaves the queue and gets one DLQ note; it is not deleted;
               `--failed ""` or a path no longer in 01_Capture/ counts no failure
 4. secrets  — (4b: password assignments — quoted, bare, underscore/camelCase-prefixed, unquoted —
@@ -29,6 +31,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -269,7 +272,14 @@ def run(vault: Path) -> dict:
         add(pr.LEDGERS["ingested"], '{"doc_id": "1", "capture": "01_Capture/x.md", "via": "clip"}',
             '{"doc_id": "2", "capture": "01_Capture/y.md", "via": "radar"}', '{"doc_id": "3", "found": "04_Resources/z.md"}')
         failed = "01_Capture/Readwise-Newsletter-news.md"
+        add(Path("00_Memory/imports.jsonl"), '{"kind": "run", "run": "2026-06-01 09:00", "items": []}')  # 114 days old
         r = _end(pr, sandbox, NOW, distilled=2, dropped=1, failed=[failed])
+        ledger = [json.loads(x) for x in (sandbox / "00_Memory/imports.jsonl").read_text(encoding="utf-8").splitlines()]
+        want = {"kind": "run", "run": "2026-09-23 12:00", "at": "2026-09-23T12:00:00Z", "distilled": 2, "dropped": 1,
+                "failed": 1, "shallow": False}
+        if len(ledger) != 1 or {k: ledger[0].get(k) for k in want} != want or len(ledger[0].get("items", [])) != 3 \
+                or not str(ledger[0].get("summary", "")).startswith("2 distilled, 1 dropped, 1 failed; in: "):
+            problems.append(f"phase 2: end writes the run's row with its counts and prunes a row out of the window, got {ledger}")
         log = _git(sandbox, "log", "--format=%s", f"{head0}..HEAD").splitlines()
         if len(log) != 1 or "2 distilled, 1 dropped, 1 failed" not in log[0]:
             problems.append(f"phase 2: expected one commit with the summary, got {log}")

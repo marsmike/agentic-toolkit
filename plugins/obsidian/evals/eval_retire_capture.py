@@ -31,6 +31,8 @@ and its folder's manifest together, under a lock.
                   (a long description, double-quoted timestamps) is left exactly as written
 11. idempotent    — retiring an already-retired capture refuses and changes no note, and so does
                   a capture refused as already archived (the stamp waits for that refusal)
+12. ledger        — every retirement appends one `retired` row to 00_Memory/imports.jsonl with its
+                  kind (new, enriched, dropped, duplicate), notes, reason and what; a refusal none
 
 Offline: judgment keys are removed so distill_check's soft findability/preservation calls (which
 need a backend) never run; retire_capture only needs the hard gates, which don't.
@@ -321,6 +323,19 @@ def run(vault: Path) -> dict:
                 problems.append(f"phase 11: refused for the wrong reason: {e}")
         if stamp_note_path.read_text(encoding="utf-8") != stamp_before:
             problems.append("phase 11: a refused re-retirement restamped the note")
+
+        # --- 12. ledger: one `retired` row per retirement, fields not prose; a refusal writes none ---
+        rows = {Path(r["retired"]).stem: r for r in vault_utils.read_jsonl(sandbox / rc.LEDGER) if r.get("retired")}
+        want = {"Readwise-Retire-Clip": ("new", ["04_Resources/Retire-Eval-Good.md"], None, "→ new note [[Retire-Eval-Good]]."),
+                "Readwise-Retire-Radar": ("dropped", [], "arrived via radar, discard-candidate 0.9", None),
+                "Readwise-Retire-Clip2": ("enriched", ["04_Resources/Retire-Eval-Good.md"], None, "→ enrichment only."),
+                "Readwise-Retire-Dup": ("duplicate", [], "duplicate of 04_Resources/Retire-Eval-Good.md", None),
+                "Readwise-Retire-Keep": ("enriched", ["04_Resources/Retire-Eval-Keep.md"], None, "→ [[Retire-Eval-Keep]].")}
+        got = {k: (r.get("kind"), r.get("notes"), r.get("reason"), r.get("what")) for k, r in rows.items() if k in want}
+        if got != want:
+            problems.append(f"phase 12: ledger rows {got}")
+        if len(rows) != 7 or any(not _re.match(ts_re, str(r.get("at") or "")) or "run" in r for r in rows.values()):
+            problems.append(f"phase 12: expected 7 timestamped retired rows and no run key, got {sorted(rows)}")
     finally:
         for k, v in saved.items():
             if v is not None:
@@ -331,4 +346,5 @@ def run(vault: Path) -> dict:
     return {"eval": NAME, "pass": not problems,
             "detail": "; ".join(problems) if problems else
             "lock serializes; move+manifest succeed for --line and --dropped; refuses a dropped clip, a bad --note, a bad mode and --line without --note; appends accumulate; "
-            "new and enriched notes get updated_at and nothing else changes; a refused re-retirement stamps nothing"}
+            "new and enriched notes get updated_at and nothing else changes; a refused re-retirement stamps nothing; "
+            "one structured ledger row per retirement"}

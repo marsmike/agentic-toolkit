@@ -4,12 +4,26 @@
     uv run scripts/imports_log.py [build]        rebuild Imports.md (a generator in `end`)
     uv run scripts/imports_log.py backfill       seed the log from the vault's git history, once
 
-`end` records each run's new Readwise ledger rows (the rows appended since `begin`) in
-`00_Memory/imports.jsonl`, one line per run: `{"run": "YYYY-MM-DD HH:MM", "items": [...]}`, with
-what the capture said at the time (title, source, category, author, enrichment, media). What became
-of each item is looked up at every build, so the page stays true as captures move on:
+`00_Memory/imports.jsonl` is the pipeline's one ledger, and every count of runs on every page comes
+from it, never from `git log` (a cloud checkout can be shallow). Two kinds of row:
 
-    distilled   retired to 05_Archive/, its manifest line names the note(s) it became
+    run      `end` writes one per run, an empty one too: `{"kind": "run", "run": "YYYY-MM-DD HH:MM",
+             "at", "distilled", "dropped", "failed", "shallow", "summary", "items": [...]}`, the
+             items being the run's new Readwise ledger rows (appended since `begin`) with what the
+             capture said at the time (title, source, category, author, enrichment, media)
+    retired  `retire_capture.py` writes one per capture it retires: `{"retired": <capture>, "at",
+             "kind": new|enriched|dropped|duplicate, "notes", "reason", "what", "archived_to"}`
+
+A run row written before 2026-09-29 carries only `run` and `items`: its counts come from its own
+`pipeline <run>: …` commit when this checkout has it, else they are "not recorded" (the run still
+counts). An item retired before then has no `retired` row: what became of it is read from its
+manifest line, as before. Nothing is backfilled. `end` prunes rows older than WINDOW_DAYS
+(`prune`); git keeps them. [earned: 2026-09-29 — a shallow cloud checkout published 52 new notes
+where the full history gives 192, and the Dashboard listed 17 runs of 59]
+
+What became of each item is looked up at every build, so the page stays true as captures move on:
+
+    distilled   retired to 05_Archive/ into the note(s) its `retired` row (or manifest line) names
     dropped     retired without a note (radar and newsletter captures only)
     duplicate   retired as a copy of another capture or note, kept whole
     archived    in the archive whole, but no manifest line says what it became (retired by hand)
@@ -17,8 +31,11 @@ of each item is looked up at every build, so the page stays true as captures mov
     waiting     still in 01_Capture/ (with its failed attempts, if any)
     missing     nowhere in the vault: a clipping was lost, and the page says so first
 
-Runs are sections headed by their date and time, newest first. [earned: 2026-09-25, owner's
-request — keep a list of what each run imported, in one file, sorted by date and time]
+Days are sections, newest first, each headed by how many runs it had and what they distilled —
+the same numbers the daily note and the run report show for that day (`day_totals`); within a day
+each run that imported something is a section headed by its date and time, and the quiet ones are
+one line. [earned: 2026-09-25, owner's request — keep a list of what each run imported, in one
+file, sorted by date and time; 2026-09-29 — a day showed 4 runs where the ledger had 10]
 """
 from __future__ import annotations
 
@@ -27,6 +44,8 @@ import json
 import re
 import subprocess
 import sys
+from datetime import date, timedelta
+from itertools import groupby
 from pathlib import Path
 
 from vault_utils import (
@@ -34,6 +53,8 @@ from vault_utils import (
     atomic_write,
     contained,
     format_ts,
+    git_output,
+    jsonl_lock,
     read_frontmatter,
     read_jsonl,
     require_vault,
@@ -45,7 +66,10 @@ LOG = Path("00_Memory") / "imports.jsonl"
 INGESTED = Path("00_Memory") / "readwise-ingested.jsonl"
 STATE = Path("00_Memory") / "pipeline-state.json"
 PAGE = "Imports.md"
+WINDOW_DAYS = 84  # twelve weeks of rows in the ledger; the owner's decision, 2026-09-29
 RUN_SUBJECT = re.compile(r"^pipeline (\d{4}-\d{2}-\d{2} \d{2}:\d{2})")
+COUNTS = re.compile(r"(\d+) distilled, (\d+) dropped, (\d+) failed")
+FACTS = ("at", "distilled", "dropped", "failed", "shallow", "summary")  # what `end` puts on a run row
 WIKILINK = re.compile(r"\[\[([^\]|#\\]+)(?:[^\]]*)\]\]")
 LABEL = {"tweet": "Tweet", "article": "Article", "video": "Video", "email": "Newsletter", "pdf": "PDF",
          "epub": "EPUB", "rss": "Feed", "podcast": "Podcast", "highlights": "Highlights"}
@@ -82,19 +106,90 @@ def describe(vault: Path, row: dict) -> dict:
     return item
 
 
-def record(vault: Path, run: str, rows: list[dict]) -> dict:
-    """Append this run's imports to the log (every run, an empty one too: a quiet run is a fact)."""
-    entry = {"run": run, "items": [describe(vault, r) for r in rows]}
-    append_jsonl(vault / LOG, entry)
+def record(vault: Path, run: str, rows: list[dict], **facts) -> dict:
+    """Append this run's row to the ledger (every run, an empty one too: a quiet run is a fact),
+    with `facts` — `end` passes FACTS: when it ran, its counts, whether history was shallow."""
+    entry = {"kind": "run", "run": run, **{k: v for k, v in facts.items() if k in FACTS},
+             "items": [describe(vault, r) for r in rows]}
+    with jsonl_lock(vault / LOG):
+        append_jsonl(vault / LOG, entry)
     return entry
 
 
+def prune(vault: Path, current: str, today: date, days: int = WINDOW_DAYS) -> int:
+    """Drop ledger rows dated more than `days` before `today` (a run row by its `run`, a retired
+    row by its `at`); keep `current` (this run) and any row without a date. Idempotent: the file is
+    rewritten, whole and valid, only when a row goes. Returns how many went. Git keeps them."""
+    path, cutoff = vault / LOG, (today - timedelta(days=days)).isoformat()
+    with jsonl_lock(path):
+        rows = read_jsonl(path)
+        keep = [r for r in rows if r.get("run") == current
+                or not (day := str(r.get("run") or r.get("at") or "")[:10]) or day >= cutoff]
+        if len(keep) != len(rows):
+            atomic_write(path, "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in keep))
+    return len(rows) - len(keep)
+
+
 def load(vault: Path) -> list[dict]:
+    """Every run row, newest first; two rows under one label (a backfill beside the real one) are
+    one run, its items together and its facts from whichever row has them."""
     runs: dict[str, dict] = {}
     for entry in read_jsonl(vault / LOG):
         if entry.get("run"):
-            runs.setdefault(entry["run"], {"run": entry["run"], "items": []})["items"] += entry.get("items") or []
+            run = runs.setdefault(entry["run"], {"run": entry["run"], "items": []})
+            run["items"] += entry.get("items") or []
+            run.update({k: entry[k] for k in FACTS if k in entry and k not in run})
     return sorted(runs.values(), key=lambda r: r["run"], reverse=True)
+
+
+def retirements(vault: Path) -> dict[str, dict]:
+    """Archived capture file name → the newest `retired` row for it."""
+    return {f"{Path(str(r['retired'])).stem}--FULLCAPTURE.md": r
+            for r in read_jsonl(vault / LOG) if r.get("retired")}
+
+
+def _commit_counts(vault: Path) -> dict[str, dict]:
+    """Run label → counts and summary from its own `pipeline <label>: …` commit, for a run row
+    written before `end` put them on it. Whatever this checkout's history holds, and no more."""
+    out: dict[str, dict] = {}
+    for subject in git_output(vault, "log", "--grep=^pipeline", "--format=%s").splitlines():
+        stamp, counts = RUN_SUBJECT.match(subject), COUNTS.search(subject)
+        if stamp and counts and stamp.group(1) not in out:
+            out[stamp.group(1)] = {**dict(zip(("distilled", "dropped", "failed"), map(int, counts.groups()), strict=True)),
+                                   "summary": subject.split(": ", 1)[-1]}
+    return out
+
+
+def runs(vault: Path) -> list[dict]:
+    """Every run in the ledger, newest first, with its counts: `counted` says where they came from
+    — "ledger" (the row), "git" (a legacy row's own commit), or None (not recorded; the run still
+    counts, its numbers do not). `at` is always set: a legacy row's label is the run's UTC time."""
+    out = load(vault)
+    legacy = _commit_counts(vault) if any("distilled" not in r for r in out) else {}
+    for r in out:
+        r.setdefault("at", f"{r['run'].replace(' ', 'T')}:00Z")
+        if "distilled" in r:
+            r["counted"] = "ledger"
+        elif r["run"] in legacy:
+            r.update(legacy[r["run"]], counted="git")
+        else:
+            r["counted"] = None
+    return out
+
+
+def day_totals(all_runs: list[dict], day: str) -> dict:
+    """One UTC day's runs and what they did, from `runs()`: the numbers Imports.md, the daily note
+    and the run report all show for that day."""
+    ran = [r for r in all_runs if r["run"][:10] == day]
+    counted = [r for r in ran if r.get("counted")]
+    return {"runs": len(ran), **{k: sum(int(r.get(k) or 0) for r in counted) for k in ("distilled", "dropped", "failed")},
+            "uncounted": len(ran) - len(counted)}
+
+
+def day_line(t: dict) -> str:
+    """`10 runs: 42 distilled, 3 dropped, 0 failed` (+ how many runs' counts were not recorded)."""
+    return (f"{t['runs']} run{'s' if t['runs'] != 1 else ''}: {t['distilled']} distilled, {t['dropped']} dropped, "
+            f"{t['failed']} failed" + (f" ({t['uncounted']} run(s) without recorded counts)" if t["uncounted"] else ""))
 
 
 def _manifests(vault: Path) -> dict[str, str]:
@@ -108,8 +203,37 @@ def _manifests(vault: Path) -> dict[str, str]:
     return lines
 
 
-def fate(vault: Path, item: dict, manifests: dict[str, str], attempts: dict[str, int]) -> dict:
-    """{status, notes, detail} for one item, from where things are now."""
+def _plain(text: str) -> str:
+    """A line's wikilinks as their labels (or the note's name), for a one-line detail."""
+    text = re.sub(r"\[\[([^\]|\\]+)\\?\|([^\]]+)\]\]", r"\2", text)
+    return re.sub(r"\[\[([^\]]+)\]\]", lambda m: m.group(1).rsplit("/", 1)[-1], text)
+
+
+def _distilled_at(vault: Path, notes: list[str]) -> dict:
+    """The first note's own `distilled_at` (and whether it is estimated), when it has one."""
+    note_path = vault / f"{notes[0]}.md" if notes else None
+    if note_path is None or not note_path.is_file():
+        return {}
+    nfm, _ = read_frontmatter(note_path)
+    at = nfm.get("distilled_at") if isinstance(nfm.get("distilled_at"), str) else None
+    return {"distilled_at": at, "distilled_at_estimated": bool(nfm.get("distilled_at_estimated"))} if at else {}
+
+
+def _retired_fate(vault: Path, row: dict) -> dict:
+    """{status, kind, notes, detail, reason} from a `retired` row: fields, not prose."""
+    kind, reason = str(row.get("kind") or ""), str(row.get("reason") or "")
+    if kind in ("dropped", "duplicate"):
+        detail = f"a second save of {row['duplicate_of']}" if row.get("duplicate_of") else reason
+        return {"status": kind, "kind": kind, "notes": [], "detail": detail[:300], "reason": reason}
+    notes = [str(n).removesuffix(".md") for n in row.get("notes") or []]
+    detail = re.sub(r"\s+", " ", _plain(str(row.get("what") or ""))).strip()
+    return {"status": "distilled", "kind": kind, "notes": notes, "detail": detail[:300], **_distilled_at(vault, notes)}
+
+
+def fate(vault: Path, item: dict, manifests: dict[str, str], attempts: dict[str, int],
+         retired: dict[str, dict] | None = None) -> dict:
+    """{status, notes, detail} for one item, from where things are now: its `retired` row when it
+    has one (then also `kind`, and `reason` for a drop or duplicate), else its manifest line."""
     if item.get("duplicate_of"):
         return {"status": "duplicate", "notes": [], "detail": f"a second save of {item['duplicate_of']}"}
     if item.get("found"):
@@ -120,23 +244,17 @@ def fate(vault: Path, item: dict, manifests: dict[str, str], attempts: dict[str,
     if capture and (vault / capture).is_file():
         n = attempts.get(capture, 0)
         return {"status": "waiting", "notes": [], "detail": f"in the inbox, {n} failed attempt(s)" if n else "in the inbox"}
-    line = manifests.get(f"{Path(capture).stem}--FULLCAPTURE.md") if capture else None
+    archived = f"{Path(capture).stem}--FULLCAPTURE.md" if capture else ""
+    if archived and archived in (retired or {}):
+        return _retired_fate(vault, (retired or {})[archived])
+    line = manifests.get(archived) if capture else None
     if line is None:
         if _capture_file(vault, capture):
             return {"status": "archived", "notes": [], "detail": "kept whole in the archive, without a manifest line"}
         return {"status": "missing", "notes": [], "detail": "not in the inbox, not in the archive"}
     notes = [t.strip().removesuffix(".md") for t in WIKILINK.findall(line)]
     status = "duplicate" if "**duplicate**" in line else "dropped" if "**dropped**" in line else "distilled"
-    detail = re.sub(r"\[\[([^\]|\\]+)\\?\|([^\]]+)\]\]", r"\2", line)
-    detail = re.sub(r"\[\[([^\]]+)\]\]", lambda m: m.group(1).rsplit("/", 1)[-1], detail)
-    distilled_at = None
-    distilled_at_estimated = False
-    if status == "distilled" and notes:
-        note_path = vault / f"{notes[0]}.md"
-        if note_path.is_file():
-            nfm, _ = read_frontmatter(note_path)
-            distilled_at = nfm.get("distilled_at") if isinstance(nfm.get("distilled_at"), str) else None
-            distilled_at_estimated = bool(nfm.get("distilled_at_estimated"))
+    detail = _plain(line)
     if status == "distilled":
         # `retire_capture.py` always appends "Distilled <today>." to a `--line` summary as its own
         # provenance marker; every consumer shows the note's own `distilled_at` explicitly instead
@@ -145,18 +263,18 @@ def fate(vault: Path, item: dict, manifests: dict[str, str], attempts: dict[str,
         # 2026-09-28. (distilled 2026-09-28)"]
         detail = re.sub(r"\s*Distilled \d{4}-\d{2}-\d{2}\.\s*$", "", detail)
     return {"status": status, "notes": notes, "detail": re.sub(r"\s+", " ", detail)[:300],
-            **({"distilled_at": distilled_at, "distilled_at_estimated": distilled_at_estimated} if distilled_at else {})}
+            **(_distilled_at(vault, notes) if status == "distilled" else {})}
 
 
 def resolved(vault: Path) -> list[dict]:
-    """Every logged run with each item's fate attached, newest first."""
-    manifests = _manifests(vault)
+    """Every logged run (`runs()`, with its counts) with each item's fate attached, newest first."""
+    manifests, retired = _manifests(vault), retirements(vault)
     try:
         attempts = json.loads((vault / STATE).read_text(encoding="utf-8")).get("attempts", {})
     except (OSError, json.JSONDecodeError):
         attempts = {}
-    return [{"run": r["run"], "items": [{**it, "fate": fate(vault, it, manifests, attempts)} for it in r["items"]]}
-            for r in load(vault)]
+    return [{**r, "items": [{**it, "fate": fate(vault, it, manifests, attempts, retired)} for it in r["items"]]}
+            for r in runs(vault)]
 
 
 def _bullet(vault: Path, it: dict) -> str:
@@ -188,27 +306,33 @@ def render(vault: Path) -> str:
     out = ["---", "description: What every pipeline run imported from Readwise and what became of each item, newest run first.",
            "status: generated", "---", "", "# Imports", "", HEADER, "",
            f"*Generated {format_ts(utc_timestamp())}.*", "",
-           f"{len(items)} items in {len(runs)} runs: " + ", ".join(f"{n} {s}" for s, n in count.items() if n) + "."]
+           f"{len(items)} items in {len(runs)} runs: " + ", ".join(f"{n} {s}" for s, n in count.items() if n) + ".",
+           "", f"*The ledger keeps the last {WINDOW_DAYS} days; older runs are in the vault's git history.*"]
     missing = [(r["run"], it) for r in runs for it in r["items"] if it["fate"]["status"] == "missing"]
     if missing:
         out += ["", "> [!danger] Missing clippings", "> Imported, but in neither the inbox nor the archive:"]
         out += [f"> - {run}: " + _bullet(vault, it)[2:] for run, it in missing]
-    quiet: list[str] = []
-    for r in runs:
-        if not r["items"]:
-            quiet.append(r["run"])
-            continue
+    for day, group in groupby(runs, key=lambda r: r["run"][:10]):
+        day_runs = list(group)
+        out += ["", f"## {day}", "", f"{day_line(day_totals(day_runs, day))}."]
+        quiet: list[str] = []
+        for r in day_runs:
+            if not r["items"]:
+                quiet.append(r["run"])
+                continue
+            if quiet:
+                out += ["", f"*Nothing new in {len(quiet)} run(s) from {quiet[-1]} to {quiet[0]}.*"]
+                quiet = []
+            out += ["", f"### {r['run']}", "", f"{len(r['items'])} imported.", ""] + [_bullet(vault, it) for it in r["items"]]
         if quiet:
             out += ["", f"*Nothing new in {len(quiet)} run(s) from {quiet[-1]} to {quiet[0]}.*"]
-            quiet = []
-        out += ["", f"## {r['run']}", "", f"{len(r['items'])} imported.", ""] + [_bullet(vault, it) for it in r["items"]]
-    if quiet:
-        out += ["", f"*Nothing new in {len(quiet)} run(s) from {quiet[-1]} to {quiet[0]}.*"]
     return "\n".join(out) + "\n"
 
 
-def backfill(vault: Path) -> int:
-    """Seed the log from git: each `pipeline …` commit's added ledger rows are that run's imports."""
+def backfill(vault: Path, today: date | None = None) -> int:
+    """Seed the log from git: each `pipeline …` commit's added ledger rows are that run's imports.
+    Only runs inside the ledger's window: `end` would prune anything older again."""
+    cutoff = ((today or date.today()) - timedelta(days=WINDOW_DAYS)).isoformat()
     have = {r["run"] for r in load(vault)}
     log = subprocess.run(["git", "-C", str(vault), "log", "--reverse", "--grep=^pipeline", "--format=%H%x09%s"],
                          capture_output=True, text=True, check=False).stdout
@@ -216,7 +340,7 @@ def backfill(vault: Path) -> int:
     for line in log.splitlines():
         sha, _, subject = line.partition("\t")
         m = RUN_SUBJECT.match(subject)
-        if not m or m.group(1) in have:
+        if not m or m.group(1) in have or m.group(1)[:10] < cutoff:
             continue
         diff = subprocess.run(["git", "-C", str(vault), "show", "--format=", "-U0", sha, "--", INGESTED.as_posix()],
                               capture_output=True, text=True, check=False).stdout
