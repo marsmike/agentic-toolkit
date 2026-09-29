@@ -8,14 +8,17 @@ browser (today, yesterday, 7 / 30 / 84 days, domain, kind, source, search), so "
 viewer's today even when the file was built hours earlier. Open it in a browser; each note links
 back into Obsidian (`obsidian://open`).
 
-    notes    every note in 02-04 (and root active notes) whose processed_date is a real date in the
-             window; `processed_date_estimated: true` notes (a backfilled legacy date) are left out
+    notes    every note in 02-04 (and root active notes) distilled on a real date in the window
+             (`vault_utils.distilled_when`, the daily note's rule: a distilled note's `distilled_at`,
+             else `processed_date`, never an estimated one); a note never distilled is left out
     source   what the note came from, by its `source` address: tweet, article, video, paper, repo,
              podcast, or own (no address)
     radar    what the feeds brought (radar_ledger): worth-or-strong items, per-interest counts, strong per
              ISO week, rising interests; the page filters them by the same range as the notes
-    runs     the pipeline's commits in the window (`git log --grep=^pipeline`), with their counts and
-             what each imported and what became of it (imports_log.py, the data behind Imports.md)
+    runs     the pipeline's runs in the window, from the ledger's run rows (imports_log.py, the data
+             behind Imports.md), with their counts and what each imported and what became of it;
+             only a vault with no run row yet falls back to its `pipeline …` commits, and says so in
+             each run's summary when that history is shallow
     inbox    captures waiting in 01_Capture/
 
 Note text reaches the page only as JSON and is rendered with textContent, never as HTML: a clip's
@@ -25,7 +28,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 from datetime import UTC, date, datetime, timedelta
@@ -34,24 +36,27 @@ from urllib.parse import urlsplit
 
 import imports_log
 import radar_ledger
-from map_build import _date, _tags
+from map_build import _tags
 from vault_utils import (
     atomic_write,
     contained,
     discover_notes,
+    distilled_when,
     one_line,
     profile_value,
     read_frontmatter,
     require_vault,
+    shallow_history,
     title_of,
     utc_timestamp,
 )
 
 OUT = "Dashboard.html"
 TEMPLATE = Path(__file__).resolve().parent / "dashboard_template.html"
-WINDOW_DAYS = 84
+WINDOW_DAYS = imports_log.WINDOW_DAYS
 DESC_CHARS = 280
-RUN = re.compile(r"(\d+) distilled, (\d+) dropped, (\d+) failed")
+RUN = imports_log.COUNTS
+SHALLOW = " (counted from git, whose history in this checkout is shallow: a floor, not a total)"
 SOURCE_HOSTS = (  # first match wins
     ("tweet", ("x.com", "twitter.com")),
     ("video", ("youtube.com", "youtu.be", "vimeo.com")),
@@ -76,8 +81,8 @@ def notes(vault: Path, since: str) -> list[dict]:
     out = []
     for p in discover_notes(vault):
         fm, body = read_frontmatter(p)
-        day = _date(fm.get("processed_date"))
-        if not day or day < since or fm.get("processed_date_estimated") is True:
+        day = distilled_when(fm)[:10]
+        if not day or day < since:
             continue
         rel = p.relative_to(vault).as_posix()
         tags = _tags(fm)
@@ -118,11 +123,20 @@ def _utc_z(iso_with_offset: str) -> str:
 
 
 def runs(vault: Path, since: str, imports: list[dict]) -> list[dict]:
-    imported = {r["run"]: [_item(it) for it in r["items"]] for r in imports}
+    """The window's runs, newest first: the ledger's run rows (`imports` is imports_log.resolved()),
+    or for a vault with none yet, its `pipeline …` commits."""
+    if imports:
+        return [{"at": r["at"], "sha": "", "run": r["run"], "items": [_item(it) for it in r["items"]],
+                 **({"distilled": r["distilled"], "dropped": r["dropped"], "failed": r["failed"],
+                     "summary": str(r.get("summary") or f"{r['distilled']} distilled, {r['dropped']} dropped, "
+                                                        f"{r['failed']} failed")[:300]}
+                    if r["counted"] else {"distilled": 0, "dropped": 0, "failed": 0, "summary": "counts not recorded"})}
+                for r in imports if r["run"][:10] >= since]
     if not (vault / ".git").exists():
         return []
     git = subprocess.run(["git", "-C", str(vault), "log", f"--since={since}", "--grep=^pipeline",
                           "--format=%cI%x09%h%x09%s"], capture_output=True, text=True, check=False)
+    shallow = SHALLOW if shallow_history(vault) else ""
     out = []
     for line in git.stdout.splitlines():
         when, sha, subject = (line.split("\t", 2) + ["", ""])[:3]
@@ -130,8 +144,8 @@ def runs(vault: Path, since: str, imports: list[dict]) -> list[dict]:
         if m:
             key = imports_log.RUN_SUBJECT.match(subject)
             out.append({"at": _utc_z(when), "sha": sha, "distilled": int(m.group(1)), "dropped": int(m.group(2)),
-                        "failed": int(m.group(3)), "summary": subject.split(": ", 1)[-1][:300],
-                        "run": key.group(1) if key else "", "items": imported.get(key.group(1), []) if key else []})
+                        "failed": int(m.group(3)), "summary": subject.split(": ", 1)[-1][:300] + shallow,
+                        "run": key.group(1) if key else "", "items": []})
     return out
 
 
@@ -141,7 +155,7 @@ def inbox(vault: Path) -> int:
 
 def build(vault: Path, today: date) -> dict:
     since = (today - timedelta(days=WINDOW_DAYS - 1)).isoformat()
-    imports = imports_log.resolved(vault)
+    imports = imports_log.resolved(vault)  # every run in the ledger, newest first, with its counts
     # UTC, `Z`-suffixed like ingested_at/distilled_at (contract/VAULT_SCHEMA.md); the template's own
     # JS parses it with `new Date()` and shows it in the viewer's local time by design, the same way
     # "today" in this page is the viewer's today, not the build machine's.

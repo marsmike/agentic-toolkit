@@ -8,8 +8,9 @@ Fixture days are far from any date in the example vault (2031), each run pinned 
                 UTC; 23:30Z and 00:30Z on different days), processed_date without one, never an
                 estimated date, newest first; Changed today from updated_at, not repeating a distilled
                 note (and nothing at all where no note has updated_at); Radar: the day's strong items,
-                capped with "… and N more"; runs from `pipeline …` commits plus last_run; Stuck: the
-                day's DLQ notes as obsidian:// links
+                capped with "… and N more"; runs from `pipeline …` commits plus last_run (a vault
+                with no run row in its ledger); Stuck: the day's active DLQ notes as obsidian://
+                links, a resolved one left out; a `status: review` note never distilled is no one's
 3. links      — titles with `|`, `]]`, `#` and `%% daily:end %%` break no wikilink and no marker; a
                 description's own [[link]] is not carried over; a path with `#` gets an obsidian://
                 link; every wikilink resolves to a note under 02–04 or an existing daily note
@@ -19,6 +20,8 @@ Fixture days are far from any date in the example vault (2031), each run pinned 
                 markers gets the block appended after its untouched text
 7. malformed  — a start marker without an end: the file is untouched, reported, one DLQ note
 8. quiet day  — "Nothing distilled", no runs or stuck section, no error
+9. ledger     — with run rows in 00_Memory/imports.jsonl, the day's runs and totals are those rows,
+                not the commits; a legacy row without counts counts as a run, "counts not recorded"
 """
 
 from __future__ import annotations
@@ -103,6 +106,10 @@ def run(vault: Path) -> dict:
                 "Touched", "touched", processed_date="2031-01-01", updated_at=f"{DAY}T09:15:00Z"
             ),
         }
+        # never distilled: a real processed_date, but no distilled_at and not `status: distilled`
+        notes["Eval-Daily-Review.md"] = _note("Review", "review", processed_date=DAY).replace(
+            "status: distilled", "status: review"
+        )
         for name, text in notes.items():
             (res / name).write_text(text, encoding="utf-8")
         radar = sandbox / "00_Memory" / "radar"
@@ -144,6 +151,9 @@ def run(vault: Path) -> dict:
         (sandbox / "00_Memory" / "dlq" / f"{DAY}-eval-stuck.md").write_text(
             f"---\ndescription: Eval stuck thing\nstatus: active\ncreated: {DAY}\n---\n# x\n", encoding="utf-8"
         )
+        (sandbox / "00_Memory" / "dlq" / f"{DAY}-eval-resolved.md").write_text(
+            f"---\ndescription: Eval resolved thing\nstatus: resolved\ncreated: {DAY}\n---\n# x\n", encoding="utf-8"
+        )
         for args in (
             ("init", "-q"),
             ("config", "user.email", "eval@example.org"),
@@ -177,8 +187,10 @@ def run(vault: Path) -> dict:
             problems.append(
                 f"phase 2: distilled that UTC day, newest first (23:30Z, 01:30+02:00, 12:00, 08:00, date-only); got {dist!r}"
             )
-        if "Eval-Daily-Next|" in dist or "Estimated" in dist or "Eval-Daily-Touched" in dist:
-            problems.append(f"phase 2: 00:30Z is the next day's, an estimated date is no one's; got {dist!r}")
+        if "Eval-Daily-Next|" in dist or "Estimated" in dist or "Eval-Daily-Touched" in dist or "Eval-Daily-Review" in dist:
+            problems.append(
+                f"phase 2: 00:30Z is the next day's, an estimated date is no one's, a note never distilled is not; got {dist!r}"
+            )
         if "Eval-Daily-Touched|" not in changed or "Weird" in changed or not text.count("### Changed today (1)"):
             problems.append(f"phase 2: Changed today holds the updated note, not the distilled one; got {changed!r}")
         prev_text = prev.read_text(encoding="utf-8")
@@ -201,6 +213,8 @@ def run(vault: Path) -> dict:
         stuck = _section(text, "Stuck today")
         if "Eval stuck thing" not in stuck or "obsidian://open?vault=" not in stuck or "[[00_Memory" in text:
             problems.append(f"phase 2: the day's DLQ note as an obsidian:// link, never a wikilink; got {stuck!r}")
+        if "Eval resolved thing" in text or "### Stuck today (1)" not in text:
+            problems.append(f"phase 2: a resolved DLQ note is not stuck; got {stuck!r}")
 
         # 3. links
         for page in daily.glob("*.md"):
@@ -307,6 +321,33 @@ def run(vault: Path) -> dict:
             or stats.get("distilled")
         ):
             problems.append(f"phase 8: a quiet day gets a block saying so; got {text!r}")
+
+        # 9. ledger: once imports.jsonl has run rows, the day's runs are those rows, never the commits
+        # (the 08:00 commit above has no row here); a legacy row without counts still counts as a run
+        ledger = sandbox / "00_Memory" / "imports.jsonl"
+        ledger.write_text(
+            "".join(
+                json.dumps(r) + "\n"
+                for r in (
+                    {"kind": "run", "run": f"{DAY} 03:00", "at": f"{DAY}T03:00:04Z", "distilled": 4, "dropped": 2,
+                     "failed": 0, "shallow": True, "items": []},
+                    {"run": f"{DAY} 06:00", "items": []},
+                    {"kind": "run", "run": f"{DAY} 09:00", "at": f"{DAY}T09:00:02Z", "distilled": 1, "dropped": 0,
+                     "failed": 1, "shallow": True, "items": []},
+                )
+            ),
+            encoding="utf-8",
+        )
+        _run(daily_build, DAY)
+        runs = _section(today.read_text(encoding="utf-8"), "Pipeline runs today")
+        want = [
+            "- In all: 5 distilled, 2 dropped, 1 failed (1 run(s) without recorded counts)",
+            "- 03:00 UTC: 4 distilled, 2 dropped, 0 failed",
+            "- 06:00 UTC: counts not recorded",
+            "- 09:00 UTC: 1 distilled, 0 dropped, 1 failed",
+        ]
+        if runs.splitlines() != want or "### Pipeline runs today (3)" not in today.read_text(encoding="utf-8"):
+            problems.append(f"phase 9: the day's runs come from the ledger's run rows; got {runs!r}")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)

@@ -19,7 +19,9 @@ oldest first, at most `--batch` (profile `pipeline_batch`, default 25). A captur
 MAX_ATTEMPTS runs is left out and written to the DLQ once: it needs a human, and it must not
 block the queue.
 
-`end` records failures, stamps `distilled_at`/`ingested_at` on any distilled note this run
+`end` records failures, appends the run's row to `00_Memory/imports.jsonl` (its counts, UTC time
+and whether the git history is shallow: every page counts runs from these rows) and prunes that
+ledger to its twelve-week window (`imports_log.py`), stamps `distilled_at`/`ingested_at` on any distilled note this run
 touched that `retire_capture.py` didn't already stamp (`stamp_distilled_notes`, a safety net —
 invariant 6 runs `retire_capture.py`, which stamps deterministically, for every capture), rebuilds
 Index.md, the maps, Now.md and the day's daily note (`index_build.py`, `map_build.py`, `now_build.py`,
@@ -55,6 +57,7 @@ from vault_utils import (
     read_frontmatter,
     require_vault,
     set_frontmatter_fields,
+    shallow_history,
     utc_timestamp,
     write_dlq_note,
     write_frontmatter,
@@ -509,20 +512,8 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
         summary += f"; {len(untouched)} of the batch not attempted"
     summary += f"; {left} in the inbox" + (f"; {note}" if note else "")
     env = {**os.environ, "TOOLKIT_VAULT": str(vault)}
-    # A generator that fails may have replaced some of its files and not others, so its files go
-    # back to how they were before it ran: navigation is this run's or the last one's, never a mix.
-    # The run is still committed (it is the undo for the notes it wrote); the failure is reported
-    # and gets a DLQ note. [earned: 2026-09-23, PR #20 and #24 reviews]
-    # What this run imported goes in the log before the pages that show it are built.
-    lost: dict[str, list[str]] = {"ignored": [], "missing": []}
-    rows_in: list[dict] = []
-    if marks is not None:
-        rows_in = _rows(vault / LEDGERS["ingested"])[marks.get("ingested", 0):]
-        imports_log.record(vault, now.strftime("%Y-%m-%d %H:%M"), rows_in)
-        lost = lost_media(vault, rows_in)
-    # Safety net alongside retire_capture.py's own deterministic stamping (invariant 6 runs it for
-    # every capture) — before the navigation generators read these notes.
-    stamped_timestamps = stamp_distilled_notes(vault, rows_in)
+    rows_in = _rows(vault / LEDGERS["ingested"])[marks.get("ingested", 0):] if marks is not None else []
+    lost = lost_media(vault, rows_in)
     if lost["ignored"] or lost["missing"]:
         _dlq_once(vault, slug="media-not-in-git", title="Images a capture names will not leave this machine",
                   what_happened=(f"git-ignored: {', '.join(lost['ignored'])}. " if lost["ignored"] else "")
@@ -536,6 +527,21 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
         summary += "; " + ", ".join(x for x in (
             f"{len(lost['ignored'])} image(s) git-ignored" if lost["ignored"] else "",
             f"{len(lost['missing'])} image(s) missing" if lost["missing"] else "") if x)
+    # The run's row goes in the ledger before the pages that show it are built — every run, an
+    # `end` without `begin` and a quiet one too, since each makes a `pipeline …` commit; then the
+    # ledger drops what fell out of its window. [earned: 2026-09-29 — counts came from `git log`,
+    # which a shallow cloud checkout cuts short]
+    stamp = now.strftime("%Y-%m-%d %H:%M")
+    imports_log.record(vault, stamp, rows_in, at=now.strftime("%Y-%m-%dT%H:%M:%SZ"), distilled=distilled,
+                       dropped=dropped, failed=len(failed), shallow=shallow_history(vault), summary=summary)
+    imports_log.prune(vault, stamp, now.date())
+    # Safety net alongside retire_capture.py's own deterministic stamping (invariant 6 runs it for
+    # every capture) — before the navigation generators read these notes.
+    stamped_timestamps = stamp_distilled_notes(vault, rows_in)
+    # A generator that fails may have replaced some of its files and not others, so its files go
+    # back to how they were before it ran: navigation is this run's or the last one's, never a mix.
+    # The run is still committed (it is the undo for the notes it wrote); the failure is reported
+    # and gets a DLQ note. [earned: 2026-09-23, PR #20 and #24 reviews]
     failed_builds = []
     for script in GENERATORS:
         before = _snapshot(vault, GENERATORS[script])

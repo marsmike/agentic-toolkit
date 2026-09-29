@@ -8,6 +8,10 @@
 5. notes    — a note added in the working tree since HEAD is listed as written this run
 6. vitals   — the vault's note count and the distilled-per-day chart are on the page
 7. radar    — today's strong feed item is listed with its link and "Promoted"; a javascript: url is text
+8. agree    — for one day, Imports.md's day header, the daily note's runs section and the report's footer
+              show the same number of runs and the same distilled count (one ledger, one `day_totals`)
+9. why      — a dropped item says why from its `retired` row; the footer names the ledger's window and
+              "history shallow" when the run's row says so; the run line carries the row's own counts
 """
 from __future__ import annotations
 
@@ -106,6 +110,40 @@ def run(vault: Path) -> dict:
             problems.append("timestamps: the item's own ingested timestamp is missing")
         if "distilled 2026-09-25 13:00 UTC" not in page:
             problems.append("timestamps: the item's own distilled timestamp is missing")
+
+        # 8-9. one day, three surfaces: Imports.md's day header, the daily note's runs section and the
+        # report's footer give the same runs and distilled count, from the same run rows; a dropped
+        # item says why from its `retired` row; the footer says the ledger's window and a shallow history
+        import daily_build
+        day = today.isoformat()
+        (arch / "Readwise-Rss-why--FULLCAPTURE.md").write_text(
+            "---\nsource: https://example.org/why\ncategory: rss\nvia: radar\n---\n\n# Why dropped\n", encoding="utf-8")
+        rows = [{"kind": "run", "run": f"{day} 03:00", "at": f"{day}T03:00:02Z", "distilled": 4, "dropped": 1, "failed": 0,
+                 "shallow": False, "items": []},
+                {"run": f"{day} 06:00", "items": []},
+                {"retired": "01_Capture/Readwise-Rss-why.md", "at": f"{day}T08:40:00Z", "kind": "dropped", "notes": [],
+                 "reason": "Windows-only; the owner's rig is macOS", "what": None},
+                {"kind": "run", "run": f"{day} 09:00", "at": f"{day}T09:00:04Z", "distilled": 2, "dropped": 0, "failed": 1,
+                 "shallow": True, "items": [{"doc_id": "y", "capture": "01_Capture/Readwise-Rss-why.md", "via": "radar",
+                                             "title": "Why dropped", "category": "rss"}]}]
+        (sandbox / imports_log.LOG).write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        imports_page = imports_log.render(sandbox)
+        daily_text = daily_build.block(sandbox, today, daily_build.notes(sandbox), set())[0]
+        page = report_build.render(sandbox, today=today)
+        surfaces = {
+            "Imports.md": re.search(rf"^## {day}\n\n(\d+) runs?: (\d+) distilled", imports_page, re.M),
+            "daily note": re.search(r"^### Pipeline runs today \((\d+)\)\n\n- In all: (\d+) distilled", daily_text, re.M),
+            "report": re.search(rf"Data: {day}, (\d+) runs?: (\d+) distilled", page),
+        }
+        got = {k: m.groups() if m else None for k, m in surfaces.items()}
+        if set(got.values()) != {("3", "6")}:
+            problems.append(f"agree: runs and distilled for {day} must match on every surface, got {got}")
+        if "why: Windows-only; the owner&#x27;s rig is macOS" not in page:
+            problems.append("why: a dropped item's reason from its retired row is not on the report")
+        if "the last 84 days kept" not in page or "history shallow" not in page:
+            problems.append("freshness: the footer must name the ledger's window and a shallow history")
+        if f"Run <b class=\"num\">{day} 09:00 UTC</b> · 2 distilled, 0 dropped, 1 failed" not in page:
+            problems.append("counts: the run line must carry the run row's own counts")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)

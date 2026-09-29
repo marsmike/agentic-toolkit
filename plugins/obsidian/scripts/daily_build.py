@@ -14,13 +14,18 @@ outside it untouched. A note without the markers gets the block appended at its 
 note is created with minimal frontmatter and the block; a note with a start and no end (or more
 than one of either) is left alone and reported in a DLQ note.
 
-    Distilled today      notes distilled that UTC day (`distilled_at`, else `processed_date`;
-                         never an estimated one), newest first
+    Distilled today      notes distilled that UTC day (`vault_utils.distilled_when`: a distilled
+                         note's `distilled_at`, else `processed_date`; never an estimated one),
+                         newest first
     Changed today        notes whose `updated_at` falls on the day and that were not distilled on it
     Radar today          the day's strong radar items (00_Memory/radar/state.jsonl)
-    Pipeline runs today  the day's `pipeline …` commits plus the run in progress
-                         (pipeline-state.json's last_run); left out when there are none
-    Stuck today          DLQ notes created that day; left out when there are none
+    Pipeline runs today  the day's run rows in 00_Memory/imports.jsonl (`imports_log.runs`, the
+                         same numbers Imports.md and the run report show); only a vault whose ledger
+                         has no run row yet falls back to its `pipeline …` commits plus the run in
+                         progress (pipeline-state.json's last_run), saying so when history is
+                         shallow; left out when there are none
+    Stuck today          DLQ notes created that day and still `status: active`; left out when
+                         there are none
 
 Each run rebuilds today's block, and yesterday's when its note or block is missing or today's
 note has no block yet (the first run of a new day, so a run that finished after midnight UTC
@@ -37,21 +42,24 @@ import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
-from dashboard_build import RUN
-from imports_log import RUN_SUBJECT
+import imports_log
+from imports_log import COUNTS, RUN_SUBJECT
 from now_build import _obsidian_uri
 from pipeline_run import STATE
 from vault_utils import (
     atomic_write,
     contained,
     discover_notes,
+    distilled_when,
     one_line,
     read_frontmatter,
     read_jsonl,
     require_vault,
+    shallow_history,
     title_of,
     write_dlq_note,
 )
+from vault_utils import utc_text as _utc
 
 DAILY = "00_Daily"
 START, END = "%% daily:start %%", "%% daily:end %%"
@@ -65,30 +73,6 @@ HEADER = (
 )
 _WIKILINK = re.compile(r"\[\[([^\]|]+\|)?([^\]]+)\]\]")
 _UNLINKABLE = re.compile(r"[#^\[\]|]")  # a path with one of these cannot be a wikilink target
-
-
-def _utc(value: object) -> str:
-    """A frontmatter date or timestamp as UTC text: `YYYY-MM-DDTHH:MM:SSZ`, a bare `YYYY-MM-DD`
-    for a date-only value, "" for nothing or something unreadable. YAML reads an unquoted
-    timestamp as a `datetime` (and one with an offset must be moved to UTC before taking its day)."""
-    if isinstance(value, str):
-        text = value.strip()
-        try:
-            value = datetime.fromisoformat(text) if len(text) > 10 else date.fromisoformat(text)
-        except ValueError:
-            return ""
-    if isinstance(value, datetime):
-        moment = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-        return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
-    return value.isoformat() if isinstance(value, date) else ""
-
-
-def distilled_when(fm: dict) -> str:
-    """When a note was distilled, in UTC: `distilled_at` unless estimated, else `processed_date`
-    unless estimated, else ""."""
-    if fm.get("distilled_at_estimated") is not True and (when := _utc(fm.get("distilled_at"))):
-        return when
-    return _utc(fm.get("processed_date")) if fm.get("processed_date_estimated") is not True else ""
 
 
 def _text(value: object, limit: int) -> str:
@@ -139,10 +123,17 @@ def radar(vault: Path, day: str) -> list[dict]:
     return sorted(best.values(), key=lambda r: (-r["score"], str(r.get("title"))))
 
 
-def runs(vault: Path, day: date) -> list[tuple[str, int, int, int]]:
-    """(HH:MM, distilled, dropped, failed) per run on `day`: its `pipeline YYYY-MM-DD HH:MM: …`
-    commits (the stamp is the run's UTC `now`), plus pipeline-state.json's `last_run` — the run
-    whose `end` is building this, not committed yet — under the same stamp."""
+def runs(vault: Path, day: date) -> tuple[list[tuple[str, int | None, int | None, int | None]], dict, str]:
+    """([(HH:MM, distilled, dropped, failed)], the day's totals, a caveat) for `day`. From the
+    ledger's run rows (`imports_log`; counts None for a legacy row whose counts were not recorded),
+    whose `end` writes this run's row before building this. A vault with no run row at all falls
+    back to its `pipeline YYYY-MM-DD HH:MM: …` commits plus pipeline-state.json's `last_run` (the
+    run building this, not committed yet), with a caveat when that history is shallow."""
+    ledger = imports_log.runs(vault)
+    if ledger:
+        mine = sorted((r for r in ledger if r["run"][:10] == day.isoformat()), key=lambda r: r["run"])
+        rows = [(r["run"][11:], *((r["distilled"], r["dropped"], r["failed"]) if r["counted"] else (None,) * 3)) for r in mine]
+        return rows, imports_log.day_totals(ledger, day.isoformat()), ""
     found: dict[str, tuple[int, int, int]] = {}
     if (vault / ".git").exists():
         git = subprocess.run(
@@ -152,7 +143,7 @@ def runs(vault: Path, day: date) -> list[tuple[str, int, int, int]]:
             check=False,
         )
         for subject in git.stdout.splitlines():
-            stamp, counts = RUN_SUBJECT.match(subject), RUN.search(subject)
+            stamp, counts = RUN_SUBJECT.match(subject), COUNTS.search(subject)
             if stamp and counts and stamp.group(1).startswith(day.isoformat()):
                 found[stamp.group(1)] = tuple(int(n) for n in counts.groups())
     try:
@@ -162,22 +153,25 @@ def runs(vault: Path, day: date) -> list[tuple[str, int, int, int]]:
     stamp = _utc(str(last.get("at", "")))[:16].replace("T", " ")
     if stamp.startswith(day.isoformat()) and stamp not in found:
         found[stamp] = (int(last.get("distilled") or 0), int(last.get("dropped") or 0), int(last.get("failed") or 0))
-    return [(s[11:], *found[s]) for s in sorted(found)]
+    rows = [(s[11:], *found[s]) for s in sorted(found)]
+    totals = {"runs": len(rows), **{k: sum(r[i] for r in rows) for i, k in ((1, "distilled"), (2, "dropped"), (3, "failed"))},
+              "uncounted": 0}
+    caveat = "counted from git, whose history in this checkout is shallow: a floor, not a total" if rows and shallow_history(vault) else ""
+    return rows, totals, caveat
 
 
 def stuck(vault: Path, day: str) -> list[str]:
-    """DLQ notes created on `day`: 00_Memory/, so plain text and an `obsidian://` link."""
+    """DLQ notes created on `day` and still `status: active` (now_build's rule: a resolved note is
+    not stuck): 00_Memory/, so plain text and an `obsidian://` link. [earned: 2026-09-29 audit — a
+    resolved DLQ note was listed as stuck]"""
     out = []
     for p in contained(sorted((vault / "00_Memory" / "dlq").glob("*.md")), vault):
         fm, body = read_frontmatter(p)
         created = _utc(fm.get("created"))[:10] or p.name[:10]
-        if created == day:
+        if created == day and str(fm.get("status", "active")) == "active":
             rel = p.relative_to(vault).with_suffix("").as_posix()
             title = _text(fm.get("description") or title_of(fm, body, p.stem), TITLE_CHARS)
-            state = str(fm.get("status", "active"))
-            out.append(
-                f"- {title} ([open]({_obsidian_uri(vault, rel)}))" + ("" if state == "active" else f" · {state}")
-            )
+            out.append(f"- {title} ([open]({_obsidian_uri(vault, rel)}))")
     return out
 
 
@@ -193,7 +187,7 @@ def block(vault: Path, day: date, content: list[tuple[str, dict, str]], exists: 
     done = {rel for _, rel, _, _ in distilled}
     changed = [n for n in on_day(lambda fm: _utc(fm.get("updated_at"))) if n[1] not in done]
     strong = radar(vault, d)
-    ran = runs(vault, day)
+    ran, totals, caveat = runs(vault, day)
     dlq = stuck(vault, d)
 
     def line(when: str, rel: str, fm: dict, title: str) -> str:
@@ -224,13 +218,17 @@ def block(vault: Path, day: date, content: list[tuple[str, dict, str]], exists: 
     )
     out += [f"### Radar today ({len(strong)})", ""] + (radar_lines or ["- (none)"]) + [""]
     if ran:
-        totals = [sum(r[i] for r in ran) for i in (1, 2, 3)]
         out += [
-            f"### Pipeline runs today ({len(ran)})",
+            f"### Pipeline runs today ({totals['runs']})",
             "",
-            f"- In all: {totals[0]} distilled, {totals[1]} dropped, {totals[2]} failed",
+            f"- In all: {totals['distilled']} distilled, {totals['dropped']} dropped, {totals['failed']} failed"
+            + (f" ({totals['uncounted']} run(s) without recorded counts)" if totals["uncounted"] else "")
+            + (f" — {caveat}" if caveat else ""),
         ]
-        out += [f"- {t} UTC: {a} distilled, {b} dropped, {c} failed" for t, a, b, c in ran] + [""]
+        out += [
+            f"- {t} UTC: " + (f"{a} distilled, {b} dropped, {c} failed" if a is not None else "counts not recorded")
+            for t, a, b, c in ran
+        ] + [""]
     if dlq:
         out += [f"### Stuck today ({len(dlq)})", ""] + dlq + [""]
     out[-1] = END

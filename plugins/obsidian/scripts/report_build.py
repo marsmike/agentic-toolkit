@@ -7,7 +7,9 @@ A generator in `end`, so it describes the run that is ending: what it imported, 
 came from (its source and every link ingest expanded), the images it kept, what each became (the
 note on GitHub and in Obsidian), every note the run wrote or changed, and the vault's vitals
 (notes by PARA folder and domain, distilled per day, the archive, images, highlights, Reader).
-A run that imported nothing says so and shows the last run that did. The cloud routine publishes
+A run that imported nothing says so and shows the last run that did. A dropped or duplicate item
+says why (its `retired` row's `reason`), and the footer says where the numbers come from: the run's
+day as Imports.md and the daily note count it, the ledger's window, and whether history was shallow. The cloud routine publishes
 this file to one Claude artifact after every successful run (`report_artifact_url` in the
 profile), so the artifact always holds the latest report. [earned: 2026-09-25, owner's request —
 publish the last ingestion report as an artifact, overwritten by each successful run; "more
@@ -34,6 +36,7 @@ import radar_ledger
 from vault_utils import (
     atomic_write,
     contained,
+    distilled_when,
     format_ts,
     git_output,
     profile_value,
@@ -247,8 +250,8 @@ def vault_stats(vault: Path, notes: list[tuple[str, dict]], runs: list[dict], to
             if isinstance(t, str) and t.startswith("domain/"):
                 domains[t.removeprefix("domain/")] += 1
         kinds[str(fm.get("kind") or "unsorted")] += 1
-        day = str(fm.get("processed_date") or "")[:10]
-        if re.match(r"\d{4}-\d{2}-\d{2}$", day) and day >= since and fm.get("processed_date_estimated") is not True:
+        day = distilled_when(fm)[:10]  # the daily note's and the Dashboard's rule, never an estimated date
+        if day and day >= since:
             per_day[day] += 1
     archive = sum(1 for p in contained((vault / "05_Archive").glob("*/*--FULLCAPTURE.md"), vault) if p.is_file())
     media = sum(1 for p in contained((vault / MEDIA).glob("*"), vault) if p.is_file()) if (vault / MEDIA).is_dir() else 0
@@ -385,7 +388,9 @@ def _item_html(vault: Path, it: dict, gh: str, by_source: dict[str, list[str]], 
     if distilled_at and f["status"] == "distilled":
         meta.append(escape(f"distilled {format_ts(distilled_at, estimated=distilled_est)}"))
 
-    became = escape(f["detail"])
+    # A drop or duplicate retired with its reason as a field says why in so many words; an older one's
+    # manifest prose (its `detail`) already carries it. [earned: 2026-09-29, owner's request]
+    became = escape(f"why: {f['reason']}" if f.get("reason") else f["detail"])
     out = [f'<li class="item"><div class="row"><span class="kind">{escape(kind)}</span>'
            f'<span class="status s-{f["status"]}">{STATUS.get(f["status"], f["status"])}</span></div>{head}']
     if meta:
@@ -440,10 +445,15 @@ def render(vault: Path, run: str | None = None, today: date | None = None) -> st
     gh = _github_base(vault)
     latest = next((r for r in runs if r["run"] == run), None) if run else (runs[0] if runs else None)
     shown = latest if latest and latest["items"] else next((r for r in runs if r["items"]), None)
-    try:
-        last = json.loads((vault / STATE).read_text(encoding="utf-8")).get("last_run") or {}
-    except (OSError, json.JSONDecodeError):
-        last = {}
+    # The run's counts are its ledger row's, like every other page's; pipeline-state.json's last_run
+    # only for a run whose row carries none.
+    if latest and latest.get("counted"):
+        last = latest
+    else:
+        try:
+            last = json.loads((vault / STATE).read_text(encoding="utf-8")).get("last_run") or {}
+        except (OSError, json.JSONDecodeError):
+            last = {}
     when = (latest or {}).get("run") or run or datetime.now().strftime("%Y-%m-%d %H:%M")
     notes = _notes(vault)
     stats = vault_stats(vault, notes, runs, today)
@@ -507,8 +517,21 @@ def render(vault: Path, run: str | None = None, today: date | None = None) -> st
     every = " · ".join(f'<a href="{escape(gh + p)}">{p}</a>' if gh else p for p in ("Imports.md", "Dashboard.html", "Index.md"))
     out.append(f"<footer><span><b>agentic-toolkit</b> reads, links and files, so the vault keeps up without you.</span>"
                f"<span>Generated {escape(format_ts(utc_timestamp()))}. Rebuilt and republished after every successful run; "
-               f"the previous report is replaced. The long view: {every}.</span></footer></div>")
+               f"the previous report is replaced. The long view: {every}.</span>"
+               f"<span>{escape(freshness(runs, when[:10]))}</span></footer></div>")
     return "\n".join(out) + "\n"
+
+
+def freshness(runs: list[dict], day: str) -> str:
+    """The footer's one line on where the numbers come from: the run's day as Imports.md and the
+    daily note count it, the ledger's window, and 'history shallow' when `end` said so."""
+    if not runs:
+        return "Data: the ledger (00_Memory/imports.jsonl) has no run yet."
+    span = f"{runs[-1]['run'][:10]} to {runs[0]['run'][:10]}"
+    return (f"Data: {day}, {imports_log.day_line(imports_log.day_totals(runs, day))} · ledger {span}, "
+            f"{len(runs)} runs, the last {imports_log.WINDOW_DAYS} days kept"
+            + (" · history shallow: this checkout's git log is cut short, so a run logged before the "
+               "ledger kept counts may show none" if runs[0].get("shallow") else "") + ".")
 
 
 def main() -> int:
