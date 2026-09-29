@@ -12,7 +12,7 @@ tags:
 
 # Farsight
 
-The toolkit's first native engine (R1, `crates/farsight/`, currently **0.1.1**): a **stateless
+The toolkit's first native engine (R1, `crates/farsight/`, currently **0.1.2**): a **stateless
 BM25** search binary over a vault's active-content notes, CLI-in/JSON-out per
 [[CLI-in-JSON-out-Contracts]]. `farsight query "<terms>" --vault ./vault --k 10 --json` re-scans
 `02_Projects`/`03_Areas`/`04_Resources` plus any root note with its own `status: active` (this
@@ -50,6 +50,13 @@ them.
 R1 shipped scoped only to `02_Projects`/`03_Areas`/`04_Resources`; farsight 0.1.1 (R4) added the
 root-note `status: active` clause, ending a disagreement with gaiafield where the graph could
 traverse to [[Alex-Vega]] but search couldn't find it at all.
+
+## 0.1.2 — headings weighted wherever they fall
+
+A note's own `#`-headings are now weighted like its title across the *whole* body, not only
+within the first 2,000 characters scored: a query like "how were contrails solved" found nothing
+although a note had a section "Result: contrails solved" at character 3,512 — it now ranks first.
+Mirrors the same fix in `search.py`'s Python fallback.
 
 ## Where this vault exercises it
 

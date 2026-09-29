@@ -12,7 +12,7 @@ tags:
 
 # Gaiafield
 
-The toolkit's graph engine (`crates/gaiafield/`, currently **0.2.0**), built on the premise in
+The toolkit's graph engine (`crates/gaiafield/`, currently **0.2.6**), built on the premise in
 [[Knowledge-Graphs-from-Wikilinks]]: the graph already exists in a vault's wikilinks, frontmatter,
 and tags, so the first version only has to extract it faithfully. Two layers now ship, never
 conflated: `extracted` edges (deterministic, v1) and `inferred` edges (statistical, v2).
@@ -31,6 +31,16 @@ conflated: `extracted` edges (deterministic, v1) and `inferred` edges (statistic
   embedding stack, verified by build-log inspection). New subcommands: `infer`, `candidates`,
   `surprise`, `calibrate`. Governed entirely by [[Inference-Write-Policy|Report-Only Inference]] — see that note for the
   full rule set.
+- **0.2.1–0.2.6 (patch line, same v2 surface)** — 0.2.1 released the fixes that had sat
+  unreleased since 0.2.0 (`.md` symlinks out of the vault excluded, duplicate-bare-wikilink and
+  nanosecond-mtime fixes) and turned the gates into `infer --high-gate/--low-gate` flags/profile
+  keys instead of rebuild-only constants; 0.2.2 trusts the OS certificate store for the model
+  download; 0.2.3 reads links written inside Markdown tables; 0.2.4 makes parallel indexers wait
+  for each other instead of racing; 0.2.5 makes `infer` write in one transaction like `index`, so
+  parallel distill workers can no longer duplicate or wipe each other's inferred edges; 0.2.6 is
+  the battle-tested release (status/doctor/link report true UTC times and settings, `link` re-runs
+  report "unchanged", `candidates`/`surprise` text output reads as text). See `CHANGELOG.md` for
+  each release's own entry.
 - **v3 (not yet built)** — community detection ([[Community-Detection-and-Bridge-Notes]]), causal
   edge types, and an OKF-compatible export for interoperability with external graph tooling.
 
