@@ -228,7 +228,7 @@ def frontmatter_parse_errors(vault_path: Path) -> list[dict]:
 
 
 def dlq_status(vault_path: Path) -> dict:
-    """Status of the dead-letter queue at 00_Memory/dlq/ (contract/ROUTING.md's DLQ concept).
+    """Status of the dead-letter queue at 00_Memory/dlq/ (contract/KNOWLEDGE_API.md's DLQ concept).
     `count` is every entry; `open` those not marked `status: resolved` — the ones that need a
     person. [earned: 2026-09-28, doctor reported "5 DLQ entries" when all five were resolved]"""
     dlq_path = Path(vault_path) / "00_Memory" / "dlq"
