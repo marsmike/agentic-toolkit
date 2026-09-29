@@ -22,7 +22,8 @@ block the queue.
 `end` records failures, stamps `distilled_at`/`ingested_at` on any distilled note this run
 touched that `retire_capture.py` didn't already stamp (`stamp_distilled_notes`, a safety net —
 invariant 6 runs `retire_capture.py`, which stamps deterministically, for every capture), rebuilds
-Index.md, the maps and Now.md (`index_build.py`, `map_build.py`, `now_build.py`), appends one
+Index.md, the maps, Now.md and the day's daily note (`index_build.py`, `map_build.py`, `now_build.py`,
+`daily_build.py`), appends one
 Log.md line, and releases the lock. If the vault is a git repository it commits (the undo for an
 unattended run), then pulls and pushes when there is an upstream.
 Before any commit the staged diff is scanned for key-shaped strings; a hit refuses the commit and
@@ -77,6 +78,7 @@ GENERATORS = {  # script → the files it writes (a trailing / = every file dire
     "index_build.py": ("Index.md",),
     "map_build.py": ("Maps/",),
     "now_build.py": ("Now.md", "Boards/Pipeline.md"),
+    "daily_build.py": ("00_Daily/",),
     "imports_log.py": ("Imports.md",),
     "report_build.py": ("00_Memory/last-run-report.html",),
     "dashboard_build.py": ("Dashboard.html",),
@@ -619,7 +621,12 @@ def _owned(vault: Path, paths: tuple[str, ...]) -> list[Path]:
     out = []
     for rel in paths:
         target = vault / rel
-        out += sorted(p for p in target.iterdir() if p.is_file()) if rel.endswith("/") and target.is_dir() else [target]
+        if rel.endswith("/"):
+            # A folder that does not exist yet owns no file; the folder itself is never one (a
+            # failed build's `_restore` would `unlink()` the directory the build had created).
+            out += sorted(p for p in target.iterdir() if p.is_file()) if target.is_dir() else []
+        else:
+            out.append(target)
     return out
 
 
