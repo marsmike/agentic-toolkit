@@ -640,11 +640,11 @@ CATALOG = {
                         "prints search suggestions instead of failing silently.",
         "json": "{ok, op, vault, note, result[{path, title, description, depth}]}",
         "examples": [
-            ("unisphere graph neighbors Gaiafield", "one hop out, both directions"),
-            ("unisphere graph neighbors Gaiafield --depth 2 --direction out", "two hops, outgoing links only"),
-            ("unisphere graph neighbors Gaiafield --include-inferred --json", "also inferred edges, as JSON"),
+            ("unisphere graph neighbors <note>", "one hop out, both directions"),
+            ("unisphere graph neighbors <note> --depth 2 --direction out", "two hops, outgoing links only"),
+            ("unisphere graph neighbors <note> --include-inferred --json", "also inferred edges, as JSON"),
         ],
-        "example": "unisphere graph neighbors Gaiafield --depth 2 --json",
+        "example": "unisphere graph neighbors <note> --depth 2 --json",
     },
     "graph path": {
         "summary": "Shortest link path between two notes (gaiafield).",
@@ -653,10 +653,10 @@ CATALOG = {
                         "just explicit wikilinks.",
         "json": "{ok, op, vault, result{from, to, connected, path[]}}",
         "examples": [
-            ("unisphere graph path Alex-Vega Gaiafield", "the shortest chain of explicit links"),
-            ("unisphere graph path Alex-Vega Gaiafield --include-inferred", "also allow inferred edges"),
+            ("unisphere graph path <from> <to>", "the shortest chain of explicit links"),
+            ("unisphere graph path <from> <to> --include-inferred", "also allow inferred edges"),
         ],
-        "example": "unisphere graph path Alex-Vega Gaiafield --json",
+        "example": "unisphere graph path <from> <to> --json",
     },
     "graph candidates": {
         "summary": "Same-topic notes with no link to this one yet — link suggestions (gaiafield infer must have run).",
@@ -665,11 +665,11 @@ CATALOG = {
                         "`gaiafield infer` to have populated the graph first; an empty result usually means it hasn't.",
         "json": "{ok, op, vault, note, result[{path, score, label, kind, det_distance, surprise}]}",
         "examples": [
-            ("unisphere graph candidates Gaiafield", "link suggestions for one note"),
-            ("unisphere graph candidates Gaiafield --include-ambiguous", "also the lower-confidence band"),
-            ("unisphere graph candidates Gaiafield --limit 5 --json", "fewer results, machine-readable"),
+            ("unisphere graph candidates <note>", "link suggestions for one note"),
+            ("unisphere graph candidates <note> --include-ambiguous", "also the lower-confidence band"),
+            ("unisphere graph candidates <note> --limit 5 --json", "fewer results, machine-readable"),
         ],
-        "example": "unisphere graph candidates Gaiafield --json",
+        "example": "unisphere graph candidates <note> --json",
     },
     "doctor": {
         "summary": "The vault's structure: PARA folders, note counts, frontmatter errors, profiles, DLQ, graph.",
@@ -821,8 +821,8 @@ GROUP_HELP = {
         "group": "Find things",
         "examples": [
             ("unisphere graph stats", "size, dangling links, most-linked notes"),
-            ("unisphere graph neighbors Gaiafield --depth 2", "notes linked to/from Gaiafield, two hops out"),
-            ("unisphere graph path Alex-Vega Gaiafield", "the shortest chain of links between two notes"),
+            ("unisphere graph neighbors <note> --depth 2", "notes linked to/from a note, two hops out"),
+            ("unisphere graph path <from> <to>", "the shortest chain of links between two notes"),
         ],
         "see_also": ["search", "doctor"],
     },

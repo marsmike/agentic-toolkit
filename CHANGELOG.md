@@ -4,6 +4,17 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Agents are pointed at `unisphere` (obsidian 3.4.1).** The CLI was on PATH, but no agent-facing
+  file named it: the vault template, the `vault` skill and TheVoid's own `AGENTS.md` sent agents to
+  `search.py` only, and the link graph had no command an agent could run. Now the `vault` skill and
+  the `VAULT_AGENTS.md` template use `unisphere graph neighbors|path|candidates` and `unisphere
+  search` when `command -v unisphere` finds it, and fall back to `search.py` and `grep` when it
+  does not (cloud runs). Following Claude Code's advice to name the CLI and let the agent learn
+  the rest from `--help`, they list a few commands and point to `unisphere commands --json`
+  instead of copying the catalogue. The help examples use `<note>` and `<from> <to>` in place of
+  the example vault's `Gaiafield` and `Alex-Vega`, which failed on any other vault.
+  [earned: 2026-09-29, the owner asked whether agents used unisphere; none were told it existed]
+
 - **One ledger, one definition per number, no count from git history (obsidian 3.4.0, radar 3.4.1).**
   The same week showed 52, 192 and 290 new notes on different pages: the cloud checkout of TheVoid
   can be shallow, and `Now.md`, the Dashboard (17 runs of 59) and the daily notes counted from

@@ -27,6 +27,12 @@ when no skill is running.
 
 Full schema: https://github.com/marsmike/agentic-toolkit/blob/main/contract/VAULT_SCHEMA.md.
 
+## Finding things
+
+`unisphere`, the toolkit's CLI, when `command -v unisphere` finds it: `unisphere search <words> --json`,
+`unisphere graph neighbors|path|candidates <note> --json`, `unisphere status`. `unisphere commands --json`
+is the full catalogue. Without it, `grep` `Index.md` and the notes' `description:` lines.
+
 ## Distilling captures — non-negotiable
 
 1. **Two phases, one checkpoint.** Phase 1: analyze only — read the capture, search existing

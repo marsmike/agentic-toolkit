@@ -1,6 +1,6 @@
 ---
 name: vault
-description: Work with the vault directly — read, create, edit and search notes, frontmatter, links, canvases and Bases — and keep it healthy (orphans, stale pages, broken links, Index drift, metadata). Use for any vault operation or maintenance audit.
+description: Work with the vault directly — read, create, edit and search notes, follow the link graph, frontmatter, links, canvases and Bases — and keep it healthy (orphans, stale pages, broken links, Index drift, metadata). Use for any vault operation or maintenance audit.
 allowed-tools:
   - Read
   - Write
@@ -23,6 +23,11 @@ S vault_lint.py [--stale-days 180] [--json]  # orphans, stale, missing concepts,
 S vault_normalize.py --check links|frontmatter|tags|source|summary [--scope 04_Resources] [--fix --dry-run]
 S vault_judge.py [--scope 04_Resources]      # vague descriptions, missing domain tags (report only)
 ```
+
+The link graph has no script here: when `command -v unisphere` finds the toolkit's CLI, use
+`unisphere graph neighbors|path|candidates <note> --json` (links in and out, the chain between two
+notes, unlinked same-topic notes) and `unisphere graph stats`. `unisphere commands --json` lists the
+rest. Without it, `grep` for `[[<note>` finds inbound links.
 
 ## Finding things
 
