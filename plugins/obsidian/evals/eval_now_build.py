@@ -42,7 +42,7 @@ from a month ago and a weak one; one capture is parked, one DLQ note is open and
                three of its drops with their reasons (none shown when the row has none; an earlier
                run's drop and a distilled capture never), "… and N more"; a run row without counts
                falls back to pipeline-state.json's last run
-10. topics   — New topics: this week's concept notes (Concepts/ or `kind: concept`), six and how many
+10. topics   — New topics: this week's concept notes (Concepts/ or `kind: concept`), four and how many
                more; no line in a week without one
 11. blind    — Not in your vault yet: signal.json's blind spots, the five strongest by name and how
                many more; one alone has no "more"; none, no line
@@ -371,13 +371,13 @@ def run(vault: Path) -> dict:
         if not lines[1].endswith(" · last run 2026-09-29 10:03 UTC: 2 distilled, 1 dropped, 0 failed*") or lines[2] != QUIET:
             problems.append(f"phase 9: a run row without counts falls back to pipeline-state.json's last run; got {lines[:3]}")
 
-        # 10. new topics: the concept notes New counts, newest first, six at most; none in a quiet week
+        # 10. new topics: the concept notes New counts, newest first, four at most; none in a quiet week
         now = (sandbox / "Now.md").read_text(encoding="utf-8")
         topics = next((ln for ln in _status(now) if ln.startswith("**New topics:** ")), "")
         n = now_build.build(sandbox, today)[1]["topics"]
-        if (topics.count("[[") != 6 or not topics.endswith(f" … and {n - 6} more") or "Eval-Kind-Concept" not in topics
+        if (topics.count("[[") != 4 or not topics.endswith(f" … and {n - 4} more") or "Eval-Kind-Concept" not in topics
                 or "Eval-Concept-5" not in topics or "Eval-Concept-0" in topics or "Eval-Concept-Old" in topics or _dead(topics)):
-            problems.append(f"phase 10: New topics lists this week's concept notes (folder or kind), six, then how many more; got {topics!r}")
+            problems.append(f"phase 10: New topics lists this week's concept notes (folder or kind), four, then how many more; got {topics!r}")
         if "**New topics:**" in now_build.build(sandbox, today + timedelta(days=400))[0]["Now.md"]:
             problems.append("phase 10: a week without a new concept note has no New topics line")
 
