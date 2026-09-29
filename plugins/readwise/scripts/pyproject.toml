@@ -1,6 +1,6 @@
 [project]
 name = "readwise-plugin-scripts"
-version = "2.4.0"
+version = "3.1.1"
 description = "Standalone scripts for the readwise plugin — no vendored env, run via `uv run`."
 requires-python = ">=3.11"
 dependencies = [

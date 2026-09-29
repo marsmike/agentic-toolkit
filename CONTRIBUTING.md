@@ -26,7 +26,7 @@ By signing off, you certify that you authored the contribution and have the righ
 ## Adding a plugin
 
 1. Open an issue describing the behavior it delivers (if you can't name the behavior, it doesn't get in).
-2. After approval: PR with the plugin directory, a `marketplace.json` entry (version in lock-step with `plugin.json`), a README, evals, and a stated answer to the dead-letter question — *when this plugin's automation fails, where does the failure go?*
+2. After approval: PR with the plugin directory, a `marketplace.json` entry (version in lock-step with `plugin.json`, and with `scripts/pyproject.toml` if the plugin has one — `core/tests/test_dependency_locks.py` checks it), a README, evals, and a stated answer to the dead-letter question — *when this plugin's automation fails, where does the failure go?*
 
 ## Code style
 
