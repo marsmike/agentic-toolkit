@@ -21,6 +21,7 @@ S() { uv run --locked --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_P
 S distill_judge.py 01_Capture/<capture>.md --dossier --json   # everything known about it, before you read it
 S distill_check.py <note> 01_Capture/<capture>.md --ask "<a question a reader would type>" --ask "…"
 S retire_capture.py 01_Capture/<capture>.md --note <note> --line "<what became of it>"   # invariant 6, one call
+#   it also appends a ledger row to 00_Memory/imports.jsonl (kind new|enriched|dropped|duplicate, notes, reason, what): name EVERY note you produced or changed with --note, and give --dropped its reason
 S fetch_source.py 01_Capture/<capture>.md --json   # a stub's own source, through the Tavily CLI (tvly extract)
 ```
 

@@ -29,6 +29,8 @@ flowchart LR
 | `weekly [--week YYYY-Www] [--force]` | `01_Capture/Radar-Week-…md`, a draft digest for distill | none |
 | `feeds` | per-feed yield; "consider unsubscribing", "serves only <interest>" | none |
 | `trend [--week]` | interests rising above their baseline; emerging title terms (experimental) | none |
+
+The Signal Radar's vault section ranks a tag as rising only against a real baseline: notes with a real (non-estimated) date in at least 2 of the 4 earlier weeks and 20 notes in all. Until then it is headed "Busiest in your vault" and says "no baseline yet", and `signal.json` carries `vault.baseline {ready, weeks, notes}` and a `null` baseline on every tag, domain, interest and hub. The blind-spot count in the note's description is the real total, and the list says "showing 8 of 29" when it is cut.
 | `discover [--interest ID] [--seed URL] [--queries N]` | candidate feeds from Kagi, URL shapes, autodiscovery and hnrss, validated and judged, as an OPML | Kagi, Reader (read), the candidate sites, judgment backend |
 | `gaps [--promote]` | once a week: recent posts per interest the feeds missed (Kagi news), judged; strong ones in the digest, optionally saved to Later | Kagi, judgment backend, Reader (save) |
 | `kagi search\|news\|answer\|summarize TEXT` | the kagi skill: one Kagi call under the ledger and weekly budget | Kagi |

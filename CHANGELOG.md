@@ -4,6 +4,23 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **One ledger, one definition per number, no count from git history (obsidian 3.4.0, radar 3.4.1).**
+  The same week showed 52, 192 and 290 new notes on different pages: the cloud checkout of TheVoid
+  can be shallow, and `Now.md`, the Dashboard (17 runs of 59) and the daily notes counted from
+  `git log`. Now `00_Memory/imports.jsonl` is the one ledger: a run row per run (counts, UTC time,
+  `shallow`) and a retired row per capture (`kind` new, enriched, dropped or duplicate, `notes`,
+  `reason`, `what`), pruned to a twelve-week window at `end`. Run counts, `Imports.md`, the daily
+  note, the report and the watchdog read it; "distilled" is one rule (`vault_utils.distilled_when`:
+  distilled, real date, never estimated) so the per-day chart says 17, not 92, for 2026-09-26.
+  `Now.md` shows health (`watchdog.health()`), the last run's receipt with the reason for every
+  drop, and new topics. The run report says why an item was dropped and where its numbers come
+  from. Pipeline, Signal Radar and watchdog prompts fetch the full history first, and `end` says
+  when it is still truncated. `map_build` writes canvases exactly as Obsidian saves them, so
+  opening the vault no longer leaves thousands of changed lines behind (a cause of "Pull
+  failed"). Radar: the blind-spot count is the true total, and "rising in your vault" needs a real
+  baseline (it read "baseline 0.0" for every tag) and says "no baseline yet" until it has one.
+  [earned: 2026-09-29, the owner could not trust or reconcile the pipeline's numbers]
+
 - **A homepage you can read in five seconds, a "recently changed" list, the Signal Radar inside
   the vault, and a note per day (obsidian 3.3.0, radar 3.4.0).** `Now.md` was 126 lines of link
   lists with the live views at the bottom; now it opens with one status line (last run, stuck,

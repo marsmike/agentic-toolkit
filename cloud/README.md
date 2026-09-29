@@ -64,6 +64,10 @@ no connectors; no per-run notifications. GitHub's search API is out of reach fro
 (the session proxy binds api.github.com to the attached repositories, token or not), so there the
 GitHub source reads GitHub Trending instead and reports `partial`.
 
+## Shallow checkouts
+
+A cloud session's TheVoid checkout can arrive with truncated history (the pipeline's first cloud counts showed 52 new notes for a week the full history counts as 192). Two defences: no count is taken from `git log` any more (frontmatter and the ledger `00_Memory/imports.jsonl` are the sources), and the three prompts fetch the full history first (`git fetch --unshallow`, guarded, changes no file). `pipeline_run.py end` reports `shallow` in its result and summary whenever history is still truncated, for example when the session proxy refuses the fetch. [earned: 2026-09-29, Now.md published 52 where the full history gives 192]
+
 ## Two writers, one vault
 
 Of the three routines, two write to the vault — the pipeline and the Signal Radar (the watchdog

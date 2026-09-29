@@ -30,6 +30,7 @@ P pipeline_run.py begin          # pulls the vault's upstream first; "busy" (ano
 P pipeline_run.py queue --json   # this run's captures: the owner's clips first, oldest first
 # distill each one with the distill skill, --auto
 P pipeline_run.py end --token <begin's token> --distilled N --dropped N --failed <captures that failed distill_check>
+#   end writes the run's row (counts, UTC time, shallow flag) to 00_Memory/imports.jsonl, prunes it to 84 days, and says so when the vault checkout has truncated git history
 ```
 
 **Unattended on the Mac** (`scripts/run-pipeline.sh`) the run may call only these scripts, and only

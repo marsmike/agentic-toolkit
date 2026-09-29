@@ -38,11 +38,12 @@ not a note's inbound link.
 | Path | Built by | What it is |
 |---|---|---|
 | `Index.md` | `index_build.py` | One line per active note, from its `description` |
-| `Now.md` | `now_build.py` | The homepage, short enough to read at a glance: a status line (last run, stuck, inbox, the Signal Radar's early warnings), then the live `Recently changed` and `Recently distilled` views, then this week's new and enriched notes, radar and per-day chart folded away |
+| `Now.md` | `now_build.py` | The homepage, short enough to read at a glance: a status line (last run, stuck, inbox, the Signal Radar's early warnings), health (`watchdog.health()`), the last run's receipt with the reason for every drop, new topics (Concept notes first distilled this week, and strong outside things not in the vault yet), then the live `Recently changed` and `Recently distilled` views, then this week's new and enriched notes, radar and per-day chart folded away. Every count comes from frontmatter or the ledger, never from git history |
 | `00_Daily/<YYYY-MM-DD>.md` | `daily_build.py` | One note per UTC day for Obsidian's Daily notes and Calendar: what was distilled, changed, found by the radar and run that day. The generator owns only the block between `%% daily:start %%` and `%% daily:end %%`; text outside it is the owner's and is never touched |
 | `Maps/<domain>.md`, `.canvas` | `map_build.py` | One map per `domain/*` tag on three or more notes (or configured in `maps.md`); `Maps/Overview` lists them |
 | `Boards/Pipeline.md` | `now_build.py` | The same state as Now.md as a Kanban board; drags are overwritten |
-| `Imports.md` | `imports_log.py` | What every run imported and what became of each item (note, dropped, duplicate, waiting, missing), runs newest first; data in `00_Memory/imports.jsonl` |
+| `Imports.md` | `imports_log.py` | What every run imported and what became of each item (note, dropped with its reason, duplicate, waiting, missing), one `## day` section per day that says how many runs it had, runs newest first; data in `00_Memory/imports.jsonl` |
+| `00_Memory/imports.jsonl` | `pipeline_run.py end`, `retire_capture.py` | The one ledger every count comes from, never `git log` (a cloud checkout can be shallow). A **run row** (`kind: run`, `at`, `distilled`, `dropped`, `failed`, `shallow`, `summary`, `items`) per run, quiet ones included; a **retired row** per capture (`kind: new\|enriched\|dropped\|duplicate`, `notes`, `reason`, `what`). Twelve-week window: `end` prunes rows older than 84 days, git keeps them. Rows written before this shape are not backfilled and render from their manifest line |
 | `00_Memory/last-run-report.html` | `report_build.py` | The last run's ingestion report as an Artifact page (every import with its links, what it became, the notes written); the routine publishes it to `report_artifact_url` |
 | `00_Memory/radar/Signal-Radar.html`, `.md`, `Signal-Radar-scope.svg`, `Signal-Radar-momentum.svg`, `signal.json` | radar `radar.py signal` | What is taking off: named things across feeds, sensors, the vault and its graph, each with a signal strength; the routine publishes the page to `signal_artifact_url`; the note embeds the two SVGs, so Obsidian shows the same radar the browser page does |
 | `Dashboard.html` | `dashboard_build.py` | Twelve weeks of distilling for a browser: per day, by source, domain and kind, with the notes and the runs |
@@ -77,6 +78,8 @@ them holding still. Check whether an existing field fits before adding a new one
 | `author`, `published` | Original author / publish date | External material |
 | `created` | Note creation date | Most notes |
 | `enrichment_targets` | Notes/profiles to notify when this note is enriched | Opt-in |
+
+**Which date counts.** A note counts as distilled on a day only when it was distilled (`distilled_at` present or `status: distilled`) and the date is real: `distilled_at`, else `processed_date`, and never a value flagged `*_estimated` (a backfill stamped 1,096 notes) nor a `status: review` note that merely carries a `processed_date`. `vault_utils.distilled_when` is that rule; `now_build`, `daily_build`, `dashboard_build` and the report all use it, so a week's number is the same on every surface. Radar's rising-tag test uses the same idea plus a minimum baseline (at least 2 of the 4 earlier weeks and 20 notes), and says 'no baseline yet' until it has one.
 
 Going forward, `ingested_at`, `distilled_at` and `updated_at` are set deterministically in code — a writer
 script or a retirement step stamps `datetime.now(UTC)` at the moment it acts, never left to an
