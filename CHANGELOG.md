@@ -347,7 +347,7 @@ git; the vault stays knowledge only and gets no copy of the code.
   on the Mac and one in a clone produce identical maps. [earned: 2026-09-23]
 - `AGENTS.md` gains "Working on a real vault".
 
-## [Unreleased] — R12, six skills and one entry file (marketplace 3.0.0)
+## [3.0.0] — R12, six skills and one entry file; generated navigation and git sync (reconstructed from history)
 
 Fifteen skills, six wrapper commands and a duplicate distill agent cost a slot in every session's
 skill list and about 2,470 lines of skill text, 666 of them generic Obsidian syntax reference.
@@ -357,6 +357,10 @@ Six skills remain, each short enough to read and follow without the plugin insta
   five Obsidian format references.
 - **`radar:radar`** absorbs `kagi` as a section; **`handoff:handoff`** absorbs `handoff-resume`
   as a mode.
+- **plugins/handoff 3.0.0** — `handoff-resume` folds into `handoff` as its resume mode (one skill,
+  two sections, instead of two skills); its now-redundant `commands/handoff.md` and
+  `commands/handoff-resume.md` thin wrappers are removed, since a skill is invoked by its own
+  name. No behavior change to save or resume themselves.
 - **readwise is scripts only**: the pipeline runs `ingest.py` by path. `daily`/`status` (Now.md
   and Log.md say the same), `enrich` and its two modules (never run by the pipeline) and the
   SessionStart hook (a line in every session) are gone.
@@ -367,7 +371,7 @@ Six skills remain, each short enough to read and follow without the plugin insta
   `toolkit vault init` creates (`contract/templates/VAULT_AGENTS.md`). Claude Code reads
   `AGENTS.md` when no `CLAUDE.md` is on the path; keeping both would hide it.
 
-## [Unreleased] — R12, generated navigation and git sync (plugins/obsidian)
+**Generated navigation and git sync (plugins/obsidian)**
 
 The vault had a flat 1,386-line Index.md and about 80 hand-made MOCs that its own rules forbid
 ("no hand-maintained MOCs"); they had gone stale. Everything a person or an agent uses to find
@@ -388,7 +392,7 @@ their way is now rebuilt by the pipeline's `end` step, with no model call.
 - **Secret scan before every commit** — a key-shaped string on the staged diff refuses the commit;
   the DLQ note names the file and the kind of key, never the value.
 
-## [Unreleased] — R10, the radar (plugins/radar 2.10.0)
+## [2.10.0] — R10/R11, the radar; tools from migrating a live vault (reconstructed from history)
 
 Everything before R10 ran *after* a clip. Measured on a real Reader account: 1,716 feed items in
 30 days, none of them ever opened, and 55 clips made by hand, none from the feed. The radar reads
@@ -433,7 +437,7 @@ Plan and acceptance: `docs/R10-RADAR-PLAN.md`.
   `00_Memory/` and `01_Capture/` as the only automation sinks.
 - **Not built** — `gaps`, `--todoist`, a Kagi skill (specified in the plan).
 
-## [Unreleased] — tools from migrating a live vault
+**Tools from migrating a live vault**
 
 What the first real migration (a ~1,200-note vault, 2026-09-22) needed that the plugin lacked. The
 normalize audit went from 810 issues to 370 and Index.md drift from 148 dangling / 73 missing /
