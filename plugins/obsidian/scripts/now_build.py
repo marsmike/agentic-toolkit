@@ -5,21 +5,30 @@
 
 Now.md says what is going on first, and the long lists last, in Markdown any agent can read:
 
-    Status                     the last run (pipeline-state.json), stuck and inbox counts, and the
-                               Signal Radar's new/hot/rising blips (00_Memory/radar/signal.json,
-                               written by its own routine, so labelled with its own time)
+    Status                     health (`watchdog.health`: a word, the pipeline's and the radar's
+                               last UTC times); the last run's receipt from the ledger's newest run
+                               row (00_Memory/imports.jsonl: what came in, what it did, what it
+                               dropped and why, from the retired rows it wrote), else
+                               pipeline-state.json's last_run; stuck and inbox counts; the Signal
+                               Radar's new/hot/rising blips (00_Memory/radar/signal.json, written by
+                               its own routine, so labelled with its own time); new topics (concept
+                               notes distilled this week) and the radar's strongest blind spots
     Links                      Maps, Index, Log, the Signal Radar note, today's daily note, and the
                                published Signal Radar and last-run report artifacts, each only if it exists
     Live views                 Recently changed and Recently distilled, embedded from Vault.base
     Stuck                      parked captures (pipeline-state.json) and open DLQ notes; only if any
     Inbox                      the backlog in 01_Capture/, next captures in queue order; only if any
-    This week (folded)         New: notes distilled since the window opened (`distilled_at`, else
-                               `processed_date`; never an estimated one). Enriched: notes whose
+    This week (folded)         New: notes distilled since the window opened (`distilled_when`, the
+                               one rule of every per-day count: a distilled note's `distilled_at`,
+                               else `processed_date`; never an estimated one). Enriched: notes whose
                                `updated_at` falls in the window and that are not new; the title says
                                so when the window opens before the vault's first `updated_at`. Both
                                newest first, from frontmatter alone: a count never depends on how
                                much git history a checkout has. Radar: this week's strong items
-                               (00_Memory/radar/state.jsonl). Distilled per day: last 14 days.
+                               (00_Memory/radar/state.jsonl). Distilled per day: last 14 days, by
+                               the same rule as New.
+
+Every time on the page is absolute UTC, never "5 min ago": the page is read hours after it is built.
 
 Embedded views render in Obsidian only; a folded callout (`> [!tip]- …`) is a plain blockquote
 elsewhere. Boards/Pipeline.md is the same state as a Kanban board; it is rebuilt every run, so
@@ -30,18 +39,20 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
-from map_build import _date
+import imports_log
 from pipeline_run import STATE, _order
 from vault_utils import (
     atomic_write,
     contained,
     discover_notes,
+    distilled_when,
     format_ts,
     one_line,
     profile_value,
@@ -49,6 +60,7 @@ from vault_utils import (
     read_jsonl,
     require_vault,
     resolve_title,
+    utc_text,
     utc_timestamp,
 )
 
@@ -60,6 +72,11 @@ SIGNAL = "00_Memory/radar/signal.json"
 SIGNAL_NOTE = "00_Memory/radar/Signal-Radar.md"
 SIGNAL_STAGES = ("new", "hot", "rising")
 SIGNAL_SHOW = 5
+BLIND_SHOW = 5
+TOPICS_SHOW = 6
+DROPS_SHOW = 3
+CONCEPTS = "04_Resources/Concepts/"
+HEALTH = {"healthy": "✅ healthy", "late": "⚠ late", "failing": "⛔ failing", "stuck": "⏸ stuck"}
 GENERATOR = "now_build.py"
 WEEK = 7
 CHART_DAYS = 14
@@ -99,31 +116,6 @@ def _newest_first(paths: list[str], dated: dict[str, str]) -> list[str]:
     return sorted(sorted(paths), key=lambda p: dated.get(p, ""), reverse=True)
 
 
-def _utc(value: object) -> str:
-    """A frontmatter date or timestamp as UTC text (`YYYY-MM-DDTHH:MM:SSZ`, or `YYYY-MM-DD` for a
-    date), "" for nothing or something unreadable. A mirror of `daily_build._utc`: daily_build
-    imports this module, so importing it back would be circular."""
-    if isinstance(value, str):
-        text = value.strip()
-        try:
-            value = datetime.fromisoformat(text) if len(text) > 10 else date.fromisoformat(text)
-        except ValueError:
-            return ""
-    if isinstance(value, datetime):
-        moment = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-        return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
-    return value.isoformat() if isinstance(value, date) else ""
-
-
-def _distilled_when(fm: dict) -> str:
-    """When a note was distilled, in UTC: `distilled_at` unless estimated, else `processed_date`
-    unless estimated, else "". The rule of `daily_build.distilled_when` (mirrored, see `_utc`) and
-    of `dashboard_build.notes`, which never counts an estimated date either."""
-    if fm.get("distilled_at_estimated") is not True and (when := _utc(fm.get("distilled_at"))):
-        return when
-    return _utc(fm.get("processed_date")) if fm.get("processed_date_estimated") is not True else ""
-
-
 def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
     """(new, enriched, source): content notes distilled since `since`, and the ones whose
     `updated_at` falls in the window without being new; each newest first, ties by path.
@@ -136,9 +128,9 @@ def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
     for p in discover_notes(vault):
         fm = read_frontmatter(p)[0]
         rel = p.relative_to(vault).as_posix()
-        if (when := _distilled_when(fm)) and when[:10] >= day:
+        if (when := distilled_when(fm)) and when[:10] >= day:
             new[rel] = when
-        elif (when := _utc(fm.get("updated_at"))) and when[:10] >= day:
+        elif (when := utc_text(fm.get("updated_at"))) and when[:10] >= day:
             enriched[rel] = when
     return _newest_first(list(new), new), _newest_first(list(enriched), enriched), "frontmatter"
 
@@ -146,7 +138,7 @@ def this_week(vault: Path, since: date) -> tuple[list[str], list[str], str]:
 def first_updated(vault: Path) -> str:
     """The UTC day of the earliest `updated_at` among the content notes, "" when none has one:
     before that day an enrichment left no stamp to count."""
-    days = [when[:10] for p in discover_notes(vault) if (when := _utc(read_frontmatter(p)[0].get("updated_at")))]
+    days = [when[:10] for p in discover_notes(vault) if (when := utc_text(read_frontmatter(p)[0].get("updated_at")))]
     return min(days, default="")
 
 
@@ -182,14 +174,76 @@ def inbox(vault: Path, parked: list[str]) -> list[str]:
     return [p.relative_to(vault).as_posix() for p in ordered if p.relative_to(vault).as_posix() not in parked]
 
 
+def topics(vault: Path, new: list[str]) -> list[str]:
+    """The new notes (`this_week`'s, so distilled by the same rule) that are concepts: under
+    04_Resources/Concepts/ or `kind: concept`; in `new`'s order, newest first."""
+    return [p for p in new if p.startswith(CONCEPTS) or read_frontmatter(vault / p)[0].get("kind") == "concept"]
+
+
 def per_day(vault: Path, today: date) -> list[tuple[str, int]]:
+    """Notes distilled on each of the last CHART_DAYS UTC days, by New's rule (`distilled_when`).
+    [earned: 2026-09-29 audit — counting every `processed_date` put 92 on a day whose runs
+    distilled 17: 75 `status: review` notes carry that date and were never distilled]"""
     days = [(today - timedelta(days=i)).isoformat() for i in range(CHART_DAYS - 1, -1, -1)]
-    counts = Counter()
-    for p in discover_notes(vault):
-        d = _date(read_frontmatter(p)[0].get("processed_date"))
-        if d in days:
-            counts[d] += 1
+    counts = Counter(distilled_when(read_frontmatter(p)[0])[:10] for p in discover_notes(vault))
     return [(d, counts[d]) for d in days]
+
+
+def _at(stamp: object, today: date) -> str:
+    """A stored UTC stamp (`YYYY-MM-DDTHH:MM:SSZ`) as `HH:MM UTC`, with its date when that is not
+    `today`; "" when unreadable."""
+    try:
+        at = datetime.strptime(str(stamp), "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return ""
+    return at.strftime("%H:%M UTC" if at.date() == today else "%Y-%m-%d %H:%M UTC")
+
+
+def _plain(text: object, limit: int) -> str:
+    """One line of someone else's text, its brackets made harmless for Markdown and wikilinks."""
+    return one_line(str(text), limit).replace("[", "(").replace("]", ")")
+
+
+def _health_line(vault: Path, today: date) -> str | None:
+    """`watchdog.health` in one line: the word with its sign, the pipeline's and the radar's last
+    times, and the detail when not healthy — but not `late`'s "last run N h ago", which a page read
+    hours later turns into a lie (the pipeline's time says it). None when health cannot run:
+    watchdog is imported here, not at the top, so a scripts folder without it still builds Now.md."""
+    try:
+        import watchdog
+        h = watchdog.health(vault)
+    except Exception:
+        return None
+    parts = [f"**{HEALTH.get(h['word'], h['word'])}**"]
+    parts += [f"{name} {when}" for name, stamp in (("pipeline", h["pipeline_at"]), ("radar", h["radar_at"]))
+              if (when := _at(stamp, today))]
+    if not h["ok"] and (h["word"] != "late" or not h["pipeline_at"]):
+        parts.append(str(h["detail"]))
+    return " · ".join(parts)
+
+
+def _receipt(vault: Path, today: date) -> list[str]:
+    """The last run, from the ledger alone (never git): its run row's time, what came in (the
+    summary's `in: …`, as `pipeline_run.came_in` writes it) and its counts; then what it dropped —
+    the retired rows of kind dropped/duplicate written after the run before it (`end` writes the
+    run row after the run retired its captures), each with its own reason, or with none. A newest
+    run row without counts (written before 2026-09-29), or none: pipeline-state.json's line."""
+    ran = imports_log.load(vault)
+    if not ran or "distilled" not in ran[0]:
+        return [_last_run(vault)]
+    last, at = ran[0], str(ran[0].get("at") or "")
+    before = str(ran[1].get("at") or f"{ran[1]['run'].replace(' ', 'T')}:00Z") if len(ran) > 1 else ""
+    funnel = re.search(r"\bin: ([^;]*(?:; readwise [^;]*)?)", str(last.get("summary") or ""))
+    line = (f"last run {_at(at, today) or last['run'] + ' UTC'}"
+            + (f" · in: {funnel.group(1).replace('; ', ' · ')}" if funnel else "")
+            + f" → {last['distilled']} distilled, {last.get('dropped', 0)} dropped, {last.get('failed', 0)} failed"
+            + (" · history shallow" if last.get("shallow") else ""))
+    titles = {it["capture"]: it["title"] for r in ran for it in r["items"] if it.get("capture") and it.get("title")}
+    drops = [f"- dropped: {_plain(titles.get(r['retired']) or Path(str(r['retired'])).stem, 100)}"
+             + (f" — {_plain(r['reason'], 160)}" if r.get("reason") else "")
+             for r in read_jsonl(vault / imports_log.LOG)
+             if r.get("retired") and r.get("kind") in ("dropped", "duplicate") and before < str(r.get("at") or "") <= at]
+    return [line, *drops[:DROPS_SHOW]] + ([f"- … and {len(drops) - DROPS_SHOW} more"] if len(drops) > DROPS_SHOW else [])
 
 
 def _last_run(vault: Path) -> str:
@@ -209,20 +263,39 @@ def _radar_line(r: dict) -> str:
     return f"- [{title}]({r.get('url')}) — {topics}" + (" · in vault" if r.get("in_vault") else "")
 
 
-def _signal_line(vault: Path, today: date) -> str | None:
+def _signal(vault: Path) -> dict | None:
+    """signal.json, read once for both of its lines; None when missing or not JSON."""
+    try:
+        return json.loads((vault / SIGNAL).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _signal_line(data: dict | None, today: date) -> str | None:
     """The Signal Radar's early warnings: its strongest new, hot or rising blips. Its own routine
     writes signal.json on its own clock, so the line carries the file's time, never this run's.
     None when the file is missing or malformed — Now.md then just leaves the line out."""
     try:
-        data = json.loads((vault / SIGNAL).read_text(encoding="utf-8"))
-        at = datetime.strptime(data["generated"], "%Y-%m-%dT%H:%M:%SZ")
+        when = _at(data["generated"], today)
         blips = [b for b in data["blips"] if b["stage"] in SIGNAL_STAGES][:SIGNAL_SHOW]
-        names = [f"{one_line(b['name'], 60).replace('[', '(').replace(']', ')')} ({b['stage']}, {int(b['strength'])})"
-                 for b in blips]
-    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        names = [f"{_plain(b['name'], 60)} ({b['stage']}, {int(b['strength'])})" for b in blips]
+    except (ValueError, TypeError, KeyError, AttributeError):
         return None
-    when = at.strftime("%H:%M UTC" if at.date() == today else "%Y-%m-%d %H:%M UTC")
-    return f"**Signal Radar** (as of {when}): " + (" · ".join(names) or "nothing new, hot or rising")
+    return (f"**Signal Radar** (as of {when}): " + (" · ".join(names) or "nothing new, hot or rising")) if when else None
+
+
+def _blind_line(data: dict | None) -> str | None:
+    """The radar's blind spots — strong blips no vault note anchors (`blind_spots`, keys into
+    `blips`) — the BLIND_SHOW strongest by name, and how many more. None when there are none or
+    the file is missing or malformed."""
+    try:
+        by_key = {b["key"]: b for b in data["blips"]}
+        spots = sorted((by_key[k] for k in data["blind_spots"]), key=lambda b: (-b["strength"], b["key"]))
+        names = [_plain(b["name"], 60) for b in spots[:BLIND_SHOW]]
+    except (TypeError, KeyError, AttributeError):
+        return None
+    more = f" (+{len(spots) - BLIND_SHOW} more, see the Signal Radar)" if len(spots) > BLIND_SHOW else ""
+    return f"**Not in your vault yet:** {' · '.join(names)}{more}" if names else None
 
 
 def _signal_artifact_url(vault: Path) -> str:
@@ -264,13 +337,20 @@ def build(vault: Path, today: date) -> tuple[dict[str, str], dict]:
     queue = inbox(vault, parked)
     chart = per_day(vault, today)
     peak = max((c for _, c in chart), default=0) or 1
+    fresh = topics(vault, new)
+    signal = _signal(vault)
 
     held = len(parked) + len(dlq)
     waiting = (f"**{held} stuck**" if held else "Nothing stuck") + " · " + (
         f"**{len(queue)} waiting** in the inbox" if queue else "inbox empty")
-    status = [f"*Generated {format_ts(utc_timestamp())} · {_last_run(vault)}*", "", waiting]
-    if signal := _signal_line(vault, today):
-        status += ["", signal]
+    health = _health_line(vault, today)
+    receipt, *drops = _receipt(vault, today)
+    status = [*([health, ""] if health else []), f"*Generated {format_ts(utc_timestamp())} · {receipt}*", *drops, "", waiting]
+    new_topics = ("**New topics:** " + " · ".join(_link(vault, p) for p in fresh[:TOPICS_SHOW])
+                  + (f" … and {len(fresh) - TOPICS_SHOW} more" if len(fresh) > TOPICS_SHOW else "")) if fresh else None
+    for line in (_signal_line(signal, today), new_topics, _blind_line(signal)):
+        if line:
+            status += ["", line]
     out = ["---", f"generated_by: {GENERATOR}", "cssclasses:", "  - dashboard", "---", "# Now", "", HEADER, "",
            *status, "", " · ".join(_nav(vault, today)), ""]
     for view in LIVE_VIEWS:
@@ -287,18 +367,18 @@ def build(vault: Path, today: date) -> tuple[dict[str, str], dict]:
                         folded=True)
         out += [f"![[{BASE}#Inbox]]", ""]
     out += [f"## This week (since {since.isoformat()})", ""]
-    out += _callout("success", f"New this week ({len(new)})", _capped([f"- {_link(vault, p)}" for p in new]) or ["- (none)"],
+    out += _callout("success", f"New this week ({len(new)} notes distilled)", _capped([f"- {_link(vault, p)}" for p in new]) or ["- (none)"],
                     folded=True)
     # `updated_at` is young: a window that opens before the first stamp undercounts, and the title
     # says so instead of passing the number off as the whole week.
     first = first_updated(vault)
     counted = ("; no note has updated_at yet" if not first else
                f"; counted since {first}, when updated_at started" if first > since.isoformat() else "")
-    out += _callout("info", f"Enriched this week ({len(enriched)}{counted})",
+    out += _callout("info", f"Enriched this week ({len(enriched)} notes changed{counted})",
                     _capped([f"- {_link(vault, p)}" for p in enriched]) or ["- (none)"], folded=True)
     out += _callout("tip", f"Radar: strong this week ({len(strong)})",
                     _capped([_radar_line(r) for r in strong], RADAR_SHOW) or ["- (none)"], folded=True)
-    out += _callout("note", "Distilled per day", ["```text"] + [f"{d[5:]} {'█' * round(20 * c / peak):<20} {c}" for d, c in chart] + ["```"],
+    out += _callout("note", "Distilled per day (notes distilled)", ["```text"] + [f"{d[5:]} {'█' * round(20 * c / peak):<20} {c}" for d, c in chart] + ["```"],
                     folded=True)
     now_md = "\n".join(out).rstrip() + "\n"
 
@@ -315,7 +395,7 @@ def build(vault: Path, today: date) -> tuple[dict[str, str], dict]:
         board += [f"## {lane}", ""] + items + [""]
     board += ["%% kanban:settings", "```", json.dumps({"kanban-plugin": "board", "list-collapse": [False] * len(lanes)}), "```", "%%"]
     stats = {"new": len(new), "enriched": len(enriched), "source": source, "radar": len(strong),
-             "parked": len(parked), "dlq": len(dlq), "inbox": len(queue)}
+             "parked": len(parked), "dlq": len(dlq), "inbox": len(queue), "topics": len(fresh), "per_day": dict(chart)}
     return {NOW: now_md, BOARD: "\n".join(board) + "\n"}, stats
 
 
