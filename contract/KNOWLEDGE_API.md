@@ -23,16 +23,18 @@ The baseline surface every plugin can rely on:
 These are filesystem operations first; where `core` exposes one as a CLI command, the command
 takes flags in and returns JSON out.
 
-## v1+ — reserved for the Rust engines
+## v1+ — implemented by the Rust engines
 
 A stable CLI-in/JSON-out interface that plugins may call but must never bypass by reading an
 engine's internal state (index files, databases) directly:
 
-- **farsight** — `query`: hybrid BM25+vector search over vault and PDF chunks.
-- **gaiafield** — `neighbors`, `context`, and other graph queries over the link/frontmatter/tag
-  graph.
+- **farsight** — `query`: BM25 full-text search over the vault's active notes. Vector search and
+  PDF-chunk support are later increments, not shipped yet (`crates/farsight/README.md`).
+- **gaiafield** — `neighbors`, `path`, `stats`: graph queries over the link/frontmatter/tag graph;
+  `candidates`/`surprise`: the inferred-edge surface (see v2 below). `context` is named as a
+  reserved verb here but is not implemented (`crates/gaiafield/README.md`).
 
-Until an engine ships, plugins needing this behavior fall back to the v0 surface (e.g. grep-based
+A plugin needing behavior beyond what's shipped falls back to the v0 surface (e.g. grep-based
 search) rather than inventing a competing interface.
 
 ## v2 — inferred edges (R5)
@@ -83,9 +85,14 @@ model name (rule 3); every emitted block carries all three.
 
 ## Automation sinks
 
-Scripts that run without a human in the loop write to two places only: `00_Memory/` (their own
-state, reports and dead-letter notes) and `01_Capture/` (material for distill, which reaches
-`02_`–`04_` only through the human checkpoint). The radar is the first plugin that does both on a
+Scripts that run without a human in the loop write to three places only: `00_Memory/` (their own
+state, reports and dead-letter notes), `01_Capture/` (material for distill, which reaches
+`02_`–`04_` only through the human checkpoint), and generated navigation (`Index.md`, `Now.md`,
+`Maps/`, `Boards/Pipeline.md`, `Imports.md`, `Dashboard.html`, `Log.md` — see
+`contract/VAULT_SCHEMA.md`'s "Generated navigation"). The third sink is written only by the
+pipeline's `end` step through its listed generators (`pipeline_run.py`'s `GENERATORS`), is never
+hand-edited, and is fully regenerated each run — it is navigation over active content, not active
+content itself. The radar is the first plugin that uses both of the first two sinks on a
 schedule: `00_Memory/radar/` daily, `01_Capture/Radar-Week-*.md` weekly.
 
 ## Cross-plugin ledgers (v1)
