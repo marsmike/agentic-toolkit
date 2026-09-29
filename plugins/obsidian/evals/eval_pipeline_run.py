@@ -438,14 +438,21 @@ def run(vault: Path) -> dict:
                 f"---\ndescription: {name}\nstatus: distilled\nsource: https://example.org/{name}\n"
                 f"processed_date: 2026-09-24\ndistilled_at: '2026-09-24T00:00:00Z'\nupdated_at: '{head_value}'\n---\n\nBody.\n",
                 encoding="utf-8")
+        # an old note (no updated_at in HEAD or the tree) that an enrichment changes: the common case
+        (sandbox / "04_Resources" / "Eval-Stamp-Old.md").write_text(
+            "---\ndescription: old\nstatus: distilled\nsource: https://example.org/old\nprocessed_date: 2026-09-01\n"
+            "distilled_at: '2026-09-01T00:00:00Z'\n---\n\nBody.\n", encoding="utf-8")
         _git(sandbox, "add", "-A")
-        _git(sandbox, "commit", "-q", "-m", "eval fixture: enriched candidates")
-        for name in ("Eval-Stamp-Enriched", "Eval-Stamp-Restamped"):
+        _git(sandbox, "commit", "-q", "-m", "eval fixture: enriched candidates and an old note")
+        for name in ("Eval-Stamp-Enriched", "Eval-Stamp-Restamped", "Eval-Stamp-Old"):
             path = sandbox / "04_Resources" / f"{name}.md"
             path.write_text(path.read_text(encoding="utf-8") + "\nEnriched line.\n", encoding="utf-8")
         restamped = sandbox / "04_Resources" / "Eval-Stamp-Restamped.md"
         restamped.write_text(restamped.read_text(encoding="utf-8").replace("2026-09-01T00:00:00Z'", "2026-09-29T07:00:00Z'"), encoding="utf-8")
         stamped = pr.stamp_distilled_notes(sandbox, [])
+        old_fm, _ = read_frontmatter(sandbox / "04_Resources" / "Eval-Stamp-Old.md")
+        if "04_Resources/Eval-Stamp-Old.md" not in stamped or not _re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", str(old_fm.get("updated_at") or "")):
+            problems.append(f"phase 8: an old note with no updated_at, then enriched, was not stamped: {old_fm.get('updated_at')!r}")
         if "04_Resources/Eval-Stamp-Enriched.md" not in stamped or "04_Resources/Eval-Stamp-Restamped.md" in stamped:
             problems.append(f"phase 8: updated_at safety net stamped the wrong notes: {stamped}")
         enriched_fm, _ = read_frontmatter(sandbox / "04_Resources" / "Eval-Stamp-Enriched.md")

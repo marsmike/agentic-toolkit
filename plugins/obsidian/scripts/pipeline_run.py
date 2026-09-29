@@ -349,12 +349,9 @@ def stamp_distilled_notes(vault: Path, rows_in: list[dict]) -> list[str]:
         # in HEAD, or none, so it gets `now`. A note `retire_capture.py` stamped this run differs
         # from HEAD and is left alone. [earned: 2026-09-29 — "recently changed" needs one stamp
         # per changed note, not one per note somebody remembered to name]
-        if "A" not in code and "?" not in code:
-            head = _git(vault, "show", f"HEAD:{rel}").stdout
-            m = re.search(r"^updated_at:\s*['\"]?([^'\"\n]+)", head.split("\n---", 2)[0], flags=re.M)
-            unchanged = bool(m) and str(fm.get("updated_at") or "") == m.group(1).strip()
-        else:
-            unchanged = not fm.get("updated_at")
+        head = _git(vault, "show", f"HEAD:{rel}").stdout  # empty for a note HEAD has never seen
+        m = re.search(r"^updated_at:\s*['\"]?([^'\"\n]+)", head.split("\n---", 2)[0], flags=re.M)
+        unchanged = str(fm.get("updated_at") or "") == (m.group(1).strip() if m else "")
         if unchanged:
             set_frontmatter_fields(path, {"updated_at": now})
             if rel not in stamped:
