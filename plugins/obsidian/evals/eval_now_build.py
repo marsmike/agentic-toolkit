@@ -1,17 +1,22 @@
-"""Eval: now_build.py writes Now.md and the Pipeline board from the vault's state, in a git sandbox.
+"""Eval: now_build.py writes Now.md and the Pipeline board from the vault's state, in a sandbox.
 
-Fixture: after a base commit, a `pipeline …` commit adds one note and changes another, and a
-hand commit adds a third; the radar state holds a strong item from this week, one from a month
-ago and a weak one; one capture is parked, one DLQ note is open and one resolved.
+Fixture: notes whose distilled date (`distilled_at`, else `processed_date`; estimated or not) and
+`updated_at` fall in or before the week; the radar state holds a strong item from this week, one
+from a month ago and a weak one; one capture is parked, one DLQ note is open and one resolved.
 
 0. shape     — the status block (generated line, last run, stuck/inbox counts) comes first, then the
                live views (Recently changed, Recently distilled), then Stuck and Inbox, then the
                week's lists as folded callouts (`> [!tip]- …`)
-1. week      — New holds the pipeline's new note (not the hand-committed one), Enriched the changed one;
-               a root `status: active` note the run added is new, the Index.md it rewrote is not
-               (2026-09-24 review IMPL-GLM-4); an added note distilled before the week, or with an
-               estimated or non-date one, is not new; one never distilled is, whatever its `created`;
-               New runs newest first (2026-09-26: 1,322 "new")
+1. week      — from frontmatter only (stats `source: frontmatter`): New holds the notes distilled in
+               the window, newest first, a root `status: active` one among them and Index.md never
+               (2026-09-24 review IMPL-GLM-4); a note distilled before the week, with an estimated
+               or non-date date, or never distilled, is not new; a note updated in the window but
+               distilled before it (or estimated) is enriched once and never also new; one with
+               both dates in the window is new only
+1b. history  — the same lists with no git at all and after one commit of everything: a count never
+               depends on how much history a checkout has (2026-09-29: a shallow clone's "52 new")
+1c. honesty  — Enriched's title says "counted since <first updated_at>" while the window opens
+               before the vault's first `updated_at`, and not once a stamp predates the window
 2. radar     — only this week's strong item
 3. stuck     — the parked capture and the open DLQ note, not the resolved one; the inbox leaves the
                parked capture out
@@ -32,14 +37,14 @@ import json
 import os
 import re
 import subprocess
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import yaml
 from _sandbox import make_sandbox, teardown_sandbox
 
 NAME = "now_build"
-NOTE = "---\ndescription: {d}\nstatus: distilled\nprocessed_date: {p}\n---\n\n# N\n"
+NOTE = "---\ndescription: {d}\nstatus: distilled\n{fm}---\n\n# N\n"
 EXCLUDED = ("00_Memory/", "01_Capture/", "00_Daily/")
 QUIET = "Nothing stuck · inbox empty"
 
@@ -65,40 +70,33 @@ def run(vault: Path) -> dict:
     import now_build
 
     problems: list[str] = []
-    today = date.today()
+    # One UTC day for the fixture and every build (`--today`): a local date near midnight would
+    # move the window under the fixture.
+    today = datetime.now(UTC).date()
+    at = f"--today={today}"
+    since = today - timedelta(days=now_build.WEEK)
     sandbox, saved = None, os.environ.get("TOOLKIT_VAULT")
     try:
         sandbox = make_sandbox(vault)
         os.environ["TOOLKIT_VAULT"] = str(sandbox)
-        for args in (("init", "-q"), ("config", "user.email", "eval@example.org"), ("config", "user.name", "eval"),
-                     ("add", "-A"), ("commit", "-q", "-m", "base")):
-            _git(sandbox, *args)
         res = sandbox / "04_Resources"
-        (res / "Eval-Pipeline-New.md").write_text(NOTE.format(d="new", p=today.isoformat()), encoding="utf-8")
-        (res / "Eval-Pipeline-Earlier.md").write_text(NOTE.format(d="earlier", p=(today - timedelta(days=2)).isoformat()), encoding="utf-8")
-        (res / "Eval-Pipeline-Legacy.md").write_text(NOTE.format(d="legacy", p="2020-01-01"), encoding="utf-8")
-        (res / "Eval-Pipeline-Undistilled.md").write_text("---\ndescription: project\nstatus: active\ncreated: 2020-01-01\n---\n\n# P\n", encoding="utf-8")
-        (res / "Eval-Pipeline-Unknown.md").write_text(NOTE.format(d="unknown", p="unknown"), encoding="utf-8")
-        (res / "Eval-Pipeline-Estimated.md").write_text(
-            NOTE.format(d="estimated", p=today.isoformat()).replace("status:", "processed_date_estimated: true\nstatus:"), encoding="utf-8")
-        enriched = next(p for p in sorted((res / "Concepts").glob("*.md")))
-        enriched.write_text(enriched.read_text(encoding="utf-8") + "\nEnriched.\n", encoding="utf-8")
-        (sandbox / "Eval-Root-Profile.md").write_text("---\ndescription: root\nstatus: active\n---\n\n# R\n", encoding="utf-8")
+        fixture = {
+            "Eval-New": f"distilled_at: '{today}T09:00:00Z'\nupdated_at: '{today}T09:00:00Z'\n",
+            "Eval-Both": f"distilled_at: '{today}T08:00:00+00:00'\nprocessed_date: 2020-01-01\nupdated_at: '{today}T11:00:00Z'\n",
+            "Eval-Earlier": f"processed_date: {today - timedelta(days=2)}\n",
+            "Eval-Legacy": "processed_date: 2020-01-01\n",
+            "Eval-Unknown": "processed_date: unknown\n",
+            "Eval-Estimated": f"processed_date: {today}\nprocessed_date_estimated: true\nupdated_at: '{today}T10:00:00Z'\n",
+            "Eval-Est-At": f"distilled_at: '{today}T06:00:00Z'\ndistilled_at_estimated: true\nprocessed_date: {since - timedelta(days=9)}\n",
+            "Eval-Enriched": f"processed_date: {since - timedelta(days=3)}\nupdated_at: '{today}T07:00:00Z'\n",
+        }
+        for name, fm in fixture.items():
+            (res / f"{name}.md").write_text(NOTE.format(d=name, fm=fm), encoding="utf-8")
+        (res / "Eval-Undistilled.md").write_text("---\ndescription: project\nstatus: active\ncreated: 2020-01-01\n---\n\n# P\n", encoding="utf-8")
+        (sandbox / "Eval-Root-Profile.md").write_text(
+            f"---\ndescription: root\nstatus: active\nprocessed_date: {today - timedelta(days=1)}\n---\n\n# R\n", encoding="utf-8")
+        (sandbox / "Eval-Root-Undated.md").write_text("---\ndescription: root\nstatus: active\n---\n\n# R\n", encoding="utf-8")
         (sandbox / "Index.md").write_text((sandbox / "Index.md").read_text(encoding="utf-8") + "\n", encoding="utf-8")
-        _git(sandbox, "add", "-A")
-        _git(sandbox, "commit", "-q", "-m", "pipeline 2026-09-23 12:00: 1 distilled, 0 dropped, 0 failed")
-        (res / "Eval-Hand-Note.md").write_text(NOTE.format(d="hand", p="2020-01-01"), encoding="utf-8")
-        _git(sandbox, "add", "-A")
-        _git(sandbox, "commit", "-q", "-m", "hand note")
-
-        # A later pipeline commit, same week, enriches a note the *first* pipeline commit added
-        # with an estimated processed_date (so it never counted as "new"). It must not vanish
-        # from both lists: `changed - new` used to exclude every path ever added this week, not
-        # only what "New" actually lists. [earned: 2026-09-28 battle test]
-        estimated = res / "Eval-Pipeline-Estimated.md"
-        estimated.write_text(estimated.read_text(encoding="utf-8") + "\nEnriched later.\n", encoding="utf-8")
-        _git(sandbox, "add", "-A")
-        _git(sandbox, "commit", "-q", "-m", "pipeline 2026-09-24 09:00: 0 distilled, 0 dropped, 0 failed")
 
         radar = sandbox / "00_Memory" / "radar"
         radar.mkdir(parents=True, exist_ok=True)
@@ -119,7 +117,7 @@ def run(vault: Path) -> dict:
         (dlq / "2026-09-20-open.md").write_text("---\nstatus: active\n---\n# open\n", encoding="utf-8")
         (dlq / "2026-09-19-done.md").write_text("---\nstatus: resolved\n---\n# done\n", encoding="utf-8")
 
-        now_build.main([])
+        now_build.main([at])  # the sandbox has no .git at all
         now = (sandbox / "Now.md").read_text(encoding="utf-8")
         board = (sandbox / "Boards" / "Pipeline.md").read_text(encoding="utf-8")
 
@@ -139,22 +137,39 @@ def run(vault: Path) -> dict:
 
         # 1. week
         new, enr = _callout(now, "New this week"), _callout(now, "Enriched this week")
-        if "Eval-Pipeline-New" not in new or "Eval-Hand-Note" in new or enriched.stem not in enr:
-            problems.append(f"phase 1: new/enriched from the pipeline commit only; new={new!r} enriched={enr!r}")
-        if "Eval-Pipeline-Undistilled" not in new or "Eval-Pipeline-Unknown" in new:
-            problems.append(f"phase 1: no processed_date is new whatever `created` says; a non-date one is not; new={new!r}")
-        if "Eval-Pipeline-Legacy" in new + enr:
-            problems.append(f"phase 1: an added note dated before the week is not new; new={new!r}")
-        if "Eval-Pipeline-Estimated" in new:
-            problems.append(f"phase 1: an added note with an estimated processed_date is not new; new={new!r}")
-        if "Eval-Pipeline-Estimated" not in enr:
-            problems.append(
-                f"phase 1: a later pipeline commit enriching a note an earlier one added (estimated "
-                f"date, so never 'new') must still show as enriched, not vanish from both lists; enriched={enr!r}")
-        if not (0 <= new.find("Eval-Pipeline-New") < new.find("Eval-Pipeline-Earlier") < new.find("Eval-Root-Profile")):
-            problems.append(f"phase 1: New runs newest first, undated last; new={new!r}")
-        if "Eval-Root-Profile" not in new or "[[Index" in new + enr:
-            problems.append(f"phase 1: a root active note counts as new, Index.md never; new={new!r} enriched={enr!r}")
+        stats = now_build.build(sandbox, today)[1]
+        if stats["source"] != "frontmatter" or "git history" in now:
+            problems.append(f"phase 1: the week is counted from frontmatter and never mentions git; source={stats['source']!r}")
+        if not (0 <= new.find("Eval-New") < new.find("Eval-Both") < new.find("Eval-Root-Profile") < new.find("Eval-Earlier")):
+            problems.append(f"phase 1: New holds the notes distilled in the window (distilled_at before processed_date), newest first; new={new!r}")
+        if any(n in new + enr for n in ("Eval-Legacy", "Eval-Unknown", "Eval-Undistilled", "Eval-Root-Undated", "Eval-Est-At", "[[Index")):
+            problems.append(f"phase 1: a note distilled before the week, with a non-date or estimated date, or never "
+                            f"distilled is in neither list, Index.md never; new={new!r} enriched={enr!r}")
+        if "Eval-Estimated" in new or "Eval-Enriched" in new or "Eval-New" in enr or "Eval-Both" in enr:
+            problems.append(f"phase 1: a note is new or enriched, never both; new={new!r} enriched={enr!r}")
+        if not (0 <= enr.find("Eval-Estimated") < enr.find("Eval-Enriched")) or enr.count("Eval-Enriched") != 1:
+            problems.append(f"phase 1: Enriched holds the notes updated in the window but not distilled in it "
+                            f"(an estimated date among them), once each, newest first; enriched={enr!r}")
+
+        # 1b. history: a checkout with one commit of everything (a shallow clone's view) lists
+        # exactly what one with no git at all does
+        for args in (("init", "-q"), ("config", "user.email", "eval@example.org"), ("config", "user.name", "eval"),
+                     ("add", "-A"), ("commit", "-q", "-m", "pipeline 2026-09-27 12:35: 1 distilled, 0 dropped, 0 failed")):
+            _git(sandbox, *args)
+        now_build.main([at])
+        again = (sandbox / "Now.md").read_text(encoding="utf-8")
+        if (_callout(again, "New this week"), _callout(again, "Enriched this week")) != (new, enr):
+            problems.append("phase 1b: New/Enriched differ between no git history and a single commit")
+
+        # 1c. honesty: every updated_at is from today, so the window opens before the first one
+        if f"Enriched this week (2; counted since {today}, when updated_at started)" not in now:
+            problems.append(f"phase 1c: Enriched says it counts since the first updated_at ({today})")
+        (res / "Eval-Old-Stamp.md").write_text(
+            NOTE.format(d="old", fm=f"processed_date: 2020-01-01\nupdated_at: '{since - timedelta(days=1)}T12:00:00Z'\n"), encoding="utf-8")
+        now_build.main([at])
+        stamped = (sandbox / "Now.md").read_text(encoding="utf-8")
+        if "counted since" in stamped or "> [!info]- Enriched this week (2)\n" not in stamped or "Eval-Old-Stamp" in stamped:
+            problems.append("phase 1c: once an updated_at predates the window, no 'counted since', and that note is in neither list")
         # 2. radar
         rad = _callout(now, "Radar")
         if "Strong this week" not in rad or "last month" in rad or "Weak" in rad:
@@ -192,7 +207,7 @@ def run(vault: Path) -> dict:
 
         # 7. signal: another routine's file, labelled with its own time; the Signal Radar note, today's
         # daily note and the two artifact URLs join the link row once they exist
-        utc_today = datetime.now(UTC).date()
+        utc_today = today
         blips = [{"name": n, "stage": s, "strength": v} for n, s, v in
                  (("Hot Thing", "hot", 80), ("Steady Thing", "steady", 70), ("New [Thing]", "new", 60), ("Rising Thing", "rising", 50))]
         (radar / "signal.json").write_text(json.dumps({"generated": f"{utc_today}T08:30:00Z", "blips": blips}), encoding="utf-8")
@@ -204,7 +219,7 @@ def run(vault: Path) -> dict:
             profile = sandbox / rel
             text = profile.read_text(encoding="utf-8").replace(f"{key}: null\n", "")
             profile.write_text(text.replace(anchor, f"{anchor}{key}: https://claude.ai/artifact/{key}\n", 1), encoding="utf-8")
-        now_build.main([])
+        now_build.main([at])
         now = (sandbox / "Now.md").read_text(encoding="utf-8")
         line = next((ln for ln in now.splitlines() if ln.startswith("**Signal Radar**")), "")
         if (line != "**Signal Radar** (as of 08:30 UTC): Hot Thing (hot, 80) · New (Thing) (new, 60) · Rising Thing (rising, 50)"
@@ -216,12 +231,12 @@ def run(vault: Path) -> dict:
         if not all(w in nav for w in want) or _dead(now):
             problems.append(f"phase 7: the link row names today's note and the Signal Radar note by obsidian://, and both artifacts; got {nav!r}")
         (radar / "signal.json").write_text(json.dumps({"generated": f"{utc_today - timedelta(days=1)}T23:10:00Z", "blips": []}), encoding="utf-8")
-        now_build.main([])
+        now_build.main([at])
         now = (sandbox / "Now.md").read_text(encoding="utf-8")
         if f"**Signal Radar** (as of {utc_today - timedelta(days=1)} 23:10 UTC): nothing new, hot or rising" not in now:
             problems.append("phase 7: a signal.json from before today carries its date, and no blip says so")
         (radar / "signal.json").write_text("{", encoding="utf-8")
-        now_build.main([])
+        now_build.main([at])
         if "**Signal Radar**" in (sandbox / "Now.md").read_text(encoding="utf-8"):
             problems.append("phase 7: a malformed signal.json drops the line")
 
@@ -229,7 +244,7 @@ def run(vault: Path) -> dict:
         (sandbox / "00_Memory" / "pipeline-state.json").write_text(json.dumps({"parked": []}), encoding="utf-8")
         for p in [*dlq.glob("*.md"), *(sandbox / "01_Capture").glob("*.md")]:
             p.unlink()
-        now_build.main([])
+        now_build.main([at])
         now = (sandbox / "Now.md").read_text(encoding="utf-8")
         sections = ("] Stuck (", "] Inbox (", "#Stuck]]", "#Inbox]]")
         if QUIET not in now or any(s in now for s in sections) or "![[Vault.base#Recently changed]]" not in now:
