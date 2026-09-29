@@ -20,9 +20,12 @@ graph — offline (gaiafield and Kagi stubbed).
                ledger file, and the pipeline's spend in the other one counts against the same budget;
                with Tavily available it asks the news index first (6c); a name with 0 news hits (6d)
                falls back to a general search, still under the same ledger/budget
-7. writes    — signal.json, Signal-Radar.html and Signal-Radar.md in the radar dir, the page
-               carries its data and the note wikilinks the anchor note; nothing else in the vault
-               changes but the radar dir
+7. writes    — signal.json, Signal-Radar.html, Signal-Radar.md and the note's two SVGs
+               (Signal-Radar-scope.svg, Signal-Radar-momentum.svg) in the radar dir, the page
+               carries its data and the note embeds both SVGs and wikilinks the anchor note; the
+               SVGs are well-formed, scriptless, titled, escape a hostile name, re-render byte for
+               byte and draw one dot per blip the page places; nothing else in the vault changes
+               but the radar dir
 8. no graph  — without gaiafield the graph is "skipped" and the anchor still comes from the files
 9. vocab/early (pure, no sandbox) — "Sonnet 5.5" on one mention keeps its sector because "Sonnet"
                is a sibling of "Opus"/"Fable", already in that interest's own query; "SpaceX" on
@@ -239,6 +242,53 @@ def _alias_checks(problems: list[str]) -> None:
         problems.append(f"alias: two mentions judged under the old id should earn the renamed interest's sector, got {blip['sector']!r}")
 
 
+def _svg_checks(problems: list[str], out: Path, data: dict) -> None:
+    """The note's two images, from the run's own data plus a name crafted to break out of the
+    markup: well-formed, no script, titled and described, escaped, byte-identical on a second
+    render, one blip per dot the page would place, and no crash on no data or on a single blip."""
+    import xml.etree.ElementTree as ET
+
+    import signal_render as R
+
+    ns = "{http://www.w3.org/2000/svg}"
+    hostile = '<img src=x onerror=1>&"\x01'
+    evil = {**data, "blips": [*data["blips"], {**data["blips"][0], "key": "evil", "name": hostile, "strength": 99}]}
+    for fname in (R.SCOPE_SVG, R.MOMENTUM_SVG):
+        if not (out / fname).is_file():
+            problems.append(f"svg: {fname} was not written beside signal.json")
+    renders = {"scope": R.render_scope_svg, "momentum": R.render_momentum_svg}
+    for name, render in renders.items():
+        for label, case in (("run", data), ("hostile", evil), ("empty", {}),
+                            ("one blip", {**data, "blips": data["blips"][:1]}),
+                            ("one sector", {**data, "sectors": data["sectors"][:1]})):
+            svg = render(case)
+            try:
+                root = ET.fromstring(svg)
+            except ET.ParseError as exc:
+                problems.append(f"svg: {name} ({label}) is not well-formed XML: {exc}")
+                continue
+            tags = {el.tag.removeprefix(ns) for el in root.iter()}
+            if "script" in tags or "foreignObject" in tags or root.find(f"{ns}title") is None \
+                    or root.find(f"{ns}desc") is None or root.get("role") != "img":
+                problems.append(f"svg: {name} ({label}) needs role=img, a title and a desc, and no script, got {sorted(tags)}")
+            if render(case) != svg:
+                problems.append(f"svg: {name} ({label}) must render byte-identical from the same data")
+            if label == "hostile" and ("<img" in svg or "\x01" in svg
+                                       or not any((el.text or "").startswith("<img src=x onerror=1>&\"") for el in root.iter())):
+                problems.append(f"svg: {name} must escape a feed-supplied name, not carry it as markup")
+    written = (out / R.SCOPE_SVG).read_text(encoding="utf-8") if (out / R.SCOPE_SVG).is_file() else ""
+    if written != R.render_scope_svg(data):
+        problems.append("svg: the written scope must be the render of the written signal.json")
+    ids = {s["id"] for s in evil["sectors"]}
+    shown = sum(1 for b in evil["blips"] if b["sector"] in ids)  # the page places exactly these
+    try:
+        drawn = len(ET.fromstring(R.render_scope_svg(evil)).findall(f"{ns}g[@class='blip']"))
+    except ET.ParseError:
+        drawn = -1  # already reported above
+    if drawn != shown or not shown:
+        problems.append(f"svg: the scope must draw one dot per blip the page places ({shown}), got {drawn}")
+
+
 def run(vault: Path) -> dict:
     import interests
     import kagi
@@ -337,6 +387,11 @@ def run(vault: Path) -> dict:
             problems.append("writes: links must open at the top level (<base target=\"_blank\">), not in the artifact frame")
         if "[[04_Resources/Qwen-Notes" not in md:
             problems.append("writes: the note must wikilink the anchor note")
+        if "![[Signal-Radar-scope.svg]]" not in md or "![[Signal-Radar-momentum.svg]]" not in md or "obsidian://" in md:
+            problems.append("writes: the note must embed both SVGs as wikilinks, never an obsidian:// link")
+        if not {"00_Memory/radar/Signal-Radar-scope.svg", "00_Memory/radar/Signal-Radar-momentum.svg"} <= set(r.get("files", [])):
+            problems.append(f"writes: the result must list both SVGs among its files, got {r.get('files')}")
+        _svg_checks(problems, out, data)
         changed = {p for p, v in snapshot(sandbox).items() if before.get(p) != v}
         outside = sorted(p for p in changed if not p.startswith("00_Memory/radar/"))
         if outside:
