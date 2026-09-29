@@ -1,5 +1,6 @@
 formulas:
   domain: tags.filter(value.startsWith("domain/")).map(value.replace("domain/", "")).join(", ")
+  changed: if(note.updated_at, date(note.updated_at), if(note.distilled_at, date(note.distilled_at), date(note.processed_date)))
 properties:
   file.name:
     displayName: Title
@@ -17,7 +18,29 @@ properties:
     displayName: Source
   formula.domain:
     displayName: Domain
+  formula.changed:
+    displayName: Changed
 views:
+  - type: table
+    name: Recently changed
+    filters:
+      and:
+        - note.processed_date != null
+        - note.processed_date != "unknown"
+        - or:
+            - file.inFolder("02_Projects")
+            - file.inFolder("03_Areas")
+            - file.inFolder("04_Resources")
+    order:
+      - file.name
+      - formula.changed
+      - formula.domain
+      - kind
+      - description
+    sort:
+      - property: formula.changed
+        direction: DESC
+    limit: 15
   - type: table
     name: Recently distilled
     filters:

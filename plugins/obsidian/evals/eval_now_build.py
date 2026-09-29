@@ -4,6 +4,9 @@ Fixture: after a base commit, a `pipeline …` commit adds one note and changes 
 hand commit adds a third; the radar state holds a strong item from this week, one from a month
 ago and a weak one; one capture is parked, one DLQ note is open and one resolved.
 
+0. shape     — the status block (generated line, last run, stuck/inbox counts) comes first, then the
+               live views (Recently changed, Recently distilled), then Stuck and Inbox, then the
+               week's lists as folded callouts (`> [!tip]- …`)
 1. week      — New holds the pipeline's new note (not the hand-committed one), Enriched the changed one;
                a root `status: active` note the run added is new, the Index.md it rewrote is not
                (2026-09-24 review IMPL-GLM-4); an added note distilled before the week, or with an
@@ -13,10 +16,15 @@ ago and a weak one; one capture is parked, one DLQ note is open and one resolved
 3. stuck     — the parked capture and the open DLQ note, not the resolved one; the inbox leaves the
                parked capture out
 4. board     — Kanban frontmatter, the four lanes in order, every card a `- [ ]` line, settings JSON
-5. bases     — every view Now.md embeds exists in the shipped Vault.base
-6. no dead links on the docs site — Now.md/Pipeline.md never wikilink into 00_Memory/ or
-               01_Capture/ (docs.yml excludes both), and the nav line never links [[Log]] when
+5. bases     — every view Now.md embeds exists in the shipped Vault.base, Recently changed among them
+6. no dead links on the docs site — Now.md/Pipeline.md never wikilink into 00_Memory/, 01_Capture/
+               or 00_Daily/ (docs.yml excludes them), and the nav line never links [[Log]] when
                Log.md doesn't exist (2026-09-28 repo audit A1/A2)
+7. signal    — no signal.json, no Signal Radar line; with one, its new/hot/rising blips (not steady)
+               labelled with the file's own time; the Signal Radar note and today's daily note are
+               linked (by obsidian://, never a wikilink) once they exist; a malformed file drops the line
+8. quiet     — nothing parked, no open DLQ note, no capture: one "Nothing stuck · inbox empty" line,
+               no Stuck or Inbox section, the live views still there
 """
 from __future__ import annotations
 
@@ -24,7 +32,7 @@ import json
 import os
 import re
 import subprocess
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -32,6 +40,8 @@ from _sandbox import make_sandbox, teardown_sandbox
 
 NAME = "now_build"
 NOTE = "---\ndescription: {d}\nstatus: distilled\nprocessed_date: {p}\n---\n\n# N\n"
+EXCLUDED = ("00_Memory/", "01_Capture/", "00_Daily/")
+QUIET = "Nothing stuck · inbox empty"
 
 
 def _git(root: Path, *args: str) -> str:
@@ -39,8 +49,12 @@ def _git(root: Path, *args: str) -> str:
 
 
 def _callout(text: str, title: str) -> str:
-    m = re.search(rf"^> \[!\w+\] {re.escape(title)}.*?\n((?:>.*\n)*)", text, re.M)
+    m = re.search(rf"^> \[!\w+\]-? {re.escape(title)}.*?\n((?:>.*\n)*)", text, re.M)
     return m.group(1) if m else ""
+
+
+def _dead(text: str) -> list[str]:
+    return [m for m in re.findall(r"\[\[([^\]|]+)", text) if m.startswith(EXCLUDED)]
 
 
 def run(vault: Path) -> dict:
@@ -109,9 +123,19 @@ def run(vault: Path) -> dict:
         now = (sandbox / "Now.md").read_text(encoding="utf-8")
         board = (sandbox / "Boards" / "Pipeline.md").read_text(encoding="utf-8")
 
-        import re as _re
-        if not _re.search(r"\*Generated \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", now):
-            problems.append("phase 0: Now.md is missing its own 'Generated ... UTC' header line")
+        # 0. shape
+        if not re.search(r"\*Generated \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC · no run yet\*", now):
+            problems.append("phase 0: Now.md is missing its own 'Generated ... UTC · <last run>' status line")
+        marks = [now.find(s) for s in ("*Generated", "**2 stuck** · **", "![[Vault.base#Recently changed]]",
+                                       "![[Vault.base#Recently distilled]]", "> [!warning] Stuck (2)",
+                                       "> [!abstract]- Inbox (", "> [!success]- New this week")]
+        if -1 in marks or marks != sorted(marks):
+            problems.append(f"phase 0: status, live views, Stuck, Inbox, then the week, in that order; positions {marks}")
+        if not all(f"> [!{k}]- {t}" in now for k, t in (("info", "Enriched this week"), ("tip", "Radar: strong"),
+                                                         ("note", "Distilled per day"))):
+            problems.append("phase 0: the week's long lists are folded callouts")
+        if QUIET in now or "**Signal Radar**" in now:
+            problems.append("phase 0/7: a busy vault without signal.json shows no quiet line and no Signal Radar line")
 
         # 1. week
         new, enr = _callout(now, "New this week"), _callout(now, "Enriched this week")
@@ -154,18 +178,62 @@ def run(vault: Path) -> dict:
         shipped = Path(__file__).resolve().parent.parent / "obsidian" / "Vault.base"
         views = {v["name"] for v in yaml.safe_load(shipped.read_text(encoding="utf-8"))["views"]}
         embedded = set(re.findall(r"!\[\[Vault\.base#([^\]]+)\]\]", now))
-        if not embedded or embedded - views:
+        if not embedded or embedded - views or not {"Recently changed", "Stuck", "Inbox"} <= embedded:
             problems.append(f"phase 5: embedded views missing from Vault.base: {sorted(embedded - views) or 'none embedded'}")
         # 6. no dead links on the docs site: no wikilink into an excluded folder, and [[Log]] only
         # when Log.md exists (it doesn't here — no log_vault.py call in this fixture)
         for name, text in (("Now.md", now), ("Boards/Pipeline.md", board)):
-            bad = [m for m in re.findall(r"\[\[([^\]|]+)", text) if m.startswith(("00_Memory/", "01_Capture/"))]
-            if bad:
+            if bad := _dead(text):
                 problems.append(f"phase 6: {name} wikilinks into an excluded folder: {bad}")
         if "[[Log]]" in now or "[[Log|" in now:
             problems.append("phase 6: Now.md links [[Log]] although Log.md does not exist in the fixture")
         if "obsidian://open?vault=" not in stuck or "obsidian://open?vault=" not in inbox:
             problems.append(f"phase 6: Stuck/Inbox should reference 00_Memory/01_Capture notes via an obsidian:// link, not a wikilink; stuck={stuck!r} inbox={inbox!r}")
+
+        # 7. signal: another routine's file, labelled with its own time; the Signal Radar note, today's
+        # daily note and the two artifact URLs join the link row once they exist
+        utc_today = datetime.now(UTC).date()
+        blips = [{"name": n, "stage": s, "strength": v} for n, s, v in
+                 (("Hot Thing", "hot", 80), ("Steady Thing", "steady", 70), ("New [Thing]", "new", 60), ("Rising Thing", "rising", 50))]
+        (radar / "signal.json").write_text(json.dumps({"generated": f"{utc_today}T08:30:00Z", "blips": blips}), encoding="utf-8")
+        (radar / "Signal-Radar.md").write_text("# Signal Radar\n", encoding="utf-8")
+        (sandbox / "00_Daily").mkdir(exist_ok=True)
+        (sandbox / "00_Daily" / f"{utc_today}.md").write_text("# Today\n", encoding="utf-8")
+        for rel, anchor, key in (("Config/toolkit/radar.md", "plugin: radar\n", "signal_artifact_url"),
+                                 ("Config/toolkit/obsidian.md", "plugin: obsidian\n", "report_artifact_url")):
+            profile = sandbox / rel
+            text = profile.read_text(encoding="utf-8").replace(f"{key}: null\n", "")
+            profile.write_text(text.replace(anchor, f"{anchor}{key}: https://claude.ai/artifact/{key}\n", 1), encoding="utf-8")
+        now_build.main([])
+        now = (sandbox / "Now.md").read_text(encoding="utf-8")
+        line = next((ln for ln in now.splitlines() if ln.startswith("**Signal Radar**")), "")
+        if (line != "**Signal Radar** (as of 08:30 UTC): Hot Thing (hot, 80) · New (Thing) (new, 60) · Rising Thing (rising, 50)"
+                or now.find(line) > now.find("![[Vault.base#Recently changed]]")):
+            problems.append(f"phase 7: the new/hot/rising blips, as of the file's own time, above the live views; got {line!r}")
+        nav = next((ln for ln in now.splitlines() if ln.startswith("[[Maps/Overview")), "")
+        want = ("Today ([open](obsidian://", "Signal Radar ([open](obsidian://", "[Signal Radar (claude.ai)](https://claude.ai/artifact/signal_artifact_url)",
+                "[Last run report (claude.ai)](https://claude.ai/artifact/report_artifact_url)")
+        if not all(w in nav for w in want) or _dead(now):
+            problems.append(f"phase 7: the link row names today's note and the Signal Radar note by obsidian://, and both artifacts; got {nav!r}")
+        (radar / "signal.json").write_text(json.dumps({"generated": f"{utc_today - timedelta(days=1)}T23:10:00Z", "blips": []}), encoding="utf-8")
+        now_build.main([])
+        now = (sandbox / "Now.md").read_text(encoding="utf-8")
+        if f"**Signal Radar** (as of {utc_today - timedelta(days=1)} 23:10 UTC): nothing new, hot or rising" not in now:
+            problems.append("phase 7: a signal.json from before today carries its date, and no blip says so")
+        (radar / "signal.json").write_text("{", encoding="utf-8")
+        now_build.main([])
+        if "**Signal Radar**" in (sandbox / "Now.md").read_text(encoding="utf-8"):
+            problems.append("phase 7: a malformed signal.json drops the line")
+
+        # 8. quiet: nothing parked, no open DLQ note, no capture
+        (sandbox / "00_Memory" / "pipeline-state.json").write_text(json.dumps({"parked": []}), encoding="utf-8")
+        for p in [*dlq.glob("*.md"), *(sandbox / "01_Capture").glob("*.md")]:
+            p.unlink()
+        now_build.main([])
+        now = (sandbox / "Now.md").read_text(encoding="utf-8")
+        sections = ("] Stuck (", "] Inbox (", "#Stuck]]", "#Inbox]]")
+        if QUIET not in now or any(s in now for s in sections) or "![[Vault.base#Recently changed]]" not in now:
+            problems.append("phase 8: an all-quiet Now.md says so in one line, with no Stuck or Inbox section")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
@@ -174,4 +242,4 @@ def run(vault: Path) -> dict:
         if sandbox is not None:
             teardown_sandbox(sandbox)
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "week from pipeline commits, radar, stuck, Kanban board, embedded views exist"}
+            "detail": "; ".join(problems) if problems else "status first, folded week lists, radar, stuck, Kanban board, embedded views exist, signal, quiet"}
