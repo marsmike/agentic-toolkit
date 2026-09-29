@@ -280,6 +280,7 @@ def render_daily(run_date: str, rows: list[dict], interests: list[Interest], usa
     worth_n = sum(1 for r in rows if r["worth"])
     models = sorted({f"{r['backend']}/{r['model']}" for r in rows})
     qv = sorted({r["questions_version"] for r in rows})
+    now = now or datetime.now(UTC)
     lines = [
         "---",
         f"description: Radar {run_date} — {len(rows)} feed items judged, {strong_n} strong, {worth_n} worth reading",
@@ -291,11 +292,13 @@ def render_daily(run_date: str, rows: list[dict], interests: list[Interest], usa
         "",
         f"# Radar {run_date}",
         "",
-        f"*Generated {(now or datetime.now(UTC)).strftime('%Y-%m-%d %H:%M')} UTC.*",
+        f"*Generated {now.strftime('%Y-%m-%d %H:%M')} UTC.*",
         "",
+        # The counts are the whole day's; the spend is only the run that rewrote the note. [earned:
+        # 2026-09-29 — "This run: …" sat beside whole-day counts and read as the day's cost]
         f"{len(rows)} feed items judged against {len(interests)} interests ({', '.join(models) or 'no backend'}; "
         f"questions {', '.join(qv) or '-'}). **{strong_n} strong, {worth_n} worth reading.** "
-        f"This run: {usage.get('requests', 0)} requests, ${usage.get('usd', 0):.4f}.",
+        f"Last run at {now.strftime('%H:%M')} UTC: {usage.get('requests', 0)} requests, ${usage.get('usd', 0):.4f}.",
         "",
     ]
     quiet = []

@@ -36,6 +36,14 @@ graph — offline (gaiafield and Kagi stubbed).
                (real case, 2026-09-28: "AI Agents & Multi-Agent Systems" -> "AI Agents, Harnesses
                & Reliability") folds into the renamed interest's sector, not a phantom sector of
                its own; an id naming no live interest (current or aliased) resolves to nothing
+11. note     (pure, no sandbox) — the note's description counts every early warning and blind
+               spot, and a capped section says "showing 8 of 29"; with no vault baseline the
+               section says "no baseline yet" and lists the week's tags by count, never "0.0
+               baseline"; with one, only rising/new tags, each against its baseline (real cases,
+               2026-09-29)
+12. hubs     (pure, stub graph) — growing hubs follow the same baseline rule: too little history
+               is baseline None (not a "new hub" at 0.0); an estimated date puts no note in a
+               week, but still dates its anchor (a backfilled note is not new this week)
 """
 from __future__ import annotations
 
@@ -242,6 +250,66 @@ def _alias_checks(problems: list[str]) -> None:
         problems.append(f"alias: two mentions judged under the old id should earn the renamed interest's sector, got {blip['sector']!r}")
 
 
+def _note_checks(problems: list[str]) -> None:
+    """The Obsidian note's counts and baselines (real cases, 2026-09-29): 29 blind spots rendered as
+    "8 not yet in the vault"; with no real baseline every vault tag read "new, 0.0 baseline"."""
+    import signal_render as R
+
+    blips = [{"key": f"b{i}", "name": f"Thing {i}", "stage": "new", "strength": 90 - i, "families": ["hn"]}
+             for i in range(29)]
+    data = {"generated": "2026-09-29T08:29:00Z", "blips": blips, "early": [b["key"] for b in blips[:10]],
+            "blind_spots": [b["key"] for b in blips]}
+    md = R.render_md(data)
+    if "10 early warnings, 29 not yet in the vault" not in md:
+        problems.append("note: the description must count every early warning and blind spot, not the shown few")
+    if f"showing {R.MD_TOP_BLIND} of 29" not in md or f"Showing {R.MD_TOP_EARLY} of 10" not in md:
+        problems.append("note: a capped section must say how many it shows of how many")
+    few = R.render_md({**data, "early": data["early"][:2], "blind_spots": data["blind_spots"][:3]})
+    if "2 early warnings, 3 not yet in the vault" not in few or "howing" in few:
+        problems.append("note: an uncapped section needs no 'showing N of M'")
+
+    tags = [{"tag": "claude", "this_week": 9, "baseline": None, "ratio": None, "rising": False, "new": False},
+            {"tag": "podcast", "this_week": 5, "baseline": None, "ratio": None, "rising": False, "new": False}]
+    hubs = [{"title": "Quantization", "path": "04_Resources/Concepts/Quantization.md", "this_week": 15, "baseline": None, "new": False}]
+    young = R.render_md({**data, "vault": {"baseline": {"ready": False, "weeks": 2, "notes": 17}, "tags": tags},
+                         "graph": {"growing_hubs": hubs}})
+    if "No baseline yet" not in young or "**claude** — 9 this week" not in young or "no baseline yet" not in young \
+            or "0.0 baseline" in young or "None" in young or "## Rising in your vault" in young:
+        problems.append("note: without a baseline the vault section must say 'no baseline yet', list the week's "
+                        "tags by count and never print a 0.0 or None baseline")
+    rising = [{"tag": "qwen", "this_week": 6, "baseline": 1.25, "ratio": 4.8, "rising": True, "new": False}, *tags]
+    ready = R.render_md({**data, "vault": {"baseline": {"ready": True, "weeks": 4, "notes": 40}, "tags": rising}})
+    if "- **qwen** — rising, 6 this week vs 1.25 baseline" not in ready or "**claude**" in ready:
+        problems.append("note: with a baseline only rising or new tags are listed, each against its baseline")
+
+
+def _hub_checks(problems: list[str]) -> None:
+    """Growing hubs share the vault pulse's baseline rule: with too little dated history before
+    this week a hub has no baseline (None, not a "new hub" at 0.0); with enough, the mean is over
+    the weeks that hold notes; a backfilled (estimated) date is no date."""
+    import vault_graph
+
+    class Linked:  # every note links to one hub
+        ok = True
+
+        def neighbors(self, path: str, direction: str = "both") -> list[dict]:
+            return [{"path": "hub.md"}]
+
+    today = NOW.date()
+    this_week = {f"n{i}.md": {"title": f"N{i}", "written": (today - timedelta(days=i % 3)).isoformat()} for i in range(6)}
+    thin = {f"t{i}.md": {"title": f"T{i}", "written": (today - timedelta(days=9)).isoformat()} for i in range(3)}
+    rows = vault_graph.growing_hubs(Linked(), {**this_week, **thin}, today)
+    if len(rows) != 1 or rows[0]["baseline"] is not None or rows[0]["new"]:
+        problems.append(f"hubs: 3 notes of history are no baseline — baseline None, not a new hub, got {rows}")
+    history = {f"h{i}.md": {"title": f"H{i}", "written": (today - timedelta(days=9 + 7 * (i % 2))).isoformat()} for i in range(20)}
+    rows = vault_graph.growing_hubs(Linked(), {**this_week, **history}, today)
+    if len(rows) != 0:
+        problems.append(f"hubs: 6 this week against a baseline of 10 a week is not growing, got {rows}")
+    backfilled = {"processed_date": "2026-08-12", "processed_date_estimated": True}
+    if vault_graph._date(backfilled, real=True) is not None or vault_graph._date(backfilled) != "2026-08-12":
+        problems.append("hubs: an estimated processed_date must not date a note's week, but still dates its anchor")
+
+
 def _svg_checks(problems: list[str], out: Path, data: dict) -> None:
     """The note's two images, from the run's own data plus a name crafted to break out of the
     markup: well-formed, no script, titled and described, escaped, byte-identical on a second
@@ -326,6 +394,8 @@ def run(vault: Path) -> dict:
         _entity_checks(problems)
         _sector_and_early_checks(problems)
         _alias_checks(problems)
+        _note_checks(problems)
+        _hub_checks(problems)
         sandbox = make_sandbox(vault)
         (sandbox / "03_Areas" / "Sig-Interests.md").write_text(INTERESTS_NOTE, encoding="utf-8")
         (sandbox / "04_Resources" / "Qwen-Notes.md").write_text(QWEN_NOTE, encoding="utf-8")

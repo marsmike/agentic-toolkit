@@ -13,7 +13,7 @@ import re
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -192,6 +192,22 @@ def read_frontmatter(path: Path, strict: bool = False) -> tuple[dict, str]:
             raise UnparseableFrontmatter(f"{path}: frontmatter block did not parse to a mapping")
         return {}, text
     return dict(data), text[match.end():]
+
+
+def real_date(fm: dict, keys: Sequence[str]) -> date | None:
+    """The first of `keys` in `fm` that holds a parseable date and is not a backfilled estimate
+    (`<key>_estimated: true`, contract/VAULT_SCHEMA.md); a present-but-bad value (a placeholder
+    like "TBD") falls through to the next key. [earned: 2026-09-29 — a backfill stamped 1,096
+    notes `distilled_at_estimated` and 310 `processed_date_estimated`, and the Signal Radar
+    counted those dates as when the notes were written]"""
+    for key in keys:
+        if fm.get(f"{key}_estimated") is True:
+            continue
+        try:
+            return date.fromisoformat(str(fm.get(key) or "")[:10])
+        except ValueError:
+            continue
+    return None
 
 
 def write_frontmatter(path: Path, frontmatter: dict, body: str) -> None:

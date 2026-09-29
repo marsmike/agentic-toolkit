@@ -8,7 +8,8 @@ database directly), after an incremental `gaiafield index`:
   depth-1 neighbourhood says how connected it is, and the neighbours most of them share are its
   hubs ("connects to"). A thing with no anchor is a blind spot, whatever the week brought.
 - **Growing hubs.** The notes each of this week's new notes links to, counted against the mean of
-  the four weeks before: the places the graph is thickening now.
+  the four weeks before (none until there is enough dated history, as in `vault_pulse`): the
+  places the graph is thickening now. A backfilled `<key>_estimated` date puts no note in a week.
 
 Without a gaiafield binary the anchors still come from the files, the neighbourhood is empty and
 the status says `skipped`. Nothing is written to the vault except gaiafield's own ignored index
@@ -27,7 +28,8 @@ from pathlib import Path
 from typing import Any
 
 import entities
-from vault_utils import UnparseableFrontmatter, contained, read_frontmatter
+from vault_pulse import BASELINE_MIN_NOTES, BASELINE_MIN_WEEKS
+from vault_utils import UnparseableFrontmatter, contained, read_frontmatter, real_date
 
 CONTENT_DIRS = ("02_Projects", "03_Areas", "04_Resources")
 MAX_ANCHORS = 8          # notes asked about per named thing
@@ -95,7 +97,13 @@ class Graph:
         return self.cache[k]
 
 
-def _date(fm: dict) -> str | None:
+def _date(fm: dict, real: bool = False) -> str | None:
+    """The note's date. A backfilled estimate still proves a note is older than this week, so it
+    dates an anchor (`first_seen`); only `real=True`, for what was written when (growing hubs),
+    skips it."""
+    if real:
+        day = real_date(fm, ("created", "processed_date"))
+        return day.isoformat() if day else None
     for field in ("created", "processed_date"):
         v = str(fm.get(field) or "")[:10]
         try:
@@ -122,7 +130,7 @@ def note_index(vault: Path) -> tuple[dict[str, list[str]], dict[str, dict]]:
                 continue
             m = _H1.search(body)
             title = m.group(1).strip() if m else path.stem
-            notes[rel] = {"title": title, "created": _date(fm)}
+            notes[rel] = {"title": title, "created": _date(fm), "written": _date(fm, real=True)}
             tags = fm.get("tags") or []
             tags = [str(t) for t in (tags if isinstance(tags, list) else [tags])]
             keys = {entities.key(n) for n in entities.from_title(title) + entities.from_title(path.stem.replace("-", " "))}
@@ -153,13 +161,18 @@ def anchor(graph: Graph, notes: dict[str, dict], paths: list[str]) -> dict[str, 
 
 
 def growing_hubs(graph: Graph, notes: dict[str, dict], today: date, limit: int = 10) -> list[dict]:
-    """Hubs this week's new notes link to, against the mean week of the four before."""
+    """Hubs this week's new notes link to, against the mean week of the four before — over the
+    weeks that hold a note, and only once there is a baseline at all (vault_pulse's
+    BASELINE_MIN_WEEKS / BASELINE_MIN_NOTES); before that `baseline` is None and the hubs rank by
+    this week alone."""
     if not graph.ok:
         return []
     week_from = (today - timedelta(days=6)).isoformat()
     base_from = (today - timedelta(days=34)).isoformat()
-    recent = sorted(((n["created"], p) for p, n in notes.items() if n["created"] and n["created"] >= base_from),
-                    reverse=True)[:MAX_GROWTH_NOTES]
+    dated = [(n["written"], p) for p, n in notes.items() if n.get("written") and n["written"] >= base_from]
+    base_weeks = Counter((today - date.fromisoformat(c)).days // 7 for c, _ in dated if c < week_from)
+    ready = len(base_weeks) >= BASELINE_MIN_WEEKS and sum(base_weeks.values()) >= BASELINE_MIN_NOTES
+    recent = sorted(dated, reverse=True)[:MAX_GROWTH_NOTES]
     now_c: Counter = Counter()
     base_c: Counter = Counter()
     examples: dict[str, list[str]] = defaultdict(list)
@@ -173,13 +186,13 @@ def growing_hubs(graph: Graph, notes: dict[str, dict], today: date, limit: int =
                 base_c[n["path"]] += 1
     rows = []
     for hub, c in now_c.items():
-        base = base_c[hub] / 4
-        if c < 2 or c < 2 * base + 1:
+        base = base_c[hub] / len(base_weeks) if ready else None
+        if c < 2 or (base is not None and c < 2 * base + 1):
             continue
         rows.append({"title": notes.get(hub, {}).get("title") or Path(hub).stem, "path": hub, "this_week": c,
-                     "baseline": round(base, 2), "new": base == 0,
+                     "baseline": None if base is None else round(base, 2), "new": base == 0,
                      "examples": [{"title": notes[e]["title"], "path": e} for e in examples[hub] if e in notes]})
-    rows.sort(key=lambda r: (-(r["this_week"] - r["baseline"]), r["path"]))
+    rows.sort(key=lambda r: (-(r["this_week"] - (r["baseline"] or 0)), r["path"]))
     return rows[:limit]
 
 

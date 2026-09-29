@@ -6,7 +6,9 @@
                  carries no search queries and no reading signals; an item strong for two interests
                  is strong for both; an item whose source a vault note already has is marked; only
                  00_Memory/radar/ changes; a repost (same feed, same title, new URL) is not judged
-                 again; a new feed's back catalogue is marked seen as backlog, never judged
+                 again; a new feed's back catalogue is marked seen as backlog, never judged; the
+                 daily note's spend line names the last run ("Last run at HH:MM UTC"), since its
+                 counts are the whole day's
 3. rerun       — the same items are seen: no request, status empty
 4. split       — a backend refusing the state for size gets smaller chunks; every item is still judged
 5. failure     — a backend answering nothing: one DLQ note, status failed, nothing but backlog marked seen
@@ -229,6 +231,9 @@ def run(vault: Path) -> dict:
         note = (out / f"{NOW.date().isoformat()}.md").read_text(encoding="utf-8") if (out / f"{NOW.date().isoformat()}.md").is_file() else ""
         if "## Agent Memory" not in note or "## Firmware" not in note or "Nothing worth reading for: Birding" not in note:
             problems.append("phase 2: daily note is missing an interest section or the quiet line")
+        # the counts are the whole day's, the spend only the rewriting run's: the line says which run
+        if "Last run at 12:00 UTC: " not in note or "This run:" in note:
+            problems.append("phase 2: the daily note's spend line must say it is the last run's (at HH:MM UTC), not the day's")
 
         # 3. rerun
         n = len(calls)
