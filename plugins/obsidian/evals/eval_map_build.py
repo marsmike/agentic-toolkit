@@ -18,6 +18,10 @@ config block gives the domain a title, an intro and a "Concepts" section. After 
 8. duplicates — a bare [[Dup]] with two `Dup.md` notes resolves to the one in the linking note's
                own folder, and stays unresolved from any other folder (the example vault has two
                `Weekly-Review.md`; the first one scanned used to win, 2026-09-24 review CODE-4)
+9. obsidian  — every canvas is byte for byte what Obsidian writes when it saves it: one compact
+               object per line, tabs, `nodes`, `edges`, `metadata` in that order, no final newline;
+               an empty list is `[]` (2026-09-29: Obsidian re-saved two generated canvases on open,
+               8,752 uncommitted lines and a failed pull)
 """
 from __future__ import annotations
 
@@ -52,6 +56,21 @@ The fixture domain for eval_map_build.
 def _note(kind: str, when: str, desc: str, body: str) -> str:
     return (f"---\ndescription: {desc}\nkind: {kind}\nstatus: distilled\nprocessed_date: {when}\n"
             f"tags:\n  - domain/evalhub\n---\n\n# Note\n\n{body}\n")
+
+
+def _obsidian(canvas: dict) -> str:
+    """Obsidian's canvas serializer, re-implemented from the files it saved in the owner's vault."""
+    def compact(v) -> str:
+        return json.dumps(v, ensure_ascii=False, separators=(",", ":"))
+    parts = []
+    for key, value in canvas.items():
+        if isinstance(value, list):
+            inner = "".join(f"\n\t\t{compact(item)}," for item in value).rstrip(",")
+            parts.append(f"\t{compact(key)}:[{inner}\n\t]" if value else f"\t{compact(key)}:[]")
+        else:
+            inner = "".join(f"\n\t\t{compact(k)}:{compact(v)}," for k, v in value.items()).rstrip(",")
+            parts.append(f"\t{compact(key)}:{{{inner}\n\t}}")
+    return "{\n" + ",\n".join(parts) + "\n}"
 
 
 def _section(text: str, heading: str) -> str:
@@ -159,6 +178,21 @@ def run(vault: Path) -> dict:
         got = map_build.resolve_links(dup)
         if got["B/Linker"] != {"B/Dup"} or got["C/Stranger"] or got["C/Pathed"] != {"A/Dup"}:
             problems.append(f"phase 8: duplicate names must resolve to the own folder or not at all; got {got}")
+        # 9. Obsidian's own serialization: a re-save changes no byte
+        node_keys = (["id", "type", "file", "x", "y", "width", "height"], ["id", "type", "label", "x", "y", "width", "height"])
+        edge_keys = (["id", "fromNode", "fromSide", "toNode", "toSide"], ["id", "fromNode", "toNode", "label"])
+        canvases = {p.name: p.read_text(encoding="utf-8") for p in sorted(maps.glob("*.canvas"))}
+        canvases["(empty)"] = map_build._canvas([], [])
+        for name, text in canvases.items():
+            data = json.loads(text)
+            if list(data) != ["nodes", "edges", "metadata"] or data["metadata"] != {"version": "1.0-1.0", "frontmatter": {}}:
+                problems.append(f"phase 9: {name}: top level must be nodes, edges, metadata; got {list(data)}")
+            elif any(list(n) not in node_keys for n in data["nodes"]) or any(list(e) not in edge_keys for e in data["edges"]):
+                problems.append(f"phase 9: {name}: node or edge keys out of order")
+            elif _obsidian(data) != text:
+                problems.append(f"phase 9: {name} is not what Obsidian would save")
+        if canvases["(empty)"] != '{\n\t"nodes":[],\n\t"edges":[],\n\t"metadata":{\n\t\t"version":"1.0-1.0",\n\t\t"frontmatter":{}\n\t}\n}':
+            problems.append(f"phase 9: an empty canvas must be Obsidian's; got {canvases['(empty)']!r}")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
@@ -167,4 +201,5 @@ def run(vault: Path) -> dict:
         if sandbox is not None:
             teardown_sandbox(sandbox)
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "hubs, new, config sections, valid canvases, no stale maps, idempotent, duplicate names by folder"}
+            "detail": "; ".join(problems) if problems else "hubs, new, config sections, valid canvases, no stale maps, idempotent, duplicate names by folder, "
+                      "canvases in Obsidian's own serialization"}
