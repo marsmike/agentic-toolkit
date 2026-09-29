@@ -3,7 +3,10 @@
 1. rising/new/baseline — "rising-tag" (baseline 1/week, this week 5 notes + 1 clip) is rising;
    "steady-tag" (baseline 3/week, this week 4) grows but stays under the 2x+1 limit, not rising;
    "new-tag" (baseline 0, this week 2) is new but not rising (needs 3); a note's date decides
-   which rolling week it lands in, not the order it was written
+   which rolling week it lands in, not the order it was written; four weeks of real notes (>=
+   BASELINE_MIN_NOTES) make the baseline `ready`
+1b. estimated dates — a note whose dates are all `<key>_estimated: true` is left out and counted
+   `estimated`; an estimated `processed_date` falls through to a real `distilled_at`
 2. tag filtering — `domain/testing` never appears in a mention's `tags` (it becomes `domain`
    instead); `readwise/concept`, bare `readwise`, `W39-2026`, `area` and `source/github` are all
    dropped outright; the domains aggregate still sees "testing" rising; a plain tag on the same
@@ -23,6 +26,10 @@
    the PARA folder when a note has no `kind`; `daily` covers exactly the last 28 days with zeros
    included
 9. no writes — `pulse()` never touches the vault
+10. young vault — the live vault's 2026-09-29 shape (a bulk week of notes after a thin one, plus
+   25 backfilled notes with estimated dates): no baseline, so every tag/domain/interest baseline
+   is None, nothing is rising or new, and the tags rank by this week's count [earned: 2026-09-29
+   — the Signal Radar called `claude`, `podcast` and every other tag "new, baseline 0.0"]
 """
 from __future__ import annotations
 
@@ -92,6 +99,22 @@ def _build(vault: Path) -> None:
     for d in THIS_WEEK_DATES[:4]:
         _note(next_name("steady-this"), ["steady-tag", "vault-generic"], d.isoformat(), kind="field-report")
 
+    # history: two untagged notes per baseline week, so the baseline weeks hold >= BASELINE_MIN_NOTES
+    for d in BASELINE_DATES:
+        for _ in range(2):
+            _note(next_name("history"), [], d.isoformat(), kind="field-report")
+
+    # 1b. estimated dates: a backfilled processed_date is no date at all — a note with only that is
+    # left out and counted `estimated`; one that also has a real distilled_at is dated by that
+    (res / "estimated-only.md").write_text(_fm([
+        "processed_date: " + BASELINE_DATES[0].isoformat(), "processed_date_estimated: true",
+        "distilled_at: " + BASELINE_DATES[0].isoformat() + "T09:00:00Z", "distilled_at_estimated: true",
+        "tags:", "  - estimated-tag"]) + "\n# Estimated only\n", encoding="utf-8")
+    (res / "estimated-then-real.md").write_text(_fm([
+        "processed_date: " + BASELINE_DATES[1].isoformat(), "processed_date_estimated: true",
+        "distilled_at: " + THIS_WEEK_DATES[0].isoformat() + "T09:00:00Z", "tags:", "  - fallthrough-tag"])
+        + "\n# Estimated then real\n", encoding="utf-8")
+
     # 3. new-tag: no baseline, this week 2 — no `kind`, to check the folder-name origin fallback
     for d in THIS_WEEK_DATES[:2]:
         _note(next_name("new-this"), ["new-tag", "vault-generic"], d.isoformat())
@@ -132,6 +155,45 @@ def _build(vault: Path) -> None:
     (capture / "Bad-Clip.md").write_text("---\nvia: clip\ntags: [unterminated\n---\n# Bad Clip\n", encoding="utf-8")
 
 
+def _build_young(vault: Path) -> None:
+    """The live vault's shape on 2026-09-29: a bulk week of distilled notes after a thin week of
+    real history, plus a backfill stamped with estimated dates inside the baseline window."""
+    res = vault / "04_Resources"
+    res.mkdir(parents=True)
+    for i, d in enumerate(THIS_WEEK_DATES * 2):
+        _note(res / f"bulk-{i}.md", ["claude", "podcast"] if i % 2 else ["claude"], d.isoformat())
+    for i in range(3):
+        _note(res / f"thin-{i}.md", ["homelab"], BASELINE_DATES[0].isoformat())
+    for i in range(25):
+        (res / f"backfilled-{i}.md").write_text(_fm([
+            "processed_date: " + BASELINE_DATES[2].isoformat(), "processed_date_estimated: true",
+            "tags:", "  - claude"]) + "\n# Backfilled\n", encoding="utf-8")
+
+
+def _young_checks(problems: list[str], root: Path) -> None:
+    """No real baseline yet: every tag's baseline is None, nothing is rising or new, the tags rank
+    by this week alone, and the backfilled notes neither make a baseline nor count as a week."""
+    import vault_pulse
+
+    young = root / "young"
+    _build_young(young)
+    result = vault_pulse.pulse(young, NOW)
+    b = result.get("baseline") or {}
+    if b != {"ready": False, "weeks": 1, "notes": 3}:
+        problems.append(f"young: 3 real notes in one baseline week are no baseline, got {b}")
+    if result.get("estimated") != 25:
+        problems.append(f"young: 25 notes with only an estimated date should be counted estimated, got {result.get('estimated')}")
+    tags = result["tags"]
+    if any(t["baseline"] is not None or t["rising"] or t["new"] or t["ratio"] is not None for t in tags):
+        problems.append(f"young: without a baseline no tag has one, rises or is new, got {tags}")
+    if [t["tag"] for t in tags[:2]] != ["claude", "podcast"] or tags[0]["this_week"] != 10:
+        problems.append(f"young: tags rank by this week's count, claude (10) first, got {[(t['tag'], t['this_week']) for t in tags]}")
+    if any(d["baseline"] is not None or d.get("rising") for d in result["domains"] + result["interests"]):
+        problems.append("young: domains and interests carry no baseline either")
+    if result["week"]["notes"] != 10 or result["week"]["baseline_notes"] is not None:
+        problems.append(f"young: the week's notes have no baseline either (not a median of empty weeks), got {result['week']}")
+
+
 def run(vault: Path) -> dict:
     import vault_pulse
 
@@ -169,6 +231,17 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 1: new-tag should be this_week=2 baseline=0.0 new=True rising=False, got {nt}")
         if rt and not rt["examples"]:
             problems.append("phase 1: a rising tag with this-week notes should carry examples")
+        if not (result.get("baseline") or {}).get("ready") or result["baseline"]["weeks"] != 4:
+            problems.append(f"phase 1: four weeks of real notes are a baseline, got {result.get('baseline')}")
+
+        # 1b. estimated dates
+        if "estimated-tag" in tags or any(m["url"].endswith("estimated-only.md") for m in result["mentions"]):
+            problems.append("phase 1b: a note dated only by estimates must be left out")
+        if result.get("estimated") != 1:
+            problems.append(f"phase 1b: expected 1 note counted estimated, got {result.get('estimated')}")
+        fall = next((m for m in result["mentions"] if m["url"].endswith("estimated-then-real.md")), None)
+        if not fall or fall["at"] != THIS_WEEK_DATES[0].isoformat():
+            problems.append(f"phase 1b: an estimated processed_date must fall through to a real distilled_at, got {fall}")
 
         # 2. tag filtering
         noise_mentions = [m for m in result["mentions"] if m.get("domain") == "testing"]
@@ -211,8 +284,9 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 5: interest should be this_week=3 baseline=0.25, got {ci}")
 
         # 6. skipped
-        if result["skipped"] != 3:
-            problems.append(f"phase 6: expected 3 skipped (bad frontmatter + no date + bad clip), got {result['skipped']}")
+        if result["skipped"] != 4:
+            problems.append(f"phase 6: expected 4 skipped (bad frontmatter + no date + estimated only + bad clip), "
+                            f"got {result['skipped']}")
         # the two reasons are counted apart, so the page can name each one truthfully
         if (result.get("unparseable"), result.get("undated")) != (2, 1):
             problems.append(f"phase 6: expected unparseable=2 (note + clip) and undated=1, got "
@@ -249,10 +323,13 @@ def run(vault: Path) -> dict:
                 problems.append(f"phase 8: daily should be oldest-first ending today, got {dates[0]}..{dates[-1]}")
             if not any(d["notes"] == 0 and d["clips"] == 0 for d in result["daily"]):
                 problems.append("phase 8: a day with no notes or clips should still appear with zeros")
+
+        # 10. a young vault: no baseline yet
+        _young_checks(problems, sandbox.parent)
     finally:
         if sandbox is not None:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "rising/new/baseline, tag filtering, "
-                      "the document-frequency cut, clips, interests, skips and shape all ok"}
+            "detail": "; ".join(problems) if problems else "rising/new/baseline, estimated dates, tag filtering, "
+                      "the document-frequency cut, clips, interests, skips, shape and a young vault all ok"}

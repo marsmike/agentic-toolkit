@@ -3,14 +3,22 @@ are accelerating in HIS notes — read straight from the vault's files, never th
 plugin (AGENTS.md "Hard rules": plugins depend on core/contract only, never a sibling plugin).
 
     from vault_pulse import pulse
-    pulse(vault, now)  # -> {"mentions", "daily", "week", "tags", "domains", "interests",
-                       #     "skipped", "unparseable", "undated"}
+    pulse(vault, now)  # -> {"mentions", "daily", "week", "baseline", "tags", "domains",
+                       #     "interests", "skipped", "unparseable", "undated", "estimated"}
 
 Content notes are every `*.md` under `02_Projects/`, `03_Areas/`, `04_Resources/` (via `contained`,
 so a symlink out of the vault is not one), dated by frontmatter `created` (fallbacks
-`processed_date`, `distilled_at`, `ingested_at`); a note carrying none is counted `undated`, one
-whose frontmatter doesn't parse `unparseable`, and neither is guessed at. Clips (`clips.load`) are the second half: what the owner chose to read
-himself, no threshold or feed gate in between.
+`processed_date`, `distilled_at`, `ingested_at`), skipping any date flagged `<key>_estimated: true`
+(a backfill's guess, not when the note was written); a note carrying no date is counted
+`undated`, one carrying only estimated dates `estimated`, one whose frontmatter doesn't parse
+`unparseable`, and none of them is guessed at. Clips (`clips.load`) are the second half: what the
+owner chose to read himself, no threshold or feed gate in between.
+
+The baseline is the mean of the four weeks before this one, over the weeks that hold a note —
+and only once there is one: at least BASELINE_MIN_WEEKS such weeks and BASELINE_MIN_NOTES notes in
+them. Before that every tag, domain and interest carries `baseline: None` and nothing is rising or
+new; the tags are ranked by this week's count alone. Clips don't make a baseline: their tags are
+formats (`tweet`, `article`), not topics.
 
 Tag filtering — a tag namespace/pattern check, plus a document-frequency cut on top of it. The
 named patterns (`domain/*`, `readwise/*` and bare `readwise`, `source/*`, `W\\d\\d-\\d{4}`, and a
@@ -34,11 +42,18 @@ from pathlib import Path
 from typing import Any
 
 import clips as clips_mod
-from vault_utils import UnparseableFrontmatter, contained, read_frontmatter
+from vault_utils import UnparseableFrontmatter, contained, read_frontmatter, real_date
 
 CONTENT_FOLDERS = ("02_Projects", "03_Areas", "04_Resources")
 DAILY_DAYS = 28
 BASELINE_WEEKS = 4
+# A baseline needs history: notes in at least this many of the four weeks before this one, and at
+# least this many notes in them (the same "enough to judge" floor as _DF_STOP_MIN_DOCS). [earned:
+# 2026-09-29 — with 17 real notes in two of the four weeks, every tag this week read "new,
+# baseline 0.0", `claude` and `podcast` among them]
+BASELINE_MIN_WEEKS = 2
+BASELINE_MIN_NOTES = 20
+DATE_KEYS = ("created", "processed_date", "distilled_at", "ingested_at")
 TAG_TOP = 30
 TAG_EXAMPLES_CAP = 3
 
@@ -186,7 +201,9 @@ def _daily(mentions: Sequence[dict], today: date, n_days: int = DAILY_DAYS) -> l
     return out
 
 
-def _week_summary(mentions: Sequence[dict], today: date) -> dict[str, Any]:
+def _week_summary(mentions: Sequence[dict], today: date, ready: bool) -> dict[str, Any]:
+    """This week's notes and clips, each against the median week before. Notes have no baseline
+    until the tags do (`ready`); clips, a stream of their own, always have one."""
     def counts(is_clip: bool) -> tuple[int, list[int]]:
         start, end = _week_range(today, 0)
         this_week = sum(1 for m in mentions if (m["origin"] == "clip") == is_clip and start <= _mention_date(m) <= end)
@@ -201,7 +218,7 @@ def _week_summary(mentions: Sequence[dict], today: date) -> dict[str, Any]:
     return {
         "notes": notes_this,
         "clips": clips_this,
-        "baseline_notes": statistics.median(notes_weekly),
+        "baseline_notes": statistics.median(notes_weekly) if ready else None,
         "baseline_clips": statistics.median(clips_weekly),
     }
 
@@ -209,7 +226,7 @@ def _week_summary(mentions: Sequence[dict], today: date) -> dict[str, Any]:
 def _weekly_series(mentions: Sequence[dict], today: date,
                     keys_of: Callable[[dict], Iterable[str]]) -> dict[str, tuple[int, list[int]]]:
     """For every key `keys_of(mention)` yields: (this week's count, [count per prior week,
-    oldest... nearest]). Shared by tags/domains/interests — same rolling-week counting, different
+    nearest... oldest]). Shared by tags/domains/interests — same rolling-week counting, different
     key and different final shape."""
     this_start, this_end = _week_range(today, 0)
     bounds = [_week_range(today, b) for b in range(1, BASELINE_WEEKS + 1)]
@@ -243,44 +260,64 @@ def _tag_examples(mentions: Sequence[dict], today: date, cap: int = TAG_EXAMPLES
     return out
 
 
-def _rising(this_week: int, baseline: float) -> bool:
-    return this_week >= 3 and this_week >= 2 * baseline + 1
+def _baseline_history(mentions: Sequence[dict], today: date) -> tuple[list[int], int]:
+    """(indices of the baseline weeks that hold a note, 0 = last week; the notes in them)."""
+    per_week = []
+    for back in range(1, BASELINE_WEEKS + 1):
+        s, e = _week_range(today, back)
+        per_week.append(sum(1 for m in mentions if m["origin"] != "clip" and s <= _mention_date(m) <= e))
+    return [i for i, n in enumerate(per_week) if n], sum(per_week)
 
 
-def _tag_stats(mentions: Sequence[dict], today: date) -> list[dict[str, Any]]:
+def _baseline(weekly: list[int], covered: list[int]) -> float | None:
+    """The mean week over the covered baseline weeks, None without a baseline. An empty week
+    before the vault's history began is not a zero week."""
+    return sum(weekly[i] for i in covered) / len(covered) if covered else None
+
+
+def _rising(this_week: int, baseline: float | None) -> bool:
+    return baseline is not None and this_week >= 3 and this_week >= 2 * baseline + 1
+
+
+def _rounded(baseline: float | None) -> float | None:
+    return None if baseline is None else round(baseline, 2)
+
+
+def _tag_stats(mentions: Sequence[dict], today: date, covered: list[int]) -> list[dict[str, Any]]:
     series = _weekly_series(mentions, today, lambda m: m["tags"])
     examples = _tag_examples(mentions, today)
     out = []
     for tag, (this_week, weekly) in series.items():
-        baseline = sum(weekly) / BASELINE_WEEKS
+        baseline = _baseline(weekly, covered)
         out.append({
-            "tag": tag, "this_week": this_week, "baseline": round(baseline, 2),
+            "tag": tag, "this_week": this_week, "baseline": _rounded(baseline),
             "ratio": round(this_week / baseline, 2) if baseline else None,
             "rising": _rising(this_week, baseline),
             "new": baseline == 0 and this_week >= 2,
             "examples": examples.get(tag, []),
         })
-    out.sort(key=lambda x: (x["rising"], x["new"], x["this_week"] - x["baseline"]), reverse=True)
+    # Without a baseline nothing is rising or new, and this week's count alone orders the list.
+    out.sort(key=lambda x: (x["rising"], x["new"], x["this_week"] - (x["baseline"] or 0)), reverse=True)
     return out[:TAG_TOP]
 
 
-def _domain_stats(mentions: Sequence[dict], today: date) -> list[dict[str, Any]]:
+def _domain_stats(mentions: Sequence[dict], today: date, covered: list[int]) -> list[dict[str, Any]]:
     series = _weekly_series(mentions, today, lambda m: [m["domain"]] if m.get("domain") else [])
     out = []
     for domain, (this_week, weekly) in series.items():
-        baseline = sum(weekly) / BASELINE_WEEKS
+        baseline = _baseline(weekly, covered)
         out.append({
-            "domain": domain, "this_week": this_week, "baseline": round(baseline, 2),
+            "domain": domain, "this_week": this_week, "baseline": _rounded(baseline),
             "ratio": round(this_week / baseline, 2) if baseline else None,
             "rising": _rising(this_week, baseline),
         })
-    out.sort(key=lambda x: (x["rising"], x["this_week"] - x["baseline"]), reverse=True)
+    out.sort(key=lambda x: (x["rising"], x["this_week"] - (x["baseline"] or 0)), reverse=True)
     return out
 
 
-def _interest_stats(mentions: Sequence[dict], today: date) -> list[dict[str, Any]]:
+def _interest_stats(mentions: Sequence[dict], today: date, covered: list[int]) -> list[dict[str, Any]]:
     series = _weekly_series(mentions, today, lambda m: m.get("interests") or [])
-    out = [{"id": iid, "this_week": tw, "baseline": round(sum(weekly) / BASELINE_WEEKS, 2)}
+    out = [{"id": iid, "this_week": tw, "baseline": _rounded(_baseline(weekly, covered))}
            for iid, (tw, weekly) in series.items()]
     out.sort(key=lambda x: -x["this_week"])
     return out
@@ -292,7 +329,7 @@ def pulse(vault: Path, now: datetime, days: int = 56) -> dict[str, Any]:
     today = now.date()
     since = today - timedelta(days=days)
     mentions: list[dict[str, Any]] = []
-    unparseable = undated = 0
+    unparseable = undated = estimated = 0
 
     for path in _content_paths(vault):
         try:
@@ -303,18 +340,12 @@ def pulse(vault: Path, now: datetime, days: int = 56) -> dict[str, Any]:
         # `created` first, but a present-and-unparseable `created` (a placeholder like "TBD") must
         # still fall back to the next date rather than be treated as "found, just bad". [earned:
         # 2026-09-28 week review] `distilled_at`/`ingested_at` date notes that carry no other date.
-        day = None
-        for key in ("created", "processed_date", "distilled_at", "ingested_at"):
-            raw = str(fm.get(key) or "")[:10]
-            if not raw:
-                continue
-            try:
-                day = date.fromisoformat(raw)
-                break
-            except ValueError:
-                continue
+        day = real_date(fm, DATE_KEYS)
         if day is None:
-            undated += 1
+            if any(fm.get(f"{k}_estimated") is True for k in DATE_KEYS):
+                estimated += 1
+            else:
+                undated += 1
             continue
         if day < since:
             continue
@@ -327,18 +358,24 @@ def pulse(vault: Path, now: datetime, days: int = 56) -> dict[str, Any]:
 
     _apply_df_stop(mentions)
     mentions.sort(key=lambda m: (m["at"], m["title"]))
+    history, baseline_notes = _baseline_history(mentions, today)
+    ready = len(history) >= BASELINE_MIN_WEEKS and baseline_notes >= BASELINE_MIN_NOTES
+    covered = history if ready else []  # no covered weeks: every baseline is None
 
     return {
         "mentions": mentions,
         "daily": _daily(mentions, today),
-        "week": _week_summary(mentions, today),
-        "tags": _tag_stats(mentions, today),
-        "domains": _domain_stats(mentions, today),
-        "interests": _interest_stats(mentions, today),
+        "week": _week_summary(mentions, today, ready),
+        # Why the tags carry a baseline or none: the page says "no baseline yet" from `ready`.
+        "baseline": {"ready": ready, "weeks": len(history), "notes": baseline_notes},
+        "tags": _tag_stats(mentions, today, covered),
+        "domains": _domain_stats(mentions, today, covered),
+        "interests": _interest_stats(mentions, today, covered),
         # Two different reasons, counted apart: the page names each one truthfully. `skipped` stays
         # their sum for callers that only want a total. [earned: 2026-09-29 — the Signal Radar said
         # "173 notes skipped (unparseable frontmatter)" when all 173 parsed and only lacked a date]
-        "skipped": unparseable + undated,
+        "skipped": unparseable + undated + estimated,
         "unparseable": unparseable,
         "undated": undated,
+        "estimated": estimated,
     }

@@ -465,6 +465,13 @@ def _graph_tail(b: dict[str, Any]) -> str:
     return head
 
 
+def _vs_baseline(row: dict) -> str:
+    """"5 this week vs 1.25 baseline", or "5 this week, no baseline yet" — never a made-up 0.0."""
+    base = row.get("baseline")
+    tail = ", no baseline yet" if base is None else f" vs {base} baseline"
+    return f"{row.get('this_week', 0)} this week{tail}"
+
+
 def render_md(data: dict[str, Any]) -> str:
     """The Obsidian note: the scope and momentum SVGs embedded at the top, then early warnings, top
     signals, blind spots, rising vault tags, and a link to the full page. Notes and hubs are
@@ -477,17 +484,23 @@ def render_md(data: dict[str, Any]) -> str:
     blind_keys = data.get("blind_spots") or []
     by_key = {b["key"]: b for b in blips}
     top = blips[:MD_TOP_SIGNALS]
-    early = [by_key[k] for k in early_keys if k in by_key][:MD_TOP_EARLY]
-    blind = [by_key[k] for k in blind_keys if k in by_key][:MD_TOP_BLIND]
+    # The counts are the whole lists; the sections show the first few and say so. [earned:
+    # 2026-09-29 — the note said "8 not yet in the vault" beside a signal.json of 29]
+    all_early = [by_key[k] for k in early_keys if k in by_key]
+    all_blind = [by_key[k] for k in blind_keys if k in by_key]
+    early = all_early[:MD_TOP_EARLY]
+    blind = all_blind[:MD_TOP_BLIND]
     vault = data.get("vault") or {}
-    rising_tags = [t for t in (vault.get("tags") or []) if t.get("rising") or t.get("new")][:MD_TOP_TAGS]
+    has_baseline = (vault.get("baseline") or {}).get("ready", True)
+    tags = vault.get("tags") or []
+    rising_tags = ([t for t in tags if t.get("rising") or t.get("new")] if has_baseline else tags)[:MD_TOP_TAGS]
     graph = data.get("graph") or {}
     hubs = (graph.get("growing_hubs") or [])[:MD_TOP_TAGS]
 
     lines: list[str] = [
         "---",
-        f"description: \"Signal Radar {created} — {len(blips)} signals, {len(early)} early warnings, "
-        f"{len(blind)} not yet in the vault.\"",
+        f"description: \"Signal Radar {created} — {len(blips)} signals, {len(all_early)} early warnings, "
+        f"{len(all_blind)} not yet in the vault.\"",
         "status: active",
         f"created: {created}",
         "tags:",
@@ -506,6 +519,8 @@ def render_md(data: dict[str, Any]) -> str:
     ]
 
     lines += ["## Early warning", ""]
+    if len(all_early) > len(early):
+        lines += [f"Showing {len(early)} of {len(all_early)}; the full page lists them all.", ""]
     if early:
         for b in early:
             lines.append(_blip_line(b))
@@ -521,7 +536,8 @@ def render_md(data: dict[str, Any]) -> str:
         lines.append("No signals scored this run.")
     lines.append("")
 
-    lines += ["## Not in your vault yet", "", "Strong outside, no anchor in the graph yet:", ""]
+    shown = f" — showing {len(blind)} of {len(all_blind)}, the full page lists them all" if len(all_blind) > len(blind) else ""
+    lines += ["## Not in your vault yet", "", f"Strong outside, no anchor in the graph yet{shown}:", ""]
     if blind:
         for b in blind:
             link = _top_link(b)
@@ -531,16 +547,23 @@ def render_md(data: dict[str, Any]) -> str:
         lines.append("None — everything strong enough already has a note.")
     lines.append("")
 
-    lines += ["## Rising in your vault", ""]
+    if has_baseline:
+        lines += ["## Rising in your vault", ""]
+    else:
+        # Too little dated history to call anything rising: say so, and show the week as it is.
+        b = vault.get("baseline") or {}
+        lines += ["## Busiest in your vault", "",
+                  f"No baseline yet: the four weeks before this one hold {b.get('notes', 0)} dated notes in "
+                  f"{b.get('weeks', 0)} week(s), too few to call a tag rising. This week's most-tagged:", ""]
     if rising_tags:
         for t in rising_tags:
             examples = t.get("examples") or []
             ex = ", ".join(_wikilink(e["path"], e["title"]) for e in examples[:2] if e.get("path"))
-            mark = "new" if t.get("new") else "rising"
+            mark = "new, " if t.get("new") else "rising, " if t.get("rising") else ""
             tail = f" ({ex})" if ex else ""
-            lines.append(f"- **{t['tag']}** — {mark}, {t.get('this_week', 0)} this week vs {t.get('baseline', 0)} baseline{tail}")
+            lines.append(f"- **{t['tag']}** — {mark}{_vs_baseline(t)}{tail}")
     else:
-        lines.append("Nothing rising in your own notes this week.")
+        lines.append("Nothing rising in your own notes this week." if has_baseline else "No tagged notes this week.")
     lines.append("")
 
     if hubs:
@@ -550,8 +573,7 @@ def render_md(data: dict[str, Any]) -> str:
             ex = ", ".join(_wikilink(e["path"], e["title"]) for e in examples[:2] if e.get("path"))
             tail = f" — {ex}" if ex else ""
             mark = " (new hub)" if h.get("new") else ""
-            lines.append(f"- {_wikilink(h['path'], h['title'])}{mark} — {h.get('this_week', 0)} this week vs "
-                         f"{h.get('baseline', 0)} baseline{tail}")
+            lines.append(f"- {_wikilink(h['path'], h['title'])}{mark} — {_vs_baseline(h)}{tail}")
         lines.append("")
 
     lines.append("The full page adds the sortable table, each signal's detail and the interest trend.")
