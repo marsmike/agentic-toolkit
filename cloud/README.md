@@ -73,7 +73,7 @@ commit time, which is conflict-free only while no file has two writers:
 | Files in `00_Memory/radar/` | Written by |
 |---|---|
 | `state.jsonl`, `seen.jsonl`, `promoted.jsonl`, `promote_retry.jsonl`, `todoist.jsonl`, `YYYY-MM-DD.md`, `weekly.jsonl`, `gaps-*.json`, `feeds-discovered-*`, `kagi-ledger.jsonl` | pipeline (scan, gaps, weekly; discover and scout by hand) |
-| `sensors/`, `signal.json`, `Signal-Radar.html`, `Signal-Radar.md`, `signal-kagi.jsonl`, `kagi-ledger-signal.jsonl`, `signal-tavily.jsonl`, `tavily-ledger-signal.jsonl` | Signal Radar |
+| `sensors/`, `signal.json`, `Signal-Radar.html`, `Signal-Radar.md`, `Signal-Radar-scope.svg`, `Signal-Radar-momentum.svg`, `signal-kagi.jsonl`, `kagi-ledger-signal.jsonl`, `signal-tavily.jsonl`, `tavily-ledger-signal.jsonl` | Signal Radar |
 
 The Kagi budget is one weekly budget over both ledger files. DLQ notes are new files with
 per-day, per-kind names, so both may add them. The Signal Radar reads the pipeline's `state.jsonl`

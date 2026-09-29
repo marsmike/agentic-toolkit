@@ -16,7 +16,7 @@ Streams, all read from files, none fetched here except the optional web check:
   news when Tavily is not available; `signal-tavily.jsonl` / `signal-kagi.jsonl` remember what was
   asked, and both count while their answers are a week old.
 
-Writes `00_Memory/radar/signal.json` (the data), `Signal-Radar.html` (the page the routine
+Writes `00_Memory/radar/signal.json` (the data), `Signal-Radar-scope.svg` and `Signal-Radar-momentum.svg` (what the note embeds), `Signal-Radar.html` (the page the routine
 publishes as an artifact and the vault keeps) and `Signal-Radar.md` (the same, as a note), all in
 the radar dir. Nothing else in the vault changes.
 

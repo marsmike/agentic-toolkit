@@ -59,7 +59,7 @@ the owner's own vault included, into named things (`Qwen3.8`, `llama.cpp`, `Opus
 each 0–100 from breadth (independent sources), velocity (last three days against the fourteen
 before), engagement (percentile within its source), relevance (the judge) and volume, plus a
 little for being in the vault already. It writes `00_Memory/radar/Signal-Radar.html` (the radar
-page), `Signal-Radar.md` and `signal.json`. Brief from `signal.json`: the `early` list first
+page), `Signal-Radar.md` with its two embedded SVGs (`Signal-Radar-scope.svg`, `Signal-Radar-momentum.svg`) and `signal.json`. Brief from `signal.json`: the `early` list first
 (first seen in the last 72 h and already in two sources), then hot and rising blips, then
 `blind_spots` (strong outside, absent from the vault) and the vault's rising tags. Stages and
 numbers are the script's; do not re-rank. `--check` searches the week's web for at most six new
