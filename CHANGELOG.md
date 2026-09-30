@@ -4,6 +4,18 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **One story cannot fill a run (radar 3.6.2).** In the first run on radar 3.6.1, 14 of the 20
+  promotions were Meta Muse coverage from 14 outlets. Their headlines were worded too differently
+  for the title-overlap check, and distill merges them into one note anyway. A watched name now
+  takes at most `SENSOR_PER_NAME_PER_RUN` (2) of a run's sensor promotions and
+  `SENSOR_PER_NAME_PER_DAY` (6) of a day, counted from today's ledger. Held-back items are counted
+  as `sensors_capped`. A lab's own announcement always goes through but counts toward its name. A
+  watched name followed by a hyphen and a letter no longer matches: "Meta-Instrument" took one of
+  Meta's slots in the replay. Replayed on 2026-09-30's sensor data, one run of 25 is now 10 lab
+  posts, 1 momentum item, 9 watched and 5 strong, across Sonnet 5.5, Dots, Nvidia, Jeff and the
+  music plugins, with 60 items held back.
+  [earned: 2026-09-30, 19:11 run; the owner: "all from Muse is not ok"]
+
 - **Google News links become the publisher's URL (radar 3.6.1); a same-named capture no longer
   fails retirement (obsidian 3.4.5).** On 2026-09-30, 210 of the day's 989 sensor items were
   `news.google.com/rss/articles/…` links, from the Google News search feeds and from Kagi News.

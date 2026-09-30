@@ -15,7 +15,9 @@ ingest turns them into captures, every item from SENSOR_PROMOTE_SOURCES that is 
 published within the window (a newly added feed's week of back catalogue is not news), in that
 order, strongest first within each, within the run's `promote_per_run` (the feed gets what the
 sensors leave). An item already promoted, held by the vault, or another outlet's
-copy of a story promoted in the window (title-word overlap, SENSOR_SAME_STORY) is skipped. A Google
+copy of a story promoted in the window (title-word overlap, SENSOR_SAME_STORY) is skipped. A
+watched name takes at most SENSOR_PER_NAME_PER_RUN of a run and SENSOR_PER_NAME_PER_DAY of a day
+(a lab's own announcement always goes, and counts), so one story cannot fill the run. A Google
 News link is saved as the publisher's own URL (`gnews.resolve`), or not at all: Reader cannot
 follow one. [earned: 2026-09-30 — untitled "Google News" captures, two DLQ notes, one failed] Every
 save is one `promoted.jsonl` row with `via: sensors`; its Reader note starts `[radar sensors`
@@ -92,11 +94,18 @@ def load_items(out: Path, today: date) -> list[dict]:
 
 def watch_pattern(names: list[str]) -> re.Pattern[str] | None:
     """One case-insensitive pattern for the watched names, each ending at a non-letter: `GPT`
-    matches "GPT-6.1" and "GPT 6.1", `Claude` matches "Claude's", `Meta` does not match "metadata"."""
+    matches "GPT-6.1" and "GPT 6.1", `Claude` matches "Claude's", `Meta` does not match "metadata"
+    or "Meta-Instrument" (a hyphen and a letter make another word, a hyphen and a digit a version).
+    [earned: 2026-09-30 — a plugin host's "Meta-Instrument" took one of Meta's two slots]"""
     names = [n.strip() for n in names if n.strip()]
     if not names:
         return None
-    return re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(n) for n in names) + r")(?![a-z])", re.I)
+    return re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(n) for n in names) + r")(?![a-z]|-[a-z])", re.I)
+
+
+def named(title: str, pattern: re.Pattern[str] | None) -> set[str]:
+    """The watched names a title carries, lower-cased: "Meta's Muse vs ChatGPT" → {meta, muse, chatgpt}."""
+    return {m.lower() for m in pattern.findall(title or "")} if pattern else set()
 
 
 def rank(it: dict, t: dict[str, float], watch: re.Pattern[str] | None = None) -> tuple[int, float] | None:
@@ -128,12 +137,18 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
     stories = [words(r["title"]) for r in done if r.get("title") and str(r.get("date", "")) > since]
     ranked = []
     pattern = watch_pattern(watch or [])
+    per_run: dict[str, int] = {}
+    per_day: dict[str, int] = {}
+    for r in done:
+        if r.get("date") == run_date and r.get("via") == "sensors":
+            for n in named(r.get("title", ""), pattern):
+                per_day[n] = per_day.get(n, 0) + 1
     for it in load_items(out, date.fromisoformat(run_date)):
         r = rank(it, t, pattern)
         if r is not None:
             ranked.append(((r[0], last_choice(it["url"]), r[1]), it))
     ranked.sort(key=lambda x: x[0])
-    saved, unresolved, errors, rules = 0, 0, [], {0: 0, 1: 0, 2: 0, 3: 0}
+    saved, unresolved, capped, errors, rules = 0, 0, 0, [], {0: 0, 1: 0, 2: 0, 3: 0}
     for (rule, _, _), it in ranked:
         if saved >= budget:
             break
@@ -144,6 +159,11 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
             continue
         published = str(it.get("published") or "")[:10]
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}", published) and published <= since:
+            continue
+        hits = named(it.get("title", ""), pattern)
+        if rule != 0 and any(per_run.get(n, 0) >= policy.SENSOR_PER_NAME_PER_RUN
+                             or per_day.get(n, 0) >= policy.SENSOR_PER_NAME_PER_DAY for n in hits):
+            capped += 1
             continue
         google_news = None
         if gnews.is_google_news(url):
@@ -167,11 +187,15 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
                                "source": it.get("source"), "title": it.get("title", ""),
                                **({"google_news": google_news} if google_news else {})}])
         already |= {canonical, google_news} - {None}
+        for n in hits:
+            per_run[n] = per_run.get(n, 0) + 1
+            per_day[n] = per_day.get(n, 0) + 1
         stories.append(w)
         saved += 1
         rules[rule] += 1
-    if not saved and not errors and not unresolved:
+    if not saved and not errors and not unresolved and not capped:
         return {}
     return {"sensors_promoted": saved, "sensors_by_rule": {"lab": rules[0], "momentum": rules[1], "watched": rules[2], "strong": rules[3]},
             **({"sensors_unresolved": unresolved} if unresolved else {}),
+            **({"sensors_capped": capped} if capped else {}),
             **({"sensors_promote_errors": errors} if errors else {})}

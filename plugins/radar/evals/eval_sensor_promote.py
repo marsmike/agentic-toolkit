@@ -20,6 +20,10 @@
                 is never saved and is counted; `gnews` reads an old-format id from its payload and
                 a current one through the page's signature, and returns None on any failure
                 (2026-09-30: untitled "Google News" captures, two DLQ notes, one failed capture)
+6. per name   — one watched name takes at most SENSOR_PER_NAME_PER_RUN of a run and
+                SENSOR_PER_NAME_PER_DAY of a day, counted from today's ledger; a lab's own
+                announcement is never held back; other stories fill the rest (2026-09-30: 14 of
+                20 promotions in one run were Meta Muse coverage)
 """
 from __future__ import annotations
 
@@ -219,10 +223,41 @@ def run(vault: Path) -> dict:
                 gnews.resolve = real_resolve
         finally:
             gnews._request = real_gn
+
+        # 6. one watched name cannot fill the run
+        pat = sensor_promote.watch_pattern(WATCH)
+        if sensor_promote.named("MegaMorph Meta-Instrument host; GPT-6.1 and Claude's plan; metadata", pat) != {"gpt", "claude"}:
+            problems.append("phase 6: 'Meta-Instrument' and 'metadata' name no Meta; 'GPT-6.1' and 'Claude's' do")
+        out6 = sandbox.parent / "radar-names"
+        (out6 / "sensors").mkdir(parents=True)
+        flood = {f"kagi_news:m{i}": _item("kagi_news", title, f"https://outlet{i}.example.org/muse", 0.9)
+                 for i, title in enumerate(["Muse tops five million downloads", "Muse sent a stranger to a door",
+                                            "Small business owners try Muse", "Regulators question Muse permissions",
+                                            "Muse versus rival assistants compared"])}
+        flood["rss:lab"] = _item("rss", "Introducing Muse for business", "https://openai.com/index/muse-lab/", 0.9)
+        flood["kagi_news:other"] = _item("kagi_news", "Chip maker opens a second fab", "https://fab2.example.org/n", 0.86)
+        (out6 / "sensors" / f"{DAY}.json").write_text(json.dumps({"day": DAY, "items": flood}), encoding="utf-8")
+        saves.clear()
+        r = sensor_promote.promote(out6, T, DAY, 10, "later", known, names, WATCH)
+        muse = [u for u in (s["url"] for s in saves) if "outlet" in u]
+        # the lab post always goes and counts: it and one outlet make the run's two Muse stories
+        if len(muse) != 1 or "https://openai.com/index/muse-lab/" not in [s["url"] for s in saves] \
+                or "https://fab2.example.org/n" not in [s["url"] for s in saves] or r.get("sensors_capped") != 4:
+            problems.append(f"phase 6: the lab post and one outlet (two Muse a run), the other story too, four capped; "
+                            f"got {[s['url'] for s in saves]}, {r}")
+        (out6 / "promoted.jsonl").write_text("".join(json.dumps({"canonical": f"earlier{n}", "date": DAY, "via": "sensors",
+                                                                  "title": f"Muse story number {n}"}) + "\n" for n in range(5))
+                                             + json.dumps({"canonical": "openai.com/index/muse-lab", "date": "2026-09-29"}) + "\n"
+                                             + json.dumps({"canonical": "fab2.example.org/n", "date": "2026-09-29"}) + "\n",
+                                             encoding="utf-8")
+        saves.clear()
+        sensor_promote.promote(out6, T, DAY, 10, "later", known, names, WATCH)
+        if len([u for u in (s["url"] for s in saves) if "outlet" in u]) != 1:
+            problems.append(f"phase 6: five Muse promotions earlier today leave one of the day's six, got {[s['url'] for s in saves]}")
     finally:
         reader._request = real
         if sandbox is not None:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "5 offline phases ok (rules, skips, budget, web-check candidates, Google News links)"}
+            "detail": "; ".join(problems) if problems else "6 offline phases ok (rules, skips, budget, web-check candidates, Google News links, per-name caps)"}

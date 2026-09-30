@@ -90,7 +90,7 @@ Hacker News, Kagi News and the sensor RSS feeds that are, in this order:
 3. naming a watched lab or model (profile `watch`) and worth reading;
 4. strong (0.80), the feed's own bar.
 
-Inside the run's `promote_per_run`, ahead of the feed's strong items; nothing already promoted or held by the vault, and no
+Inside the run's `promote_per_run`, ahead of the feed's strong items; one watched name (Muse, OpenAI, …) at most 2 a run and 6 a day, a lab's own announcement always; nothing already promoted or held by the vault, and no
 second outlet's copy of a story saved in the window. The Signal Radar's web check (six names a day)
 now skips names that belong to no interest ("jeff", "Delhi" and "Netherlands" took three of six on
 2026-09-30), asks watched names first, and asks a one-word name with its interest beside it
