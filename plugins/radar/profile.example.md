@@ -43,7 +43,7 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
 - **`promote_location`** — where `scan --promote` moves a strong item: `later` (default),
   `shortlist` or `new`.
 - **`promote_per_day`** — how many strong items a day `scan --promote` and `gaps --promote` together
-  may save into Reader (default 5), sensor items included (at most 15 of them a day, `policy.py`). The 0.80 "strong" bar is policy and stays in code; this is
+  may save into Reader (default 5), sensor items included (at most 50 of them a day, `policy.py`). The 0.80 "strong" bar is policy and stays in code; this is
   the owner's appetite. Raise it when the daily radar note shows strong items the cap discarded.
 - **`watch`** — the labs and models you follow by name (comma list or YAML list). A sensor item
   (Hacker News, Kagi News, the sensor RSS feeds) whose title names one and that the judge rates

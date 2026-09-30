@@ -8,7 +8,7 @@ Every release entry links the change to the research or the dated failure that m
   2026 and GPT-6.1 Sol never reached the vault. The Signal Radar had both for two days: OpenAI's own
   Sol post at 805 Hacker News points, the DevDay recap, and FT and NPR on GPT-6.1 Astra being
   shelved. But only Reader feed items could be promoted, and the feeds carry no lab. Now `scan
-  --promote` also saves sensor items (Hacker News, Kagi News, sensor RSS) to Later, at most 15 a
+  --promote` also saves sensor items (Hacker News, Kagi News, sensor RSS) to Later, at most 50 a
   day inside `promote_per_day`: a lab's own announcement page whatever its title scored ("DevDay
   2026 Recap": 0.31), 300+ HN points at worth-reading, a title naming a lab or model on the new
   profile `watch` list at worth-reading, or strong. It never saves anything already promoted or in

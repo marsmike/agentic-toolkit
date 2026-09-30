@@ -28,7 +28,7 @@ PROMOTE_PER_DAY = 5
 # for two days and nothing ever promoted them, since only Reader feed items could be.
 # [earned: 2026-09-30, DevDay 2026 missing from the vault]
 SENSOR_PROMOTE_SOURCES = ("hn", "kagi_news", "rss")  # hf/github trending and Reddit have their own feed path
-SENSOR_PROMOTE_PER_DAY = 15      # within promote_per_day, not on top of it
+SENSOR_PROMOTE_PER_DAY = 50      # within promote_per_day, not on top of it (15 -> 50 on 2026-09-30, owner)
 SENSOR_PROMOTE_WINDOW_DAYS = 3   # sensor day files read back; an item first seen earlier is old news
 SENSOR_HN_MOMENTUM = 300         # HN points at which T_WORTH is enough: the judge sees a title only
 SENSOR_SAME_STORY = 0.5          # title-word Jaccard at or above: another outlet's copy of a promoted story
