@@ -220,6 +220,13 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 6: an item merged into a note's `sources` maps to that note, not its archived capture; got {idx.get('m.example/7')}")
         if briefing._tail("05_Archive/X/cap--FULLCAPTURE.md") != " · archived":
             problems.append("phase 6: the archive is never linked")
+        if radar.briefing_cmd(sandbox, sandbox / "00_Memory" / "no-radar-here", datetime(2026, 9, 30, tzinfo=UTC))["status"] != "skipped":
+            problems.append("phase 6: `briefing` skips a vault without radar state")
+        bdir = sandbox.parent / "brief"
+        bdir.mkdir()
+        (bdir / "promoted.jsonl").write_text(json.dumps({"canonical": "z.example/1", "date": DAY, "title": "Z"}) + "\n", encoding="utf-8")
+        if radar.briefing_cmd(sandbox, bdir, datetime(2026, 9, 30, 21, tzinfo=UTC)).get("status") != "ok" or not (bdir / f"Bubbles-{DAY}.md").exists():
+            problems.append("phase 6: `briefing` rebuilds the day's briefing")
         if "weight 75%" not in text:
             problems.append("phase 6: each bubble shows its weight share")
         legacy = briefing.render(DAY, [Interest(id="agents", name="AI Agents")], alloc,

@@ -655,6 +655,18 @@ def allocate(vault: Path, out: Path, interests: list[Interest], fetched: list[It
     return result
 
 
+def briefing_cmd(vault: Path, out: Path, now: datetime) -> dict[str, Any]:
+    """Rebuild today's Bubbles briefing after distill, so each promoted item links to the note it
+    became. The scan writes it before distill; without this the links wait a whole run.
+    [earned: 2026-09-30 — Gemini 4 Argon was distilled at 20:46 and the briefing still had no link]"""
+    day = now.date().isoformat()
+    if not (out / ALLOCATION_FILE).exists() and not (out / "promoted.jsonl").exists():
+        return {"status": "skipped", "detail": "no radar state in this vault"}
+    interests = interests_mod.load(vault)
+    path = briefing.write(vault, out, day, interests, now)
+    return {"status": "ok", "file": path.relative_to(vault).as_posix() if path.is_relative_to(vault) else str(path)}
+
+
 def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | None = None,
          max_requests: int = policy.MAX_REQUESTS_PER_RUN, archive: bool = True, promote: bool = False,
          todoist: bool = False) -> dict[str, Any]:
@@ -849,6 +861,9 @@ def main(argv: list[str] | None = None) -> int:
     snp.add_argument("--only", action="append", default=None, help="one source (hn, hf, github, reddit, rss); repeat")
     snp.add_argument("--out", type=Path, default=None)
     snp.add_argument("--json", action="store_true")
+    bp = sub.add_parser("briefing", help="rebuild the day's Bubbles briefing (the pipeline's end runs it, after distill)")
+    bp.add_argument("--out", type=Path, default=None)
+    bp.add_argument("--json", action="store_true")
     sgp = sub.add_parser("signal", help="named things with a signal strength; writes the Signal Radar page and note")
     sgp.add_argument("--check", action="store_true", help="check the newest names on the week's web: Tavily (tvly), else Kagi news (a few a day)")
     sgp.add_argument("--out", type=Path, default=None)
@@ -859,12 +874,14 @@ def main(argv: list[str] | None = None) -> int:
     now = datetime.now(UTC)
     # The unattended pipeline may run these three: their state stays in the vault, never where an
     # agent points it. [earned: 2026-09-24, impl-02 review IMPL02-CODE-1]
-    if args.cmd in ("scan", "gaps", "weekly", "sensors", "signal") and args.out and not args.out.resolve().is_relative_to(vault.resolve()):
+    if args.cmd in ("scan", "gaps", "weekly", "sensors", "signal", "briefing") and args.out and not args.out.resolve().is_relative_to(vault.resolve()):
         raise SystemExit(f"--out must be inside the vault for {args.cmd}: {args.out}")
     if args.cmd == "sensors":
         result = sensors_cmd(vault, args.out or vault / RADAR_DIR, now, args.only)
     elif args.cmd == "signal":
         result = signal_radar.write(vault, args.out or vault / RADAR_DIR, now, args.check)
+    elif args.cmd == "briefing":
+        result = briefing_cmd(vault, args.out or vault / RADAR_DIR, now)
     elif args.cmd == "kagi":
         result = kagi_cmd(vault, args.out or vault / RADAR_DIR, args.mode, args.text)
     elif args.cmd == "gaps":

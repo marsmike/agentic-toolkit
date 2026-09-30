@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The briefing links what distill just wrote (radar 3.8.1, obsidian 3.5.1).** The scan writes
+  `Bubbles-<day>.md` before distill, so a promoted item's "→ note" waited a whole run: Gemini 4
+  Argon was distilled at 20:46 on 2026-09-30 and the daily note still had no link to it. The new
+  `radar.py briefing` command rebuilds it, and `pipeline_run.py end` runs it (a sibling's entry point as
+  a subprocess, skipped when the radar plugin is absent) before the daily note is built.
+  [earned: 2026-09-30, first live run of radar 3.8.0]
+
 - **An untitled radar promotion takes the radar's headline (readwise 3.1.3).** Reader leaves a
   paywalled or consent-walled page untitled, and each one became a "missing title" DLQ note (three
   on 2026-09-30: FT, Yahoo Finance, InnovationAus), all for items the radar had promoted under a

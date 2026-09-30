@@ -39,6 +39,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -563,6 +564,16 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     # The run is still committed (it is the undo for the notes it wrote); the failure is reported
     # and gets a DLQ note. [earned: 2026-09-23, PR #20 and #24 reviews]
     failed_builds = []
+    # The radar's Bubbles briefing is rebuilt now that distill is done, so the daily note below
+    # links each promoted item to its note; a sibling plugin's entry point, run as a subprocess
+    # (AGENTS.md "Hard rules"). No radar plugin next to this one: nothing to do. [earned: 2026-09-30]
+    radar_dir = SCRIPTS.parent.parent / "radar" / "scripts"
+    uv = shutil.which("uv")
+    if uv and (radar_dir / "radar.py").is_file():
+        brief = subprocess.run([uv, "run", "--locked", "--project", str(radar_dir), "python3", str(radar_dir / "radar.py"),
+                                "briefing", "--json"], capture_output=True, text=True, check=False, env=env)
+        if brief.returncode != 0:
+            failed_builds.append({"script": "radar.py briefing", "error": (brief.stderr.strip().splitlines() or ["?"])[-1][:200]})
     for script in GENERATORS:
         before = _snapshot(vault, GENERATORS[script])
         run = subprocess.run([sys.executable, str(SCRIPTS / script)], capture_output=True, text=True, check=False, env=env)
