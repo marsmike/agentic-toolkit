@@ -15,7 +15,7 @@ Git is the sync channel and the pipeline is its one committer. [earned: 2026-09-
 sessions write to the vault through GitHub]
 
 `queue` picks this run's batch from `01_Capture/`: the owner's clips first, then everything else,
-oldest first, at most `--batch` (profile `pipeline_batch`, default 25). A capture that has failed
+oldest first (within a day, radar captures in the order the radar promoted them), at most `--batch` (profile `pipeline_batch`, default 25). A capture that has failed
 MAX_ATTEMPTS runs is left out and written to the DLQ once: it needs a human, and it must not
 block the queue.
 
@@ -128,13 +128,32 @@ def _save_state(vault: Path, state: dict[str, Any]) -> None:
     atomic_write(vault / STATE, json.dumps(state, indent=2, sort_keys=True) + "\n")
 
 
-def _order(path: Path) -> tuple[int, str]:
+def _promotion_rank(vault: Path) -> dict[str, int]:
+    """Readwise document id -> its row in the radar's promoted ledger. The radar promotes in rank
+    order (a lab's announcement first, the strongest first), so within one day a radar capture
+    keeps that order. `saved_at` is a bare date: before this, a day's radar captures tied and went
+    by file name, and 24 music-plugin and tool captures were distilled while OpenAI's DevDay recap
+    and GPT-6.1 Sol post waited in the inbox. [earned: 2026-09-30 pipeline run]"""
+    ranks: dict[str, int] = {}
+    path = vault / LEDGERS["promoted"]
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines() if path.is_file() else []):
+        try:
+            doc = json.loads(line).get("id")
+        except (json.JSONDecodeError, AttributeError):
+            continue
+        if doc:
+            ranks.setdefault(str(doc), n)
+    return ranks
+
+
+def _order(path: Path, ranks: dict[str, int] | None = None) -> tuple[int, str, int, str]:
     try:
         fm, _ = read_frontmatter(path)
     except Exception:
         fm = {}
     clip = str(fm.get("via") or "clip") == "clip"
-    return (0 if clip else 1, str(fm.get("saved_at") or fm.get("created") or fm.get("captured") or path.name))
+    rank = (ranks or {}).get(str(fm.get("readwise_doc_id") or ""), sys.maxsize)
+    return (0 if clip else 1, str(fm.get("saved_at") or fm.get("created") or fm.get("captured") or path.name), rank, path.name)
 
 
 def _guard(lock: Path):
@@ -242,8 +261,9 @@ def queue(vault: Path, batch: int | None = None) -> dict[str, Any]:
     state = _state(vault)
     attempts: dict[str, int] = state.get("attempts", {})
     parked: list[str] = state.get("parked", [])
+    ranks = _promotion_rank(vault)
     captures = sorted((p for p in contained((vault / "01_Capture").glob("*.md"), vault) if p.is_file()),
-                      key=_order)
+                      key=lambda p: _order(p, ranks))
     newly_parked = []
     queue = []
     for p in captures:

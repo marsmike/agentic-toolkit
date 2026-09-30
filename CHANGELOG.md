@@ -4,6 +4,16 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Lab news is distilled first; open outlets beat paywalls (obsidian 3.4.3, radar 3.5.1).** The
+  first pipeline run on radar 3.5.0 promoted DevDay, GPT-6.1 Sol and Dots, and merged a Sonnet 5.5
+  news copy into its note. But it distilled 11 music-plugin and tool captures while those three
+  waited, because a day's radar captures tied on a bare `saved_at` date and went by file name. The
+  queue now orders them as the radar promoted them (`promoted.jsonl` row by `readwise_doc_id`), so
+  lab announcements come first. Both FT stories were dropped as paywalled while NPR had the Astra
+  story whole, so a paywalled outlet now loses a tie to an open one. The sensors' `radar/sensors`
+  tag also no longer shows up as an interest named "sensors" in `radar_interests`.
+  [earned: 2026-09-30, first pipeline run after radar 3.5.0]
+
 - **News copies merge into one note (obsidian 3.4.2).** Now that the radar promotes sensor news, one
   launch arrives as the lab's page, an HN link and several outlets. Distill merges them without
   asking: one note per event, sourced from the primary source, and every other report is an L1

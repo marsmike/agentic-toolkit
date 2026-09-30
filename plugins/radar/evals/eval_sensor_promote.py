@@ -6,7 +6,8 @@
                 one below it is not; a strong Kagi News item is saved; a strong Hugging Face item
                 is not (not a promote source); in that order, tagged radar/sensors, one
                 promoted.jsonl row each with via: sensors
-2. skips      — already promoted, held by the vault, another outlet's copy of a saved story, a
+2. skips      — already promoted, held by the vault, another outlet's copy of a saved story (a
+                paywalled outlet loses a tie to an open one), a
                 bare youtube.com/watch, an item only in a day file older than the window, one
                 published before the window, and a lab's customer story that only its own RSS
                 carried (below LAB_RSS_MIN_P) are never saved; `Metadata` does not match the watched name `Meta`
@@ -40,7 +41,7 @@ ITEMS = {
     "hn:1": _item("hn", "DevDay 2026 Recap", "https://openai.com/index/devday-2026-recap/", 0.31, 87),
     "hn:2": _item("hn", "A fast new database engine", "https://db.example.org/launch", 0.72, 805),
     "hn:3": _item("hn", "A fast new database engine", "https://db2.example.org/quiet", 0.72, 40),
-    "kagi_news:a": _item("kagi_news", "OpenAI shelves GPT-6.1 Astra after safety tests", "https://ft.example.org/astra", 0.75),
+    "kagi_news:a": _item("kagi_news", "OpenAI shelves GPT-6.1 Astra after safety tests", "https://www.ft.com/content/astra", 0.9),
     "kagi_news:b": _item("kagi_news", "OpenAI shelves GPT-6.1 Astra after safety tests flag risks", "https://npr.example.org/astra", 0.9),
     "kagi_news:c": _item("kagi_news", "Claude gets a new plan", "https://news.example.org/claude", 0.65),
     "kagi_news:d": _item("kagi_news", "Metadata standards body meets", "https://std.example.org/meta", 0.72),
@@ -96,14 +97,15 @@ def run(vault: Path) -> dict:
                 "https://npr.example.org/astra", "https://fab.example.org/news"]
         if urls != want:
             problems.append(f"phase 1: expected lab, momentum, watched, strong in order {want}, got {urls}")
-        if saves and (saves[0]["tags"][:2] != ["radar", "radar/sensors"] or "lab announcement" not in saves[0]["notes"]):
-            problems.append(f"phase 1: a save is tagged radar/sensors with its reason, got {saves[0]}")
+        if saves and (saves[0]["tags"] != ["radar", "radar/frontier"]
+                      or not saves[0]["notes"].startswith("[radar sensors") or "lab announcement" not in saves[0]["notes"]):
+            problems.append(f"phase 1: a save is tagged radar/<interest> only, its note says sensors and why; got {saves[0]}")
         rows = [json.loads(ln) for ln in (out / "promoted.jsonl").read_text(encoding="utf-8").splitlines()[1:]]
         if len(rows) != len(want) or any(x.get("via") != "sensors" or not x.get("title") for x in rows):
             problems.append(f"phase 1: one promoted.jsonl row per save, via sensors, with its title; got {rows}")
         if r.get("sensors_by_rule") != {"lab": 1, "momentum": 1, "watched": 1, "strong": 1}:
             problems.append(f"phase 1: the result counts saves per rule, got {r}")
-        for bad in ("done.example.org", "held.example.org", "ft.example.org", "youtube.com", "std.example.org",
+        for bad in ("done.example.org", "held.example.org", "ft.com", "youtube.com", "std.example.org",
                     "openai.com/index/old", "huggingface.co", "db2.example.org", "news.example.org",
                     "openai.com/index/proaction", "solar.example.org"):
             if any(bad in u for u in urls):

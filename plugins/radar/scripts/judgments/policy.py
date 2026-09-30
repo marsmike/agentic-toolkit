@@ -31,6 +31,10 @@ SENSOR_PROMOTE_SOURCES = ("hn", "kagi_news", "rss")  # hf/github trending and Re
 SENSOR_PROMOTE_PER_DAY = 50      # within promote_per_day, not on top of it (15 -> 50 on 2026-09-30, owner)
 SENSOR_PROMOTE_WINDOW_DAYS = 3   # sensor day files read back; an item first seen earlier is old news
 SENSOR_HN_MOMENTUM = 300         # HN points at which T_WORTH is enough: the judge sees a title only
+# A paywalled outlet is the last choice of a story told by several: the capture holds a headline,
+# and distill drops it (both FT stories of 2026-09-30 were dropped, NPR had the Astra story whole).
+PAYWALLED = ("ft.com", "nytimes.com", "wsj.com", "bloomberg.com", "theinformation.com", "economist.com",
+             "washingtonpost.com", "theathletic.com", "barrons.com")
 SENSOR_SAME_STORY = 0.5          # title-word Jaccard at or above: another outlet's copy of a promoted story
 # A lab's own announcement is promoted whatever the judge says from its title alone ("DevDay 2026
 # Recap" scored 0.31). Host -> path prefixes that are announcements, not docs or careers pages.

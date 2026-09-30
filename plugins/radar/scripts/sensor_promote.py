@@ -16,7 +16,8 @@ published within the window (a newly added feed's week of back catalogue is not 
 order, strongest first within each, at most SENSOR_PROMOTE_PER_DAY a day and never past
 what is left of `promote_per_day`. An item already promoted, held by the vault, or another outlet's
 copy of a story promoted in the window (title-word overlap, SENSOR_SAME_STORY) is skipped. Every
-save is one `promoted.jsonl` row with `via: sensors`. A Reader failure never fails the scan.
+save is one `promoted.jsonl` row with `via: sensors`; its Reader note starts `[radar sensors`
+(a `radar/…` tag would become an interest in the capture's `radar_interests`). A Reader failure never fails the scan.
 [earned: 2026-09-30, OpenAI DevDay 2026 and GPT-6.1 Sol sat in the sensors for two days and never
 reached the vault]
 
@@ -61,6 +62,13 @@ def usable(url: str) -> bool:
     if not u.scheme.startswith("http") or not u.netloc:
         return False
     return not (u.netloc.lower().removeprefix("www.").removeprefix("m.") == "youtube.com" and u.path == "/watch" and "v=" not in u.query)
+
+
+def last_choice(url: str) -> bool:
+    """A Google News redirect (the outlet's own URL is better) or a paywalled outlet (the capture
+    holds a headline): taken only when no other outlet's copy of the story comes first."""
+    host = urlparse(url).netloc.lower().removeprefix("www.")
+    return host.endswith("news.google.com") or any(host == h or host.endswith("." + h) for h in policy.PAYWALLED)
 
 
 def load_items(out: Path, today: date) -> list[dict]:
@@ -123,8 +131,7 @@ def promote(out: Path, t: dict[str, float], run_date: str, per_day: int, locatio
     for it in load_items(out, date.fromisoformat(run_date)):
         r = rank(it, t, pattern)
         if r is not None:
-            # A Google News redirect is the last choice of its story: the outlet's own URL is better.
-            ranked.append(((r[0], urlparse(it["url"]).netloc.endswith("news.google.com"), r[1]), it))
+            ranked.append(((r[0], last_choice(it["url"]), r[1]), it))
     ranked.sort(key=lambda x: x[0])
     saved, errors, rules = 0, [], {0: 0, 1: 0, 2: 0, 3: 0}
     for (rule, _, _), it in ranked:
@@ -142,7 +149,7 @@ def promote(out: Path, t: dict[str, float], run_date: str, per_day: int, locatio
         why = ("lab announcement", f"{it.get('score') or 0:.0f} HN points", "watched name", "strong")[rule]
         note = f"[radar sensors {run_date}] {why}; " + "; ".join(f"{names.get(i, i)} p={p[i]:.2f}" for i in tagged)
         try:
-            doc_id = reader.save(it["url"], location, ["radar", "radar/sensors", *(f"radar/{i}" for i in tagged)], note)
+            doc_id = reader.save(it["url"], location, ["radar", *(f"radar/{i}" for i in tagged)], note)
         except (reader.ReaderError, ValueError) as e:
             errors.append(str(e)[:120])
             continue

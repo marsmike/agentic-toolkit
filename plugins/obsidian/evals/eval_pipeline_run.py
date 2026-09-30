@@ -1,6 +1,7 @@
 """Eval: pipeline_run.py, the deterministic ends of an unattended run, in a git sandbox.
 
-1. queue    — the owner's clips come first, then radar/newsletter captures, oldest first, capped
+1. queue    — the owner's clips come first, then radar/newsletter captures, oldest first (a day's radar
+              captures in promotion order), capped
               at the batch size; a second begin while the lock is held is `busy`
 2. end      — Index.md and the day's 00_Daily/ note rebuilt, one Log.md line, one git commit carrying the run's summary; the
               lock is released and never committed; what came in is counted from the rows the
@@ -247,6 +248,16 @@ def run(vault: Path) -> dict:
         names = [Path(p).name for p in r.get("batch", [])]
         if names[:2] != ["Readwise-Article-clip-older.md", "Readwise-Article-clip-newer.md"] or len(names) != 3:
             problems.append(f"phase 1: clips first, oldest first, three in all; got {names}")
+        # 1b. within a day, radar captures keep the radar's promotion order, not the file name's
+        # [earned: 2026-09-30, DevDay 2026 waited behind 24 captures whose names sorted first]
+        ranked = sandbox.parent / "ranked"
+        ranked.mkdir()
+        for fname, doc in (("a-music-plugin.md", "docA"), ("z-openai-devday.md", "docZ"), ("m-unranked.md", "")):
+            (ranked / fname).write_text(f"---\nvia: radar\nsaved_at: '2026-09-30'\nreadwise_doc_id: '{doc}'\n---\n# x\n",
+                                        encoding="utf-8")
+        order = [p.name for p in sorted(ranked.iterdir(), key=lambda p: pr._order(p, {"docZ": 0, "docA": 1}))]
+        if order != ["z-openai-devday.md", "a-music-plugin.md", "m-unranked.md"]:
+            problems.append(f"phase 1b: a day's radar captures go in promotion order, unranked last; got {order}")
         if _begin(pr, sandbox, NOW + timedelta(minutes=5))["status"] != "busy":
             problems.append("phase 1: a second begin while the lock is held must be busy")
         later = NOW + timedelta(hours=pr.LOCK_STALE_HOURS + 1)
