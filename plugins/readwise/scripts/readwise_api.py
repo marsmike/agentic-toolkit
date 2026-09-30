@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -54,6 +55,13 @@ def _token(token: str | None = None) -> str:
 
 
 def _request(method: str, url: str, token: str, data: dict | None = None, timeout: int = 30) -> Any:
+    # TOOLKIT_READER_SHADOW=<file>: writes (archive, delete, update) are logged there and answered
+    # as done, reads go to Readwise; the local improvement loop. [earned: 2026-09-30]
+    shadow = os.environ.get("TOOLKIT_READER_SHADOW")
+    if shadow and method != "GET":
+        with open(shadow, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"method": method, "url": url, "data": data}, ensure_ascii=False) + "\n")
+        return (204 if method == "DELETE" else 200), {}
     body = json.dumps(data).encode("utf-8") if data is not None else None
     headers = {"Authorization": f"Token {token}"}
     if body is not None:

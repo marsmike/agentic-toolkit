@@ -49,6 +49,9 @@ SENSOR_PER_NAME_PER_DAY = 6      # profile `promote_per_name_per_day` wins
 # PROMOTE_PER_SOURCE_PER_RUN of a run, a lab's own blog included (it goes first next run).
 # [earned: 2026-09-30 — sensors 42, feed 8 of the day's 50; 155 sensor items from one search]
 SENSOR_SHARE = 0.5               # profile `promote_sensor_share` wins
+PER_EVENT_PER_DAY = 3            # one story (bubbles.events) at most this many a day; profile `promote_per_event_per_day`
+MUST_SEE_SHARE = 0.5             # the must-see lane takes at most this share of a run
+HOLD_DAYS = 3                    # a held feed item waits this long for a later run, then it is missed
 PROMOTE_PER_SOURCE_PER_RUN = 3   # profile `promote_per_source_per_run` wins
 # A lab's own announcement is promoted whatever the judge says from its title alone ("DevDay 2026
 # Recap" scored 0.31). Host -> path prefixes that are announcements, not docs or careers pages.

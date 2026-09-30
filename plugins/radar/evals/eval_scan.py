@@ -382,7 +382,7 @@ def run(vault: Path) -> dict:
         if sorted(u["id"] for u in promoted) != ["ev0", "ev4", "ev5"]:
             problems.append(f"phase 8h: a budget of three takes each interest's best first, got {sorted(u['id'] for u in promoted)}")
         busy = [fitem(10 + i, "arxiv") for i in range(4)]
-        brows = [{"canonical": it.canonical, "backend": "jev", "p": {f"t{i}": 0.95}} for i, it in enumerate(busy)]
+        brows = [{"canonical": it.canonical, "backend": "jev", "p": {"t0": 0.95 - i / 100}} for i, it in enumerate(busy)]
         out8h2 = sandbox.parent / "even-source"
         out8h2.mkdir(exist_ok=True)
         promoted.clear()
@@ -394,21 +394,31 @@ def run(vault: Path) -> dict:
         if len(promoted) != 2:
             problems.append(f"phase 8h: one feed takes at most its per-source cap of a run, got {len(promoted)}")
 
-        # The split: the sensors are offered half the run first; what the feed leaves goes back to them.
-        import sensor_promote
-        real_sp, budgets = sensor_promote.promote, []
+        # The split: sensors and feed are allocated together; the sensors take at most their share
+        # (half) while feed candidates remain, and the rest of the run once the feed is spent.
+        real_save, sensor_saves = reader.save, []
+        reader.save = lambda url, location, tags, note: sensor_saves.append(url) or f"s{len(sensor_saves)}"
         saved_cap, policy.PROMOTE_PER_RUN = policy.PROMOTE_PER_RUN, 4
         try:
-            for took, want in ((lambda b: b, [2]), (lambda b: 0, [2, 2])):
-                budgets.clear()
-                sensor_promote.promote = lambda out, t, d, budget, *a, _took=took, **k: (
-                    budgets.append(budget) or {"sensors_promoted": _took(budget)})
+            for n_sensor, want_sensors in ((3, 2), (1, 1)):
+                out_split = sandbox.parent / f"split-{n_sensor}"
+                (out_split / "sensors").mkdir(parents=True, exist_ok=True)
+                sitems = {f"hn:s{i}": {"source": "hn", "origin": f"Outlet {i}", "title": f"Distinct sensor story {w}",
+                                       "url": f"https://sensor{i}.example.org/x", "summary": "", "published": NOW.date().isoformat(),
+                                       "score": 10, "p": {"agent-memory": 0.95}, "kind": "news"}
+                          for i, w in zip(range(n_sensor), ["alpha kettle", "bravo lantern", "charlie meadow"], strict=False)}
+                (out_split / "sensors" / f"{NOW.date().isoformat()}.json").write_text(
+                    json.dumps({"day": NOW.date().isoformat(), "items": sitems}), encoding="utf-8")
+                sensor_saves.clear()
                 promoted.clear()
-                radar.scan(sandbox, sandbox.parent / f"split-{len(want)}", since, NOW, promote=True)
-                if budgets != want:
-                    problems.append(f"phase 8h: sensor budgets for a run of 4 with the feed taking its two should be {want}, got {budgets}")
+                r = radar.scan(sandbox, out_split, since, NOW, promote=True)
+                if len(sensor_saves) != want_sensors or r.get("sensors_promoted") != want_sensors:
+                    problems.append(f"phase 8h: {n_sensor} strong sensor items in a run of 4 with feed candidates: "
+                                    f"{want_sensors} saved, got {len(sensor_saves)} ({r.get('sensors_promoted')})")
+                if not (out_split / f"Bubbles-{NOW.date().isoformat()}.md").exists() or not (out_split / "allocation.json").exists():
+                    problems.append("phase 8h: the scan writes the day's Bubbles briefing and allocation.json")
         finally:
-            sensor_promote.promote, policy.PROMOTE_PER_RUN = real_sp, saved_cap
+            reader.save, policy.PROMOTE_PER_RUN = real_save, saved_cap
 
         # 8e/8f. stranded: once an item is older than --since it is never fetched again, so a
         # failed promotion must still be retried (from promote_retry.jsonl, regardless of the

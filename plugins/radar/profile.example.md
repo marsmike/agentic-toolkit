@@ -12,6 +12,9 @@ promote_per_name_per_run: 2
 promote_per_name_per_day: 6
 promote_per_source_per_run: 3
 promote_sensor_share: 0.5
+promote_per_event_per_day: 3
+# bubble_weights:            # multiply a bubble's weight (interest id or name)
+#   music-production-djing: 0.5
 watch: OpenAI,GPT,ChatGPT,Codex,Anthropic,Claude,Google,Gemini,DeepMind,Meta,Muse,Llama,Mistral,xAI,Grok,DeepSeek,Qwen
 kagi_weekly_budget_usd: 1.00
 tavily_weekly_budget_usd: 2.00
@@ -60,7 +63,24 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
   for the next run.
 - **`promote_sensor_share`** — the share of a run's budget the sensors are offered first (default
   0.5); the Reader feed gets the rest, and whatever the feed leaves goes back to the sensors. Both
-  sides take interests round-robin (each interest's strongest item first).
+  sides are allocated together (below).
+- **`promote_per_event_per_day`** — how many promotions one story may take in a day (default 3). A
+  story is an event the Signal Radar saw this fortnight (Sonnet 5.5, DevDay, Muse), or headlines that
+  overlap enough; its best copy (a lab's own post, the feed, an open outlet, a paywall last) is
+  promoted and the other outlets ride along in the Reader note as "also covered by".
+- **`bubble_weights`** — a multiplier per bubble (interest id or name). A bubble's weight is
+  `sqrt(1 + notes) + sqrt(1 + notes this month)` from the vault (tags or `radar_interests`), times
+  1.5 while the Signal Radar calls it rising; this key has the last word.
+
+**How a run chooses (`allocation.py`).** Must-see events (a Signal Radar early warning, or strength
+75+ from 3+ source families) and the labs' own posts go first, up to half the run. Then every bubble
+gets turns by weight: each run adds `promote_per_run × weight share` to its credit, each promotion
+costs one, credit carries from run to run (halved at a new day). A bubble with nothing yet today
+goes first, so every bubble with a strong item gets one a day; a bubble more than one past its share
+waits. What is not taken is held: a feed item stays in Reader and is offered again first for three
+days, a sensor item stays in the window; what never makes it is written to `missed.jsonl`. Each scan
+rewrites `00_Memory/radar/Bubbles-<day>.md`, the day by bubble (★ must-see, ⏳ held, ✗ missed, → the
+note), which the daily note copies in.
 - **`watch`** — the labs and models you follow by name (comma list or YAML list). A sensor item
   (Hacker News, Kagi News, the sensor RSS feeds) whose title names one and that the judge rates
   worth reading (0.70) is saved into Reader like a strong feed item, and the Signal Radar's web

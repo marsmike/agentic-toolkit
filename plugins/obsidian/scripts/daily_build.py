@@ -18,6 +18,9 @@ than one of either) is left alone and reported in a DLQ note.
                          note's `distilled_at`, else `processed_date`; never an estimated one),
                          newest first
     Changed today        notes whose `updated_at` falls on the day and that were not distilled on it
+    Bubbles today        the radar's briefing for the day, copied in (00_Memory/radar/Bubbles-<day>.md:
+                         each bubble's promotions, held and missed items, heaviest first; its headings
+                         one level down, never a link into 00_Memory); left out when there is none
     Radar today          the day's strong radar items (00_Memory/radar/state.jsonl)
     Pipeline runs today  the day's run rows in 00_Memory/imports.jsonl (`imports_log.runs`, the
                          same numbers Imports.md and the run report show); only a vault whose ledger
@@ -107,6 +110,26 @@ def notes(vault: Path) -> list[tuple[str, dict, str]]:
             fm, body = read_frontmatter(p)
             out.append((rel, fm, title_of(fm, body, p.stem)))
     return out
+
+
+def bubbles(vault: Path, day: str) -> list[str]:
+    """The radar's Bubbles briefing of the day as lines of this block: its body without frontmatter
+    or title, headings two levels down (## → ####), markers and link syntax left as the radar wrote
+    them. [earned: 2026-09-30 — the owner wants the weighted day in the vault, not only online]"""
+    path = vault / "00_Memory" / "radar" / f"Bubbles-{day}.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    if text.startswith("---"):
+        text = text.split("\n---", 1)[-1]
+    body = [ln for ln in text.splitlines() if not ln.startswith("# ") and "%%" not in ln]
+    body = ["##" + ln if ln.startswith("#") else ln for ln in body]
+    while body and not body[0].strip():
+        body.pop(0)
+    while body and not body[-1].strip():
+        body.pop()
+    return (["### Bubbles today", ""] + body + [""]) if body else []
 
 
 def radar(vault: Path, day: str) -> list[dict]:
@@ -208,6 +231,7 @@ def block(vault: Path, day: date, content: list[tuple[str, dict, str]], exists: 
         + [""]
     )
     out += [f"### Changed today ({len(changed)})", ""] + ([line(*n) for n in changed] or ["- (none)"]) + [""]
+    out += bubbles(vault, d)
     radar_lines = [
         f"- [{_text(r.get('title') or r.get('url'), TITLE_CHARS).replace('[', '(').replace(']', ')')}]"
         f"({str(r.get('url') or '').replace(' ', '%20').replace(')', '%29')}) — {_text(', '.join(r['strong']), 80)}"

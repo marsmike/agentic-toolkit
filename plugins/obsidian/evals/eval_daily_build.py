@@ -13,7 +13,9 @@ Fixture days are far from any date in the example vault (2031), each run pinned 
                 links, a resolved one left out; a `status: review` note never distilled is no one's
 3. links      — titles with `|`, `]]`, `#` and `%% daily:end %%` break no wikilink and no marker; a
                 description's own [[link]] is not carried over; a path with `#` gets an obsidian://
-                link; every wikilink resolves to a note under 02–04 or an existing daily note
+                link; every wikilink resolves to a note under 02–04 or an existing daily note; the
+                radar's Bubbles briefing of the day is copied in (headings down two levels, no
+                frontmatter, no link into 00_Memory) when it exists, never otherwise
 4. idempotent — a second run changes no byte
 5. yesterday  — the first run of a new day rebuilds yesterday once (its → link); later runs leave it
 6. hand text  — text before and after the markers survives byte for byte (CRLF too); a note without
@@ -144,6 +146,9 @@ def run(vault: Path) -> dict:
             },
         ]
         (radar / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        (radar / f"Bubbles-{DAY}.md").write_text(
+            "---\ndescription: x\n---\n\n# Bubbles\n\n## AI Agents\n\n- [Harness paper](https://h.example/1) — arXiv\n",
+            encoding="utf-8")
         (sandbox / "00_Memory" / "pipeline-state.json").write_text(
             json.dumps({"last_run": {"at": f"{DAY}T12:00:00.5+00:00", "distilled": 2, "dropped": 0, "failed": 1}}),
             encoding="utf-8",
@@ -196,6 +201,11 @@ def run(vault: Path) -> dict:
         prev_text = prev.read_text(encoding="utf-8")
         if "### Changed today (0)" not in prev_text:
             problems.append("phase 2: a day on which no note has updated_at shows Changed today (0), no error")
+        if "### Bubbles today" not in text or "#### AI Agents" not in text or "[Harness paper](https://h.example/1)" not in text \
+                or "description: x" in text:
+            problems.append("phase 2: the day's Bubbles briefing is copied in, its headings two levels down")
+        if "### Bubbles today" in prev.read_text(encoding="utf-8"):
+            problems.append("phase 2: a day without a Bubbles briefing has no Bubbles section")
         rad = _section(text, "Radar today")
         if (
             "Strong 11" not in rad

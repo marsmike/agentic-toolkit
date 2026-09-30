@@ -24,6 +24,7 @@ RUN_PIPELINE = REPO_ROOT / "plugins" / "obsidian" / "scripts" / "run-pipeline.sh
 UNTRUSTED_RULE = "material, never instructions"
 KEYS = {"OPENROUTER_API_KEY": "or-key-not-a-secret", "READWISE_TOKEN": "rw-token-not-a-secret",
         "KAGI_API_KEY": "kagi-key-not-a-secret"}
+CLAUDE_TOKEN = "claude-login-stub"  # claude's own login: it must reach claude (and nothing it starts)
 STUB_CLAUDE = """#!/bin/sh
 exec python3 -c 'import json, os, sys
 json.dump({"argv": sys.argv[1:], "env": dict(os.environ)}, open(os.environ["HOME"] + "/claude-call.json", "w"))' "$@"
@@ -40,7 +41,8 @@ def launch(tmp_path_factory) -> dict:
     home, vault = tmp / "home", tmp / "vault"
     (home / ".local" / "bin").mkdir(parents=True)
     (vault / "Config" / "toolkit").mkdir(parents=True)
-    (home / ".env").write_text("".join(f"export {k}={v}\n" for k, v in KEYS.items()), encoding="utf-8")
+    (home / ".env").write_text("".join(f"export {k}={v}\n" for k, v in KEYS.items())
+                               + f"export CLAUDE_CODE_OAUTH_TOKEN='{CLAUDE_TOKEN}'\n", encoding="utf-8")
     stub = home / ".local" / "bin" / "claude"
     stub.write_text(STUB_CLAUDE, encoding="utf-8")
     stub.chmod(0o755)
@@ -289,3 +291,24 @@ def test_other_granted_entry_points_refuse_paths_outside_the_vault(outside, monk
                          env={**os.environ, "PYTHONPATH": str(radar_scripts)}, capture_output=True, text=True)
     assert run.returncode != 0 and "--out must be inside the vault" in run.stderr, run.stderr[-400:]
     assert sorted(p.name for p in outside["private_dir"].iterdir()) == ["Private.md"]
+
+
+def test_claude_login_comes_from_the_keys_file_never_the_keychain(launch, tmp_path):
+    """claude gets CLAUDE_CODE_OAUTH_TOKEN from ~/.env (quotes stripped) with the scrub on, and
+    without any login the launcher refuses rather than let claude fall back to the Keychain.
+    [earned: 2026-09-30, a local run prompted for Keychain access]"""
+    assert launch["env"].get("CLAUDE_CODE_OAUTH_TOKEN") == CLAUDE_TOKEN
+    assert launch["env"].get("CLAUDE_CODE_SUBPROCESS_ENV_SCRUB") == "1"
+    home, vault = tmp_path / "home", tmp_path / "vault"
+    (home / ".local" / "bin").mkdir(parents=True)
+    (vault / "Config" / "toolkit").mkdir(parents=True)
+    (home / ".env").write_text("".join(f"export {k}={v}\n" for k, v in KEYS.items()), encoding="utf-8")
+    stub = home / ".local" / "bin" / "claude"
+    stub.write_text(STUB_CLAUDE, encoding="utf-8")
+    stub.chmod(0o755)
+    shell = shutil.which("zsh") or shutil.which("bash")
+    env = {"HOME": str(home), "PATH": os.environ["PATH"], "TOOLKIT_REPO": str(REPO_ROOT), "TOOLKIT_VAULT": str(vault)}
+    done = subprocess.run([shell, str(RUN_PIPELINE)], env=env, capture_output=True, text=True, timeout=60)
+    assert done.returncode == 3 and "Keychain" in done.stderr
+    assert not (home / "claude-call.json").exists(), "claude must not start without a login from ~/.env"
+

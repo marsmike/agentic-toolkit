@@ -1,6 +1,6 @@
 {
   "name": "readwise",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "Readwise ingestion for the vault contract, as scripts the pipeline runs: Reader/Classic highlights into origin-prefixed 01_Capture/ notes with their provenance.",
   "author": {
     "name": "agentic-toolkit contributors"

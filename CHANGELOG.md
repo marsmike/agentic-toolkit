@@ -4,6 +4,42 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A weighted selection of the owner's bubbles, with nothing important missed (radar 3.8.0,
+  obsidian 3.5.0, readwise 3.1.2).** On 2026-09-30, Music Production got 23 promotions while Local AI
+  (27 strong items) and AI Agents (23) got one each, and one story took 14 of a run. Promotion now
+  runs through one allocator for sensors and the feed together (`allocation.py`, `bubbles.py`):
+  - **Must-see lane:** a Signal Radar early warning, or an event at strength 75+ from 3+ source
+    families, and the labs' own posts go first (up to half the run), whatever the quotas say.
+  - **One event, one promotion:** an event is a Signal Radar entity first seen in the last ten days,
+    in one of the owner's sectors, and not a term his interests already use. All coverage of it is
+    one story. Its best copy is promoted (lab post, then feed, then open outlet, paywall last); the
+    others ride along in the Reader note as "also covered by". At most 3 a day
+    (`promote_per_event_per_day`).
+  - **Weighted bubbles:** a bubble's weight is `sqrt(1 + notes) + sqrt(1 + notes this month)` from the
+    vault, ×1.5 while rising, overridable per bubble (`bubble_weights`). Each run adds
+    `budget × weight share` of credit and each promotion costs one; credit carries across runs and is
+    halved at a new day. A bubble with nothing yet today goes first; one more than a promotion past
+    its share waits.
+  - **Per-source cap per bubble:** 3 per bubble, 6 across bubbles. arXiv and reddit carry several
+    bubbles, and a shared cap held back the heaviest ones.
+  - **Nothing silently lost:** strong items not taken are held. A feed item stays in Reader and is
+    offered first for 3 days (`promote_hold.jsonl`); what never makes it goes to `missed.jsonl`.
+  - **The day in the vault:** each scan writes `00_Memory/radar/Bubbles-<day>.md`, bubbles heaviest
+    first with ★ must-see, ⏳ held, ✗ missed and → the note an item became; the daily note copies it
+    in (headings down, no link into `00_Memory`). Items merged into a note's `sources` link to that
+    note; the archive is never linked.
+  - **Local loop:** `TOOLKIT_READER_SHADOW=<file>` logs every Reader write instead of sending it, and
+    `scripts/local-loop.sh` runs scan and a dry ingest on a vault clone in seconds.
+    `run-pipeline.sh` now takes claude's login only from `~/.env` and refuses to fall back to the
+    Keychain.
+
+  Replaying 2026-09-30 in 8 runs with the vault's real weights: Local AI 11 and AI Agents 11 (they
+  had 1 each), Claude Code 7, every must-see event in, 58 promotions against the real 98, and 9
+  items held at day's end. The replay also showed Obsidian & Agentic KM, the owner's second-heaviest
+  bubble, with no strong feed item at all: a feed gap, not an allocation gap.
+  [earned: 2026-09-30, the owner: "I do not want to miss anything important, but need a weighted
+  selection of what happened in my bubbles"]
+
 - **Even ingest: every interest gets a turn, no source takes the run (radar 3.7.0, obsidian
   3.4.6).** The per-name caps of 3.6.2 handled one symptom. The general problem: the sensors took
   their promotions before the Reader feed got any (42 to 8 of the day's 50), one Google News

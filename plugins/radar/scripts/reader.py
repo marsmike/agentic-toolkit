@@ -13,7 +13,9 @@ item 2026-09-22]
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -67,9 +69,29 @@ def _token() -> str:
     return tok
 
 
+def _shadow(method: str, url: str, data: dict | None) -> tuple[int, Any, float | None] | None:
+    """With TOOLKIT_READER_SHADOW=<file>, every write (save, bulk_update) is appended to that file
+    and answered as if it worked; reads still go to Reader. The local improvement loop runs a scan
+    on a vault clone this way without moving anything in the owner's Reader. [earned: 2026-09-30 —
+    the owner: "test the ingest and distill locally to have a faster improvement loop"]"""
+    path = os.environ.get("TOOLKIT_READER_SHADOW")
+    if not path or method == "GET":
+        return None
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"method": method, "url": url, "data": data}, ensure_ascii=False) + "\n")
+    if url.endswith("/save/"):
+        return 201, {"id": "shadow-" + hashlib.sha1(str((data or {}).get("url")).encode()).hexdigest()[:12]}, None
+    if url.endswith("/bulk_update/"):
+        return 200, {"results": [{"id": u.get("id"), "success": True} for u in (data or {}).get("updates", [])]}, None
+    return 200, {}, None
+
+
 def _request(method: str, url: str, data: dict | None = None) -> tuple[int, Any, float | None]:
     """The one network call in this module. Evals replace it with a stub.
     Returns (status, parsed body, Retry-After seconds or None)."""
+    shadow = _shadow(method, url, data)
+    if shadow is not None:
+        return shadow
     body = json.dumps(data).encode("utf-8") if data is not None else None
     headers = {"Authorization": f"Token {_token()}"}
     if body is not None:

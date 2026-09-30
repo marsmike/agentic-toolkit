@@ -48,7 +48,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import re
 import shutil
 import subprocess
@@ -59,6 +58,8 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import briefing
+import bubbles
 import clips as clips_mod
 import discover as discover_mod
 import fairness
@@ -73,6 +74,7 @@ import scout as scout_mod
 import sensor_promote
 import sensors as sensors_mod
 import signal_radar
+from allocation import Cand, Caps, Selector, credit_for_run
 from interests import Interest
 from judgments import policy
 from judgments import questions as Q
@@ -353,6 +355,51 @@ def _apply(updates: list[dict], done_key: str) -> dict[str, Any]:
 
 
 RETRY_FILE = "promote_retry.jsonl"
+HOLD_FILE = "promote_hold.jsonl"
+MISSED_FILE = "missed.jsonl"
+
+
+def _hold_rows(out: Path | None, run_date: str, promoted_keys: set[str]) -> tuple[dict[str, dict], list[dict]]:
+    """The hold file's rows still waiting (by canonical) and those past HOLD_DAYS, which become
+    MISSED_FILE rows here. A promoted row is simply gone."""
+    if out is None:
+        return {}, []
+    limit = (date.fromisoformat(run_date) - timedelta(days=policy.HOLD_DAYS)).isoformat()
+    waiting, expired = {}, []
+    for r in read_jsonl(out / HOLD_FILE):
+        c = r.get("canonical")
+        if not c or c in promoted_keys:
+            continue
+        if str(r.get("first_held", run_date)) <= limit:
+            expired.append(r)
+        else:
+            waiting[c] = r
+    if expired:
+        append_jsonl(out / MISSED_FILE, [{**r, "missed": run_date, "why": f"held {policy.HOLD_DAYS} days, never promoted"}
+                                         for r in expired])
+    return waiting, expired
+
+
+def write_hold(out: Path, run_date: str, held: list[Cand], promoted_keys: set[str]) -> None:
+    """Rewrite the hold file: this run's held candidates, each keeping the day it was first held.
+    A sensor row that fell out of the window without a promotion of it or of its story is missed."""
+    before = {r["canonical"]: r for r in read_jsonl(out / HOLD_FILE) if r.get("canonical")}
+    now = {}
+    for c in held:
+        old = before.get(c.key, {})
+        now[c.key] = {"canonical": c.key, "id": getattr(c.ref, "id", None) if c.kind == "feed" else None,
+                      "kind": c.kind, "url": c.url, "title": c.title, "source": c.source, "bubble": c.bubble,
+                      "strength": round(c.strength, 3), **({"event": c.event} if c.event else {}),
+                      **({"must_see": True} if c.must_see else {}),
+                      "first_held": old.get("first_held", run_date), "last_held": run_date}
+    promoted = read_jsonl(out / "promoted.jsonl")
+    events = {r["event"] for r in promoted if r.get("event")}
+    limit = (date.fromisoformat(run_date) - timedelta(days=policy.HOLD_DAYS)).isoformat()
+    gone = [r for k, r in before.items() if k not in now and k not in promoted_keys and r.get("kind") == "sensor"
+            and not (r.get("event") and r["event"] in events) and str(r.get("first_held", run_date)) > limit]
+    if gone:
+        append_jsonl(out / MISSED_FILE, [{**r, "missed": run_date, "why": "left the sensor window unpromoted"} for r in gone])
+    atomic_write(out / HOLD_FILE, "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in now.values()))
 MAX_PROMOTE_RETRIES = 3  # after this many failed promotions of the same item, give up and archive
 
 
@@ -375,24 +422,10 @@ def _pending_retries(out: Path, promoted_keys: set[str]) -> dict[str, dict]:
     return {c: {**r, "attempts": attempts[c]} for c, r in last.items() if c not in promoted_keys and c not in given_up}
 
 
-def _merge_sensed(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
-    """Two sensor passes of one run as one result: counts add up, errors join."""
-    out = dict(a)
-    for k, v in b.items():
-        if isinstance(v, int) and isinstance(out.get(k), int):
-            out[k] += v
-        elif isinstance(v, dict) and isinstance(out.get(k), dict):
-            out[k] = {i: out[k].get(i, 0) + v.get(i, 0) for i in {*out[k], *v}}
-        elif isinstance(v, list) and isinstance(out.get(k), list):
-            out[k] = out[k] + v
-        else:
-            out[k] = v
-    return out
-
-
 def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], names: dict[str, str],
            run_date: str, archive: bool, promote: bool, location: str, out: Path | None = None,
-           per_run: int | None = None, per_source: int | None = None) -> dict[str, Any]:
+           per_run: int | None = None, per_source: int | None = None,
+           select: Any = None) -> dict[str, Any]:
     """Move every fetched feed item the radar has recorded (a repost shares a key with its
     original) out of the feed. With `promote`, the strongest not yet promoted, up to
     `per_run` (what the run's `promote_per_run` leaves; default PROMOTE_PER_RUN), taken round-robin by
@@ -405,7 +438,13 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
     and it is retried on every scan regardless of the window, up to MAX_PROMOTE_RETRIES times,
     after which it is archived like any other settled item (the daily note still lists it).
     [earned: 2026-09-28, week review — a promotion that failed once and then aged out of the
-    window was never promoted or archived again]. A Reader failure here never fails the scan."""
+    window was never promoted or archived again]. A Reader failure here never fails the scan.
+
+    Which strong items go is `select(feed_candidates) -> (chosen ids, held ids)`: scan passes one
+    that allocates sensors and feed together (`allocation`); without it, the feed alone is walked
+    the same way. A held item is not archived: it stays in Reader, is remembered in HOLD_FILE and
+    offered again first for HOLD_DAYS; then it is archived and written to MISSED_FILE, so nothing
+    strong leaves unseen. [earned: 2026-09-30 — every strong item past the day's cap was archived]"""
     strong: dict[str, dict[str, float]] = {}
     ledger = (out / "promoted.jsonl") if out else None
     done_before = read_jsonl(ledger) if ledger else []
@@ -425,33 +464,39 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
     retry_items = [Item(id=r["id"], url=r.get("url", ""), canonical=c, title=r.get("title", ""), summary="",
                         site=r.get("feed", ""), feed=r.get("feed", ""), published="", category="", saved_at="")
                    for c, r in pending.items() if c not in fetched_keys]
-    all_fetched = fetched + retry_items
-    recorded = recorded | {it.canonical for it in retry_items}
+    held_rows, expired_rows = _hold_rows(out, run_date, promoted_keys) if promote and out is not None else ({}, [])
+    known_keys = fetched_keys | {it.canonical for it in retry_items}
+    held_items = [Item(id=r["id"], url=r.get("url", ""), canonical=c, title=r.get("title", ""), summary="",
+                       site=r.get("source", ""), feed=r.get("source", ""), published="", category="", saved_at="")
+                  for c, r in held_rows.items() if r.get("kind") == "feed" and c not in known_keys]
+    all_fetched = fetched + retry_items + held_items
+    recorded = recorded | {it.canonical for it in retry_items} | {it.canonical for it in held_items}
 
     settled = [it for it in all_fetched if keys_of(it) & recorded]
-    candidates = fairness.interleave(
-        sorted((it for it in settled if item_key(it) in strong), key=lambda it: -max(strong[item_key(it)].values())),
-        lambda it: fairness.top_interest(strong[item_key(it)]))
-    cap_src = policy.PROMOTE_PER_SOURCE_PER_RUN if per_source is None else per_source
-    per_src: dict[str, int] = {}
     since = (date.fromisoformat(run_date) - timedelta(days=policy.RELEASE_STREAM_DAYS)).isoformat()
     streams = {release_stream(r["canonical"]) for r in done_before if str(r.get("date", "")) > since} - {None}
-    chosen: set[str] = set()
-    for it in candidates:
-        if len(chosen) >= budget:
-            break
-        stream = release_stream(item_key(it))
-        if stream in streams:
-            continue  # this repo's release already came in this week; the daily note still lists it
-        src = it.feed or it.site
-        if per_src.get(src, 0) >= cap_src:
-            continue  # one feed takes at most its share of a run; the daily note still lists it
-        if stream:
-            streams.add(stream)
-        per_src[src] = per_src.get(src, 0) + 1
-        chosen.add(it.id)
+    cands = [Cand(kind="feed", key=item_key(it), title=it.title, url=it.url, source=it.feed or it.site,
+                  p=strong[item_key(it)], bubble=fairness.top_interest(strong[item_key(it)]),
+                  strength=max(strong[item_key(it)].values()), stream=release_stream(item_key(it)), ref=it)
+             for it in settled if item_key(it) in strong]
+    if select is None:
+        caps = Caps(per_source_run=policy.PROMOTE_PER_SOURCE_PER_RUN if per_source is None else per_source,
+                    sensor_share=None)
+        sel = Selector([c for c in cands if not (c.stream and c.stream in streams)], budget, {}, caps=caps,
+                       streams_taken=streams)
+        sel.run(lambda c: True)
+        chosen = {c.ref.id for c in sel.taken}
+        held = {c.ref.id for c in sel.held()}
+    else:
+        chosen, held = select([c for c in cands if not (c.stream and c.stream in streams)])
+    by_key = {c.ref.id: c for c in cands}
     promotions, archive_ids = [], []
+    for r in expired_rows:
+        if r.get("kind") == "feed" and r.get("id"):
+            archive_ids.append({"id": r["id"], "location": "archive"})
     for it in settled:
+        if it.id in held and it.id not in chosen:
+            continue  # stays in Reader for a later run; HOLD_FILE remembers it
         if it.id in chosen:
             p = strong[item_key(it)]
             u: dict[str, Any] = {"id": it.id, "location": location, "tags": ["radar", *(f"radar/{i}" for i in sorted(p))]}
@@ -484,10 +529,18 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
             if archive and gave_up_ids:
                 archive_ids += [{"id": i, "location": "archive"} for i in gave_up_ids]
         if ledger and done:
-            append_jsonl(ledger, [{"canonical": item_key(by_id[i]), "id": i, "date": run_date} for i in done])
+            append_jsonl(ledger, [{"canonical": item_key(by_id[i]), "id": i, "date": run_date,
+                                   "title": by_id[i].title, "source": by_id[i].feed or by_id[i].site,
+                                   **({"bubble": by_key[i].bubble} if i in by_key else {}),
+                                   **({"event": by_key[i].event} if i in by_key and by_key[i].event else {})}
+                                  for i in done])
         result["promoted"] = len(done)
         if failed:
             result["promote_failed"] = len(failed)
+    if held:
+        result["held"] = len(held - chosen)
+    if expired_rows:
+        result["missed"] = len(expired_rows)
     return {**result, **_apply(archive_ids, "archived")}
 
 
@@ -533,6 +586,75 @@ def comment_epics(out: Path, rows: list[dict], interests: list[Interest], run_da
     return {"todoist_comments": posted}
 
 
+ALLOCATION_FILE = "allocation.json"
+
+
+def allocate(vault: Path, out: Path, interests: list[Interest], fetched: list[Item], recorded: set[str],
+             state_rows: list[dict], run_date: str, now: datetime, archive: bool, location: str) -> dict[str, Any]:
+    """One run's promotions, sensors and feed together (`allocation.Selector`): must-see events
+    and labs' own posts first, then a weighted turn for every bubble (`bubbles.weights`, credit
+    carried in ALLOCATION_FILE), one event one promotion, every source and watched name capped.
+    What is not taken is held (HOLD_FILE) and the day's briefing says so (`briefing`).
+    [earned: 2026-09-30 — Music 23 promotions, Local AI and AI Agents 1 each, Muse 14 of a run]"""
+    names = {i.id: i.name for i in interests}
+    per_run = profile_number(vault, "promote_per_run", policy.PROMOTE_PER_RUN, cast=int)
+    share = min(1.0, max(0.0, profile_number(vault, "promote_sensor_share", policy.SENSOR_SHARE, cast=float)))
+    caps = Caps(per_source_run=profile_number(vault, "promote_per_source_per_run", policy.PROMOTE_PER_SOURCE_PER_RUN, cast=int),
+                per_name_run=profile_number(vault, "promote_per_name_per_run", policy.SENSOR_PER_NAME_PER_RUN, cast=int),
+                per_name_day=profile_number(vault, "promote_per_name_per_day", policy.SENSOR_PER_NAME_PER_DAY, cast=int),
+                per_event_day=profile_number(vault, "promote_per_event_per_day", policy.PER_EVENT_PER_DAY, cast=int),
+                sensor_share=share, must_share=policy.MUST_SEE_SHARE)
+    signal = bubbles.load_signal(out)
+    evs = bubbles.events(signal, interests, now.date())
+    watch = profile_value(vault, "watch", None)
+    watch = watch if isinstance(watch, list) else [w for w in str(watch or "").split(",")]
+    pattern = sensor_promote.watch_pattern([str(w) for w in watch])
+    overrides = profile_value(vault, "bubble_weights", None)
+    weights = bubbles.weights(interests, bubbles.note_counts(vault, interests, now.date()), bubbles.rising(signal),
+                              overrides if isinstance(overrides, dict) else None)
+    try:
+        saved = json.loads((out / ALLOCATION_FILE).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        saved = {}
+    credit = credit_for_run(saved.get("credit") or {}, weights, per_run, new_day=saved.get("date") != run_date)
+    b_n, e_n, n_n = sensor_promote.today_counts(out, run_date, pattern)
+    t = policy.thresholds(judge.load_config(vault)["backend"])
+    known = set(vault_sources(vault))
+    sensor_cands = sensor_promote.candidates(out, t, run_date, known, pattern, evs)
+    ctx: dict[str, Any] = {}
+
+    def select(feed_cands: list[Cand]) -> tuple[set[str], set[str]]:
+        for c in feed_cands:
+            ev = bubbles.event_of(c.title, evs)
+            if ev:
+                c.event, c.event_name, c.must_see = ev.key, ev.name, ev.must_see
+            c.names = frozenset(sensor_promote.named(c.title, pattern))
+        sel = Selector(sensor_cands + feed_cands, per_run, credit, caps=caps,
+                       today_bubbles=b_n, today_events=e_n, today_names=n_n)
+        stats: dict[str, Any] = {}
+        sel.run(lambda c: sensor_promote.save(c, out, t, run_date, location, names, known, stats)
+                if c.kind == "sensor" else True)
+        ctx.update(sel=sel, stats=stats)
+        return ({c.ref.id for c in sel.taken if c.kind == "feed"}, {c.ref.id for c in sel.held() if c.kind == "feed"})
+
+    result = settle(fetched, recorded, state_rows, names, run_date, archive, True, location, out,
+                    per_run=per_run, select=select)
+    sel = ctx.get("sel")
+    if sel is not None:
+        result |= sensor_promote.report(sel, ctx["stats"])
+        result["bubbles"] = dict(Counter(c.bubble for c in sel.taken))
+        result["must_see"] = sum(1 for c in sel.taken if c.must_see)
+        write_hold(out, run_date, sel.held(), {r["canonical"] for r in read_jsonl(out / "promoted.jsonl")})
+    atomic_write(out / ALLOCATION_FILE, json.dumps({
+        "date": run_date, "at": now.isoformat(timespec="minutes"),
+        "weights": {k: round(v, 3) for k, v in sorted(weights.items(), key=lambda kv: -kv[1])},
+        "credit": {k: round(v, 3) for k, v in (sel.credit if sel is not None else credit).items()},
+        "events": [{"key": e.key, "name": e.name, "strength": e.strength, "must_see": e.must_see} for e in evs],
+    }, indent=2, ensure_ascii=False) + "\n")
+    briefing.write(vault, out, run_date, interests, now)
+    return result
+
+
 def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | None = None,
          max_requests: int = policy.MAX_REQUESTS_PER_RUN, archive: bool = True, promote: bool = False,
          todoist: bool = False) -> dict[str, Any]:
@@ -566,32 +688,10 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
     def archived() -> dict[str, Any]:
         names = {i.id: i.name for i in interests}
         location = str(profile_value(vault, "promote_location", DEFAULT_PROMOTE_LOCATION))
-        per_run = profile_number(vault, "promote_per_run", policy.PROMOTE_PER_RUN, cast=int)
-        per_source = profile_number(vault, "promote_per_source_per_run", policy.PROMOTE_PER_SOURCE_PER_RUN, cast=int)
-        share = min(1.0, max(0.0, profile_number(vault, "promote_sensor_share", policy.SENSOR_SHARE, cast=float)))
-        sensed: dict[str, Any] = {}
-        sense = None
-        if promote:
-            # Before the feed, but only its share: a lab's own announcement outranks the day's
-            # fortieth arXiv paper, and the feed still gets its half. [earned: 2026-09-30]
-            watch = profile_value(vault, "watch", None)
-            watch = watch if isinstance(watch, list) else [w for w in str(watch or "").split(",")]
-            run_counts: dict[str, dict[str, int]] = {}
-
-            def sense(budget: int) -> dict[str, Any]:
-                return sensor_promote.promote(
-                    out, policy.thresholds(judge.load_config(vault)["backend"]), run_date, budget, location,
-                    set(vault_sources(vault)), names, [str(w) for w in watch],
-                    profile_number(vault, "promote_per_name_per_run", policy.SENSOR_PER_NAME_PER_RUN, cast=int),
-                    profile_number(vault, "promote_per_name_per_day", policy.SENSOR_PER_NAME_PER_DAY, cast=int),
-                    per_source, run_counts)
-            sensed = sense(math.ceil(per_run * share))
-        settled = settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote,
-                         location, out, per_run=per_run - sensed.get("sensors_promoted", 0), per_source=per_source)
-        left = per_run - sensed.get("sensors_promoted", 0) - settled.get("promoted", 0)
-        if sense is not None and left > 0:
-            sensed = _merge_sensed(sensed, sense(left))  # what the feed left goes back to the sensors
-        return sensed | settled
+        state_rows = read_jsonl(out / "state.jsonl")
+        if not promote:
+            return settle(fetched, recorded, state_rows, names, run_date, archive, False, location, out)
+        return allocate(vault, out, interests, fetched, recorded, state_rows, run_date, now, archive, location)
     append_jsonl(out / "seen.jsonl", [{"canonical": item_key(it), "title_key": title_key(it),
                                         "first_seen": run_date, "backlog": True} for it in backlog])
     result: dict[str, Any] = {"since": since.isoformat(), "fetched": len(fetched), "new": len(items),

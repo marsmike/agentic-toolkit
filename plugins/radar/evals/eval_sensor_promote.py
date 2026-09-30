@@ -103,10 +103,11 @@ def run(vault: Path) -> dict:
         # 1 + 2. rules and skips
         r = sensor_promote.promote(out, T, DAY, 50, "later", known, names, WATCH)
         urls = [s["url"] for s in saves]
-        want = ["https://openai.com/index/devday-2026-recap/", "https://db.example.org/launch",
-                "https://npr.example.org/astra", "https://fab.example.org/news"]
+        # the lab's own post first, then strongest first (0.90, 0.86, 0.72): one bubble here
+        want = ["https://openai.com/index/devday-2026-recap/", "https://npr.example.org/astra",
+                "https://fab.example.org/news", "https://db.example.org/launch"]
         if urls != want:
-            problems.append(f"phase 1: expected lab, momentum, watched, strong in order {want}, got {urls}")
+            problems.append(f"phase 1: expected the lab post, then by strength {want}, got {urls}")
         if saves and (saves[0]["tags"] != ["radar", "radar/frontier"]
                       or not saves[0]["notes"].startswith("[radar sensors") or "lab announcement" not in saves[0]["notes"]):
             problems.append(f"phase 1: a save is tagged radar/<interest> only, its note says sensors and why; got {saves[0]}")
@@ -235,7 +236,7 @@ def run(vault: Path) -> dict:
         (out7 / "sensors" / f"{DAY}.json").write_text(json.dumps({"day": DAY, "items": labs}), encoding="utf-8")
         saves.clear()
         r = sensor_promote.promote(out7, T, DAY, 10, "later", known, names, WATCH, per_source_run=2)
-        if len(saves) != 2 or r.get("sensors_capped_source") != 2:
+        if len(saves) != 2 or r.get("sensors_held") != 2:
             problems.append(f"phase 7: a lab's blog takes two of a run at a cap of two, the rest wait, got {len(saves)}, {r}")
         saves.clear()
         sensor_promote.promote(out7, T, DAY, 10, "later", known, names, WATCH, per_source_run=2)
@@ -260,8 +261,8 @@ def run(vault: Path) -> dict:
         muse = [u for u in (s["url"] for s in saves) if "outlet" in u]
         # the lab post always goes and counts: it and one outlet make the run's two Muse stories
         if len(muse) != 1 or "https://openai.com/index/muse-lab/" not in [s["url"] for s in saves] \
-                or "https://fab2.example.org/n" not in [s["url"] for s in saves] or r.get("sensors_capped") != 4:
-            problems.append(f"phase 6: the lab post and one outlet (two Muse a run), the other story too, four capped; "
+                or "https://fab2.example.org/n" not in [s["url"] for s in saves] or r.get("sensors_held") != 4:
+            problems.append(f"phase 6: the lab post and one outlet (two Muse a run), the other story too, four held; "
                             f"got {[s['url'] for s in saves]}, {r}")
         (out6 / "promoted.jsonl").write_text("".join(json.dumps({"canonical": f"earlier{n}", "date": DAY, "via": "sensors",
                                                                   "title": f"Muse story number {n}"}) + "\n" for n in range(5))

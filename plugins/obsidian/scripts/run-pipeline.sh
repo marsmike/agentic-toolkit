@@ -37,6 +37,24 @@ for name in HOME PATH USER LOGNAME SHELL TMPDIR LANG LC_ALL LC_CTYPE TERM \
   case "$name" in TOOLKIT_*KEY|TOOLKIT_*TOKEN) continue ;; esac
   if value="$(printenv "$name")"; then AGENT_ENV+=("$name=$value"); fi
 done
+# claude's own login comes from the environment or the keys file, never the macOS Keychain: without
+# CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`) or ANTHROPIC_API_KEY, claude falls back to the
+# Keychain and prompts for access mid-run. The owner allows no Keychain access: every secret lives in
+# ~/.env. Only these two names are read from it, and only into claude's own environment. [earned:
+# 2026-09-30, a local run prompted for Keychain access; the owner: "use ~/.env always"]
+if ! printf '%s\n' "${AGENT_ENV[@]}" | grep -qE '^(CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_API_KEY)='; then
+  for name in CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY; do
+    value="$(sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}$name=//p" "$KEYS_FILE" 2>/dev/null | tail -1 \
+      | sed -e 's/^["'"'"']//' -e 's/["'"'"']$//')"
+    if [ -n "$value" ]; then AGENT_ENV+=("$name=$value"); break; fi
+  done
+fi
+if ! printf '%s\n' "${AGENT_ENV[@]}" | grep -qE '^(CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_API_KEY)='; then
+  echo "run-pipeline: no CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY in the environment or $KEYS_FILE;" >&2
+  echo "run-pipeline: refusing to start claude, which would fall back to the Keychain. Run" >&2
+  echo "run-pipeline: 'claude setup-token' and add CLAUDE_CODE_OAUTH_TOKEN=<token> to $KEYS_FILE." >&2
+  exit 3
+fi
 # claude itself needs its own auth (above), but nothing it starts may inherit it: the scrub strips
 # Anthropic credentials from every Bash command, hook and MCP server the run spawns, so a granted
 # script or a steered prompt cannot print or forward them. [earned: 2026-09-24, Copilot review of #26]

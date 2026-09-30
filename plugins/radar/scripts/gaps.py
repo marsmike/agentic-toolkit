@@ -150,7 +150,8 @@ def _promote(out: Path, strong: list[dict], names: dict[str, str], now: datetime
         except reader.ReaderError as e:
             errors.append(str(e)[:120])
             continue
-        append_jsonl(ledger, [{"canonical": r["canonical"], "id": doc_id, "date": run_date, "via": "gaps"}])
+        append_jsonl(ledger, [{"canonical": r["canonical"], "id": doc_id, "date": run_date, "via": "gaps",
+                               "title": r.get("title", ""), "bubble": max(p, key=p.get) if p else None}])
         saved += 1
     return {"promoted": saved, **({"promote_errors": errors} if errors else {})}
 

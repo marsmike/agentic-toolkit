@@ -35,14 +35,17 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+import bubbles
 import fairness
 import gnews
 import reader
+from allocation import Cand, Caps, Selector
 from judgments import policy
 from judgments.urls import _canonical
 
@@ -129,94 +132,135 @@ def rank(it: dict, t: dict[str, float], watch: re.Pattern[str] | None = None) ->
     return None
 
 
-def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location: str,
-            known: set[str], names: dict[str, str], watch: list[str] | None = None,
-            per_name_run: int | None = None, per_name_day: int | None = None,
-            per_source_run: int | None = None, run: dict[str, dict[str, int]] | None = None) -> dict[str, Any]:
-    """`run` carries this run's per-name and per-source counts across calls: scan calls this
-    twice, before the feed and again with what the feed left."""
-    from radar import append_jsonl, read_jsonl  # lazy: radar imports this module
+def candidates(out: Path, t: dict[str, float], run_date: str, known: set[str],
+               pattern: re.Pattern[str] | None = None, evs: list | None = None) -> list[Cand]:
+    """The window's sensor items that qualify (`rank`) and are neither promoted, held by the vault,
+    a copy of a story promoted in the window, nor published before it; each as an allocation
+    candidate with its bubble, its event (`bubbles.event_of`, else a title-overlap story of this
+    run) and the watched names in its title."""
+    from radar import read_jsonl  # lazy: radar imports this module
 
-    ledger = out / "promoted.jsonl"
-    done = read_jsonl(ledger)
-    if budget <= 0:
-        return {}
+    done = read_jsonl(out / "promoted.jsonl")
     since = (date.fromisoformat(run_date) - timedelta(days=policy.SENSOR_PROMOTE_WINDOW_DAYS)).isoformat()
     already = {r["canonical"] for r in done} | {r["google_news"] for r in done if r.get("google_news")} | known
     stories = [words(r["title"]) for r in done if r.get("title") and str(r.get("date", "")) > since]
-    ranked = []
-    pattern = watch_pattern(watch or [])
-    cap_run = policy.SENSOR_PER_NAME_PER_RUN if per_name_run is None else per_name_run
-    cap_day = policy.SENSOR_PER_NAME_PER_DAY if per_name_day is None else per_name_day
-    cap_src = policy.PROMOTE_PER_SOURCE_PER_RUN if per_source_run is None else per_source_run
-    run = run if run is not None else {}
-    per_run: dict[str, int] = run.setdefault("names", {})
-    per_src: dict[str, int] = run.setdefault("sources", {})
-    per_day: dict[str, int] = {}
-    for r in done:
-        if r.get("date") == run_date and r.get("via") == "sensors":
-            for n in named(r.get("title", ""), pattern):
-                per_day[n] = per_day.get(n, 0) + 1
+    found: list[Cand] = []
+    local: list[tuple[set[str], str]] = []   # this run's title-overlap stories: (words, event key)
     for it in load_items(out, date.fromisoformat(run_date)):
         r = rank(it, t, pattern)
-        if r is not None:
-            ranked.append(((r[0], last_choice(it["url"]), r[1]), it))
-    ranked.sort(key=lambda x: x[0])
-    ranked = [x for x in ranked if x[0][0] == 0] + fairness.interleave(
-        [x for x in ranked if x[0][0] != 0], lambda x: fairness.top_interest(x[1].get("p") or {}))
-    saved, unresolved, capped, capped_src, errors, rules = 0, 0, 0, 0, [], {0: 0, 1: 0, 2: 0, 3: 0}
-    for (rule, _, _), it in ranked:
-        if saved >= budget:
-            break
-        url = it["url"]
-        canonical = _canonical(url)
+        if r is None:
+            continue
+        canonical = _canonical(it["url"])
         w = words(it.get("title", ""))
-        if canonical in already or any(same_story(w, s) for s in stories):
-            continue
         published = str(it.get("published") or "")[:10]
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", published) and published <= since:
+        if canonical in already or any(same_story(w, s) for s in stories) or \
+                (re.fullmatch(r"\d{4}-\d{2}-\d{2}", published) and published <= since):
             continue
-        hits = named(it.get("title", ""), pattern)
-        if rule != 0 and any(per_run.get(n, 0) >= cap_run or per_day.get(n, 0) >= cap_day for n in hits):
-            capped += 1
+        already.add(canonical)
+        p = {k: float(v) for k, v in (it.get("p") or {}).items()}
+        ev = bubbles.event_of(it.get("title", ""), evs or [])
+        key, name, must = (ev.key, ev.name, ev.must_see) if ev else (None, None, False)
+        if key is None:
+            twin = next((k for ws, k in local if same_story(w, ws)), None)
+            key = twin or f"story:{canonical}"
+            local.append((w, key))
+            name = None if twin is None else it.get("title")
+        found.append(Cand(kind="sensor", key=canonical, title=str(it.get("title") or ""), url=it["url"],
+                          source=str(it.get("origin") or it.get("source") or ""), p=p,
+                          bubble=fairness.top_interest(p), strength=max(p.values(), default=0.0),
+                          lab=r[0] == 0, last_choice=last_choice(it["url"]), event=key, event_name=name,
+                          must_see=must, names=frozenset(named(it.get("title", ""), pattern)),
+                          ref={"item": it, "rule": r[0]}))
+    return found
+
+
+RULE_WHY = ("lab announcement", "{score} HN points", "watched name", "strong")
+
+
+def save(c: Cand, out: Path, t: dict[str, float], run_date: str, location: str, names: dict[str, str],
+         known: set[str], stats: dict[str, Any]) -> bool:
+    """Save one sensor candidate to Reader (a Google News link as the publisher's URL, or not at
+    all), with the other outlets of its story in the note; one `promoted.jsonl` row."""
+    from radar import append_jsonl  # lazy: radar imports this module
+
+    it, rule = c.ref["item"], c.ref["rule"]
+    url, canonical, google_news = c.url, c.key, None
+    if gnews.is_google_news(url):
+        google_news, url = canonical, gnews.resolve(url) or ""
+        if not usable(url):
+            stats["unresolved"] = stats.get("unresolved", 0) + 1
+            return False
+        canonical = _canonical(url)
+        if canonical in known or canonical in stats.setdefault("saved", set()):
+            return False
+    tagged = sorted(i for i, v in c.p.items() if v >= t["T_WORTH"]) or ([c.bubble] if c.bubble else [])
+    why = RULE_WHY[rule].format(score=f"{it.get('score') or 0:.0f}")
+    if c.must_see:
+        why = f"must-see ({c.event_name or 'event'}); {why}"
+    also = [a.url for a in c.also if not gnews.is_google_news(a.url)][:3]
+    note = f"[radar sensors {run_date}] {why}; " + "; ".join(f"{names.get(i, i)} p={c.p[i]:.2f}" for i in tagged)
+    if also:
+        note += "; also covered by " + ", ".join(also)
+    try:
+        doc_id = reader.save(url, location, ["radar", *(f"radar/{i}" for i in tagged)], note)
+    except (reader.ReaderError, ValueError) as e:
+        stats.setdefault("errors", []).append(str(e)[:120])
+        return False
+    append_jsonl(out / "promoted.jsonl", [{
+        "canonical": canonical, "id": doc_id, "date": run_date, "via": "sensors", "source": it.get("source"),
+        "title": c.title, "bubble": c.bubble, **({"event": c.event} if c.event and not c.event.startswith("story:") else {}),
+        **({"must_see": True} if c.must_see else {}), **({"google_news": google_news} if google_news else {})}])
+    stats.setdefault("saved", set()).add(canonical)
+    rules = stats.setdefault("by_rule", {"lab": 0, "momentum": 0, "watched": 0, "strong": 0})
+    rules[("lab", "momentum", "watched", "strong")[rule]] += 1
+    return True
+
+
+def today_counts(out: Path, run_date: str, pattern: re.Pattern[str] | None) -> tuple[Counter, Counter, Counter]:
+    """Today's promotions (both paths) by bubble, by event and by watched name."""
+    from radar import read_jsonl  # lazy: radar imports this module
+
+    bubbles_n, events_n, names_n = Counter(), Counter(), Counter()
+    for r in read_jsonl(out / "promoted.jsonl"):
+        if r.get("date") != run_date:
             continue
-        src = str(it.get("origin") or it.get("source") or "")
-        if per_src.get(src, 0) >= cap_src:  # a lab's own feed too: DevDay put six OpenAI posts in one run
-            capped_src += 1
-            continue
-        google_news = None
-        if gnews.is_google_news(url):
-            google_news, url = canonical, gnews.resolve(url) or ""
-            if not usable(url):
-                unresolved += 1
-                continue
-            canonical = _canonical(url)
-            if canonical in already or canonical in known:
-                continue
-        p = it.get("p") or {}
-        tagged = sorted(i for i, v in p.items() if v >= t["T_WORTH"]) or ([max(p, key=p.get)] if p else [])
-        why = ("lab announcement", f"{it.get('score') or 0:.0f} HN points", "watched name", "strong")[rule]
-        note = f"[radar sensors {run_date}] {why}; " + "; ".join(f"{names.get(i, i)} p={p[i]:.2f}" for i in tagged)
-        try:
-            doc_id = reader.save(url, location, ["radar", *(f"radar/{i}" for i in tagged)], note)
-        except (reader.ReaderError, ValueError) as e:
-            errors.append(str(e)[:120])
-            continue
-        append_jsonl(ledger, [{"canonical": canonical, "id": doc_id, "date": run_date, "via": "sensors",
-                               "source": it.get("source"), "title": it.get("title", ""),
-                               **({"google_news": google_news} if google_news else {})}])
-        already |= {canonical, google_news} - {None}
-        per_src[src] = per_src.get(src, 0) + 1
-        for n in hits:
-            per_run[n] = per_run.get(n, 0) + 1
-            per_day[n] = per_day.get(n, 0) + 1
-        stories.append(w)
-        saved += 1
-        rules[rule] += 1
-    if not saved and not errors and not unresolved and not capped and not capped_src:
+        if r.get("bubble"):
+            bubbles_n[r["bubble"]] += 1
+        if r.get("event"):
+            events_n[r["event"]] += 1
+        for n in named(r.get("title", ""), pattern):
+            names_n[n] += 1
+    return bubbles_n, events_n, names_n
+
+
+def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location: str,
+            known: set[str], names: dict[str, str], watch: list[str] | None = None,
+            per_name_run: int | None = None, per_name_day: int | None = None,
+            per_source_run: int | None = None, evs: list | None = None) -> dict[str, Any]:
+    """The sensors alone, every bubble alike: `scan --promote` allocates sensors and feed together
+    (`allocation`); this is the same walk over the sensor candidates only."""
+    if budget <= 0:
         return {}
-    return {"sensors_promoted": saved, "sensors_by_rule": {"lab": rules[0], "momentum": rules[1], "watched": rules[2], "strong": rules[3]},
-            **({"sensors_unresolved": unresolved} if unresolved else {}),
-            **({"sensors_capped": capped} if capped else {}),
-            **({"sensors_capped_source": capped_src} if capped_src else {}),
-            **({"sensors_promote_errors": errors} if errors else {})}
+    pattern = watch_pattern(watch or [])
+    cands = candidates(out, t, run_date, known, pattern, evs)
+    b_n, e_n, n_n = today_counts(out, run_date, pattern)
+    caps = Caps(per_source_run=policy.PROMOTE_PER_SOURCE_PER_RUN if per_source_run is None else per_source_run,
+                per_name_run=policy.SENSOR_PER_NAME_PER_RUN if per_name_run is None else per_name_run,
+                per_name_day=policy.SENSOR_PER_NAME_PER_DAY if per_name_day is None else per_name_day,
+                per_event_day=policy.PER_EVENT_PER_DAY, sensor_share=None, must_share=1.0)
+    sel = Selector(cands, budget, {}, caps=caps, today_bubbles=b_n, today_events=e_n, today_names=n_n)
+    stats: dict[str, Any] = {}
+    sel.run(lambda c: save(c, out, t, run_date, location, names, known, stats))
+    return report(sel, stats)
+
+
+def report(sel: Selector, stats: dict[str, Any]) -> dict[str, Any]:
+    saved = sum(1 for c in sel.taken if c.kind == "sensor")
+    held = sum(1 for c in sel.held() if c.kind == "sensor")
+    if not saved and not held and not stats.get("errors") and not stats.get("unresolved"):
+        return {}
+    return {"sensors_promoted": saved,
+            "sensors_by_rule": stats.get("by_rule", {"lab": 0, "momentum": 0, "watched": 0, "strong": 0}),
+            **({"sensors_held": held} if held else {}),
+            **({"sensors_unresolved": stats["unresolved"]} if stats.get("unresolved") else {}),
+            **({"sensors_promote_errors": stats["errors"]} if stats.get("errors") else {})}
