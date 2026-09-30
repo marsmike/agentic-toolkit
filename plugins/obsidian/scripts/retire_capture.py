@@ -7,7 +7,8 @@
     retire_capture.py 01_Capture/<capture>.md --duplicate-of <capture, archived capture or note>
 
 Moves the capture to `05_Archive/<Origin>-Captures-<YYYY-MM>/<stem>--FULLCAPTURE.md`
-(`Origin` is the filename's own leading token, `Readwise` or `Research`), creates that
+(`<stem>-2--FULLCAPTURE.md` and on when another capture of the same name is already there;
+`Origin` is the filename's own leading token, `Readwise` or `Research`), creates that
 folder and its manifest `README.md` if this is the first capture retired there this month,
 and appends one manifest line under an exclusive lock on the folder.
 
@@ -148,6 +149,17 @@ def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None)
     return first
 
 
+def _same_capture(archived: Path, fm: dict[str, Any], capture: Path) -> bool:
+    """The archived file is this capture retired before (refuse), not another capture that happens
+    to share its name (archive beside it). Two untitled Google News items both became
+    `…-Google-News-2026-09-30.md`; the second could never be retired. [earned: 2026-09-30]"""
+    old, _ = read_frontmatter(archived)
+    for key in ("readwise_doc_id", "source"):
+        if old.get(key) and fm.get(key):
+            return str(old[key]) == str(fm[key])
+    return archived.read_bytes() == capture.read_bytes()
+
+
 def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropped: str | None,
            duplicate_of: str | None = None) -> dict[str, Any]:
     if sum(map(bool, (line, dropped, duplicate_of))) != 1:
@@ -180,13 +192,18 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
     today = time.strftime("%Y-%m-%d")
     yyyymm = today[:7]
     folder = vault / "05_Archive" / f"{origin}-Captures-{yyyymm}"
-    dest = folder / f"{capture.stem}--FULLCAPTURE.md"
     readme = folder / "README.md"
 
     with _locked(folder / ".manifest.lock"):
         folder.mkdir(parents=True, exist_ok=True)
-        if dest.exists():
-            raise RetireRefused(f"already archived: {dest.relative_to(vault).as_posix()}")
+        n = 1
+        while True:
+            dest = folder / f"{capture.stem}{'' if n == 1 else f'-{n}'}--FULLCAPTURE.md"
+            if not dest.exists():
+                break
+            if _same_capture(dest, fm, capture):
+                raise RetireRefused(f"already archived: {dest.relative_to(vault).as_posix()}")
+            n += 1
         first = _stamp_notes(vault, resolved_notes, ingested_at)
         if not readme.exists():
             readme.write_text(_manifest_header(origin, yyyymm, today), encoding="utf-8")

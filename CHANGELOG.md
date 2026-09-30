@@ -4,6 +4,22 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Google News links become the publisher's URL (radar 3.6.1); a same-named capture no longer
+  fails retirement (obsidian 3.4.5).** On 2026-09-30, 210 of the day's 989 sensor items were
+  `news.google.com/rss/articles/…` links, from the Google News search feeds and from Kagi News.
+  Reader cannot follow one: it saved a document with no title or text, ingest wrote a capture
+  named "Google News" plus a DLQ note, and the day's second one had the same filename as the
+  first, which was already archived. That made `retire_capture` refuse it, so the capture failed
+  and stayed in the inbox. The sensors now resolve such a link before saving (`gnews.py`: an
+  old-format id carries the URL; a current one is resolved through the article page's signature
+  and `batchexecute`). A link that cannot be resolved is not saved and is counted as
+  `sensors_unresolved`. The ledger row records the Google link, so a later run skips it without
+  resolving it again. `retire_capture` now tells the same capture retired twice (still refused)
+  from another capture that only shares its name (a different `readwise_doc_id` or `source`),
+  which is archived beside it as `<stem>-2--FULLCAPTURE.md`.
+  [earned: 2026-09-30, the watchdog reported "1 failed" and two DLQ notes on the first run with
+  25 promotions]
+
 - **The promotion budget is per run, not per day (radar 3.6.0, obsidian 3.4.4).** On 2026-09-30
   the day's 50 promotions were used up by 07:11 UTC, most of them in one early-morning burst of lab
   news. The three pipeline runs after that judged 60 feed items and promoted none. Each item that

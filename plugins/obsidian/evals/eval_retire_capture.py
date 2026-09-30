@@ -30,7 +30,10 @@ and its folder's manifest together, under a lock.
                   through retirement, gets a fresh `updated_at`, and every other frontmatter line
                   (a long description, double-quoted timestamps) is left exactly as written
 11. idempotent    — retiring an already-retired capture refuses and changes no note, and so does
-                  a capture refused as already archived (the stamp waits for that refusal)
+                  a capture refused as already archived (the stamp waits for that refusal); a
+                  different capture that only shares the name (another readwise_doc_id) is
+                  archived beside it as `<stem>-2--FULLCAPTURE.md` (2026-09-30, two untitled
+                  "Google News" captures)
 12. ledger        — every retirement appends one `retired` row to 00_Memory/imports.jsonl with its
                   kind (new, enriched, dropped, duplicate), notes, reason and what; a refusal none
 
@@ -323,6 +326,16 @@ def run(vault: Path) -> dict:
                 problems.append(f"phase 11: refused for the wrong reason: {e}")
         if stamp_note_path.read_text(encoding="utf-8") != stamp_before:
             problems.append("phase 11: a refused re-retirement restamped the note")
+        cap("Readwise-Retire-Stamp.md").write_text(
+            _capture("radar").replace(SOURCE, "https://news.example.org/another-story"), encoding="utf-8")
+        try:
+            r = rc.retire(cap("Readwise-Retire-Stamp.md"), sandbox, [], None, "another story under the same name")
+            if not r["archived_to"].endswith("/Readwise-Retire-Stamp-2--FULLCAPTURE.md"):
+                problems.append(f"phase 11: a same-named other capture must be archived beside it, got {r['archived_to']}")
+            if cap("Readwise-Retire-Stamp.md").exists():
+                problems.append("phase 11: the same-named other capture stayed in the inbox")
+        except rc.RetireRefused as e:
+            problems.append(f"phase 11: a different capture that only shares the name was refused: {e}")
 
         # --- 12. ledger: one `retired` row per retirement, fields not prose; a refusal writes none ---
         rows = {Path(r["retired"]).stem: r for r in vault_utils.read_jsonl(sandbox / rc.LEDGER) if r.get("retired")}

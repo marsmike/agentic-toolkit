@@ -15,7 +15,9 @@ ingest turns them into captures, every item from SENSOR_PROMOTE_SOURCES that is 
 published within the window (a newly added feed's week of back catalogue is not news), in that
 order, strongest first within each, within the run's `promote_per_run` (the feed gets what the
 sensors leave). An item already promoted, held by the vault, or another outlet's
-copy of a story promoted in the window (title-word overlap, SENSOR_SAME_STORY) is skipped. Every
+copy of a story promoted in the window (title-word overlap, SENSOR_SAME_STORY) is skipped. A Google
+News link is saved as the publisher's own URL (`gnews.resolve`), or not at all: Reader cannot
+follow one. [earned: 2026-09-30 — untitled "Google News" captures, two DLQ notes, one failed] Every
 save is one `promoted.jsonl` row with `via: sensors`; its Reader note starts `[radar sensors`
 (a `radar/…` tag would become an interest in the capture's `radar_interests`). A Reader failure never fails the scan.
 [earned: 2026-09-30, OpenAI DevDay 2026 and GPT-6.1 Sol sat in the sensors for two days and never
@@ -32,6 +34,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+import gnews
 import reader
 from judgments import policy
 from judgments.urls import _canonical
@@ -121,7 +124,7 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
     if budget <= 0:
         return {}
     since = (date.fromisoformat(run_date) - timedelta(days=policy.SENSOR_PROMOTE_WINDOW_DAYS)).isoformat()
-    already = {r["canonical"] for r in done} | known
+    already = {r["canonical"] for r in done} | {r["google_news"] for r in done if r.get("google_news")} | known
     stories = [words(r["title"]) for r in done if r.get("title") and str(r.get("date", "")) > since]
     ranked = []
     pattern = watch_pattern(watch or [])
@@ -130,33 +133,45 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
         if r is not None:
             ranked.append(((r[0], last_choice(it["url"]), r[1]), it))
     ranked.sort(key=lambda x: x[0])
-    saved, errors, rules = 0, [], {0: 0, 1: 0, 2: 0, 3: 0}
+    saved, unresolved, errors, rules = 0, 0, [], {0: 0, 1: 0, 2: 0, 3: 0}
     for (rule, _, _), it in ranked:
         if saved >= budget:
             break
-        canonical = _canonical(it["url"])
+        url = it["url"]
+        canonical = _canonical(url)
         w = words(it.get("title", ""))
         if canonical in already or any(same_story(w, s) for s in stories):
             continue
         published = str(it.get("published") or "")[:10]
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}", published) and published <= since:
             continue
+        google_news = None
+        if gnews.is_google_news(url):
+            google_news, url = canonical, gnews.resolve(url) or ""
+            if not usable(url):
+                unresolved += 1
+                continue
+            canonical = _canonical(url)
+            if canonical in already or canonical in known:
+                continue
         p = it.get("p") or {}
         tagged = sorted(i for i, v in p.items() if v >= t["T_WORTH"]) or ([max(p, key=p.get)] if p else [])
         why = ("lab announcement", f"{it.get('score') or 0:.0f} HN points", "watched name", "strong")[rule]
         note = f"[radar sensors {run_date}] {why}; " + "; ".join(f"{names.get(i, i)} p={p[i]:.2f}" for i in tagged)
         try:
-            doc_id = reader.save(it["url"], location, ["radar", *(f"radar/{i}" for i in tagged)], note)
+            doc_id = reader.save(url, location, ["radar", *(f"radar/{i}" for i in tagged)], note)
         except (reader.ReaderError, ValueError) as e:
             errors.append(str(e)[:120])
             continue
         append_jsonl(ledger, [{"canonical": canonical, "id": doc_id, "date": run_date, "via": "sensors",
-                               "source": it.get("source"), "title": it.get("title", "")}])
-        already.add(canonical)
+                               "source": it.get("source"), "title": it.get("title", ""),
+                               **({"google_news": google_news} if google_news else {})}])
+        already |= {canonical, google_news} - {None}
         stories.append(w)
         saved += 1
         rules[rule] += 1
-    if not saved and not errors:
+    if not saved and not errors and not unresolved:
         return {}
     return {"sensors_promoted": saved, "sensors_by_rule": {"lab": rules[0], "momentum": rules[1], "watched": rules[2], "strong": rules[3]},
+            **({"sensors_unresolved": unresolved} if unresolved else {}),
             **({"sensors_promote_errors": errors} if errors else {})}

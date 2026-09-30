@@ -15,6 +15,11 @@
                 is per run); a second run saves nothing new; a Reader failure is reported, not raised
 4. check      — the web check never spends a check on an Other-sector name, asks watched names
                 first, and gives a one-word name its interest's name as context
+5. google     — a Google News link is saved as the publisher's URL, its ledger row keeps the Google
+                link (a later run skips it without resolving it again); one that cannot be resolved
+                is never saved and is counted; `gnews` reads an old-format id from its payload and
+                a current one through the page's signature, and returns None on any failure
+                (2026-09-30: untitled "Google News" captures, two DLQ notes, one failed capture)
 """
 from __future__ import annotations
 
@@ -153,10 +158,71 @@ def run(vault: Path) -> dict:
                                  lambda name, context="": asked.append(name) or [])
         if asked[:1] != ["GPT-6.1 Sol"]:
             problems.append(f"phase 4: watched names are asked first, got {asked}")
+
+        # 5. Google News links
+        import base64
+
+        import gnews
+        def gid(raw: bytes) -> str:
+            return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+        old_id = gid(b"\x08\x13\"\x1ehttps://pub.example.org/old-story\xd2\x01\x00")
+        new_id = gid(b"\x08\x13\"\x10AU_yqLnewformat01\xd2\x01\x00")
+        if gnews._from_payload(old_id) != "https://pub.example.org/old-story" or gnews._from_payload(new_id) is not None:
+            problems.append("phase 5: an old-format id holds its URL, a current one does not")
+        real_gn = gnews._request
+        calls: list[str] = []
+
+        def gn_stub(url, data=None, headers=None):
+            calls.append(url)
+            if url.endswith("/batchexecute"):
+                return ")]}'\n\n" + json.dumps([["wrb.fr", "Fbv4je", json.dumps(["garturlres", "https://pub.example.org/new-story", 1])]])
+            return '<c-wiz><div data-n-a-sg="SIG" data-n-a-ts="1790000000"></div></c-wiz>'
+        gnews._request = gn_stub
+        try:
+            if gnews.resolve(f"https://news.google.com/rss/articles/{new_id}?oc=5") != "https://pub.example.org/new-story" \
+                    or len(calls) != 2 or not calls[0].endswith(f"/rss/articles/{new_id}") or not calls[1].endswith("/batchexecute"):
+                problems.append(f"phase 5: a current id resolves through the page's signature, got {calls}")
+
+            def gn_fail(url, data=None, headers=None):
+                raise OSError("blocked")
+            gnews._request = gn_fail
+            if gnews.resolve(f"https://news.google.com/rss/articles/{new_id}") is not None:
+                problems.append("phase 5: a failed resolution returns None, never raises")
+
+            out5 = sandbox.parent / "radar-gn"
+            (out5 / "sensors").mkdir(parents=True)
+            gn_items = {
+                "rss:gn1": _item("rss", "Muse agent accused of data access - Example Times",
+                                 f"https://news.google.com/rss/articles/{new_id}?oc=5", 0.9),
+                "rss:gn2": _item("rss", "Maschine update ships to all owners - Synth Weekly",
+                                 "https://news.google.com/rss/articles/CBMiUnresolvable?oc=5", 0.9),
+            }
+            (out5 / "sensors" / f"{DAY}.json").write_text(json.dumps({"day": DAY, "items": gn_items}), encoding="utf-8")
+            resolved = {f"https://news.google.com/rss/articles/{new_id}?oc=5": "https://pub.example.org/new-story"}
+            asked: list[str] = []
+            real_resolve = gnews.resolve
+            gnews.resolve = lambda u: asked.append(u) or resolved.get(u)
+            try:
+                saves.clear()
+                r = sensor_promote.promote(out5, T, DAY, 10, "later", known, names, WATCH)
+                if [s["url"] for s in saves] != ["https://pub.example.org/new-story"] or r.get("sensors_unresolved") != 1:
+                    problems.append(f"phase 5: the resolved link is saved as the publisher's URL, the other counted, got {saves}, {r}")
+                rows = [json.loads(x) for x in (out5 / "promoted.jsonl").read_text(encoding="utf-8").splitlines()]
+                if rows and (rows[0]["canonical"] != "pub.example.org/new-story" or "news.google.com" not in rows[0].get("google_news", "")):
+                    problems.append(f"phase 5: the ledger row names the publisher and keeps the Google link, got {rows}")
+                n = len(asked)
+                saves.clear()
+                sensor_promote.promote(out5, T, DAY, 10, "later", known, names, WATCH)
+                if saves or len(asked) != n + 1:
+                    problems.append(f"phase 5: a second run skips the promoted link unresolved (only the other is asked), got {len(asked) - n} asks, {saves}")
+            finally:
+                gnews.resolve = real_resolve
+        finally:
+            gnews._request = real_gn
     finally:
         reader._request = real
         if sandbox is not None:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "4 offline phases ok (rules, skips, budget, web-check candidates)"}
+            "detail": "; ".join(problems) if problems else "5 offline phases ok (rules, skips, budget, web-check candidates, Google News links)"}
