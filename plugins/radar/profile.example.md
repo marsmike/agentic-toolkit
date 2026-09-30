@@ -8,6 +8,8 @@ todoist_project_id: ""
 todoist_sections: Doing,Next,Waiting
 promote_location: later
 promote_per_run: 5
+promote_per_name_per_run: 2
+promote_per_name_per_day: 6
 watch: OpenAI,GPT,ChatGPT,Codex,Anthropic,Claude,Google,Gemini,DeepMind,Meta,Muse,Llama,Mistral,xAI,Grok,DeepSeek,Qwen
 kagi_weekly_budget_usd: 1.00
 tavily_weekly_budget_usd: 2.00
@@ -47,6 +49,10 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
   budget starts fresh every run, so a busy morning cannot starve the rest of the day. The 0.80
   "strong" bar is policy and stays in code; this is the owner's appetite. Raise it when the daily
   radar note shows strong items the cap discarded.
+- **`promote_per_name_per_run`**, **`promote_per_name_per_day`** — how many sensor promotions one
+  watched name (Muse, OpenAI, …) may take in a run and in a day (defaults 2 and 6). Outlets retell
+  one story in headlines too different to match, and distill merges them into one note anyway; a
+  lab's own announcement always goes, and counts.
 - **`watch`** — the labs and models you follow by name (comma list or YAML list). A sensor item
   (Hacker News, Kagi News, the sensor RSS feeds) whose title names one and that the judge rates
   worth reading (0.70) is saved into Reader like a strong feed item, and the Signal Radar's web

@@ -547,7 +547,9 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
             watch = profile_value(vault, "watch", None)
             watch = watch if isinstance(watch, list) else [w for w in str(watch or "").split(",")]
             sensed = sensor_promote.promote(out, policy.thresholds(judge.load_config(vault)["backend"]), run_date,
-                                            per_run, location, set(vault_sources(vault)), names, [str(w) for w in watch])
+                                            per_run, location, set(vault_sources(vault)), names, [str(w) for w in watch],
+                                            profile_number(vault, "promote_per_name_per_run", policy.SENSOR_PER_NAME_PER_RUN, cast=int),
+                                            profile_number(vault, "promote_per_name_per_day", policy.SENSOR_PER_NAME_PER_DAY, cast=int))
         return sensed | settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote,
                                location, out, per_run=per_run - sensed.get("sensors_promoted", 0))
     append_jsonl(out / "seen.jsonl", [{"canonical": item_key(it), "title_key": title_key(it),

@@ -41,8 +41,8 @@ SENSOR_SAME_STORY = 0.5          # title-word Jaccard at or above: another outle
 # a day; a lab's own announcement is never held back but counts. Outlets retell one story in words
 # the title overlap cannot match: 14 of 20 promotions in one run were Meta Muse coverage, and
 # distill merges them into one note anyway. [earned: 2026-09-30, 19:11 run]
-SENSOR_PER_NAME_PER_RUN = 2
-SENSOR_PER_NAME_PER_DAY = 6
+SENSOR_PER_NAME_PER_RUN = 2      # profile `promote_per_name_per_run` wins
+SENSOR_PER_NAME_PER_DAY = 6      # profile `promote_per_name_per_day` wins
 # A lab's own announcement is promoted whatever the judge says from its title alone ("DevDay 2026
 # Recap" scored 0.31). Host -> path prefixes that are announcements, not docs or careers pages.
 LAB_ANNOUNCEMENTS: dict[str, tuple[str, ...]] = {

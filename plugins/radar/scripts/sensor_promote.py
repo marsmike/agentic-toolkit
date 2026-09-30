@@ -16,7 +16,8 @@ published within the window (a newly added feed's week of back catalogue is not 
 order, strongest first within each, within the run's `promote_per_run` (the feed gets what the
 sensors leave). An item already promoted, held by the vault, or another outlet's
 copy of a story promoted in the window (title-word overlap, SENSOR_SAME_STORY) is skipped. A
-watched name takes at most SENSOR_PER_NAME_PER_RUN of a run and SENSOR_PER_NAME_PER_DAY of a day
+watched name takes at most `promote_per_name_per_run` of a run and `promote_per_name_per_day` of a
+day (profile; defaults SENSOR_PER_NAME_PER_RUN and SENSOR_PER_NAME_PER_DAY)
 (a lab's own announcement always goes, and counts), so one story cannot fill the run. A Google
 News link is saved as the publisher's own URL (`gnews.resolve`), or not at all: Reader cannot
 follow one. [earned: 2026-09-30 — untitled "Google News" captures, two DLQ notes, one failed] Every
@@ -125,7 +126,8 @@ def rank(it: dict, t: dict[str, float], watch: re.Pattern[str] | None = None) ->
 
 
 def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location: str,
-            known: set[str], names: dict[str, str], watch: list[str] | None = None) -> dict[str, Any]:
+            known: set[str], names: dict[str, str], watch: list[str] | None = None,
+            per_name_run: int | None = None, per_name_day: int | None = None) -> dict[str, Any]:
     from radar import append_jsonl, read_jsonl  # lazy: radar imports this module
 
     ledger = out / "promoted.jsonl"
@@ -137,6 +139,8 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
     stories = [words(r["title"]) for r in done if r.get("title") and str(r.get("date", "")) > since]
     ranked = []
     pattern = watch_pattern(watch or [])
+    cap_run = policy.SENSOR_PER_NAME_PER_RUN if per_name_run is None else per_name_run
+    cap_day = policy.SENSOR_PER_NAME_PER_DAY if per_name_day is None else per_name_day
     per_run: dict[str, int] = {}
     per_day: dict[str, int] = {}
     for r in done:
@@ -161,8 +165,7 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}", published) and published <= since:
             continue
         hits = named(it.get("title", ""), pattern)
-        if rule != 0 and any(per_run.get(n, 0) >= policy.SENSOR_PER_NAME_PER_RUN
-                             or per_day.get(n, 0) >= policy.SENSOR_PER_NAME_PER_DAY for n in hits):
+        if rule != 0 and any(per_run.get(n, 0) >= cap_run or per_day.get(n, 0) >= cap_day for n in hits):
             capped += 1
             continue
         google_news = None

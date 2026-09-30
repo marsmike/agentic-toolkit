@@ -254,6 +254,10 @@ def run(vault: Path) -> dict:
         sensor_promote.promote(out6, T, DAY, 10, "later", known, names, WATCH)
         if len([u for u in (s["url"] for s in saves) if "outlet" in u]) != 1:
             problems.append(f"phase 6: five Muse promotions earlier today leave one of the day's six, got {[s['url'] for s in saves]}")
+        saves.clear()
+        sensor_promote.promote(out6, T, DAY, 10, "later", known, names, WATCH, per_name_run=10, per_name_day=10)
+        if len([u for u in (s["url"] for s in saves) if "outlet" in u]) != 4:
+            problems.append(f"phase 6: the profile's caps (10 and 10) win over the defaults, got {[s['url'] for s in saves]}")
     finally:
         reader._request = real
         if sandbox is not None:
