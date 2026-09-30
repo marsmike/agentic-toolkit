@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **An untitled radar promotion takes the radar's headline (readwise 3.1.3).** Reader leaves a
+  paywalled or consent-walled page untitled, and each one became a "missing title" DLQ note (three
+  on 2026-09-30: FT, Yahoo Finance, InnovationAus), all for items the radar had promoted under a
+  known headline. Ingest now takes the title from `00_Memory/radar/promoted.jsonl` (the row with that
+  document id); an untitled item the radar never saw still gets its DLQ note.
+  [earned: 2026-09-30, the watchdog's "2 new DLQ note(s)" on the first live run of radar 3.8.0]
+
 - **A weighted selection of the owner's bubbles, with nothing important missed (radar 3.8.0,
   obsidian 3.5.0, readwise 3.1.2).** On 2026-09-30, Music Production got 23 promotions while Local AI
   (27 strong items) and AI Agents (23) got one each, and one story took 14 of a run. Promotion now

@@ -25,6 +25,7 @@ the moment it exited, leaving a note that linked nowhere]
 """
 from __future__ import annotations
 
+import json
 import re
 from html import unescape
 from pathlib import Path
@@ -107,6 +108,25 @@ def _html_to_md_basic(html: str, keep_media: bool = False) -> str:
     return re.sub(r"\n\s*\n\s*\n+", "\n\n", h).strip()
 
 
+def _radar_title(vault: Path, doc_id: str) -> str:
+    """The title the radar saw when it promoted this document (`00_Memory/radar/promoted.jsonl`,
+    matched by id): Reader leaves a paywalled or consent-walled page untitled, and the radar already
+    knew its headline. Empty when there is none. [earned: 2026-09-30 — three "missing title" DLQ
+    notes in a day, all radar promotions whose headline the ledger held]"""
+    try:
+        lines = (vault / "00_Memory" / "radar" / "promoted.jsonl").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    for line in reversed(lines):
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict) and str(row.get("id")) == doc_id and str(row.get("title") or "").strip():
+            return str(row["title"]).strip()
+    return ""
+
+
 def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] | None = None) -> tuple[Path | None, str]:
     """Write one Reader v3 clipping as a capture note. Returns (path, status).
 
@@ -128,7 +148,7 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
 
     category = item.get("category") or "article"
     label = CATEGORY_LABEL.get(category, category.capitalize())
-    title_raw = (item.get("title") or "").strip()
+    title_raw = (item.get("title") or "").strip() or _radar_title(vault, doc_id)
     title = title_raw or "(untitled)"
     author = (item.get("author") or "").strip()
     source_url = item.get("source_url") or item.get("url") or ""

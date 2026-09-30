@@ -64,6 +64,22 @@ def run(vault: Path) -> dict:
             if got != doc_id.startswith(("wall", "gone")):
                 problems.append(f"{doc_id} ({category}): stub={got}")
 
+        # An untitled Reader item the radar promoted takes the radar's headline, no DLQ note; one the
+        # radar never saw still gets its DLQ note. [earned: 2026-09-30, three such notes in a day]
+        radar_dir = sandbox_vault / "00_Memory" / "radar"
+        radar_dir.mkdir(parents=True, exist_ok=True)
+        (radar_dir / "promoted.jsonl").write_text(json.dumps({"canonical": "x.example/p", "id": "notitle1", "date": "2031-01-01",
+                                                              "title": "Headline the radar saw"}) + "\n", encoding="utf-8")
+        dlq = sandbox_vault / "00_Memory" / "dlq"
+        before = set(dlq.glob("*.md")) if dlq.is_dir() else set()
+        tp, _ = bc.write_capture(sandbox_vault, {**fixture, "id": "notitle1", "title": ""})
+        after = set(dlq.glob("*.md")) if dlq.is_dir() else set()
+        if not tp or "Headline-the-radar-saw" not in tp.name or after - before:
+            problems.append(f"an untitled radar promotion takes the ledger's title, no DLQ; got {tp and tp.name}, {len(after - before)} DLQ")
+        bc.write_capture(sandbox_vault, {**fixture, "id": "notitle2", "title": ""})
+        if not any("notitle2" in q.name for q in dlq.glob("*.md")):
+            problems.append("an untitled item the radar never promoted still gets its DLQ note")
+
         if problems:
             return {"eval": "capture_note_formatting", "pass": False, "detail": "; ".join(problems)}
         return {"eval": "capture_note_formatting", "pass": True, "detail": f"wrote {path.name} with conformant frontmatter"}
