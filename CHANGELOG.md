@@ -4,6 +4,22 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Sensor news becomes captures; the labs are watched by name (radar 3.5.0).** OpenAI DevDay
+  2026 and GPT-6.1 Sol never reached the vault. The Signal Radar had both for two days: OpenAI's own
+  Sol post at 805 Hacker News points, the DevDay recap, and FT and NPR on GPT-6.1 Astra being
+  shelved. But only Reader feed items could be promoted, and the feeds carry no lab. Now `scan
+  --promote` also saves sensor items (Hacker News, Kagi News, sensor RSS) to Later, at most 15 a
+  day inside `promote_per_day`: a lab's own announcement page whatever its title scored ("DevDay
+  2026 Recap": 0.31), 300+ HN points at worth-reading, a title naming a lab or model on the new
+  profile `watch` list at worth-reading, or strong. It never saves anything already promoted or in
+  the vault, or a second outlet's copy of a story it just saved. Run against that day's sensor
+  files, it saves the recap, the Sol post, OpenAI's Dots announcement and the Astra story. The
+  Signal Radar's six daily Tavily checks no longer go to names that belong to no interest ("jeff",
+  "Delhi" and "Netherlands" took three on 2026-09-30, and their hits then counted as a second source
+  for "jeff"). Watched names are checked first, and a one-word name is asked with its interest
+  beside it. New eval `sensor_promote`.
+  [earned: 2026-09-30, the owner found DevDay missing from the vault]
+
 - **Agents are pointed at `unisphere` (obsidian 3.4.1).** The CLI was on PATH, but no agent-facing
   file named it: the vault template, the `vault` skill and TheVoid's own `AGENTS.md` sent agents to
   `search.py` only, and the link graph had no command an agent could run. Now the `vault` skill and

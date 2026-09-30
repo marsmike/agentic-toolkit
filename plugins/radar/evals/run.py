@@ -23,6 +23,7 @@ EVAL_MODULES = (
     "eval_sensors",
     "eval_pulse",
     "eval_signal",
+    "eval_sensor_promote",
 )
 
 

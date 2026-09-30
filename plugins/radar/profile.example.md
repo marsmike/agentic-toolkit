@@ -8,6 +8,7 @@ todoist_project_id: ""
 todoist_sections: Doing,Next,Waiting
 promote_location: later
 promote_per_day: 5
+watch: OpenAI,GPT,ChatGPT,Codex,Anthropic,Claude,Google,Gemini,DeepMind,Meta,Muse,Llama,Mistral,xAI,Grok,DeepSeek,Qwen
 kagi_weekly_budget_usd: 1.00
 tavily_weekly_budget_usd: 2.00
 sensors: hn,hf,github,reddit,rss,kagi_news
@@ -42,8 +43,15 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
 - **`promote_location`** — where `scan --promote` moves a strong item: `later` (default),
   `shortlist` or `new`.
 - **`promote_per_day`** — how many strong items a day `scan --promote` and `gaps --promote` together
-  may save into Reader (default 5). The 0.80 "strong" bar is policy and stays in code; this is
+  may save into Reader (default 5), sensor items included (at most 15 of them a day, `policy.py`). The 0.80 "strong" bar is policy and stays in code; this is
   the owner's appetite. Raise it when the daily radar note shows strong items the cap discarded.
+- **`watch`** — the labs and models you follow by name (comma list or YAML list). A sensor item
+  (Hacker News, Kagi News, the sensor RSS feeds) whose title names one and that the judge rates
+  worth reading (0.70) is saved into Reader like a strong feed item, and the Signal Radar's web
+  check asks watched names first. Matched case-insensitively, ending at a non-letter: `GPT` matches
+  "GPT-6.1", `Meta` does not match "metadata". A lab's own announcement page (`openai.com/index/…`,
+  `anthropic.com/news/…`, `blog.google/technology/ai/…`, the list in `policy.LAB_ANNOUNCEMENTS`) is
+  saved whatever the judge says, watch list or not. Empty: no watched-name rule.
 - **`kagi_weekly_budget_usd`** — `discover` stops searching once the week's Kagi spend (measured
   from the account balance, kept in `00_Memory/radar/kagi-ledger.jsonl` and, for the Signal Radar,
   `kagi-ledger-signal.jsonl`; one budget over both) would pass this.

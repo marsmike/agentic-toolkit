@@ -473,13 +473,14 @@ def _name_check(out: Path, candidates: list[dict], now: datetime, family: str, l
     asked_today = sum(1 for r in rows if r["day"] == today)
     recent_keys = {r["key"] for r in rows if r["day"] >= week_ago}
     status = {"family": family, "label": FAMILY_LABELS[family], "status": "ok", "items": 0, "detail": ""}
-    for b in sorted(candidates, key=lambda b: (len(b["families"]), -b["strength"])) if ask else []:
+    # Watched names first (`b["watched"]`, the profile's `watch`), then the least corroborated.
+    for b in sorted(candidates, key=lambda b: (not b.get("watched"), len(b["families"]), -b["strength"])) if ask else []:
         if asked_today >= CHECKS_PER_DAY:
             break
         if b["key"] in recent_keys:
             continue
         try:
-            hits = ask(b["name"])
+            hits = ask(b["name"], b.get("context", ""))
         except _Skip as e:
             status.update(status="skipped", detail=str(e)[:160])
             break
@@ -509,15 +510,16 @@ def _tavily_ask(vault: Path, out: Path, now: datetime) -> Any:
     ledger = tavily.ledger(out, profile_number(vault, "tavily_weekly_budget_usd", tavily.DEFAULT_WEEKLY_BUDGET_USD),
                            signal=True)
 
-    def ask(name: str) -> list[dict]:
+    def ask(name: str, context: str = "") -> list[dict]:
+        query = f'"{name}" {context}'.strip()
         try:
             # "Is this name taking off this week": Tavily's news index first (one credit); a name
             # too new to be news yet still shows up in the general web index, so ask that only
             # when news came back empty (another credit, still under the same budget). [earned:
             # 2026-09-28 week review]
-            found = tavily.search(f'"{name}"', ledger, max_results=5, time_range="week", topic="news", now=now)
+            found = tavily.search(query, ledger, max_results=5, time_range="week", topic="news", now=now)
             if not found:
-                found = tavily.search(f'"{name}"', ledger, max_results=5, time_range="week", now=now)
+                found = tavily.search(query, ledger, max_results=5, time_range="week", now=now)
         except (tavily.NoKey, tavily.NoCli, tavily.OverBudget) as e:
             raise _Skip(str(e)) from e
         except tavily.TavilyError as e:  # rate limit, HTTP, a bad answer: Kagi still gets its turn [PR #75 review]
@@ -534,14 +536,37 @@ def _kagi_ask(vault: Path, out: Path, now: datetime) -> Any:
                          signal=True)
     week_ago = (now.date() - timedelta(days=7)).isoformat()
 
-    def ask(name: str) -> list[dict]:
+    def ask(name: str, context: str = "") -> list[dict]:
         try:
-            found = kagi.news(name, ledger, now)
+            found = kagi.news(f"{name} {context}".strip(), ledger, now)
         except (kagi.NoKey, kagi.OverBudget) as e:
             raise _Skip(str(e)) from e
         return [{"title": f["title"], "url": f["url"], "published": f.get("published", "")} for f in found
                 if _day(f.get("published")) and _day(f.get("published")) >= week_ago]
     return ask
+
+
+def _profile_watch(vault: Path) -> list[str]:
+    from vault_utils import profile_value
+    raw = profile_value(vault, "watch", None)
+    return [str(w).strip() for w in (raw if isinstance(raw, list) else str(raw or "").split(",")) if str(w).strip()]
+
+
+def check_candidates(blips: list[dict], names: dict[str, str], watch: list[str]) -> list[dict]:
+    """What the web check may spend its CHECKS_PER_DAY on: new or rising things that belong to an
+    interest. An Other-sector name is how "jeff", "Delhi" and "Netherlands" took three of six checks
+    on 2026-09-30, and their unrelated hits then counted as a second source for them. A one-word
+    name without a digit ("Traktor", "Muse") is asked with its interest's name beside it, or the web
+    answers about a Turkish tractor maker. [earned: 2026-09-30, DevDay 2026 never checked]"""
+    pattern = re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(w) for w in watch) + r")(?![a-z])", re.I) if watch else None
+    out = []
+    for b in blips:
+        if b["stage"] not in ("new", "rising") or b.get("sector") in (None, "other"):
+            continue
+        ambiguous = re.fullmatch(r"[A-Za-z]+", b["name"]) is not None
+        context = re.sub(r"[^\w ]+", " ", names.get(b["sector"], "")).split() if ambiguous else []
+        out.append({**b, "watched": bool(pattern and pattern.search(b["name"])), "context": " ".join(context)})
+    return out
 
 
 def web_check(vault: Path, out: Path, candidates: list[dict], now: datetime) -> tuple[list[dict], list[dict]]:
@@ -618,7 +643,9 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
         sources.append({"family": fam, "label": FAMILY_LABELS.get(fam, fam), "status": s.get("status", "ok"),
                         "items": s.get("items", 0), "detail": s.get("detail", "")})
     if check:
-        cands = [b for b in blips if b["stage"] in ("new", "rising")]
+        sectored = [dict(b) for b in blips]  # sectors are assigned for real after the check; this is a look ahead
+        assign_sectors(sectored, names, interest_list)
+        cands = check_candidates(sectored, names, _profile_watch(vault))
         check_ms, check_status = web_check(vault, out, cands, now)
         if check_ms:
             add_eng_pct(check_ms)

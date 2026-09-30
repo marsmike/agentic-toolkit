@@ -25,7 +25,7 @@ flowchart LR
 
 | Command | What it does | Network |
 |---|---|---|
-| `scan --since 1d [--promote] [--keep-in-feed]` | judge new feed items, write the day's note and state, archive what was recorded (strong items to Later with `--promote`) | Reader, judgment backend |
+| `scan --since 1d [--promote] [--keep-in-feed]` | judge new feed items, write the day's note and state, archive what was recorded (strong items to Later with `--promote`, and sensor items worth a capture: see below) | Reader, judgment backend |
 | `weekly [--week YYYY-Www] [--force]` | `01_Capture/Radar-Week-…md`, a draft digest for distill | none |
 | `feeds` | per-feed yield; "consider unsubscribing", "serves only <interest>" | none |
 | `trend [--week]` | interests rising above their baseline; emerging title terms (experimental) | none |
@@ -74,6 +74,28 @@ flowchart LR
   (`cloud/signal.prompt.md`, every three hours) republishes the page to the artifact the profile's
   `signal_artifact_url` names and sends one morning brief.
 
+## Sensor items become captures
+
+The sensors see news Reader's feeds never carry: on 2026-09-29 Hacker News had OpenAI's own GPT-6.1
+Sol post at 805 points and the DevDay recap, and Kagi News had the GPT-6.1 Astra story from the FT
+and NPR, and none of it reached the vault, because only feed items could be promoted. Now `scan
+--promote` first reads the last three sensor day files (`sensor_promote.py`; the Signal Radar
+writes them, the pipeline only reads them) and saves to Later, tagged `radar/sensors`, items from
+Hacker News, Kagi News and the sensor RSS feeds that are, in this order:
+
+1. a lab's own announcement (`policy.LAB_ANNOUNCEMENTS`: openai.com/index, anthropic.com/news,
+   blog.google, deepmind.google, ai.meta.com, mistral.ai/news, x.ai/news, …), whatever the judge
+   made of the title ("DevDay 2026 Recap" scored 0.31);
+2. at 300 Hacker News points or more and worth reading (0.70);
+3. naming a watched lab or model (profile `watch`) and worth reading;
+4. strong (0.80), the feed's own bar.
+
+At most 15 a day, inside `promote_per_day`; nothing already promoted or held by the vault, and no
+second outlet's copy of a story saved in the window. The Signal Radar's web check (six names a day)
+now skips names that belong to no interest ("jeff", "Delhi" and "Netherlands" took three of six on
+2026-09-30), asks watched names first, and asks a one-word name with its interest beside it
+("Traktor" alone found a Turkish tractor maker).
+
 ## What it measured before shipping
 
 The R10 acceptance run on a real Reader account (30 days, 1,325 feed items plus 24 own clips):
@@ -101,8 +123,8 @@ from the environment or the key file `~/.env`, read by each script itself (`READ
   tags and notes only. Never a delete, never back into the feed.
 - Writes into the vault: `00_Memory/radar/` (scan, discover, sensors, signal) and `01_Capture/` (weekly). Nothing
   in `02_`–`04_`.
-- Evals (`evals/run.py`): scan, replay, discover, reports, gaps, scout, sensors, pulse and signal —
-  all nine, offline with stubbed network, against a sandbox copy of `./vault`; registered in CI.
+- Evals (`evals/run.py`): scan, replay, discover, reports, gaps, scout, sensors, pulse, signal and
+  sensor_promote — all ten, offline with stubbed network, against a sandbox copy of `./vault`; registered in CI.
 
 ## Not yet
 

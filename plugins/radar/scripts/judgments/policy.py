@@ -23,6 +23,34 @@ MAX_REQUESTS_PER_RUN = 300      # a daily scan needs ~10; the 30-day replay ~220
 # strongest first. [Mike, 2026-09-23: one pipeline for clips and radar; the 8-day backlog held
 # 52 strong items, 36 of them arXiv]
 PROMOTE_PER_DAY = 5
+# Sensor items (Hacker News, Kagi News, the sensor RSS feeds) become captures too, not only
+# momentum: the Signal Radar held OpenAI's own GPT-6.1 Sol post (805 HN points) and DevDay recap
+# for two days and nothing ever promoted them, since only Reader feed items could be.
+# [earned: 2026-09-30, DevDay 2026 missing from the vault]
+SENSOR_PROMOTE_SOURCES = ("hn", "kagi_news", "rss")  # hf/github trending and Reddit have their own feed path
+SENSOR_PROMOTE_PER_DAY = 15      # within promote_per_day, not on top of it
+SENSOR_PROMOTE_WINDOW_DAYS = 3   # sensor day files read back; an item first seen earlier is old news
+SENSOR_HN_MOMENTUM = 300         # HN points at which T_WORTH is enough: the judge sees a title only
+SENSOR_SAME_STORY = 0.5          # title-word Jaccard at or above: another outlet's copy of a promoted story
+# A lab's own announcement is promoted whatever the judge says from its title alone ("DevDay 2026
+# Recap" scored 0.31). Host -> path prefixes that are announcements, not docs or careers pages.
+LAB_ANNOUNCEMENTS: dict[str, tuple[str, ...]] = {
+    "openai.com": ("/index/", "/news/", "/blog/"),
+    "anthropic.com": ("/news/", "/engineering/", "/research/", "/claude-"),
+    "claude.com": ("/blog/",),
+    "blog.google": ("/technology/ai/", "/technology/google-deepmind/", "/products/gemini/"),
+    "deepmind.google": ("/discover/blog/", "/blog/"),
+    "developers.googleblog.com": ("/",),
+    "ai.meta.com": ("/blog/",),
+    "mistral.ai": ("/news/",),
+    "x.ai": ("/news/",),
+    "qwenlm.github.io": ("/blog/",),
+    "huggingface.co": ("/blog/",),
+}
+# A lab's own feed also carries customer stories ("Proaction boosts sales 60% with Codex"): an
+# announcement that arrives by RSS, without Hacker News or Kagi News having picked it up, needs
+# this much from the judge, who sees its feed summary there, not a title alone.
+LAB_RSS_MIN_P = 0.5
 # One release stream (github.com/<owner>/<repo>/releases) is promoted at most once in this many
 # days: each patch release is its own feed item, and four Claude Code patch releases in a day
 # became four captures titled only "v2.1.27x". [earned: 2026-09-24 pipeline run]
