@@ -60,6 +60,9 @@ multi-source synthesis at `04_Resources/` root.
 
 Report the cluster's membership and each member's unique contribution in the Phase 1
 handoff so the user can veto the grouping before anything is written.
+Copies of one news event (the same announcement, release, incident or deal from several outlets)
+are not a cluster to veto. They merge into one note without asking: see "News arrives in copies"
+in SKILL.md. [earned: 2026-09-30, owner]
 
 ## Enrichment rules
 

@@ -69,6 +69,30 @@ L1 enrichment (what it is, who published it, the link), never dropped.
 [earned: 2026-09-24, two clips held "Create a free account" and "This page does not exist"; a
 third, longer than ingest's wall check, held someone else's LinkedIn feed]
 
+**News arrives in copies: one event, one note.** One launch reaches the inbox several times
+over a few days: the lab's own page, a Hacker News link, two or three outlets and a Reddit
+thread. The radar promotes sensor news since radar 3.5.0, so expect copies. Merge them without
+asking, attended or not:
+- The note is about the event or the thing announced, titled by it ("GPT-6.1 Sol release
+  (OpenAI, 2026)"). Its `source:` is the primary source when one exists, meaning the lab's or
+  company's own page, otherwise the first report.
+- Every other report of the same announcement, release, incident or deal enriches that note
+  (L1). Add its line to `sources:`, and add what it contributes (a figure, a quote, the
+  company's statement, a reaction) in one cited line. A report that adds nothing but its
+  address still keeps that address. Retire it with `--note <that note>`.
+- Before writing a new note for a news capture, look for the event itself, not only the
+  address. Use the dossier's `related` notes and `search.py` with the product and company
+  names. The dossier's `covers` asks about the same work or product and may score another
+  outlet's report of the same event low. If a note reports the same event, the capture is
+  covered.
+- In one batch, copies of one event become one note, written from the primary source and
+  enriched by the rest, not one note per outlet (the `cluster` block pairs them).
+- A different event involving the same company or product (a later launch, a separate
+  incident) is a new note that links to the earlier one.
+[earned: 2026-09-30, the owner: "Distillation should care about merging them automatically".
+DevDay 2026 arrived as the OpenAI recap, the Sol post, and the FT and NPR Astra stories in one
+radar run]
+
 **A tweet is usually a pointer.** Ingest expands its `t.co` links in place, lists them in
 `links:`, and puts an excerpt of up to three linked pages in `## Linked` (`enrichment: full`,
 or `partial` when a link didn't resolve or a page didn't load). Distill from all of it, the

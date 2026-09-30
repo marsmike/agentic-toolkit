@@ -4,6 +4,15 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **News copies merge into one note (obsidian 3.4.2).** Now that the radar promotes sensor news, one
+  launch arrives as the lab's page, an HN link and several outlets. Distill merges them without
+  asking: one note per event, sourced from the primary source, and every other report is an L1
+  enrichment (its source line plus what it adds). It looks for the event itself before writing,
+  because the dossier's `covers` question asks about the same work or product and may miss another
+  outlet's report of the same event. A later event involving the same product is still a new note.
+  The `covers` wording is unchanged until it can be calibrated.
+  [earned: 2026-09-30, the owner asked that distillation merge the copies automatically]
+
 - **Sensor news becomes captures; the labs are watched by name (radar 3.5.0).** OpenAI DevDay
   2026 and GPT-6.1 Sol never reached the vault. The Signal Radar had both for two days: OpenAI's own
   Sol post at 805 Hacker News points, the DevDay recap, and FT and NPR on GPT-6.1 Astra being
