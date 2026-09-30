@@ -61,7 +61,6 @@ def run(vault: Path) -> dict:
     import reader
     import sensor_promote
     import signal_radar
-    from judgments import policy
 
     problems: list[str] = []
     real = reader._request
