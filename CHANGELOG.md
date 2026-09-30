@@ -4,6 +4,24 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Even ingest: every interest gets a turn, no source takes the run (radar 3.7.0, obsidian
+  3.4.6).** The per-name caps of 3.6.2 handled one symptom. The general problem: the sensors took
+  their promotions before the Reader feed got any (42 to 8 of the day's 50), one Google News
+  search held 155 of the day's sensor items, and both paths took candidates strongest first, so
+  one busy topic could fill a run. Now:
+  - the sensors are offered `promote_sensor_share` (0.5) of the run first, the feed gets the rest,
+    and what the feed leaves goes back to the sensors;
+  - both paths take interests round-robin (`fairness.interleave`: each interest's strongest item,
+    then each interest's second, and so on), with the labs' own announcements still first among
+    the sensors;
+  - one source (a Reader feed, a Google News search, Hacker News, a lab's own blog) takes at most
+    `promote_per_source_per_run` (3) of a run. A held-back sensor item stays in the three-day window
+    and goes first next run.
+
+  Replayed on 2026-09-30's sensor data, two runs of 13 cover 7 interests and 11 origins. Before,
+  OpenAI's blog took 6 of 13 and all 14 Muse stories went in one run.
+  [earned: 2026-09-30, the owner: "it is a general topic. We need to ingest sources evenly"]
+
 - **One story cannot fill a run (radar 3.6.2; profile keys in 3.6.3).** In the first run on radar 3.6.1, 14 of the 20
   promotions were Meta Muse coverage from 14 outlets. Their headlines were worded too differently
   for the title-overlap check, and distill merges them into one note anyway. A watched name now

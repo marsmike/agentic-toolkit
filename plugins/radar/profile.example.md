@@ -10,6 +10,8 @@ promote_location: later
 promote_per_run: 5
 promote_per_name_per_run: 2
 promote_per_name_per_day: 6
+promote_per_source_per_run: 3
+promote_sensor_share: 0.5
 watch: OpenAI,GPT,ChatGPT,Codex,Anthropic,Claude,Google,Gemini,DeepMind,Meta,Muse,Llama,Mistral,xAI,Grok,DeepSeek,Qwen
 kagi_weekly_budget_usd: 1.00
 tavily_weekly_budget_usd: 2.00
@@ -53,6 +55,12 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
   watched name (Muse, OpenAI, …) may take in a run and in a day (defaults 2 and 6). Outlets retell
   one story in headlines too different to match, and distill merges them into one note anyway; a
   lab's own announcement always goes, and counts.
+- **`promote_per_source_per_run`** — how many of a run one source may take: a Reader feed, a Google
+  News search, Hacker News, a lab's own blog (default 3). What it holds back waits in the window
+  for the next run.
+- **`promote_sensor_share`** — the share of a run's budget the sensors are offered first (default
+  0.5); the Reader feed gets the rest, and whatever the feed leaves goes back to the sensors. Both
+  sides take interests round-robin (each interest's strongest item first).
 - **`watch`** — the labs and models you follow by name (comma list or YAML list). A sensor item
   (Hacker News, Kagi News, the sensor RSS feeds) whose title names one and that the judge rates
   worth reading (0.70) is saved into Reader like a strong feed item, and the Signal Radar's web

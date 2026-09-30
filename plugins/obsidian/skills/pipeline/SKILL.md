@@ -38,7 +38,7 @@ written out from the repo root as `uv run --locked --project plugins/<plugin>/sc
 plugins/<plugin>/scripts/<script> <args>`: a shell function, a variable or any other command is
 refused, and the agent holds no key (each script reads its own). [earned: 2026-09-24, review-01 SEC-1]
 
-**Sources.** The radar judges the feed and promotes at most `promote_per_run` strong items a run (default five) to Reader's
+**Sources.** The radar judges the feed and promotes at most `promote_per_run` strong items a run (default five), evenly across interests and sources, to Reader's
 Later, and once a week writes the digest capture (`via: radar`); ingest turns every new library item (your clips, newsletters, promoted items) into a
 capture that says how it arrived (`via`). Run them in that order so promoted items land in this
 run's queue.

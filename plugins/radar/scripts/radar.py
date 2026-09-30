@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import shutil
 import subprocess
@@ -60,6 +61,7 @@ from typing import Any
 
 import clips as clips_mod
 import discover as discover_mod
+import fairness
 import gaps as gaps_mod
 import interests as interests_mod
 import judge
@@ -373,12 +375,28 @@ def _pending_retries(out: Path, promoted_keys: set[str]) -> dict[str, dict]:
     return {c: {**r, "attempts": attempts[c]} for c, r in last.items() if c not in promoted_keys and c not in given_up}
 
 
+def _merge_sensed(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    """Two sensor passes of one run as one result: counts add up, errors join."""
+    out = dict(a)
+    for k, v in b.items():
+        if isinstance(v, int) and isinstance(out.get(k), int):
+            out[k] += v
+        elif isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = {i: out[k].get(i, 0) + v.get(i, 0) for i in {*out[k], *v}}
+        elif isinstance(v, list) and isinstance(out.get(k), list):
+            out[k] = out[k] + v
+        else:
+            out[k] = v
+    return out
+
+
 def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], names: dict[str, str],
            run_date: str, archive: bool, promote: bool, location: str, out: Path | None = None,
-           per_run: int | None = None) -> dict[str, Any]:
+           per_run: int | None = None, per_source: int | None = None) -> dict[str, Any]:
     """Move every fetched feed item the radar has recorded (a repost shares a key with its
     original) out of the feed. With `promote`, the strongest not yet promoted, up to
-    `per_run` (what the run's `promote_per_run` leaves; default PROMOTE_PER_RUN), go to `location`; a promoted item
+    `per_run` (what the run's `promote_per_run` leaves; default PROMOTE_PER_RUN), taken round-robin by
+    interest with at most `per_source` (default PROMOTE_PER_SOURCE_PER_RUN) from one feed, go to `location`; a promoted item
     becomes a capture and a note, so the bar is deliberate. Every other recorded item is
     archived (the daily note still lists it).
 
@@ -411,7 +429,11 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
     recorded = recorded | {it.canonical for it in retry_items}
 
     settled = [it for it in all_fetched if keys_of(it) & recorded]
-    candidates = sorted((it for it in settled if item_key(it) in strong), key=lambda it: -max(strong[item_key(it)].values()))
+    candidates = fairness.interleave(
+        sorted((it for it in settled if item_key(it) in strong), key=lambda it: -max(strong[item_key(it)].values())),
+        lambda it: fairness.top_interest(strong[item_key(it)]))
+    cap_src = policy.PROMOTE_PER_SOURCE_PER_RUN if per_source is None else per_source
+    per_src: dict[str, int] = {}
     since = (date.fromisoformat(run_date) - timedelta(days=policy.RELEASE_STREAM_DAYS)).isoformat()
     streams = {release_stream(r["canonical"]) for r in done_before if str(r.get("date", "")) > since} - {None}
     chosen: set[str] = set()
@@ -421,8 +443,12 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
         stream = release_stream(item_key(it))
         if stream in streams:
             continue  # this repo's release already came in this week; the daily note still lists it
+        src = it.feed or it.site
+        if per_src.get(src, 0) >= cap_src:
+            continue  # one feed takes at most its share of a run; the daily note still lists it
         if stream:
             streams.add(stream)
+        per_src[src] = per_src.get(src, 0) + 1
         chosen.add(it.id)
     promotions, archive_ids = [], []
     for it in settled:
@@ -541,17 +567,31 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
         names = {i.id: i.name for i in interests}
         location = str(profile_value(vault, "promote_location", DEFAULT_PROMOTE_LOCATION))
         per_run = profile_number(vault, "promote_per_run", policy.PROMOTE_PER_RUN, cast=int)
+        per_source = profile_number(vault, "promote_per_source_per_run", policy.PROMOTE_PER_SOURCE_PER_RUN, cast=int)
+        share = min(1.0, max(0.0, profile_number(vault, "promote_sensor_share", policy.SENSOR_SHARE, cast=float)))
         sensed: dict[str, Any] = {}
+        sense = None
         if promote:
-            # Before the feed: a lab's own announcement outranks the day's fortieth arXiv paper.
+            # Before the feed, but only its share: a lab's own announcement outranks the day's
+            # fortieth arXiv paper, and the feed still gets its half. [earned: 2026-09-30]
             watch = profile_value(vault, "watch", None)
             watch = watch if isinstance(watch, list) else [w for w in str(watch or "").split(",")]
-            sensed = sensor_promote.promote(out, policy.thresholds(judge.load_config(vault)["backend"]), run_date,
-                                            per_run, location, set(vault_sources(vault)), names, [str(w) for w in watch],
-                                            profile_number(vault, "promote_per_name_per_run", policy.SENSOR_PER_NAME_PER_RUN, cast=int),
-                                            profile_number(vault, "promote_per_name_per_day", policy.SENSOR_PER_NAME_PER_DAY, cast=int))
-        return sensed | settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote,
-                               location, out, per_run=per_run - sensed.get("sensors_promoted", 0))
+            run_counts: dict[str, dict[str, int]] = {}
+
+            def sense(budget: int) -> dict[str, Any]:
+                return sensor_promote.promote(
+                    out, policy.thresholds(judge.load_config(vault)["backend"]), run_date, budget, location,
+                    set(vault_sources(vault)), names, [str(w) for w in watch],
+                    profile_number(vault, "promote_per_name_per_run", policy.SENSOR_PER_NAME_PER_RUN, cast=int),
+                    profile_number(vault, "promote_per_name_per_day", policy.SENSOR_PER_NAME_PER_DAY, cast=int),
+                    per_source, run_counts)
+            sensed = sense(math.ceil(per_run * share))
+        settled = settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote,
+                         location, out, per_run=per_run - sensed.get("sensors_promoted", 0), per_source=per_source)
+        left = per_run - sensed.get("sensors_promoted", 0) - settled.get("promoted", 0)
+        if sense is not None and left > 0:
+            sensed = _merge_sensed(sensed, sense(left))  # what the feed left goes back to the sensors
+        return sensed | settled
     append_jsonl(out / "seen.jsonl", [{"canonical": item_key(it), "title_key": title_key(it),
                                         "first_seen": run_date, "backlog": True} for it in backlog])
     result: dict[str, Any] = {"since": since.isoformat(), "fetched": len(fetched), "new": len(items),

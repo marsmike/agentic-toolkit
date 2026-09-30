@@ -21,6 +21,9 @@
                  scan, whatever earlier scans that day promoted (8d: `promote_per_run` from the
                  profile/env wins over the constant); one GitHub release stream at most once in
                  RELEASE_STREAM_DAYS (the strongest release that day; a later day skips the stream)
+                 (8h, even ingest: the feed takes interests round-robin and one feed at most
+                 PROMOTE_PER_SOURCE_PER_RUN; the sensors get SENSOR_SHARE of the budget first and
+                 what the feed leaves after — 2026-09-30, sensors 42 and feed 8 of 50)
                  (8e/8f, direct `settle()`: a failed promotion is retried from promote_retry.jsonl
                  even once the item is outside --since, and given up (archived) after
                  MAX_PROMOTE_RETRIES straight failures; 8g: a non-numeric promote_per_run falls
@@ -362,6 +365,50 @@ def run(vault: Path) -> dict:
                      [{"canonical": nxt[0].canonical, "backend": "jev", "p": {"x": 0.95}}], {}, tomorrow, False, True, "later", out8c)
         if promoted:
             problems.append("phase 8: a release stream promoted yesterday must not be promoted again within the week")
+
+        # 8h. even ingest. The feed: three interests, one of them with four strong items, and one
+        # prolific feed; a budget of three takes one item per interest, a source cap of two holds
+        # the prolific feed to two.
+        def fitem(i, feed):
+            return Item(id=f"ev{i}", url="", canonical=f"example.org/even-{i}", title=f"Even {i}", summary="",
+                        site=feed, feed=feed, published="", category="rss", saved_at="")
+        even = [fitem(0, "a"), fitem(1, "b"), fitem(2, "c"), fitem(3, "d"), fitem(4, "e"), fitem(5, "f")]
+        topic = {0: "ai", 1: "ai", 2: "ai", 3: "ai", 4: "music", 5: "firmware"}
+        erows = [{"canonical": it.canonical, "backend": "jev", "p": {topic[i]: 0.99 - i / 100}} for i, it in enumerate(even)]
+        out8h = sandbox.parent / "even"
+        out8h.mkdir(exist_ok=True)
+        promoted.clear()
+        radar.settle(even, {it.canonical for it in even}, erows, {}, day, False, True, "later", out8h, per_run=3)
+        if sorted(u["id"] for u in promoted) != ["ev0", "ev4", "ev5"]:
+            problems.append(f"phase 8h: a budget of three takes each interest's best first, got {sorted(u['id'] for u in promoted)}")
+        busy = [fitem(10 + i, "arxiv") for i in range(4)]
+        brows = [{"canonical": it.canonical, "backend": "jev", "p": {f"t{i}": 0.95}} for i, it in enumerate(busy)]
+        out8h2 = sandbox.parent / "even-source"
+        out8h2.mkdir(exist_ok=True)
+        promoted.clear()
+        saved_src, policy.PROMOTE_PER_SOURCE_PER_RUN = policy.PROMOTE_PER_SOURCE_PER_RUN, 2
+        try:
+            radar.settle(busy, {it.canonical for it in busy}, brows, {}, day, False, True, "later", out8h2, per_run=10)
+        finally:
+            policy.PROMOTE_PER_SOURCE_PER_RUN = saved_src
+        if len(promoted) != 2:
+            problems.append(f"phase 8h: one feed takes at most its per-source cap of a run, got {len(promoted)}")
+
+        # The split: the sensors are offered half the run first; what the feed leaves goes back to them.
+        import sensor_promote
+        real_sp, budgets = sensor_promote.promote, []
+        saved_cap, policy.PROMOTE_PER_RUN = policy.PROMOTE_PER_RUN, 4
+        try:
+            for took, want in ((lambda b: b, [2]), (lambda b: 0, [2, 2])):
+                budgets.clear()
+                sensor_promote.promote = lambda out, t, d, budget, *a, _took=took, **k: (
+                    budgets.append(budget) or {"sensors_promoted": _took(budget)})
+                promoted.clear()
+                radar.scan(sandbox, sandbox.parent / f"split-{len(want)}", since, NOW, promote=True)
+                if budgets != want:
+                    problems.append(f"phase 8h: sensor budgets for a run of 4 with the feed taking its two should be {want}, got {budgets}")
+        finally:
+            sensor_promote.promote, policy.PROMOTE_PER_RUN = real_sp, saved_cap
 
         # 8e/8f. stranded: once an item is older than --since it is never fetched again, so a
         # failed promotion must still be retried (from promote_retry.jsonl, regardless of the

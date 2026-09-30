@@ -43,6 +43,13 @@ SENSOR_SAME_STORY = 0.5          # title-word Jaccard at or above: another outle
 # distill merges them into one note anyway. [earned: 2026-09-30, 19:11 run]
 SENSOR_PER_NAME_PER_RUN = 2      # profile `promote_per_name_per_run` wins
 SENSOR_PER_NAME_PER_DAY = 6      # profile `promote_per_name_per_day` wins
+# Even ingest: the sensors get at most this share of a run's budget first (the feed gets the rest
+# and anything the sensors leave; the sensors then get what the feed leaves), both paths take
+# interests round-robin, and one source (a feed, a Google News search, Hacker News) takes at most
+# PROMOTE_PER_SOURCE_PER_RUN of a run, a lab's own blog included (it goes first next run).
+# [earned: 2026-09-30 — sensors 42, feed 8 of the day's 50; 155 sensor items from one search]
+SENSOR_SHARE = 0.5               # profile `promote_sensor_share` wins
+PROMOTE_PER_SOURCE_PER_RUN = 3   # profile `promote_per_source_per_run` wins
 # A lab's own announcement is promoted whatever the judge says from its title alone ("DevDay 2026
 # Recap" scored 0.31). Host -> path prefixes that are announcements, not docs or careers pages.
 LAB_ANNOUNCEMENTS: dict[str, tuple[str, ...]] = {

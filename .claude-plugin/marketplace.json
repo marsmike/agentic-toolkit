@@ -12,7 +12,7 @@
     {
       "name": "obsidian",
       "source": "./plugins/obsidian",
-      "version": "3.4.5",
+      "version": "3.4.6",
       "description": "Vault interface: filesystem-first operations and health, search, graph-aware distill, and the unattended pipeline that rebuilds Index, maps and Now."
     },
     {
@@ -36,7 +36,7 @@
     {
       "name": "radar",
       "source": "./plugins/radar",
-      "version": "3.6.3",
+      "version": "3.7.0",
       "description": "Active research radar: judges every Reader feed item against your interests with typed judgments, reports which feeds earn their place, proposes new feeds, and asks Kagi (search, news, answers, summaries)."
     }
   ]

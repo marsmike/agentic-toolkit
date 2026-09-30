@@ -20,6 +20,8 @@
                 is never saved and is counted; `gnews` reads an old-format id from its payload and
                 a current one through the page's signature, and returns None on any failure
                 (2026-09-30: untitled "Google News" captures, two DLQ notes, one failed capture)
+7. per source — one source (a lab's own blog included) takes at most per_source_run of a run;
+                what it holds back goes in the next run
 6. per name   — one watched name takes at most SENSOR_PER_NAME_PER_RUN of a run and
                 SENSOR_PER_NAME_PER_DAY of a day, counted from today's ledger; a lab's own
                 announcement is never held back; other stories fill the rest (2026-09-30: 14 of
@@ -224,6 +226,22 @@ def run(vault: Path) -> dict:
         finally:
             gnews._request = real_gn
 
+        # 7. one source cannot fill the run, a lab's own blog included: four OpenAI posts, a cap of two
+        out7 = sandbox.parent / "radar-sources"
+        (out7 / "sensors").mkdir(parents=True)
+        labs = {f"rss:lab{i}": {**_item("rss", t, f"https://openai.com/index/post-{i}/", 0.9), "origin": "OpenAI News"}
+                for i, t in enumerate(["Introducing a faster reasoning model", "Safety cases for frontier training",
+                                       "How a bank rebuilt its support desk", "Disrupting a distillation campaign"])}
+        (out7 / "sensors" / f"{DAY}.json").write_text(json.dumps({"day": DAY, "items": labs}), encoding="utf-8")
+        saves.clear()
+        r = sensor_promote.promote(out7, T, DAY, 10, "later", known, names, WATCH, per_source_run=2)
+        if len(saves) != 2 or r.get("sensors_capped_source") != 2:
+            problems.append(f"phase 7: a lab's blog takes two of a run at a cap of two, the rest wait, got {len(saves)}, {r}")
+        saves.clear()
+        sensor_promote.promote(out7, T, DAY, 10, "later", known, names, WATCH, per_source_run=2)
+        if len(saves) != 2:
+            problems.append(f"phase 7: the held-back lab posts go in the next run, got {len(saves)}")
+
         # 6. one watched name cannot fill the run
         pat = sensor_promote.watch_pattern(WATCH)
         if sensor_promote.named("MegaMorph Meta-Instrument host; GPT-6.1 and Claude's plan; metadata", pat) != {"gpt", "claude"}:
@@ -255,7 +273,8 @@ def run(vault: Path) -> dict:
         if len([u for u in (s["url"] for s in saves) if "outlet" in u]) != 1:
             problems.append(f"phase 6: five Muse promotions earlier today leave one of the day's six, got {[s['url'] for s in saves]}")
         saves.clear()
-        sensor_promote.promote(out6, T, DAY, 10, "later", known, names, WATCH, per_name_run=10, per_name_day=10)
+        sensor_promote.promote(out6, T, DAY, 10, "later", known, names, WATCH, per_name_run=10, per_name_day=10,
+                                per_source_run=10)
         if len([u for u in (s["url"] for s in saves) if "outlet" in u]) != 4:
             problems.append(f"phase 6: the profile's caps (10 and 10) win over the defaults, got {[s['url'] for s in saves]}")
     finally:
@@ -264,4 +283,4 @@ def run(vault: Path) -> dict:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else "6 offline phases ok (rules, skips, budget, web-check candidates, Google News links, per-name caps)"}
+            "detail": "; ".join(problems) if problems else "7 offline phases ok (rules, skips, budget, web-check candidates, Google News links, per-name and per-source caps)"}

@@ -17,7 +17,10 @@ order, strongest first within each, within the run's `promote_per_run` (the feed
 sensors leave). An item already promoted, held by the vault, or another outlet's
 copy of a story promoted in the window (title-word overlap, SENSOR_SAME_STORY) is skipped. A
 watched name takes at most `promote_per_name_per_run` of a run and `promote_per_name_per_day` of a
-day (profile; defaults SENSOR_PER_NAME_PER_RUN and SENSOR_PER_NAME_PER_DAY)
+day (profile; defaults SENSOR_PER_NAME_PER_RUN and SENSOR_PER_NAME_PER_DAY), and one source (a
+feed, a Google News search, Hacker News, a lab's own blog) at most `per_source_run` of a run; a
+held-back lab post stays in the window and goes first next run. Past the labs' own
+announcements, candidates are taken round-robin by interest (`fairness.interleave`).
 (a lab's own announcement always goes, and counts), so one story cannot fill the run. A Google
 News link is saved as the publisher's own URL (`gnews.resolve`), or not at all: Reader cannot
 follow one. [earned: 2026-09-30 — untitled "Google News" captures, two DLQ notes, one failed] Every
@@ -37,6 +40,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+import fairness
 import gnews
 import reader
 from judgments import policy
@@ -127,7 +131,10 @@ def rank(it: dict, t: dict[str, float], watch: re.Pattern[str] | None = None) ->
 
 def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location: str,
             known: set[str], names: dict[str, str], watch: list[str] | None = None,
-            per_name_run: int | None = None, per_name_day: int | None = None) -> dict[str, Any]:
+            per_name_run: int | None = None, per_name_day: int | None = None,
+            per_source_run: int | None = None, run: dict[str, dict[str, int]] | None = None) -> dict[str, Any]:
+    """`run` carries this run's per-name and per-source counts across calls: scan calls this
+    twice, before the feed and again with what the feed left."""
     from radar import append_jsonl, read_jsonl  # lazy: radar imports this module
 
     ledger = out / "promoted.jsonl"
@@ -141,7 +148,10 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
     pattern = watch_pattern(watch or [])
     cap_run = policy.SENSOR_PER_NAME_PER_RUN if per_name_run is None else per_name_run
     cap_day = policy.SENSOR_PER_NAME_PER_DAY if per_name_day is None else per_name_day
-    per_run: dict[str, int] = {}
+    cap_src = policy.PROMOTE_PER_SOURCE_PER_RUN if per_source_run is None else per_source_run
+    run = run if run is not None else {}
+    per_run: dict[str, int] = run.setdefault("names", {})
+    per_src: dict[str, int] = run.setdefault("sources", {})
     per_day: dict[str, int] = {}
     for r in done:
         if r.get("date") == run_date and r.get("via") == "sensors":
@@ -152,7 +162,9 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
         if r is not None:
             ranked.append(((r[0], last_choice(it["url"]), r[1]), it))
     ranked.sort(key=lambda x: x[0])
-    saved, unresolved, capped, errors, rules = 0, 0, 0, [], {0: 0, 1: 0, 2: 0, 3: 0}
+    ranked = [x for x in ranked if x[0][0] == 0] + fairness.interleave(
+        [x for x in ranked if x[0][0] != 0], lambda x: fairness.top_interest(x[1].get("p") or {}))
+    saved, unresolved, capped, capped_src, errors, rules = 0, 0, 0, 0, [], {0: 0, 1: 0, 2: 0, 3: 0}
     for (rule, _, _), it in ranked:
         if saved >= budget:
             break
@@ -167,6 +179,10 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
         hits = named(it.get("title", ""), pattern)
         if rule != 0 and any(per_run.get(n, 0) >= cap_run or per_day.get(n, 0) >= cap_day for n in hits):
             capped += 1
+            continue
+        src = str(it.get("origin") or it.get("source") or "")
+        if per_src.get(src, 0) >= cap_src:  # a lab's own feed too: DevDay put six OpenAI posts in one run
+            capped_src += 1
             continue
         google_news = None
         if gnews.is_google_news(url):
@@ -190,15 +206,17 @@ def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location
                                "source": it.get("source"), "title": it.get("title", ""),
                                **({"google_news": google_news} if google_news else {})}])
         already |= {canonical, google_news} - {None}
+        per_src[src] = per_src.get(src, 0) + 1
         for n in hits:
             per_run[n] = per_run.get(n, 0) + 1
             per_day[n] = per_day.get(n, 0) + 1
         stories.append(w)
         saved += 1
         rules[rule] += 1
-    if not saved and not errors and not unresolved and not capped:
+    if not saved and not errors and not unresolved and not capped and not capped_src:
         return {}
     return {"sensors_promoted": saved, "sensors_by_rule": {"lab": rules[0], "momentum": rules[1], "watched": rules[2], "strong": rules[3]},
             **({"sensors_unresolved": unresolved} if unresolved else {}),
             **({"sensors_capped": capped} if capped else {}),
+            **({"sensors_capped_source": capped_src} if capped_src else {}),
             **({"sensors_promote_errors": errors} if errors else {})}
