@@ -133,7 +133,7 @@ def is_backlog(item: Item, since: datetime) -> bool:
 def profile_number(vault: Path, key: str, default: float, cast: type = float) -> Any:
     """A numeric profile value (a budget, a daily cap): the shipped default when the profile note
     or an env override does not parse as `cast`, rather than crashing the command that reads it.
-    [earned: 2026-09-28, week review — a non-numeric promote_per_day crashed scan]"""
+    [earned: 2026-09-28, week review — a non-numeric promote_per_day (now promote_per_run) crashed scan]"""
     try:
         return cast(profile_value(vault, key, default))
     except (TypeError, ValueError):
@@ -375,10 +375,10 @@ def _pending_retries(out: Path, promoted_keys: set[str]) -> dict[str, dict]:
 
 def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], names: dict[str, str],
            run_date: str, archive: bool, promote: bool, location: str, out: Path | None = None,
-           per_day: int | None = None) -> dict[str, Any]:
+           per_run: int | None = None) -> dict[str, Any]:
     """Move every fetched feed item the radar has recorded (a repost shares a key with its
     original) out of the feed. With `promote`, the strongest not yet promoted, up to
-    `promote_per_day` (profile; default PROMOTE_PER_DAY) a day counted in `promoted.jsonl`, go to `location`; a promoted item
+    `per_run` (what the run's `promote_per_run` leaves; default PROMOTE_PER_RUN), go to `location`; a promoted item
     becomes a capture and a note, so the bar is deliberate. Every other recorded item is
     archived (the daily note still lists it).
 
@@ -397,12 +397,10 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
             s = reports.bands(r)[1]
             if s and r["canonical"] not in promoted_keys:
                 strong[r["canonical"]] = {i: r["p"][i] for i in s}
-    # The daily budget is the owner's appetite, not a judgment threshold: `promote_per_day` in the
-    # profile, passed in by scan. [earned: 2026-09-25 — the judge rated ~13 items a day strong and
-    # the fixed 5 discarded the rest]
-    if per_day is None:
-        per_day = policy.PROMOTE_PER_DAY
-    budget = max(0, per_day - sum(1 for r in done_before if r.get("date") == run_date))
+    # The budget is the owner's appetite, not a judgment threshold: `promote_per_run` in the
+    # profile, less what the sensors took, passed in by scan. [earned: 2026-09-25 — the judge rated
+    # ~13 items a day strong and the fixed 5 discarded the rest]
+    budget = max(0, policy.PROMOTE_PER_RUN if per_run is None else per_run)
 
     pending = _pending_retries(out, promoted_keys) if promote and out is not None else {}
     fetched_keys = {k for it in fetched for k in keys_of(it)}
@@ -542,16 +540,16 @@ def scan(vault: Path, out: Path, since: datetime, now: datetime, limit: int | No
     def archived() -> dict[str, Any]:
         names = {i.id: i.name for i in interests}
         location = str(profile_value(vault, "promote_location", DEFAULT_PROMOTE_LOCATION))
-        per_day = profile_number(vault, "promote_per_day", policy.PROMOTE_PER_DAY, cast=int)
+        per_run = profile_number(vault, "promote_per_run", policy.PROMOTE_PER_RUN, cast=int)
         sensed: dict[str, Any] = {}
         if promote:
             # Before the feed: a lab's own announcement outranks the day's fortieth arXiv paper.
             watch = profile_value(vault, "watch", None)
             watch = watch if isinstance(watch, list) else [w for w in str(watch or "").split(",")]
             sensed = sensor_promote.promote(out, policy.thresholds(judge.load_config(vault)["backend"]), run_date,
-                                            per_day, location, set(vault_sources(vault)), names, [str(w) for w in watch])
+                                            per_run, location, set(vault_sources(vault)), names, [str(w) for w in watch])
         return sensed | settle(fetched, recorded, read_jsonl(out / "state.jsonl"), names, run_date, archive, promote,
-                               location, out, per_day=per_day)
+                               location, out, per_run=per_run - sensed.get("sensors_promoted", 0))
     append_jsonl(out / "seen.jsonl", [{"canonical": item_key(it), "title_key": title_key(it),
                                         "first_seen": run_date, "backlog": True} for it in backlog])
     result: dict[str, Any] = {"since": since.isoformat(), "fetched": len(fetched), "new": len(items),

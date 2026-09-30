@@ -11,8 +11,8 @@
                 bare youtube.com/watch, an item only in a day file older than the window, one
                 published before the window, and a lab's customer story that only its own RSS
                 carried (below LAB_RSS_MIN_P) are never saved; `Metadata` does not match the watched name `Meta`
-3. budget     — at most SENSOR_PROMOTE_PER_DAY a day and never past what promote_per_day leaves;
-                a second run the same day saves nothing new; a Reader failure is reported, not raised
+3. budget     — at most the run's budget, however many were promoted earlier that day (the budget
+                is per run); a second run saves nothing new; a Reader failure is reported, not raised
 4. check      — the web check never spends a check on an Other-sector name, asks watched names
                 first, and gives a one-word name its interest's name as context
 """
@@ -64,7 +64,7 @@ def run(vault: Path) -> dict:
     from judgments import policy
 
     problems: list[str] = []
-    real = (reader._request, policy.SENSOR_PROMOTE_PER_DAY)
+    real = reader._request
     saves: list[dict] = []
     fail = {"on": False}
     sandbox = None
@@ -116,17 +116,17 @@ def run(vault: Path) -> dict:
         if sensor_promote.promote(out, T, DAY, 50, "later", known, names, WATCH) or saves:
             problems.append(f"phase 3: a second run the same day saves nothing new, got {len(saves)}")
         (out / "promoted.jsonl").write_text("", encoding="utf-8")
-        policy.SENSOR_PROMOTE_PER_DAY = 2
-        sensor_promote.promote(out, T, DAY, 50, "later", known, names, WATCH)
+        sensor_promote.promote(out, T, DAY, 2, "later", known, names, WATCH)
         if len(saves) != 2:
-            problems.append(f"phase 3: SENSOR_PROMOTE_PER_DAY=2 saves two, got {len(saves)}")
-        policy.SENSOR_PROMOTE_PER_DAY = real[1]
+            problems.append(f"phase 3: a budget of 2 saves two, got {len(saves)}")
+        # 49 promoted earlier today do not count against this run [earned: 2026-09-30 — a daily
+        # cap spent by 07:11 UTC starved every later run]
         (out / "promoted.jsonl").write_text("".join(json.dumps({"canonical": f"f{n}", "date": DAY}) + "\n" for n in range(49)),
                                             encoding="utf-8")
         saves.clear()
-        sensor_promote.promote(out, T, DAY, 50, "later", known, names, WATCH)
-        if len(saves) != 1:
-            problems.append(f"phase 3: one slot left of promote_per_day saves one, got {len(saves)}")
+        sensor_promote.promote(out, T, DAY, 3, "later", known, names, WATCH)
+        if len(saves) != 3:
+            problems.append(f"phase 3: a run's budget of 3 saves three whatever the day promoted before, got {len(saves)}")
         (out / "promoted.jsonl").write_text("", encoding="utf-8")
         fail["on"] = True
         r = sensor_promote.promote(out, T, DAY, 50, "later", known, names, WATCH)
@@ -155,7 +155,7 @@ def run(vault: Path) -> dict:
         if asked[:1] != ["GPT-6.1 Sol"]:
             problems.append(f"phase 4: watched names are asked first, got {asked}")
     finally:
-        reader._request, policy.SENSOR_PROMOTE_PER_DAY = real
+        reader._request = real
         if sandbox is not None:
             teardown_sandbox(sandbox)
 

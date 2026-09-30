@@ -132,14 +132,13 @@ def gaps(vault: Path, out: Path, now: datetime, promote: bool = False) -> dict[s
 
 
 def _promote(out: Path, strong: list[dict], names: dict[str, str], now: datetime, vault: Path) -> dict:
-    """Save the strongest to Reader within what is left of the day's promotion budget."""
+    """Save the strongest to Reader within one run's promotion budget."""
     from radar import append_jsonl, profile_number, read_jsonl
 
     run_date = now.date().isoformat()
     ledger = out / "promoted.jsonl"
     done = read_jsonl(ledger)
-    per_day = profile_number(vault, "promote_per_day", policy.PROMOTE_PER_DAY, cast=int)  # shared with scan's budget
-    budget = max(0, per_day - sum(1 for r in done if r.get("date") == run_date))
+    budget = max(0, profile_number(vault, "promote_per_run", policy.PROMOTE_PER_RUN, cast=int))
     already = {r["canonical"] for r in done}
     location = str(profile_value(vault, "promote_location", "later"))
     saved, errors = 0, []

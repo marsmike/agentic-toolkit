@@ -19,16 +19,17 @@ THRESHOLDS: dict[str, dict[str, float]] = {
 
 ITEMS_PER_REQUEST = 8           # every interest is asked about every item in one request
 MAX_REQUESTS_PER_RUN = 300      # a daily scan needs ~10; the 30-day replay ~220
-# A promoted item becomes a capture and, through the pipeline, a note: at most this many a day,
-# strongest first. [Mike, 2026-09-23: one pipeline for clips and radar; the 8-day backlog held
-# 52 strong items, 36 of them arXiv]
-PROMOTE_PER_DAY = 5
+# A promoted item becomes a capture and, through the pipeline, a note: at most this many a run
+# (one `scan --promote`, one `gaps --promote`), strongest first. [Mike, 2026-09-23: one pipeline
+# for clips and radar; the 8-day backlog held 52 strong items, 36 of them arXiv] Per run, not per
+# day: a daily cap spent by a morning burst archived every strong item after it. [earned:
+# 2026-09-30 — 50 a day were gone by 07:11 UTC; the next three scans promoted none of 60]
+PROMOTE_PER_RUN = 5
 # Sensor items (Hacker News, Kagi News, the sensor RSS feeds) become captures too, not only
 # momentum: the Signal Radar held OpenAI's own GPT-6.1 Sol post (805 HN points) and DevDay recap
 # for two days and nothing ever promoted them, since only Reader feed items could be.
 # [earned: 2026-09-30, DevDay 2026 missing from the vault]
 SENSOR_PROMOTE_SOURCES = ("hn", "kagi_news", "rss")  # hf/github trending and Reddit have their own feed path
-SENSOR_PROMOTE_PER_DAY = 50      # within promote_per_day, not on top of it (15 -> 50 on 2026-09-30, owner)
 SENSOR_PROMOTE_WINDOW_DAYS = 3   # sensor day files read back; an item first seen earlier is old news
 SENSOR_HN_MOMENTUM = 300         # HN points at which T_WORTH is enough: the judge sees a title only
 # A paywalled outlet is the last choice of a story told by several: the capture holds a headline,

@@ -7,8 +7,8 @@
                 backend; the strong ones are listed with their sites; the week's file is written once
                 (a second run is `exists`, no call)
 3. promote    — with --promote the strongest are saved to Reader Later tagged radar/<interest>,
-                within what is left of the day's promotion budget, and counted in promoted.jsonl
-                (3b: the budget is `promote_per_day` from the profile/env, shared with scan's)
+                within one run's promotion budget (an earlier promotion that day does not count),
+                and counted in promoted.jsonl (3b: the budget is `promote_per_run` from the profile/env)
 4. digest     — the week's digest has a "Found outside your feeds" section
 5. kagi       — `kagi answer` returns FastGPT's output and references, recorded in the ledger;
                 over the weekly budget nothing is sent (5b: a non-numeric kagi_weekly_budget_usd
@@ -29,7 +29,7 @@ from _sandbox import make_sandbox, teardown_sandbox
 NAME = "gaps"
 ENV_KEYS = ("TOOLKIT_RADAR_JUDGMENT_API_KEY", "OPENROUTER_API_KEY", "TOOLKIT_RADAR_JUDGMENT_BACKEND",
             "TOOLKIT_RADAR_INTERESTS_NOTE", "TOOLKIT_RADAR_TODOIST_PROJECT_ID", "KAGI_API_KEY",
-            "TOOLKIT_RADAR_KAGI_WEEKLY_BUDGET_USD", "TOOLKIT_RADAR_PROMOTE_PER_DAY")
+            "TOOLKIT_RADAR_KAGI_WEEKLY_BUDGET_USD", "TOOLKIT_RADAR_PROMOTE_PER_RUN")
 NOW = datetime(2026, 9, 23, 12, 0, tzinfo=UTC)
 INTERESTS_NOTE = """---
 description: Fixture interests for the radar gaps eval.
@@ -70,7 +70,7 @@ def run(vault: Path) -> dict:
 
     problems: list[str] = []
     saved_env = {k: os.environ.pop(k, None) for k in ENV_KEYS}
-    real = (judge._post, reader._request, kagi._request, policy.PROMOTE_PER_DAY)
+    real = (judge._post, reader._request, kagi._request, policy.PROMOTE_PER_RUN)
     kagi_calls, judged_state, saves = [], [], []
     sandbox = None
 
@@ -117,9 +117,9 @@ def run(vault: Path) -> dict:
         if r["status"] != "SKIPPED" or judged_state or list(out.glob("gaps-*.json")):
             problems.append(f"phase 1: expected SKIPPED with nothing judged or written, got {r['status']}")
 
-        # 2 + 3. gaps with promotion, one slot left today
+        # 2 + 3. gaps with promotion, a budget of one; the row promoted earlier today does not count
         os.environ["KAGI_API_KEY"] = "stub-kagi-not-a-secret"
-        policy.PROMOTE_PER_DAY = 2
+        policy.PROMOTE_PER_RUN = 1
         (out / "promoted.jsonl").write_text(json.dumps({"canonical": "x", "date": NOW.date().isoformat()}) + "\n", encoding="utf-8")
         r = gaps.gaps(sandbox, out, NOW, promote=True)
         titles = [s["items"][k]["title"] for s in judged_state for k in s["items"]]
@@ -138,22 +138,22 @@ def run(vault: Path) -> dict:
             problems.append("phase 2: a second run in the same week must be `exists` without a call")
         if r.get("promoted") != 1 or len(saves) != 1 or saves[0]["location"] != "later" \
                 or saves[0]["tags"] != ["radar", "radar/agent-memory"] or not saves[0]["notes"].startswith("[radar gap"):
-            problems.append(f"phase 3: one save (the budget's last slot), tagged, with a note; got {saves}")
+            problems.append(f"phase 3: one save (the run's one slot), tagged, with a note; got {saves}")
 
-        # 3b. the budget is the profile's promote_per_day (env override), not the constant: 0 saves
+        # 3b. the budget is the profile's promote_per_run (env override), not the constant: 0 saves
         # nothing; 5 saves the one strong row phase 3 could not fit (the other is already promoted)
         strong_rows = [g for g in data.get("rows", []) if g["strong"]]
         names = {i: i for g in strong_rows for i in g["strong"]}
-        os.environ["TOOLKIT_RADAR_PROMOTE_PER_DAY"] = "0"
+        os.environ["TOOLKIT_RADAR_PROMOTE_PER_RUN"] = "0"
         saves.clear()
         gaps._promote(out, strong_rows, names, NOW, sandbox)
         if saves:
-            problems.append(f"phase 3b: promote_per_day=0 must save nothing, got {len(saves)}")
-        os.environ["TOOLKIT_RADAR_PROMOTE_PER_DAY"] = "5"
+            problems.append(f"phase 3b: promote_per_run=0 must save nothing, got {len(saves)}")
+        os.environ["TOOLKIT_RADAR_PROMOTE_PER_RUN"] = "5"
         gaps._promote(out, strong_rows, names, NOW, sandbox)
         if len(saves) != 1:
             problems.append(f"phase 3b: with the budget raised the remaining strong row is saved once, got {len(saves)}")
-        os.environ.pop("TOOLKIT_RADAR_PROMOTE_PER_DAY", None)
+        os.environ.pop("TOOLKIT_RADAR_PROMOTE_PER_RUN", None)
 
         # 4. digest
         text = reports.render_weekly(reports.week_of(NOW.date().isoformat()), [], [], NOW, gaps=data)
@@ -218,7 +218,7 @@ def run(vault: Path) -> dict:
         if not json.loads((out / f"gaps-{week}.json").read_text(encoding="utf-8")).get("rows"):
             problems.append("phase 5e: the recomputed gaps file must actually be rewritten")
     finally:
-        judge._post, reader._request, kagi._request, policy.PROMOTE_PER_DAY = real
+        judge._post, reader._request, kagi._request, policy.PROMOTE_PER_RUN = real
         for k, v in saved_env.items():
             os.environ.pop(k, None)
             if v is not None:

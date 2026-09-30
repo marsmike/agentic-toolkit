@@ -17,13 +17,13 @@
 8. promote     — with --promote the strong item and its twin move to Later tagged radar and
                  radar/<interest> with a note naming each interest and p, the rest are archived;
                  a failed promotion leaves the item in the feed (not archived) and the next scan
-                 promotes it from state without a judgment request; at most PROMOTE_PER_DAY a
-                 (8d: `promote_per_day` from the profile/env wins over the constant)
-                 day, counted across scans; one GitHub release stream at most once in
+                 promotes it from state without a judgment request; at most PROMOTE_PER_RUN a
+                 scan, whatever earlier scans that day promoted (8d: `promote_per_run` from the
+                 profile/env wins over the constant); one GitHub release stream at most once in
                  RELEASE_STREAM_DAYS (the strongest release that day; a later day skips the stream)
                  (8e/8f, direct `settle()`: a failed promotion is retried from promote_retry.jsonl
                  even once the item is outside --since, and given up (archived) after
-                 MAX_PROMOTE_RETRIES straight failures; 8g: a non-numeric promote_per_day falls
+                 MAX_PROMOTE_RETRIES straight failures; 8g: a non-numeric promote_per_run falls
                  back to the constant instead of crashing scan)
 9. todoist     — with --todoist and Portfolio epics as interests, one comment per epic with strong
                  items, dated, with links and p; a second scan the same day adds none; without
@@ -299,27 +299,37 @@ def run(vault: Path) -> dict:
                 u.get("notes") != f"[radar {NOW.date().isoformat()}] Agent Memory p=0.90; Firmware p=0.90":
             problems.append(f"phase 8: wrong tags or note on the promoted item: {u}")
 
-        # 8b. the daily cap: one promotion a day, strongest first; a second scan that day adds none
-        saved_cap, policy.PROMOTE_PER_DAY = policy.PROMOTE_PER_DAY, 1
+        # 8b. the per-run cap: one promotion a scan, strongest first; a second scan does not promote
+        # the same story again; 49 promotions earlier that day do not use up this scan's budget
+        # [earned: 2026-09-30 — a daily cap of 50 was spent by 07:11 UTC and starved every later run]
+        saved_cap, policy.PROMOTE_PER_RUN = policy.PROMOTE_PER_RUN, 1
         try:
             out8b = sandbox.parent / "cap"
             promoted.clear()
             radar.scan(sandbox, out8b, since, NOW, promote=True)
             radar.scan(sandbox, out8b, since, NOW, promote=True)
             if len(promoted) != 1 or promoted[0]["id"] not in ("doc1", "doc2"):
-                problems.append(f"phase 8: a cap of 1 a day must promote exactly one strong item across two scans, got {[u['id'] for u in promoted]}")
+                problems.append(f"phase 8: a cap of 1 a run must promote exactly one strong item across two scans, got {[u['id'] for u in promoted]}")
+            out8b2 = sandbox.parent / "cap-busy-day"
+            out8b2.mkdir()
+            (out8b2 / "promoted.jsonl").write_text("".join(json.dumps({"canonical": f"earlier{n}", "date": NOW.date().isoformat()}) + "\n"
+                                                           for n in range(49)), encoding="utf-8")
+            promoted.clear()
+            radar.scan(sandbox, out8b2, since, NOW, promote=True)
+            if len(promoted) != 1:
+                problems.append(f"phase 8: 49 promotions earlier today must not use up a scan's budget, got {len(promoted)}")
         finally:
-            policy.PROMOTE_PER_DAY = saved_cap
+            policy.PROMOTE_PER_RUN = saved_cap
 
-        # 8d. the profile key wins over the constant: promote_per_day=0 through the env override promotes
+        # 8d. the profile key wins over the constant: promote_per_run=0 through the env override promotes
         # nothing; the caller's own value of that variable, if any, is put back afterwards
-        env_key, env_before = "TOOLKIT_RADAR_PROMOTE_PER_DAY", os.environ.get("TOOLKIT_RADAR_PROMOTE_PER_DAY")
+        env_key, env_before = "TOOLKIT_RADAR_PROMOTE_PER_RUN", os.environ.get("TOOLKIT_RADAR_PROMOTE_PER_RUN")
         os.environ[env_key] = "0"
         try:
             promoted.clear()
             r = radar.scan(sandbox, sandbox.parent / "cap-profile", since, NOW, promote=True)
             if promoted or r.get("promoted") not in (0, None):
-                problems.append(f"phase 8d: promote_per_day=0 from the profile must promote nothing, got {r.get('promoted')}")
+                problems.append(f"phase 8d: promote_per_run=0 from the profile must promote nothing, got {r.get('promoted')}")
         finally:
             if env_before is None:
                 os.environ.pop(env_key, None)
@@ -400,14 +410,14 @@ def run(vault: Path) -> dict:
         if promoted or len(calls) != n:
             problems.append("phase 8f: a given-up item must never be promoted (or retried) again")
 
-        # 8g. a non-numeric promote_per_day (profile or env) falls back to the constant instead of
+        # 8g. a non-numeric promote_per_run (profile or env) falls back to the constant instead of
         # crashing scan
         os.environ[env_key] = "not-a-number"
         try:
             promoted.clear()
             r = radar.scan(sandbox, sandbox.parent / "cap-bad", since, NOW, promote=True)
             if r.get("status") != "ok":
-                problems.append(f"phase 8g: a non-numeric promote_per_day must not crash scan, got {r.get('status')}")
+                problems.append(f"phase 8g: a non-numeric promote_per_run must not crash scan, got {r.get('status')}")
         finally:
             if env_before is None:
                 os.environ.pop(env_key, None)

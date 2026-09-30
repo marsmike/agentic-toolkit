@@ -37,7 +37,8 @@ graph — offline (gaiafield and Kagi stubbed).
                & Reliability") folds into the renamed interest's sector, not a phantom sector of
                its own; an id naming no live interest (current or aliased) resolves to nothing
 11. note     (pure, no sandbox) — the note's description counts every early warning and blind
-               spot, and a capped section says "showing 8 of 29"; with no vault baseline the
+               spot, and the note lists every one of them and every signal, with each signal's
+               detail (its items, notes and hubs); nothing is left to the page (2026-09-30); with no vault baseline the
                section says "no baseline yet" and lists the week's tags by count, never "0.0
                baseline"; with one, only rising/new tags, each against its baseline (real cases,
                2026-09-29)
@@ -262,11 +263,21 @@ def _note_checks(problems: list[str]) -> None:
     md = R.render_md(data)
     if "10 early warnings, 29 not yet in the vault" not in md:
         problems.append("note: the description must count every early warning and blind spot, not the shown few")
-    if f"showing {R.MD_TOP_BLIND} of 29" not in md or f"Showing {R.MD_TOP_EARLY} of 10" not in md:
-        problems.append("note: a capped section must say how many it shows of how many")
-    few = R.render_md({**data, "early": data["early"][:2], "blind_spots": data["blind_spots"][:3]})
-    if "2 early warnings, 3 not yet in the vault" not in few or "howing" in few:
-        problems.append("note: an uncapped section needs no 'showing N of M'")
+    early_sec = md.split("## Early warning", 1)[1].split("\n## ", 1)[0]
+    blind_sec = md.split("## Not in your vault yet", 1)[1].split("\n## ", 1)[0]
+    if early_sec.count("- **Thing ") != 10 or blind_sec.count("- **Thing ") != 29 or "howing" in md:
+        problems.append("note: every early warning and blind spot is listed, none left to the page")
+    if "## All 29 signals" not in md or md.count("\n| ") < 30 or md.count("\n### Thing ") != 29:
+        problems.append("note: every signal gets a table row and a detail section")
+    detailed = R.render_md({**data, "blips": [{**blips[0], "name": "A|B", "sector": "s1", "mentions": 3,
+                                               "items": [{"title": "Post", "url": "https://x.example/p", "origin": "Hacker News",
+                                                          "at": "2026-09-29", "score": 120.0}],
+                                               "vault_notes": [{"path": "04_Resources/N.md", "title": "N"}],
+                                               "graph": {"hubs": [{"path": "04_Resources/H.md", "title": "H"}]}}],
+                            "sectors": [{"id": "s1", "name": "Sector One"}]})
+    if "| A\\|B | Sector One |" not in detailed or "- [Post](https://x.example/p) — Hacker News, 2026-09-29, score 120" not in detailed \
+            or "In your vault: [[04_Resources/N|N]]" not in detailed or "Connects to: [[04_Resources/H|H]]" not in detailed:
+        problems.append("note: a signal's detail carries its items, notes and hubs, and a pipe in a name cannot break the table")
 
     tags = [{"tag": "claude", "this_week": 9, "baseline": None, "ratio": None, "rising": False, "new": False},
             {"tag": "podcast", "this_week": 5, "baseline": None, "ratio": None, "rising": False, "new": False}]

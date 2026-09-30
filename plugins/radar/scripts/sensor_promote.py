@@ -13,8 +13,8 @@ ingest turns them into captures, every item from SENSOR_PROMOTE_SOURCES that is 
 4. strong for some interest (T_STRONG), the feed's own bar.
 
 published within the window (a newly added feed's week of back catalogue is not news), in that
-order, strongest first within each, at most SENSOR_PROMOTE_PER_DAY a day and never past
-what is left of `promote_per_day`. An item already promoted, held by the vault, or another outlet's
+order, strongest first within each, within the run's `promote_per_run` (the feed gets what the
+sensors leave). An item already promoted, held by the vault, or another outlet's
 copy of a story promoted in the window (title-word overlap, SENSOR_SAME_STORY) is skipped. Every
 save is one `promoted.jsonl` row with `via: sensors`; its Reader note starts `[radar sensors`
 (a `radar/…` tag would become an interest in the capture's `radar_interests`). A Reader failure never fails the scan.
@@ -112,15 +112,12 @@ def rank(it: dict, t: dict[str, float], watch: re.Pattern[str] | None = None) ->
     return None
 
 
-def promote(out: Path, t: dict[str, float], run_date: str, per_day: int, location: str,
+def promote(out: Path, t: dict[str, float], run_date: str, budget: int, location: str,
             known: set[str], names: dict[str, str], watch: list[str] | None = None) -> dict[str, Any]:
     from radar import append_jsonl, read_jsonl  # lazy: radar imports this module
 
     ledger = out / "promoted.jsonl"
     done = read_jsonl(ledger)
-    today_n = sum(1 for r in done if r.get("date") == run_date)
-    sensors_n = sum(1 for r in done if r.get("date") == run_date and r.get("via") == "sensors")
-    budget = min(per_day - today_n, policy.SENSOR_PROMOTE_PER_DAY - sensors_n)
     if budget <= 0:
         return {}
     since = (date.fromisoformat(run_date) - timedelta(days=policy.SENSOR_PROMOTE_WINDOW_DAYS)).isoformat()

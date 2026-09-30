@@ -7,7 +7,7 @@ interests_note: 03_Areas/Trend Radar Profile.md
 todoist_project_id: ""
 todoist_sections: Doing,Next,Waiting
 promote_location: later
-promote_per_day: 5
+promote_per_run: 5
 watch: OpenAI,GPT,ChatGPT,Codex,Anthropic,Claude,Google,Gemini,DeepMind,Meta,Muse,Llama,Mistral,xAI,Grok,DeepSeek,Qwen
 kagi_weekly_budget_usd: 1.00
 tavily_weekly_budget_usd: 2.00
@@ -42,9 +42,11 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
   of the task's `What:` line as gloss. Off while the id is empty or `td` is missing.
 - **`promote_location`** — where `scan --promote` moves a strong item: `later` (default),
   `shortlist` or `new`.
-- **`promote_per_day`** — how many strong items a day `scan --promote` and `gaps --promote` together
-  may save into Reader (default 5), sensor items included (at most 50 of them a day, `policy.py`). The 0.80 "strong" bar is policy and stays in code; this is
-  the owner's appetite. Raise it when the daily radar note shows strong items the cap discarded.
+- **`promote_per_run`** — how many strong items one `scan --promote` (or one `gaps --promote`) may
+  save into Reader (default 5), sensor items first and the feed's strong items after them. The
+  budget starts fresh every run, so a busy morning cannot starve the rest of the day. The 0.80
+  "strong" bar is policy and stays in code; this is the owner's appetite. Raise it when the daily
+  radar note shows strong items the cap discarded.
 - **`watch`** — the labs and models you follow by name (comma list or YAML list). A sensor item
   (Hacker News, Kagi News, the sensor RSS feeds) whose title names one and that the judge rates
   worth reading (0.70) is saved into Reader like a strong feed item, and the Signal Radar's web

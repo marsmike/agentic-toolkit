@@ -4,6 +4,25 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The promotion budget is per run, not per day (radar 3.6.0, obsidian 3.4.4).** On 2026-09-30
+  the day's 50 promotions were used up by 07:11 UTC, most of them in one early-morning burst of lab
+  news. The three pipeline runs after that judged 60 feed items and promoted none. Each item that
+  went over the cap was archived, not kept for the next day. The profile key is now
+  `promote_per_run` (default 5). It limits one `scan --promote` or one `gaps --promote`: sensor
+  items go first and the feed's strong items get what is left. Earlier promotions that day no
+  longer count, and `SENSOR_PROMOTE_PER_DAY` is gone. **Breaking:** rename `promote_per_day` in
+  your radar profile; the old key is no longer read.
+  [earned: 2026-09-30, the owner saw no new notes after 09:11 CEST despite a full day of feeds]
+
+- **The Signal Radar note holds the whole radar.** The Obsidian note showed 8 of 12 early warnings,
+  8 of 22 blind spots and 15 of 60 signals. Everything else, including each signal's items and the
+  interest trend, was only on the HTML page and the claude.ai artifact. The note now lists every
+  early warning and blind spot, puts every signal in one table, and adds the interest trend, the
+  sources and a detail section per signal: its score parts, every item with origin, date and
+  score, the vault notes that hold it, and the hubs it connects to. Tags and growing hubs stay
+  capped at 8, as on the page.
+  [earned: 2026-09-30, the owner asked for the radar in the vault, not only online]
+
 - **Lab news is distilled first; open outlets beat paywalls (obsidian 3.4.3, radar 3.5.1).** The
   first pipeline run on radar 3.5.0 promoted DevDay, GPT-6.1 Sol and Dots, and merged a Sonnet 5.5
   news copy into its note. But it distilled 11 music-plugin and tool captures while those three

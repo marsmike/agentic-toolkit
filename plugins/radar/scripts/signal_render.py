@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any
 
 TEMPLATE = Path(__file__).resolve().parent / "signal_template.html"
-MD_TOP_SIGNALS = 15
-MD_TOP_EARLY = 8
-MD_TOP_BLIND = 8
+# The note is the full radar, not a teaser for the page: every signal, early warning and blind
+# spot, each signal's detail. [earned: 2026-09-30 — the note showed 8 of 12 early warnings and
+# 15 of 60 signals; the rest lived only online] Tags and hubs stay capped, as on the page.
 MD_TOP_TAGS = 8
 
 STAGE_LABEL = {"new": "New", "rising": "Rising", "hot": "Hot", "steady": "Steady", "fading": "Fading"}
@@ -473,9 +473,10 @@ def _vs_baseline(row: dict) -> str:
 
 
 def render_md(data: dict[str, Any]) -> str:
-    """The Obsidian note: the scope and momentum SVGs embedded at the top, then early warnings, top
-    signals, blind spots, rising vault tags, and a link to the full page. Notes and hubs are
-    wikilinks (same vault); outside items are plain markdown links (someone else's URL)."""
+    """The Obsidian note, the whole radar: the scope and momentum SVGs embedded at the top, then
+    every early warning, every blind spot, every signal in one table, rising vault tags, growing
+    hubs, the interest trend, the sources, and each signal's detail (its items, notes and hubs).
+    Notes and hubs are wikilinks (same vault); outside items are plain markdown links."""
     generated = str(data.get("generated") or "")
     created = generated[:10] or "1970-01-01"
     generated_label = _generated_label(data)
@@ -483,13 +484,11 @@ def render_md(data: dict[str, Any]) -> str:
     early_keys = data.get("early") or []
     blind_keys = data.get("blind_spots") or []
     by_key = {b["key"]: b for b in blips}
-    top = blips[:MD_TOP_SIGNALS]
-    # The counts are the whole lists; the sections show the first few and say so. [earned:
-    # 2026-09-29 — the note said "8 not yet in the vault" beside a signal.json of 29]
+    # The counts are the whole lists. [earned: 2026-09-29 — the note said "8 not yet in the
+    # vault" beside a signal.json of 29]
     all_early = [by_key[k] for k in early_keys if k in by_key]
     all_blind = [by_key[k] for k in blind_keys if k in by_key]
-    early = all_early[:MD_TOP_EARLY]
-    blind = all_blind[:MD_TOP_BLIND]
+    sector_names = {sec.get("id"): sec.get("name") or sec.get("id") for sec in data.get("sectors") or []}
     vault = data.get("vault") or {}
     has_baseline = (vault.get("baseline") or {}).get("ready", True)
     tags = vault.get("tags") or []
@@ -510,7 +509,7 @@ def render_md(data: dict[str, Any]) -> str:
         "# Signal Radar",
         "",
         # Obsidian hands an .html file to the system browser: say so before the click does.
-        f"Generated {generated_label}. Full page, opens in your browser: [[Signal-Radar.html|Signal Radar (HTML)]].",
+        f"Generated {generated_label}. Interactive page, opens in your browser: [[Signal-Radar.html|Signal Radar (HTML)]].",
         "",
         f"![[{SCOPE_SVG}]]",
         "",
@@ -519,27 +518,16 @@ def render_md(data: dict[str, Any]) -> str:
     ]
 
     lines += ["## Early warning", ""]
-    if len(all_early) > len(early):
-        lines += [f"Showing {len(early)} of {len(all_early)}; the full page lists them all.", ""]
-    if early:
-        for b in early:
+    if all_early:
+        for b in all_early:
             lines.append(_blip_line(b))
     else:
         lines.append("Nothing crossed the early-warning bar this run.")
     lines.append("")
 
-    lines += [f"## Top {len(top)} signals", ""]
-    if top:
-        for b in top:
-            lines.append(_blip_line(b))
-    else:
-        lines.append("No signals scored this run.")
-    lines.append("")
-
-    shown = f" — showing {len(blind)} of {len(all_blind)}, the full page lists them all" if len(all_blind) > len(blind) else ""
-    lines += ["## Not in your vault yet", "", f"Strong outside, no anchor in the graph yet{shown}:", ""]
-    if blind:
-        for b in blind:
+    lines += ["## Not in your vault yet", "", "Strong outside, no anchor in the graph yet:", ""]
+    if all_blind:
+        for b in all_blind:
             link = _top_link(b)
             tail = f" — {link}" if link else ""
             lines.append(f"- **{b['name']}** — strength {b.get('strength', 0)}, {_fam_badges(b.get('families') or [])}{tail}")
@@ -576,5 +564,80 @@ def render_md(data: dict[str, Any]) -> str:
             lines.append(f"- {_wikilink(h['path'], h['title'])}{mark} — {_vs_baseline(h)}{tail}")
         lines.append("")
 
-    lines.append("The full page adds the sortable table, each signal's detail and the interest trend.")
+    lines += [f"## All {len(blips)} signals", ""]
+    if blips:
+        lines += ["| # | Signal | Sector | Stage | Strength | Mentions | Sources | First seen | Notes |",
+                  "|---|---|---|---|---|---|---|---|---|"]
+        for n, b in enumerate(blips, 1):
+            lines.append(f"| {n} | {_cell(b['name'])} | {_cell(sector_names.get(b.get('sector'), b.get('sector') or ''))} | "
+                         f"{STAGE_LABEL.get(b.get('stage'), b.get('stage', ''))} | {b.get('strength', 0)} | "
+                         f"{b.get('mentions', 0)} | {_cell(_fam_badges(b.get('families') or []))} | "
+                         f"{b.get('first_seen') or ''} | {b.get('in_vault', 0)} |")
+    else:
+        lines.append("No signals scored this run.")
+    lines.append("")
+
+    trend = data.get("interest_trend") or []
+    if trend:
+        lines += ["## Interest trend", "", "| Interest | Scanned | Strong | Baseline | |", "|---|---|---|---|---|"]
+        for t in trend:
+            base = t.get("baseline")
+            lines.append(f"| {_cell(t.get('name') or t.get('id', ''))} | {t.get('scanned', 0)} | {t.get('strong', 0)} | "
+                         f"{'' if base is None else f'{base:.1%}'} | {'rising' if t.get('rising') else ''} |")
+        lines.append("")
+
+    sources = data.get("sources") or []
+    if sources:
+        lines += ["## Sources", "", f"Window: {data.get('window_days', '?')} days.", "",
+                  "| Source | Status | Items | |", "|---|---|---|---|"]
+        for src in sources:
+            lines.append(f"| {_cell(src.get('label') or src.get('family', ''))} | {src.get('status', '')} | "
+                         f"{src.get('items', 0)} | {_cell(src.get('detail') or '')} |")
+        lines.append("")
+
+    if blips:
+        lines += ["## Signal detail", ""]
+        for b in blips:
+            lines += _blip_detail(b, sector_names)
     return "\n".join(lines) + "\n"
+
+
+def _cell(value: Any) -> str:
+    """A markdown table cell: a pipe would end it, a newline would end the row."""
+    return str(value).replace("|", "\\|").replace("\n", " ").strip()
+
+
+def _blip_detail(b: dict[str, Any], sector_names: dict[str, str]) -> list[str]:
+    """One signal in full: what it scored and why, every item that mentioned it, every note that
+    holds it and the hubs it connects to."""
+    stage = STAGE_LABEL.get(b.get("stage"), b.get("stage", ""))
+    sector = sector_names.get(b.get("sector"), b.get("sector") or "")
+    head = [f"{stage}, strength {b.get('strength', 0)}"]
+    if sector:
+        head.append(sector)
+    head.append(f"{b.get('mentions', 0)} mentions ({b.get('recent', 0)} recent)")
+    if b.get("first_seen"):
+        head.append(f"first seen {b['first_seen']}")
+    out = [f"### {b['name']}", "", " · ".join(head), ""]
+    parts = b.get("parts") or {}
+    if parts:
+        out += ["Score: " + ", ".join(f"{k} {v:.2f}" for k, v in parts.items()), ""]
+    items = b.get("items") or []
+    if items:
+        for it in items:
+            title = (it.get("title") or b["name"]).replace("\n", " ").replace("[", "(").replace("]", ")").strip()
+            url = it.get("url") or ""
+            link = f"[{title}]({url})" if url else title
+            meta = ", ".join(str(x) for x in (it.get("origin"), it.get("at"),
+                                              f"score {it['score']:.0f}" if isinstance(it.get("score"), (int, float)) else None) if x)
+            out.append(f"- {link}" + (f" — {meta}" if meta else ""))
+        out.append("")
+    notes = b.get("vault_notes") or []
+    if notes:
+        out.append("In your vault: " + ", ".join(_wikilink(n["path"], n["title"]) for n in notes if n.get("path")))
+        out.append("")
+    hubs = (b.get("graph") or {}).get("hubs") or []
+    if hubs:
+        out.append("Connects to: " + ", ".join(_wikilink(h["path"], h["title"]) for h in hubs if h.get("path")))
+        out.append("")
+    return out
