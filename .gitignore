@@ -32,3 +32,7 @@ plugins/*/skill-evals/results/
 
 # The real vault, cloned by scripts/cloud-vault.sh open; never committed here
 .vault-live/
+
+# Session records the memory hook writes when TOOLKIT_VAULT is unset: the owner's own sessions,
+# never published from this public repo (their home is the real vault)
+vault/00_Memory/sessions/
