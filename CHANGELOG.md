@@ -4,6 +4,12 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Reader's "Unnamed Document" is no title (readwise 3.1.5).** Reader names a page it could not
+  title "Unnamed Document" rather than leaving the title empty, so the radar-headline fallback (3.1.3)
+  never ran: three radar promotions in a week reached the ledger, the run report and the Atlas as
+  "Unnamed Document" while `promoted.jsonl` held their headlines. Reader's placeholder names
+  (`PLACEHOLDER_TITLES`) now count as no title. [earned: 2026-10-01, the 10:10 UTC run]
+
 - **CI green again: the Atlas finds the routines snapshot without a fixed path depth (obsidian
   3.7.7).** `atlas_build.py` set `ROUTINES = Path(__file__).resolve().parents[3] / …` at import. CI's
   `pipeline_run` eval runs the generators from `/tmp/<dir>/`, where on Linux `parents[3]` does not

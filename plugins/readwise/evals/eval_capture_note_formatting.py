@@ -84,6 +84,12 @@ def run(vault: Path) -> dict:
         after = set(dlq.glob("*.md")) if dlq.is_dir() else set()
         if not tp or "Headline-the-radar-saw" not in tp.name or after - before:
             problems.append(f"an untitled radar promotion takes the ledger's title, no DLQ; got {tp and tp.name}, {len(after - before)} DLQ")
+        # Reader's placeholder name counts as no title [earned: 2026-10-01]
+        (radar_dir / "promoted.jsonl").write_text((radar_dir / "promoted.jsonl").read_text(encoding="utf-8") + json.dumps(
+            {"canonical": "x.example/u", "id": "unnamed1", "date": "2031-01-01", "title": "Plugin launch headline"}) + "\n", encoding="utf-8")
+        tu, _ = bc.write_capture(sandbox_vault, {**fixture, "id": "unnamed1", "title": "Unnamed Document"})
+        if not tu or "Plugin-launch-headline" not in tu.name:
+            problems.append(f"Reader's 'Unnamed Document' must yield to the radar's headline; got {tu and tu.name}")
         bc.write_capture(sandbox_vault, {**fixture, "id": "notitle2", "title": ""})
         if not any("notitle2" in q.name for q in dlq.glob("*.md")):
             problems.append("an untitled item the radar never promoted still gets its DLQ note")

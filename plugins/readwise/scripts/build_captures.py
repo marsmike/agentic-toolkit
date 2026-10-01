@@ -125,6 +125,12 @@ def _tweet_title(title: str, html: str) -> str:
     return plain[: at + len(want)] if 0 < at <= 40 else title
 
 
+# Reader's own names for a page it could not title: as good as none, so the radar's headline wins.
+# [earned: 2026-10-01 — "Unnamed Document" reached the ledger, the run report and the Atlas three
+# times in a week, its headline in promoted.jsonl all along]
+PLACEHOLDER_TITLES = {"unnamed document", "untitled", "untitled document"}
+
+
 def _radar_title(vault: Path, doc_id: str) -> str:
     """The title the radar saw when it promoted this document (`00_Memory/radar/promoted.jsonl`,
     matched by id): Reader leaves a paywalled or consent-walled page untitled, and the radar already
@@ -165,7 +171,8 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
 
     category = item.get("category") or "article"
     label = CATEGORY_LABEL.get(category, category.capitalize())
-    title_raw = (item.get("title") or "").strip() or _radar_title(vault, doc_id)
+    title_raw = (item.get("title") or "").strip()
+    title_raw = (title_raw if title_raw.casefold() not in PLACEHOLDER_TITLES else "") or _radar_title(vault, doc_id)
     if category == "tweet":
         title_raw = _tweet_title(title_raw, item.get("html_content") or "")
     title = title_raw or "(untitled)"
