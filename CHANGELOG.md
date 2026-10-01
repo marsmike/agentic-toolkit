@@ -30,8 +30,8 @@ Every release entry links the change to the research or the dated failure that m
   [earned: 2026-10-01, Signal Radar 2026-10-01 04:15 UTC: jeff (HOT, 70), Machines, Scope, Sift,
   Chinese, ClaudeAI as blips; Muse/Sol/Astra/Gemini 4 beside their qualified names]
 
-- **An Other-sector bare word is checked with disambiguating context too, not silently skipped or
-  asked with none (radar 3.10.0).** `check_candidates` added a one-word name's sector as web-check
+- **An Other-sector bare word an interest stands behind is checked with that interest as context
+  (radar 3.10.0).** `check_candidates` added a one-word name's sector as web-check
   context only when the sector was not `None`/`"other"` — the function's own comment already
   documented why that is backwards: an unsectored name is often exactly what the web check exists
   to corroborate or dismiss, and a bare ambiguous name needs disambiguating context *more*, not
@@ -39,11 +39,11 @@ Every release entry links the change to the research or the dated failure that m
   real mention never earned a sector (`assign_sectors` wants a second mention or a name match,
   neither of which one mention gives it), so it was asked bare and five unrelated people named
   Jeff came back as a second, third, fourth, fifth and sixth source — strength 70, stage HOT.
-  `check_candidates` now checks a new/rising name whatever its sector, and falls back to its
-  single best-scoring judged interest (if any mention cleared `_interest_weights`' own 0.5 bar)
-  when there is no real sector to name; a name with no judged interest at all still gets no
-  manufactured context. [earned: 2026-10-01, Signal Radar 2026-10-01 04:15 UTC: jeff, HOT,
-  strength 70, one real mention plus five unrelated Tavily namesakes]
+  `check_candidates` now also checks an Other-sector name when its single best-scoring judged
+  interest cleared `_interest_weights`' own 0.5 bar, and asks it with that interest as context; an
+  Other-sector name with no judged interest at all ("Delhi", "Netherlands") still gets no check,
+  as the 2026-09-30 budget rule wanted. [earned: 2026-10-01, Signal Radar 2026-10-01 04:15 UTC:
+  jeff, HOT, strength 70, one real mention plus five unrelated Tavily namesakes]
 - **The Atlas opens its landscape with a topic map (obsidian 3.7.4).** Domains are the large nodes
   (size: notes), each domain's leading topic tags orbit it, and a tag that several domains share sits
   between them, so the map shows which topics bridge which domains; the domains whose notes link

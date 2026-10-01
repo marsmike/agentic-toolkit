@@ -13,10 +13,10 @@
                 carried (below LAB_RSS_MIN_P) are never saved; `Metadata` does not match the watched name `Meta`
 3. budget     — at most the run's budget, however many were promoted earlier that day (the budget
                 is per run); a second run saves nothing new; a Reader failure is reported, not raised
-4. check      — the web check spends on a new/rising name whatever its sector, asks watched names
-                first, and gives a one-word name disambiguating context: its sector's name, or
-                (Other has none of its own) its best-judged interest when one cleared the judge's
-                bar — never a manufactured context for a name with no judged interest at all
+4. check      — the web check spends on a new/rising name in a sector, or in Other when a judged
+                interest stands behind it (never an Other name with none: "Delhi"), asks watched
+                names first, and gives a one-word name disambiguating context: its sector's name, or
+                its best-judged interest when one cleared the judge's bar
 5. google     — a Google News link is saved as the publisher's URL, its ledger row keeps the Google
                 link (a later run skips it without resolving it again); one that cannot be resolved
                 is never saved and is counted; `gnews` reads an old-format id from its payload and
@@ -163,8 +163,8 @@ def run(vault: Path) -> dict:
              blip("Traktor", "music"), blip("GPT-6.1 Sol", "frontier", families=2), blip("Ember-1", "frontier")],
             {"music": "Music Production & DJing", "frontier": "Frontier Models & Labs"}, WATCH)
         by = {c["name"]: c for c in cands}
-        if set(by) != {"jeff", "Delhi", "Traktor", "GPT-6.1 Sol", "Ember-1"}:
-            problems.append(f"phase 4: a new/rising name is checked whatever its sector, got {sorted(by)}")
+        if set(by) != {"jeff", "Traktor", "GPT-6.1 Sol", "Ember-1"}:
+            problems.append(f"phase 4: a new/rising name is checked in a sector or with a judged interest, never Delhi; got {sorted(by)}")
         if not by.get("GPT-6.1 Sol", {}).get("watched") or by.get("Ember-1", {}).get("watched"):
             problems.append("phase 4: a watched name is marked watched, another is not")
         if by.get("Traktor", {}).get("context") != "Music Production DJing" or by.get("Ember-1", {}).get("context"):
@@ -172,9 +172,6 @@ def run(vault: Path) -> dict:
         if by.get("jeff", {}).get("context") != "Frontier Models Labs":
             problems.append(f"phase 4: an Other-sector one-word name still gets its best-judged interest as "
                             f"context, got {by.get('jeff')}")
-        if by.get("Delhi", {}).get("context"):
-            problems.append(f"phase 4: a name with no judged interest gets no manufactured context, "
-                            f"got {by.get('Delhi')}")
         asked = []
         signal_radar._name_check(out, cands, NOW, "tavily", "signal-tavily.jsonl",
                                  lambda name, context="": asked.append(name) or [])

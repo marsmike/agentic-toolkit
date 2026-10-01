@@ -625,9 +625,9 @@ def _profile_watch(vault: Path) -> list[str]:
 
 
 def check_candidates(blips: list[dict], names: dict[str, str], watch: list[str]) -> list[dict]:
-    """What the web check may spend its CHECKS_PER_DAY on: new or rising things, Other sector
-    included — unsectored is not evidence a thing is not real, it is often exactly what the web
-    check exists to help corroborate or dismiss. A one-word name without a digit ("Traktor",
+    """What the web check may spend its CHECKS_PER_DAY on: new or rising things in a sector, and an
+    Other-sector one whose mentions a judged interest stands behind (unsectored is not evidence a
+    thing is not real); an Other-sector name with no interest at all is skipped. A one-word name without a digit ("Traktor",
     "Muse", "jeff") is asked with disambiguating context beside it — its sector's name when it has
     a real one, else its single best-scoring judged interest if any mention cleared the judge's
     own bar (`_interest_weights`' 0.5) even without the two-mention support `assign_sectors` wants
@@ -646,6 +646,11 @@ def check_candidates(blips: list[dict], names: dict[str, str], watch: list[str])
             top_id, top_p = next(iter(b["_interests"].most_common(1)), (None, 0))
             if top_p >= 0.5:
                 sector_name = names.get(top_id, "")
+        if not sector_name:
+            # an Other-sector name no interest stands behind ("Delhi", "Netherlands") is not worth
+            # one of the day's checks: its hits are unrelated and would count as a second source
+            # [earned: 2026-09-30, three of six checks; kept 2026-10-01 when "jeff" got its context]
+            continue
         context = re.sub(r"[^\w ]+", " ", sector_name).split() if ambiguous else []
         out.append({**b, "watched": bool(pattern and pattern.search(b["name"])), "context": " ".join(context)})
     return out
