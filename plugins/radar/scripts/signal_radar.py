@@ -52,6 +52,10 @@ MAX_BLIPS = 60
 MAX_SECTORS = 6
 MIN_RELEVANCE = 0.35     # a judged thing below this for every interest is not the owner's business
 BLIND_SPOT_STRENGTH = 30
+# A blind spot is the owner's business: a thing an interest's sector holds, or an unsectored one the
+# judge scored this relevant. [earned: 2026-10-01 — "Delhi", "Netherlands", "Ukraine", "Pac-Man" and
+# "White House" were blind spots, and Now.md and the morning push said "Not in your vault: … Delhi"]
+BLIND_SPOT_OTHER_RELEVANCE = 0.6
 CHECKS_PER_DAY = 6
 # Weights of the strength parts; they sum to 1.
 WEIGHTS = {"breadth": 0.25, "velocity": 0.20, "engagement": 0.20, "relevance": 0.10, "volume": 0.15, "vault": 0.10}
@@ -688,6 +692,13 @@ def _early_eligible(b: dict) -> bool:
     return b["parts"]["relevance"] >= EARLY_OTHER_MIN_RELEVANCE or max(support.values(), default=0) >= EARLY_OTHER_MIN_SOURCES
 
 
+def blind_spot(b: dict) -> bool:
+    """Strong, anchored by no note, and the owner's business: in an interest's sector, or unsectored
+    with relevance of at least BLIND_SPOT_OTHER_RELEVANCE."""
+    return (b["strength"] >= BLIND_SPOT_STRENGTH and b["in_vault"] == 0
+            and (b.get("sector") != "other" or b["parts"].get("relevance", 0) >= BLIND_SPOT_OTHER_RELEVANCE))
+
+
 def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[str, Any]:
     today = now.date()
     since = (today - timedelta(days=RECENT_DAYS + BASELINE_DAYS)).isoformat()
@@ -764,7 +775,7 @@ def build(vault: Path, out: Path, now: datetime, check: bool = False) -> dict[st
         "sectors": sectors,
         "blips": blips,
         "early": early,
-        "blind_spots": [b["key"] for b in blips if b["strength"] >= BLIND_SPOT_STRENGTH and b["in_vault"] == 0],
+        "blind_spots": [b["key"] for b in blips if blind_spot(b)],
         "vault": {k: v for k, v in pulse.items() if k != "mentions"},
         "graph": graph_section,
         "interest_trend": sorted(({"id": iid, "name": names.get(iid) or pretty_id(iid), "scanned": t["scanned"], "strong": t["strong"],

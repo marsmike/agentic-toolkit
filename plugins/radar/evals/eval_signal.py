@@ -533,6 +533,11 @@ def run(vault: Path) -> dict:
                 or set(z["families"]) != {"hn", "rss"} or z["mentions"] != 2:
             problems.append(f"early: zither should be new, early and a blind spot from hn+rss, got {z and (z['stage'], z['families'])} "
                             f"early={data['early']} blind={data['blind_spots']}")
+        # a blind spot is the owner's business: sectored, or unsectored but relevant [earned: 2026-10-01]
+        spot = lambda sector, rel: signal_radar.blind_spot({"strength": 50, "in_vault": 0, "sector": sector, "parts": {"relevance": rel}})  # noqa: E731
+        if not spot("frontier-models-labs", 0.54) or spot("other", 0.37) or not spot("other", 0.74) \
+                or signal_radar.blind_spot({"strength": 50, "in_vault": 2, "sector": "frontier", "parts": {"relevance": 0.9}}):
+            problems.append("blind: a sectored or relevant unsectored thing no note has is a blind spot; 'Delhi' (other, 0.37) is not")
         if any(k.startswith("boringbench") for k in blips):
             problems.append("filters: an irrelevant arXiv item must not become a blip")
         g = blips.get("grimoire2")

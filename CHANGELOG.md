@@ -4,6 +4,14 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A blind spot is the owner's business (radar 3.10.1).** Any blip at strength 30 that no note
+  anchored was a blind spot, so world news the sensors carried ("Delhi", "Netherlands", "Ukraine",
+  "Pac-Man", "White House") stood beside Anthropic IPO on Now.md and in the morning push ("Not in
+  your vault: … Delhi"). A blind spot now also needs a sector (an interest the judge tied it to) or,
+  unsectored, relevance of at least 0.6 (`BLIND_SPOT_OTHER_RELEVANCE`, `blind_spot()`). On the
+  2026-10-01 data: 28 blind spots → about 17, Anthropic IPO and Windows 11 kept, the world news gone;
+  hexstrike-ai (0.50) goes too, a known borderline. [earned: 2026-10-01]
+
 - **The run report links the Atlas and the Signal Radar, and counts kinds as the maps group them
   (obsidian 3.7.5).** The three published pages did not point at each other; the report's header now
   links the Atlas and the Signal Radar once their URLs are set. Its Kinds panel counted 89 raw kind
