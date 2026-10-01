@@ -66,7 +66,9 @@ built from those fields only:
   then "Not in your vault: " + the `name` of up to 3 blips from `blind_spots`; then the
   `signal_artifact_url` from $TOOLKIT_VAULT/Config/toolkit/radar.md, if it is set.
 If `early`, the hot blips and `blind_spots` are all empty, send nothing. At any other hour send no
-notification at all.
+notification at all. The brief is the only push this routine ever sends: never a second one to say
+the run finished, succeeded or failed (FINISH is a message, not a notification). [earned:
+2026-10-01 — the 05:28 run sent the brief, then a "run complete" push on top]
 
 FINISH with one line: per source from step 1 (`hn ok 113, hf ok 78, github partial, …`), step 2's
 blips / early / blind_spots, the commit and whether it was pushed, whether the page was published,
