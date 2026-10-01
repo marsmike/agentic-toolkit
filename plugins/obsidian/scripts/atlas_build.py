@@ -81,7 +81,7 @@ DOMAIN_TOPICS = 8
 PROCESS_TAG = re.compile(r"^(readwise|radar|via|source|status|kind|type|project|portfolio|email|service|vehicle)(/|$)"
                          r"|^w\d{2}-\d{4}$|^(wiki|area|book|bookmark|tools|research|clip|newsletter|capture|inbox|"
                          r"tweet|article|video|paper|repo|podcast|moc|index|draft|todo)$")
-ROUTINES = Path(__file__).resolve().parents[3] / "cloud" / "routines.json"
+ROUTINES = Path("cloud") / "routines.json"  # in the toolkit checkout that holds this script
 ROLE = {"pipeline.prompt.md": "pipeline", "signal.prompt.md": "radar", "watchdog.prompt.md": "watchdog"}
 RADAR_SUBJECT = re.compile(r"^signal radar \d{4}-\d{2}-\d{2} \d{2}:\d{2}: (.+)$")
 SYNC_SUBJECT = re.compile(r"^vault: hand edits .*\(sync\)$")
@@ -267,12 +267,25 @@ def routine_runs(vault: Path, since: str, runs: list[dict]) -> list[dict]:
     return sorted((r for r in out if r["at"]), key=lambda r: r["at"])
 
 
+def routines_file(script: Path | None = None) -> Path | None:
+    """`cloud/routines.json` in the toolkit checkout holding this script, looked for upwards: never
+    a fixed depth, which a copy of the script elsewhere does not have. [earned: 2026-10-01 — CI's
+    pipeline_run eval runs the generators from /tmp/<dir>/, where `parents[3]` raised IndexError]"""
+    for parent in (script or Path(__file__)).resolve().parents:
+        if (parent / ROUTINES).is_file():
+            return parent / ROUTINES
+    return None
+
+
 def routines() -> list[dict]:
     """The cloud routines as the toolkit's `cloud/routines.json` snapshot names them: role (by the
     prompt file each one runs), name, schedule (cron, UTC) and model. Without the snapshot (scripts
     copied out of the repo), none: the page then draws the machine without its schedule."""
+    path = routines_file()
+    if path is None:
+        return []
     try:
-        rows = json.loads(ROUTINES.read_text(encoding="utf-8")).get("routines") or []
+        rows = json.loads(path.read_text(encoding="utf-8")).get("routines") or []
     except (OSError, ValueError, AttributeError):
         return []
     return [{"role": ROLE.get(Path(str(r.get("prompt_file") or "")).name, "other"), "name": str(r.get("name") or ""),

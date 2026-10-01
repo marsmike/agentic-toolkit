@@ -180,6 +180,10 @@ def run(vault: Path) -> dict:
         if len(pipe) != 1 or pipe[0]["n"] != 3 or [r["s"] for r in radar] != ["60 signals, 12 early, 20 blind spots"] or len(syncs) != 1:
             problems.append(f"runs: one pipeline run (3 distilled), one radar run, one sync, no hand edit; got {runs}")
 
+        # a copy of the script outside the repo (CI runs the generators from /tmp/<dir>/) finds no
+        # snapshot and says so, rather than failing on a fixed path depth [earned: 2026-10-01]
+        if atlas_build.routines_file(Path("/tmp/eval-copy/atlas_build.py")) is not None:
+            problems.append("runs: a script outside the toolkit checkout must find no routines snapshot")
         roles = {r["role"]: r for r in data.get("routines", [])}
         if set(roles) != {"pipeline", "radar", "watchdog"} or not all(re.match(r"^\d+ \S+ \* \* \*$", r["cron"]) for r in roles.values()):
             problems.append(f"runs: the three routines with their daily schedules come from cloud/routines.json, got {data.get('routines')}")

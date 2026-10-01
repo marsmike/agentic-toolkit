@@ -4,6 +4,15 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **CI green again: the Atlas finds the routines snapshot without a fixed path depth (obsidian
+  3.7.7).** `atlas_build.py` set `ROUTINES = Path(__file__).resolve().parents[3] / …` at import. CI's
+  `pipeline_run` eval runs the generators from `/tmp/<dir>/`, where on Linux `parents[3]` does not
+  exist: `IndexError: 3`, reported as a second `build_failed` beside the eval's own failing
+  `map_build`, and the evals job failed on every push from 3.7.1 (bcfd60a) to 3.7.6. macOS resolves
+  `/tmp` to `/private/tmp`, one level deeper, so the local runs passed. `routines_file()` now looks
+  upwards for `cloud/routines.json` and finds none outside a checkout. The same class of bug was
+  earned once before (vault_utils.py, 2026-09-28). [earned: 2026-10-01, CI run 36822324842]
+
 - **The Atlas opens on now on a phone (obsidian 3.7.6).** The routines chart and the topic map are
   drawn at their true size and scroll sideways on a narrow screen; the chart now opens on its right
   end (now) instead of the range's first day, with its row labels in a column that stays put, and
