@@ -13,7 +13,7 @@ vault's own notes never decide the outcome.
                spelling of the address) and their domains; minutes from ingest to retirement
 3. runs      — pipeline runs from the ledger with their counts; a `signal radar …` commit is a
                radar run with its numbers; a `(sync)` hand-edit commit is a sync; a plain hand
-               edit is no run
+               edit is no run; the three cloud routines' daily schedules from `cloud/routines.json`
 4. funnel    — the radar's day counts: judged, worth, strong, promoted
 5. safe      — a title holding `</script><script>` cannot close the data element: the page has
                exactly two script elements and the payload parses back to the same data
@@ -177,6 +177,10 @@ def run(vault: Path) -> dict:
         syncs = [r for r in runs if r["r"] == "sync"]
         if len(pipe) != 1 or pipe[0]["n"] != 3 or [r["s"] for r in radar] != ["60 signals, 12 early, 20 blind spots"] or len(syncs) != 1:
             problems.append(f"runs: one pipeline run (3 distilled), one radar run, one sync, no hand edit; got {runs}")
+
+        roles = {r["role"]: r for r in data.get("routines", [])}
+        if set(roles) != {"pipeline", "radar", "watchdog"} or not all(re.match(r"^\d+ \S+ \* \* \*$", r["cron"]) for r in roles.values()):
+            problems.append(f"runs: the three routines with their daily schedules come from cloud/routines.json, got {data.get('routines')}")
 
         day = data["funnel"].get(today.isoformat())
         if day != {"judged": 6, "worth": 4, "strong": 3, "promoted": 1}:

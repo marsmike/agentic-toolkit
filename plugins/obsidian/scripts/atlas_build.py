@@ -79,6 +79,8 @@ DOMAIN_TOPICS = 8
 PROCESS_TAG = re.compile(r"^(readwise|radar|via|source|status|kind|type|project|portfolio|email|service|vehicle)(/|$)"
                          r"|^w\d{2}-\d{4}$|^(wiki|area|book|bookmark|tools|research|clip|newsletter|capture|inbox|"
                          r"tweet|article|video|paper|repo|podcast|moc|index|draft|todo)$")
+ROUTINES = Path(__file__).resolve().parents[3] / "cloud" / "routines.json"
+ROLE = {"pipeline.prompt.md": "pipeline", "signal.prompt.md": "radar", "watchdog.prompt.md": "watchdog"}
 RADAR_SUBJECT = re.compile(r"^signal radar \d{4}-\d{2}-\d{2} \d{2}:\d{2}: (.+)$")
 SYNC_SUBJECT = re.compile(r"^vault: hand edits .*\(sync\)$")
 
@@ -262,6 +264,19 @@ def routine_runs(vault: Path, since: str, runs: list[dict]) -> list[dict]:
     return sorted((r for r in out if r["at"]), key=lambda r: r["at"])
 
 
+def routines() -> list[dict]:
+    """The cloud routines as the toolkit's `cloud/routines.json` snapshot names them: role (by the
+    prompt file each one runs), name, schedule (cron, UTC) and model. Without the snapshot (scripts
+    copied out of the repo), none: the page then draws the machine without its schedule."""
+    try:
+        rows = json.loads(ROUTINES.read_text(encoding="utf-8")).get("routines") or []
+    except (OSError, ValueError, AttributeError):
+        return []
+    return [{"role": ROLE.get(Path(str(r.get("prompt_file") or "")).name, "other"), "name": str(r.get("name") or ""),
+             "cron": str(r.get("cron_expression") or ""), "model": str(r.get("model") or "")}
+            for r in rows if isinstance(r, dict)]
+
+
 def build(vault: Path, today: date) -> dict:
     since = (today - timedelta(days=WINDOW_DAYS - 1)).isoformat()
     notes, days, titles, topics, cited = collect(vault)
@@ -277,6 +292,7 @@ def build(vault: Path, today: date) -> dict:
         "inflow": inflow(vault, since, runs, land["note_domains"], _resolver(notes), cited),
         "funnel": radar.get("days", {}),
         "runs": routine_runs(vault, since, runs),
+        "routines": routines(),
     }
 
 

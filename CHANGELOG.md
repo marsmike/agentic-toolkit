@@ -4,6 +4,14 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Atlas draws the machine and its plan (obsidian 3.7.1).** A "How the machine runs" diagram
+  takes the sources, the three cloud routines (each with its schedule and model from
+  `cloud/routines.json`, its last run and its next one in the viewer's time), the vault on GitHub and
+  the owner's devices (the Mac sync, Obsidian). The routines chart now draws the planned runs:
+  ahead of now (today's range) as hollow rings, and a planned pipeline or radar run with no result
+  from 15 minutes before to 75 minutes after as a red ring, counted only from a routine's first run
+  in the data. `#today`, `#7d`, `#30d` and `#12w` open the page on that range.
+
 - **The Atlas: what the vault knows and how knowledge comes in, on one page (obsidian 3.7.0).**
   `atlas_build.py` writes `Atlas.html` at the end of every run (a generator in `end`, restored
   like the others if it fails), and the routine publishes it to `atlas_artifact_url`. One range
