@@ -131,6 +131,28 @@ def read_config(vault: Path) -> dict[str, MapConfig]:
     return configs
 
 
+def kind_families(configs: dict[str, MapConfig]) -> dict[str, str]:
+    """kind → the `maps.md` section that names it ("research-finding" → "Research"); where two maps
+    name a kind differently, the first wins. What a page shows instead of the raw `kind` values,
+    which drift (`research` beside `research-finding`, `tool` beside `tool-landmark`)."""
+    out: dict[str, str] = {}
+    for cfg in configs.values():
+        for name, kinds in cfg.sections:
+            for k in kinds:
+                out.setdefault(k, name)
+    return out
+
+
+def kind_family(kind: object, rel: str, families: dict[str, str]) -> str:
+    """A note's kind as the maps group it; a project or area note without one (they need none)
+    says so instead of "unsorted". [earned: 2026-10-01 — 89 kind values on the report and the
+    Atlas, 157 project and area notes "unsorted"]"""
+    k = str(kind or "").strip().casefold()
+    if not k:
+        return {"02_Projects": "project notes", "03_Areas": "area notes"}.get(rel.split("/", 1)[0], "no kind")
+    return families.get(k, k)
+
+
 def collect(vault: Path) -> list[Note]:
     notes = []
     for path in discover_notes(vault):

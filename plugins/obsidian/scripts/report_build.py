@@ -33,6 +33,8 @@ from urllib.parse import quote, urlsplit
 
 import imports_log
 import radar_ledger
+from map_build import kind_families, kind_family, read_config
+from now_build import _signal_artifact_url
 from vault_utils import (
     atomic_write,
     contained,
@@ -101,9 +103,12 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
 .hero { background: var(--hero); color: var(--hero-ink); border-radius: 18px; padding: clamp(20px, 4vw, 36px);
   background-image: linear-gradient(var(--hero-grid) 1px, transparent 1px), linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px);
   background-size: 28px 28px; display: grid; gap: 18px; position: relative; overflow: hidden; }
-.brand { display: flex; align-items: center; gap: 10px; font: 600 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--hero-mute); }
+.brand { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font: 600 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--hero-mute); }
 .brand svg { flex: none; }
 .brand b { color: var(--hero-ink); font-weight: 600; }
+.brand .navs { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; }
+.brand .navs a { color: var(--hero-ink); text-decoration: none; text-transform: none; letter-spacing: 0; }
+.brand .navs a:hover { text-decoration: underline; }
 .hero h1 { font: 800 clamp(30px, 6.4vw, 60px)/1.02 var(--display); letter-spacing: -.02em; margin: 0; max-width: 18ch; text-wrap: balance; }
 .hero h1 em { font-style: normal; color: var(--run); }
 .hero p { margin: 0; color: var(--hero-mute); max-width: 62ch; }
@@ -243,13 +248,14 @@ def vault_stats(vault: Path, notes: list[tuple[str, dict]], runs: list[dict], to
     kinds: Counter = Counter()
     para: Counter = Counter()
     since = (today - timedelta(days=DAYS - 1)).isoformat()
+    families = kind_families(read_config(vault))
     for rel, fm in notes:
         para[rel.split("/", 1)[0]] += 1
         tags = fm.get("tags") or []
         for t in tags if isinstance(tags, list) else []:
             if isinstance(t, str) and t.startswith("domain/"):
                 domains[t.removeprefix("domain/")] += 1
-        kinds[str(fm.get("kind") or "unsorted")] += 1
+        kinds[kind_family(fm.get("kind"), rel, families)] += 1
         day = distilled_when(fm)[:10]  # the daily note's and the Dashboard's rule, never an estimated date
         if day and day >= since:
             per_day[day] += 1
@@ -446,6 +452,14 @@ def _headline(latest: dict | None, shown: dict | None, last: dict) -> tuple[str,
     return ("First run. <em>Nothing logged yet.</em>", "The next run with new clippings fills this page.")
 
 
+def _nav(vault: Path) -> str:
+    """The other published pages, beside the brand: the Atlas and the Signal Radar, when set."""
+    links = [(name, url) for name, url in (("Atlas", str(profile_value(vault, "atlas_artifact_url") or "")),
+                                            ("Signal Radar", _signal_artifact_url(vault))) if url.startswith("https://")]
+    return ('<span class="navs">' + "".join(f'<a href="{escape(url)}">{escape(name)} ↗</a>' for name, url in links)
+            + "</span>") if links else ""
+
+
 def render(vault: Path, run: str | None = None, today: date | None = None) -> str:
     today = today or date.today()
     runs = imports_log.resolved(vault)
@@ -473,7 +487,7 @@ def render(vault: Path, run: str | None = None, today: date | None = None) -> st
     big = [("hot", stats["notes"], "notes in the vault"), ("", stats["week"], "distilled in the last 7 days"),
            ("", stats["imported"], "clippings logged"), ("", stats["media"], "images kept")]
     out = [f"<title>Last Pipeline Run</title>{BASE}{STYLE}<div class=\"wrap\">",
-           f'<header class="hero"><div class="brand">{MARK}<span><b>agentic-toolkit</b> · run report · The Void</span></div>',
+           f'<header class="hero"><div class="brand">{MARK}<span><b>agentic-toolkit</b> · run report · The Void</span>{_nav(vault)}</div>',
            f"<h1>{h1}</h1><p>{sub}</p>",
            f'<p>Run <b class="num">{escape(when)} UTC</b> · {last.get("distilled", 0)} distilled, {last.get("dropped", 0)} dropped, '
            f'{last.get("failed", 0)} failed · <b class="num">{stats["inbox"]}</b> waiting in the inbox</p>',

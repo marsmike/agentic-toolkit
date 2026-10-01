@@ -12,6 +12,8 @@
               show the same number of runs and the same distilled count (one ledger, one `day_totals`)
 9. why      — a dropped item says why from its `retired` row; the footer names the ledger's window and
               "history shallow" when the run's row says so; the run line carries the row's own counts
+10. nav     — the Atlas and the Signal Radar are linked once set; kinds come as the maps group them, an
+              area note without one counted as an area note, never "unsorted"
 """
 from __future__ import annotations
 
@@ -144,6 +146,21 @@ def run(vault: Path) -> dict:
             problems.append("freshness: the footer must name the ledger's window and a shallow history")
         if f"Run <b class=\"num\">{day} 09:00 UTC</b> · 2 distilled, 0 dropped, 1 failed" not in page:
             problems.append("counts: the run line must carry the run row's own counts")
+        # 10. nav and kinds: the Atlas and the Signal Radar are linked once set; kinds come as the maps
+        # group them, and an area note without one is an "area note", never "unsorted"
+        cfg = sandbox / "Config" / "toolkit"
+        cfg.mkdir(parents=True, exist_ok=True)
+        (cfg / "radar.md").write_text("---\nsignal_artifact_url: https://claude.ai/artifact/SIGNAL\n---\n", encoding="utf-8")
+        prof = cfg / "obsidian.md"
+        text = prof.read_text(encoding="utf-8") if prof.is_file() else "---\n---\n"
+        prof.write_text(text.replace("---\n", "---\natlas_artifact_url: https://claude.ai/artifact/ATLAS\n", 1), encoding="utf-8")
+        (sandbox / "03_Areas").mkdir(exist_ok=True)
+        (sandbox / "03_Areas" / "Eval-Report-Area.md").write_text("---\ndescription: an area\n---\n# Area\n", encoding="utf-8")
+        page2 = report_build.render(sandbox)
+        if '<a href="https://claude.ai/artifact/ATLAS">Atlas ↗</a>' not in page2 or "https://claude.ai/artifact/SIGNAL" not in page2:
+            problems.append("nav: the report must link the Atlas and the Signal Radar once their URLs are set")
+        if ">unsorted<" in page2 or "area notes" not in page2:
+            problems.append("kinds: an area note without a kind is an 'area note', never 'unsorted'")
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)

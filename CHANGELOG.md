@@ -4,6 +4,14 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The run report links the Atlas and the Signal Radar, and counts kinds as the maps group them
+  (obsidian 3.7.5).** The three published pages did not point at each other; the report's header now
+  links the Atlas and the Signal Radar once their URLs are set. Its Kinds panel counted 89 raw kind
+  values and 157 "unsorted" project and area notes, which need no kind; `map_build.kind_families`
+  and `kind_family` now give the report and the Atlas one grouping, the `Config/toolkit/maps.md`
+  sections (Research 353, Concepts 282, Tools 230 on the owner's vault), with "project notes" and
+  "area notes" for the rest. [earned: 2026-10-01 quality audit]
+
 - **A fragment folds into its qualified name instead of a generic word absorbing whatever shares
   its ending, and a bare word names nothing on its own (radar 3.10.0).** `merge_variants` merged
   key `k` into `base` on pure string containment — `base` a prefix or suffix of `k`, `base`'s
