@@ -60,10 +60,15 @@ def interest_names(vault: Path) -> dict[str, str]:
 
 
 def canon(iid: str, names: dict[str, str]) -> str:
-    """A raw interest id as it should be aggregated: itself when it's a live interest or an epic,
-    else `RETIRED_ID` — a ledger row scored days or months ago against an interest the owner has
-    since renamed or dropped must not resurrect that old slug as if it were still current."""
-    return iid if iid in names or iid.startswith("epic-") else RETIRED_ID
+    """A raw interest id as it should be aggregated: an epic as itself; a live interest, or one of
+    its `aliases:`, as the interest's current id (the slug of its current name); anything else as
+    `RETIRED_ID` — a ledger row scored days or months ago against an interest the owner has since
+    renamed or dropped must not resurrect that old slug as if it were still current. [earned:
+    2026-10-01 — an alias kept its own slug, so What's moving listed "Local AI & Self-Hosted
+    Inference" twice (122/70/32 and 42/18/3), and three other renamed interests likewise]"""
+    if iid.startswith("epic-"):
+        return iid
+    return slug(names[iid]) if iid in names else RETIRED_ID
 
 
 _GH_RELEASE_RE = re.compile(r"^https?://github\.com/([^/]+)/([^/]+)/releases(?:/tag/.+)?/?(?:\?.*)?$")
@@ -108,6 +113,7 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
         rising      interest ids whose strong count this week beats RISING_FACTOR × the median of
                     the earlier weeks with data (at least RISING_MIN_WEEKS), and RISING_MIN_STRONG
         counts      judged, worth, strong, promoted over the window; and for `today`
+        days        day → {judged, worth, strong, promoted}, oldest first (the Atlas's funnel)
     """
     names = interest_names(vault)
     promoted_keys = {r.get("canonical") for r in read_jsonl(vault / PROMOTED)}
@@ -117,6 +123,7 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
     items: list[dict] = []
     counts = Counter()
     today_counts = Counter()
+    per_day: dict[str, Counter] = defaultdict(Counter)
     for r in read_jsonl(vault / STATE):
         day = str(r.get("run") or r.get("saved_at") or "")[:10]
         if not re.match(r"\d{4}-\d{2}-\d{2}$", day) or day < since:
@@ -136,6 +143,8 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
         counts["worth"] += bool(worth)
         counts["strong"] += bool(strong)
         counts["promoted"] += promoted
+        for key, hit in (("judged", True), ("worth", bool(worth)), ("strong", bool(strong)), ("promoted", promoted)):
+            per_day[day][key] += hit
         if day == today.isoformat():
             today_counts["judged"] += 1
             today_counts["strong"] += bool(strong)
@@ -176,4 +185,5 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
                  for iid in sorted(per, key=lambda i: (-per[i]["strong"], -per[i]["worth"], i))}
     return {"items": items, "interests": interests, "weeks": {w: dict(weeks[w]) for w in week_labels},
             "rising": sorted(rising, key=lambda i: -weeks[this_week].get(i, 0)),
-            "counts": dict(counts), "today": dict(today_counts), "promoted_today": promoted_days.get(today.isoformat(), 0)}
+            "counts": dict(counts), "today": dict(today_counts), "promoted_today": promoted_days.get(today.isoformat(), 0),
+            "days": {d: {k: per_day[d].get(k, 0) for k in ("judged", "worth", "strong", "promoted")} for d in sorted(per_day)}}

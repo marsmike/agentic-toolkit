@@ -384,9 +384,16 @@ def _item_html(vault: Path, it: dict, gh: str, by_source: dict[str, list[str]], 
         meta.append(escape(f"ingested {format_ts(ingested_at, estimated=ingested_est)}"))
     # `became` (the manifest line's own free text) never carries "Distilled <date>." any more
     # (imports_log.fate() strips it — that sentence only ever repeated this one clean meta line).
-    distilled_at, distilled_est = _distilled(vault, f, found)
-    if distilled_at and f["status"] == "distilled":
-        meta.append(escape(f"distilled {format_ts(distilled_at, estimated=distilled_est)}"))
+    # An enrichment changed a note written earlier: its `distilled_at` is that day, not this item's,
+    # so it shows when the capture was retired into it. [earned: 2026-10-01 — "ingested 2026-10-01
+    # 03:59 UTC · distilled 2026-09-30 19:10 UTC" on an L1 enrichment]
+    if f["status"] == "distilled" and f.get("kind") == "enriched":
+        if f.get("retired_at"):
+            meta.append(escape(f"enriched {format_ts(str(f['retired_at']))}"))
+    else:
+        distilled_at, distilled_est = _distilled(vault, f, found)
+        if distilled_at and f["status"] == "distilled":
+            meta.append(escape(f"distilled {format_ts(distilled_at, estimated=distilled_est)}"))
 
     # A drop or duplicate retired with its reason as a field says why in so many words; an older one's
     # manifest prose (its `detail`) already carries it. [earned: 2026-09-29, owner's request]

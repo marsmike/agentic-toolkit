@@ -150,6 +150,17 @@ def run(vault: Path) -> dict:
             problems.append(f"radar: a retired interest id must collapse into one 'Retired interests' bucket: {r3['interests'].get('retired')}")
         if any(iid == "agent-memory-old" for w in r3["weeks"].values() for iid in w):
             problems.append(f"radar: 'Strong per week' must not carry a raw retired id either: {r3['weeks']}")
+        # an alias (an old name the interest was renamed from) counts under the interest's current id,
+        # never as a second entry with the same name [earned: 2026-10-01 — What's moving listed four
+        # renamed interests twice]
+        interests = sandbox / "03_Areas" / "Eval-Interests.md"
+        interests.write_text("---\ninterests:\n- name: Agent Memory\n  gloss: x\n  aliases:\n  - Old Memory\n---\n", encoding="utf-8")
+        (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in [*rows, {**retired_row, "p": {"old-memory": 0.9},
+                                        "worth": ["old-memory"], "strong": ["old-memory"]}]), encoding="utf-8")
+        r4 = radar_ledger.load(sandbox, (today - timedelta(days=83)).isoformat(), today)
+        if "old-memory" in r4["interests"] or r4["interests"].get("agent-memory", {}).get("strong") != 2:
+            problems.append(f"radar: an alias must count under the current interest, got {r4['interests']}")
+        interests.write_text("---\ninterests:\n- name: Agent Memory\n  gloss: x\n---\n", encoding="utf-8")
         (rd / "state.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
         run = next((r for r in data["runs"] if r.get("run") == "2026-09-25 13:06"), {})
         fates = [(i["title"], i["status"], i["notes"]) for i in run.get("items", [])]

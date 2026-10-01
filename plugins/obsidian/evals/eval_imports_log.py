@@ -98,6 +98,14 @@ def run(vault: Path) -> dict:
             problems.append(f"retired: a drop's reason must come from its row, got {fates.get('why')}")
         if "reason" in fates.get("drop", {}):
             problems.append("retired: a legacy manifest-only drop has no structured reason")
+        if (fates.get("new", {}).get("retired_at"), fates.get("why", {}).get("retired_at")) != ("2026-09-25T15:50:00Z", "2026-09-25T15:51:00Z"):
+            problems.append(f"retired: a fate carries when its capture was retired, got {fates.get('new')}")
+        # an enrichment shows when it enriched, never the note's own first distilled_at [earned: 2026-10-01]
+        enriched = {"title": "E", "category": "article", "fate": {"status": "distilled", "kind": "enriched", "notes": [],
+                    "detail": "L1", "distilled_at": "2026-09-01T00:00:00Z", "retired_at": "2026-09-25T15:50:00Z"}}
+        line = imports_log._bullet(sandbox, enriched)
+        if "(enriched 2026-09-25 15:50" not in line or "distilled 2026-09-01" in line:
+            problems.append(f"page: an enrichment must show when it enriched, not the note's first distillation: {line}")
 
         page = imports_log.render(sandbox)
         if ("- **Article** [Title drop](https://example.org/drop) — clip, ingested 2026-09-24 08:00 UTC → dropped: "

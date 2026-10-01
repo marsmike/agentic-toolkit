@@ -88,7 +88,7 @@ model name (rule 3); every emitted block carries all three.
 Scripts that run without a human in the loop write to three places only: `00_Memory/` (their own
 state, reports and dead-letter notes), `01_Capture/` (material for distill, which reaches
 `02_`–`04_` only through the human checkpoint), and generated navigation (`Index.md`, `Now.md`,
-`Maps/`, `Boards/Pipeline.md`, `Imports.md`, `Dashboard.html`, `Log.md` — see
+`Maps/`, `Boards/Pipeline.md`, `Imports.md`, `Dashboard.html`, `Atlas.html`, `Log.md` — see
 `contract/VAULT_SCHEMA.md`'s "Generated navigation"). The third sink is written only by the
 pipeline's `end` step through its listed generators (`pipeline_run.py`'s `GENERATORS`), is never
 hand-edited, and is fully regenerated each run — it is navigation over active content, not active

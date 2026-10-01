@@ -221,14 +221,18 @@ def _distilled_at(vault: Path, notes: list[str]) -> dict:
 
 
 def _retired_fate(vault: Path, row: dict) -> dict:
-    """{status, kind, notes, detail, reason} from a `retired` row: fields, not prose."""
+    """{status, kind, notes, detail, reason, retired_at} from a `retired` row: fields, not prose.
+    `retired_at` is when this capture was retired: for an enrichment the note's own `distilled_at`
+    is the day the note was first written, often long before. [earned: 2026-10-01 — the run report
+    showed an enrichment "ingested 03:59 UTC · distilled 2026-09-30 19:10 UTC"]"""
     kind, reason = str(row.get("kind") or ""), str(row.get("reason") or "")
+    at = {"retired_at": str(row["at"])} if row.get("at") else {}
     if kind in ("dropped", "duplicate"):
         detail = f"a second save of {row['duplicate_of']}" if row.get("duplicate_of") else reason
-        return {"status": kind, "kind": kind, "notes": [], "detail": detail[:300], "reason": reason}
+        return {"status": kind, "kind": kind, "notes": [], "detail": detail[:300], "reason": reason, **at}
     notes = [str(n).removesuffix(".md") for n in row.get("notes") or []]
     detail = re.sub(r"\s+", " ", _plain(str(row.get("what") or ""))).strip()
-    return {"status": "distilled", "kind": kind, "notes": notes, "detail": detail[:300], **_distilled_at(vault, notes)}
+    return {"status": "distilled", "kind": kind, "notes": notes, "detail": detail[:300], **_distilled_at(vault, notes), **at}
 
 
 def fate(vault: Path, item: dict, manifests: dict[str, str], attempts: dict[str, int],
@@ -293,7 +297,11 @@ def _bullet(vault: Path, it: dict) -> str:
     where = {"distilled": f"→ {notes}" if notes else f"→ {f['detail']}", "known": f"→ already in the vault: {notes}",
              "dropped": f"→ dropped: {f['detail']}", "duplicate": f"→ duplicate ({f['detail']})",
              "waiting": f"→ waiting ({f['detail']})", "archived": f"→ archived ({f['detail']})", "missing": f"→ ⚠ **missing**: {f['detail']}"}[f["status"]]
-    if f["status"] == "distilled" and f.get("distilled_at"):
+    if f["status"] == "distilled" and f.get("kind") == "enriched":
+        # the note's own `distilled_at` is the day it was first written; this item enriched it now
+        if f.get("retired_at"):
+            where += f" (enriched {format_ts(str(f['retired_at']))})"
+    elif f["status"] == "distilled" and f.get("distilled_at"):
         da = str(f["distilled_at"])
         where += f" (distilled {format_ts(da, estimated=bool(f.get('distilled_at_estimated')) or len(da) < 16)})"
     return f"- **{kind}** {head}" + (f" — {', '.join(extras)}" if extras else "") + f" {where}"

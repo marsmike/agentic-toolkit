@@ -4,6 +4,31 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Atlas: what the vault knows and how knowledge comes in, on one page (obsidian 3.7.0).**
+  `atlas_build.py` writes `Atlas.html` at the end of every run (a generator in `end`, restored
+  like the others if it fails), and the routine publishes it to `atlas_artifact_url`. One range
+  (today, 7 / 30 days, 12 weeks) scopes both halves. *Inflow*: every imported item flows from its
+  source (an own save, a radar feed pick, sensor news, a gap search, a newsletter) through what it
+  became (a new note, an enriched one, dropped, waiting) to the domains it fed; the radar's funnel
+  (judged, worth reading, strong, promoted); the routines' runs on one time axis (the pipeline's
+  from the ledger, the Signal Radar's and the Mac sync's from their commits, pauses over 4.5 h
+  marked); and the median time from ingest to note. *Landscape*: a treemap of every active note by
+  domain, colored by what the range added; each domain's most-linked and newest notes, kinds and
+  topic tags; the topic tags on the move; a matrix of the links between domains; twelve weeks of
+  growth per domain. An item whose fate names no note (manifest prose from before the ledger
+  carried notes: 151 of 342) takes the notes that cite its source, so the flow reaches its
+  domains. Now.md and the dashboard link the page. Owner's goal for 2026-10-01: "visualized the
+  topics and process very good"; Now.md, the dashboard and the run report each showed one slice.
+- **What's moving lists a renamed interest once (obsidian 3.7.0).** `radar_ledger.canon()` kept an
+  alias's own slug, so rows scored before a rename and after it landed under two ids with one
+  name: "Local AI & Self-Hosted Inference" showed 122/70/32 and 42/18/3, and three other renamed
+  interests likewise. An alias now counts under the interest's current id. `radar_ledger.load`
+  also returns its counts per day (`days`), the Atlas's funnel.
+- **An enrichment shows when it enriched (obsidian 3.7.0).** The run report and Imports.md printed
+  an enriched note's own `distilled_at`, the day it was first written: "ingested 2026-10-01 03:59
+  UTC · distilled 2026-09-30 19:10 UTC". A fate now carries `retired_at` from its `retired` row,
+  and an enrichment shows "enriched <retired_at>". [earned: 2026-10-01, review of the day's runs]
+
 - **The Mac syncs the vault itself while the pipeline runs in the cloud (obsidian 3.6.0).**
   `pipeline_run.py sync` commits hand edits through the pipeline's secret scan, pulls the
   upstream (`--rebase`; a conflict is aborted with a DLQ note) and pushes, under the run lock.

@@ -162,6 +162,7 @@ def build(vault: Path, today: date) -> dict:
     return {"vault": vault.name, "built": utc_timestamp(),
             "today": today.isoformat(), "window": WINDOW_DAYS, "inbox": inbox(vault),
             "report": str(profile_value(vault, "report_artifact_url") or ""),
+            "atlas": str(profile_value(vault, "atlas_artifact_url") or ""),
             "notes": notes(vault, since), "runs": runs(vault, since, imports),
             "missing": sum(1 for r in imports for it in r["items"] if it["fate"]["status"] == "missing"),
             "radar": radar_ledger.load(vault, since, today)}

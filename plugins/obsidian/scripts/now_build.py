@@ -319,7 +319,8 @@ def _nav(vault: Path, today: date) -> list[str]:
         if (vault / rel).is_file():
             nav.append(_link(vault, rel, title))
     for title, url in (("Signal Radar (claude.ai)", _signal_artifact_url(vault)),
-                       ("Last run report (claude.ai)", str(profile_value(vault, "report_artifact_url") or ""))):
+                       ("Last run report (claude.ai)", str(profile_value(vault, "report_artifact_url") or "")),
+                       ("Atlas (claude.ai)", str(profile_value(vault, "atlas_artifact_url") or ""))):
         if url:
             nav.append(f"[{title}]({url})")
     return nav

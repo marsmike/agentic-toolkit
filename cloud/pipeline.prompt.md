@@ -89,8 +89,12 @@ REPORT (only after `end` returned status "ok" with no `build_failed`): if $TOOLK
 creates a second artifact) and never publish a failed or refused run, or one whose generators failed (`build_failed`: the
 report would be the previous run's). If the Artifact tool is not
 available, skip it and say so.
+ATLAS, under the same conditions: if obsidian.md sets `atlas_artifact_url`, publish
+$TOOLKIT_VAULT/Atlas.html there the same way (read, then publish with `url`). If the publish is
+refused because a newer version exists, read it once more and publish your file again: the page is
+generated, nothing on it is written by hand, and this run's data is the newest.
 
 FINISH with one line: end's "summary" exactly as printed (it counts what came in from the
-ledgers), the commit, whether it was pushed, whether the report was published, and the engines
+ledgers), the commit, whether it was pushed, whether the report and the Atlas were published, and the engines
 (`farsight <version>, gaiafield <version>` from `uv run --locked unisphere engines status`, or
 "engines missing"). No number the scripts did not print.

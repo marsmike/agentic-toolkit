@@ -191,6 +191,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
       <div class="sub" id="sub"></div>
     </div>
     <a class="navlink theme" id="reportlink" href="#" hidden>Last run report</a>
+    <a class="navlink" id="atlaslink" href="#" hidden>Atlas</a>
     <a class="navlink" id="importslink" href="#">Imports log</a>
     <div class="seg" role="group" aria-label="Theme">
       <button data-theme-set="light" aria-pressed="false">Light</button>
@@ -606,6 +607,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 34px; text-align: cen
   document.getElementById("sub").textContent = `${DATA.notes.length} note${DATA.notes.length === 1 ? "" : "s"} in ${DATA.window || 84} days · built ${fmtUTC(DATA.built)} by the pipeline`;
   document.getElementById("importslink").href = importsUrl("");
   if (safeUrl(DATA.report || "")) { const r = document.getElementById("reportlink"); r.href = DATA.report; r.target = "_blank"; r.rel = "noopener"; r.hidden = false; }
+  if (safeUrl(DATA.atlas || "")) { const a = document.getElementById("atlaslink"); a.href = DATA.atlas; a.target = "_blank"; a.rel = "noopener"; a.hidden = false; }
   if (DATA.missing) document.getElementById("alert").replaceChildren(el("div", {class: "alert"},
     el("b", {text: `⚠ ${DATA.missing} clipping${DATA.missing === 1 ? "" : "s"} missing`}),
     " — imported but in neither the inbox nor the archive. ", el("a", {href: importsUrl(""), text: "See Imports.md"})));

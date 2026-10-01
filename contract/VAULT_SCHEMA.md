@@ -47,6 +47,7 @@ not a note's inbound link.
 | `00_Memory/last-run-report.html` | `report_build.py` | The last run's ingestion report as an Artifact page (every import with its links, what it became, the notes written); the routine publishes it to `report_artifact_url` |
 | `00_Memory/radar/Signal-Radar.html`, `.md`, `Signal-Radar-scope.svg`, `Signal-Radar-momentum.svg`, `signal.json` | radar `radar.py signal` | What is taking off: named things across feeds, sensors, the vault and its graph, each with a signal strength; the routine publishes the page to `signal_artifact_url`; the note embeds the two SVGs, so Obsidian shows the same radar the browser page does |
 | `Dashboard.html` | `dashboard_build.py` | Twelve weeks of distilling for a browser: per day, by source, domain and kind, with the notes and the runs |
+| `Atlas.html` | `atlas_build.py` | The whole vault and the way in, for a browser: every imported item from its source through what it became to the domains it fed, the radar's funnel, the routines' runs; every active note by domain with its links, topics and growth. The routine publishes it to `atlas_artifact_url` |
 | `Log.md` | `log_vault.py` | One line per run |
 
 A map's title, intro and sections come from `Config/toolkit/maps.md`; everything else comes from
@@ -79,7 +80,7 @@ them holding still. Check whether an existing field fits before adding a new one
 | `created` | Note creation date | Most notes |
 | `enrichment_targets` | Notes/profiles to notify when this note is enriched | Opt-in |
 
-**Which date counts.** A note counts as distilled on a day only when it was distilled (`distilled_at` present or `status: distilled`) and the date is real: `distilled_at`, else `processed_date`, and never a value flagged `*_estimated` (a backfill stamped 1,096 notes) nor a `status: review` note that merely carries a `processed_date`. `vault_utils.distilled_when` is that rule; `now_build`, `daily_build`, `dashboard_build` and the report all use it, so a week's number is the same on every surface. Radar's rising-tag test uses the same idea plus a minimum baseline (at least 2 of the 4 earlier weeks and 20 notes), and says 'no baseline yet' until it has one.
+**Which date counts.** A note counts as distilled on a day only when it was distilled (`distilled_at` present or `status: distilled`) and the date is real: `distilled_at`, else `processed_date`, and never a value flagged `*_estimated` (a backfill stamped 1,096 notes) nor a `status: review` note that merely carries a `processed_date`. `vault_utils.distilled_when` is that rule; `now_build`, `daily_build`, `dashboard_build`, `atlas_build` and the report all use it, so a week's number is the same on every surface. Radar's rising-tag test uses the same idea plus a minimum baseline (at least 2 of the 4 earlier weeks and 20 notes), and says 'no baseline yet' until it has one.
 
 Going forward, `ingested_at`, `distilled_at` and `updated_at` are set deterministically in code — a writer
 script or a retirement step stamps `datetime.now(UTC)` at the moment it acts, never left to an

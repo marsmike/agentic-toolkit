@@ -93,6 +93,7 @@ GENERATORS = {  # script → the files it writes (a trailing / = every file dire
     "imports_log.py": ("Imports.md",),
     "report_build.py": ("00_Memory/last-run-report.html",),
     "dashboard_build.py": ("Dashboard.html",),
+    "atlas_build.py": ("Atlas.html",),
 }
 # A value that reads as a stand-in, never a real secret: <angle brackets>, an env-var reference
 # (`${VAR}`/`$VAR`), all-asterisks, or the word "changeme" — shared by the password and URL
