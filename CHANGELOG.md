@@ -4,6 +4,22 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Mac syncs the vault itself while the pipeline runs in the cloud (obsidian 3.6.0).**
+  `pipeline_run.py sync` commits hand edits through the pipeline's secret scan, pulls the
+  upstream (`--rebase`; a conflict is aborted with a DLQ note) and pushes, under the run lock.
+  `scripts/vault-sync.sh` runs it from launchd every 10 minutes, with Obsidian open or closed. It
+  logs one line a run and sends a macOS notification only for a conflict, a refused key or an hour
+  of failures. Git authenticates with `GH_TOKEN` from `~/.env` through a helper that answers only
+  from that variable: every configured helper is reset first, so an unattended run never reaches
+  the Keychain. On 2026-10-01 nothing on the Mac pulled the cloud's commits. Obsidian Git's
+  intervals were never set and Obsidian was closed. The vault, and the devices Obsidian Sync
+  feeds from it, lagged the cloud until a session pulled by hand (the 01:08 and 04:05 UTC runs
+  arrived at 06:13 local), and hand edits reached GitHub only when a session committed them.
+  Also: `_push` carries a pull's `conflict` and `secrets` to its caller (`commit_paths`' retry
+  loop checked `conflict`, which never arrived), and `new_commits` counts the upstream's commits,
+  not a rebased hand edit. `cloud/README.md` and `references/scheduling.md` describe the job.
+  [earned: 2026-10-01, the day's monitoring of the cloud routines]
+
 - **A note that only got a backlink is retired with `--linked`, never given the capture's source
   (obsidian 3.5.3).** The distill skill said to name every changed note with `retire_capture.py
   --note` (since 3.4.0), and `--note` holds each note to `distill_check`, whose source-line gate

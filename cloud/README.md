@@ -189,7 +189,13 @@ dossier lost its graph; two identical DLQ notes and a watchdog push followed]
    for good (unload, then rename the plist so it does not load again at login):
    `launchctl unload ~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist && mv ~/Library/LaunchAgents/io.agentic-toolkit.pipeline.plist{,.disabled}`
    (`skills/pipeline/references/scheduling.md` describes it).
-2. **Obsidian Git takes over the Mac's sync.** The Mac pipeline used to commit hand edits and pull
-   from GitHub. With it off, set Obsidian Git to auto commit-and-sync every 10 minutes, pull on
-   startup, and pull before push. Otherwise the Mac copy falls behind the cloud's commits, and
-   Obsidian Sync spreads that stale copy to the other devices.
+2. **The sync job takes over the Mac's half of git.** The Mac pipeline used to commit hand edits
+   and pull from GitHub. With it off, launchd runs `scripts/vault-sync.sh` every 10 minutes
+   (`pipeline_run.py sync`: hand edits committed through the pipeline's secret scan, the cloud's
+   commits pulled, pushed; a conflict is aborted with a DLQ note and a macOS notification). It
+   runs with Obsidian closed, and git authenticates with `GH_TOKEN` from `~/.env`, never the
+   Keychain. The plist is in `skills/pipeline/references/scheduling.md`. In Obsidian Git keep
+   auto-commit **off** and pull on startup **on**: two committers on one checkout race each other.
+   Without a sync the Mac copy falls behind the cloud's commits, and Obsidian Sync spreads that
+   stale copy to the other devices. [earned: 2026-10-01 — Obsidian Git's intervals were never
+   set and Obsidian was often closed: the Mac pulled only when a session did it by hand]

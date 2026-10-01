@@ -50,6 +50,47 @@ so their commits arrive with the next run. The pipeline is the only committer on
 Obsidian Git, turn auto-commit **off**, pull on startup **on**, push manual. A conflict aborts the
 rebase and skips the run with a DLQ note; nothing is resolved by guessing.
 
+## The Mac while the pipeline runs in the cloud
+
+With the pipeline a cloud routine, nothing on the Mac pulls its commits or pushes hand edits
+unless something runs `pipeline_run.py sync` there: hand edits committed (the pipeline's secret
+scan), the upstream pulled (`--rebase`; a conflict aborted with a DLQ note), pushed, all under the
+run lock. `scripts/vault-sync.sh` wraps it for launchd: one log line per run, a macOS notification
+when it needs a human (a conflict, a refused key, an hour of failures), and git authenticated with
+`GH_TOKEN` from `~/.env` through a helper that never reaches the Keychain.
+[earned: 2026-10-01 — the Mac pulled only when a session did it by hand]
+
+`~/Library/LaunchAgents/io.agentic-toolkit.vault-sync.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>io.agentic-toolkit.vault-sync</string>
+  <key>ProgramArguments</key><array>
+    <string>/bin/zsh</string><string>-c</string>
+    <string>$HOME/Developer/agentic-toolkit/scripts/vault-sync.sh</string>
+  </array>
+  <key>EnvironmentVariables</key><dict>
+    <key>TOOLKIT_VAULT</key><string>/Users/YOU/Documents/YourVault</string>
+  </dict>
+  <key>StartInterval</key><integer>600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>/Users/YOU/Library/Logs/agentic-toolkit-vault-sync.log</string>
+  <key>StandardErrorPath</key><string>/Users/YOU/Library/Logs/agentic-toolkit-vault-sync.log</string>
+</dict></plist>
+```
+
+```bash
+launchctl load ~/Library/LaunchAgents/io.agentic-toolkit.vault-sync.plist     # start (and one run now)
+tail ~/Library/Logs/agentic-toolkit-vault-sync.log                            # one line per run
+launchctl unload ~/Library/LaunchAgents/io.agentic-toolkit.vault-sync.plist   # stop
+```
+
+One machine per vault: two checkouts that Obsidian Sync keeps alike would each commit the same
+hand edits.
+
 ## Reading a run
 
 - `Now.md`: this week's new and enriched notes, radar, stuck work and inbox (rebuilt every run).

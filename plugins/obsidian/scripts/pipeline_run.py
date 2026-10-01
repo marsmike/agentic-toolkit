@@ -5,6 +5,7 @@
     uv run scripts/pipeline_run.py queue [--batch N]      # after the sources ran: this run's captures
     uv run scripts/pipeline_run.py end --distilled N --dropped N [--failed CAPTURE ...]
     uv run scripts/pipeline_run.py commit --path 00_Memory/radar --message MSG   # a routine's own files only
+    uv run scripts/pipeline_run.py sync                   # hand edits in, upstream pulled, pushed (launchd, the Mac)
 
 `begin` takes the run lock (`00_Memory/pipeline.lock`, created atomically; a lock younger than
 LOCK_STALE_HOURS means another run is still going: status `busy`, do nothing). The lock is local
@@ -30,6 +31,11 @@ Log.md line, and releases the lock. If the vault is a git repository it commits 
 unattended run), then pulls and pushes when there is an upstream.
 Before any commit the staged diff is scanned for key-shaped strings; a hit refuses the commit and
 writes a DLQ note that names the file and the kind of key, never the value (status `refused`).
+
+`sync` is the other machine's half while the pipeline runs elsewhere: under the run lock it commits
+hand edits (same secret scan), pulls (`--rebase`; a conflict is aborted with a DLQ note) and pushes.
+Status `ok`, `busy` (a run holds the lock), `conflict`, `refused` (a key-shaped string) or `failed`
+(offline, no upstream). `scripts/vault-sync.sh` runs it from launchd.
 """
 from __future__ import annotations
 
@@ -460,15 +466,16 @@ def _rebase_in_progress(vault: Path) -> bool:
                for d in ("rebase-merge", "rebase-apply"))
 
 
-def _pull(vault: Path, now: datetime, sweep: bool = True) -> dict[str, Any]:
+def _pull(vault: Path, now: datetime, sweep: bool = True, message: str | None = None) -> dict[str, Any]:
     """Bring the upstream's commits in under the vault's own; hand edits are committed first, so
     nothing sits in a stash. A conflict is aborted and recorded, never resolved by guessing.
-    `sweep=False` (`commit`) commits nothing else: what it did not name is stashed around the pull."""
+    `sweep=False` (`commit`) commits nothing else: what it did not name is stashed around the pull.
+    `message` names the hand-edits commit (`sync` says it was not a pipeline run)."""
     if not _is_repo(vault) or not _has_upstream(vault):
         return {"pulled": False, "detail": "no git upstream"}
     local = {"commit": None, "secrets": []}
     if sweep:
-        local = _commit(vault, f"vault: hand edits before pipeline {now.strftime('%Y-%m-%d %H:%M')}", exclude=(LOCK.as_posix(),))
+        local = _commit(vault, message or f"vault: hand edits before pipeline {now.strftime('%Y-%m-%d %H:%M')}", exclude=(LOCK.as_posix(),))
     if local["secrets"]:
         return {"pulled": False, "secrets": local["secrets"], "detail": "hand edits hold a key-shaped string; see the DLQ"}
     before = _git(vault, "rev-parse", "HEAD").stdout.strip()
@@ -484,25 +491,55 @@ def _pull(vault: Path, now: datetime, sweep: bool = True) -> dict[str, Any]:
                            confidence="high")
             return {"pulled": False, "conflict": True, "detail": "pull conflict; rebase aborted, run skipped"}
         return {"pulled": False, "detail": "pull failed: " + (pull.stderr.strip().splitlines() or ["?"])[-1]}
-    after = _git(vault, "rev-parse", "HEAD").stdout.strip()
-    count = _git(vault, "rev-list", "--count", f"{before}..{after}").stdout.strip()
+    # The upstream's commits this checkout lacked, not before..HEAD: a rebased hand edit is a new
+    # sha and would count as arriving. [earned: 2026-10-01, the sync eval]
+    count = _git(vault, "rev-list", "--count", f"{before}..@{{upstream}}").stdout.strip()
     return {"pulled": True, "hand_edits": local["commit"], "new_commits": int(count) if count.isdigit() else 0}
 
 
-def _push(vault: Path, now: datetime, sweep: bool = True) -> dict[str, Any]:
+def _push(vault: Path, now: datetime, sweep: bool = True, message: str | None = None) -> dict[str, Any]:
     if not _has_upstream(vault):
         return {"pushed": False, "detail": "no git upstream"}
-    sync = _pull(vault, now, sweep)
+    sync = _pull(vault, now, sweep, message)
     if not sync.get("pulled"):
-        return {"pushed": False, "detail": sync["detail"]}
+        # A conflict or a refused key must reach the caller as such, not as a failed push to retry.
+        # [earned: 2026-10-01 — commit_paths' retry loop checked `conflict`, which never got here]
+        return {"pushed": False, "detail": sync["detail"],
+                **{k: sync[k] for k in ("conflict", "secrets") if sync.get(k)}}
+    sync_facts = {k: sync[k] for k in ("hand_edits", "new_commits") if sync.get(k)}
     # Push explicitly to the upstream (the remote `begin` pulled from), never where pushRemote or
     # pushDefault would send a bare `git push`. [earned: 2026-09-23, PR #24 review]
     upstream = _git(vault, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}").stdout.strip()
     remote, _, branch = upstream.partition("/")
     push = _git(vault, "push", "-q", remote, f"HEAD:{branch}")
     if push.returncode != 0:
-        return {"pushed": False, "detail": "push failed: " + (push.stderr.strip().splitlines() or ["?"])[-1]}
-    return {"pushed": True}
+        return {"pushed": False, "detail": "push failed: " + (push.stderr.strip().splitlines() or ["?"])[-1], **sync_facts}
+    return {"pushed": True, **sync_facts}
+
+
+def sync(vault: Path, now: datetime) -> dict[str, Any]:
+    """Commit hand edits, pull, push: the machine where the owner edits keeps its half of git as
+    the sync channel while the pipeline runs elsewhere (a cloud routine). launchd runs it every
+    few minutes (`scripts/vault-sync.sh`). It takes the run lock, so it never commits a local run's
+    half-written state; hand edits pass the same secret scan as a run's commit, and a conflict is
+    aborted with a DLQ note, never resolved by guessing. [earned: 2026-10-01 — with the pipeline in
+    the cloud nothing on the Mac pulled: its vault, and the devices Obsidian Sync feeds from it,
+    lagged the cloud's commits until a session pulled by hand, and hand edits reached GitHub only
+    when a session committed them]"""
+    if not _is_repo(vault) or not _has_upstream(vault):
+        return {"status": "failed", "detail": "the vault is not a git repository with an upstream"}
+    lock = vault / LOCK
+    token = f"sync-{os.getpid()}-{time.time_ns()}"
+    holder = _claim(lock, now, token)
+    if holder is not None:
+        return {"status": "busy", "detail": f"a run holds the lock since {holder.isoformat()}"}
+    try:
+        result = _push(vault, now, message=f"vault: hand edits {now.strftime('%Y-%m-%d %H:%M')} (sync)")
+    finally:
+        _release(lock, token)
+    status = ("ok" if result.get("pushed") else "conflict" if result.get("conflict")
+              else "refused" if result.get("secrets") else "failed")
+    return {"status": status, **result}
 
 
 def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "",
@@ -733,10 +770,12 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--path", action="append", required=True, help="vault-relative; repeat")
     c.add_argument("--message", required=True)
     c.add_argument("--json", action="store_true")
+    s = sub.add_parser("sync", help="commit hand edits, pull and push, under the run lock (the Mac, while the pipeline runs in the cloud)")
+    s.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     vault, now = require_vault(), datetime.now(UTC)
     if args.cmd != "queue" and example_vault(vault):
-        # begin/end/commit write and push; on the example vault they would commit into the toolkit.
+        # begin/end/commit/sync write and push; on the example vault they would commit into the toolkit.
         print(json.dumps({"status": "refused", "detail": f"{vault} is the toolkit's example vault, not the "
                           "owner's: set TOOLKIT_VAULT to the real vault"}, indent=2 if args.json else None))
         return 1
@@ -746,6 +785,8 @@ def main(argv: list[str] | None = None) -> int:
         result = queue(vault, args.batch)
     elif args.cmd == "commit":
         result = commit_paths(vault, now, args.path, args.message)
+    elif args.cmd == "sync":
+        result = sync(vault, now)
     else:
         result = end(vault, now, args.distilled, args.dropped, args.failed, args.note, args.token)
     print(json.dumps(result, indent=2 if args.json else None))

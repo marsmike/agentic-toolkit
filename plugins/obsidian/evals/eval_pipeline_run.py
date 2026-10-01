@@ -26,6 +26,11 @@
               (the staged file stays staged); a named file not written yet is skipped; a second
               refusal the same day stages and records nothing new (the first refusal's note
               already covers it) rather than failing on an empty commit
+10. sync    — on a clone of the upstream (the Mac): a held lock is `busy` and commits nothing; a hand
+              edit goes up as a "(sync)" commit while the cloud's commit comes down, and the lock is
+              released; a hand edit holding a key is `refused` (nothing committed or pushed, one DLQ
+              note); a conflict is `conflict` (rebase aborted, the edit kept, one DLQ note); no
+              upstream is `failed`
 6. build    — a generator that fails is reported in `build_failed` and gets one DLQ note across
               runs; its files go back exactly as before it ran (changed, added, deleted; a hand-made
               canvas beside a map untouched); the run still commits
@@ -166,6 +171,66 @@ def _sync_phase(pr, sandbox: Path) -> list[str]:
         problems.append(f"phase 5: a conflict skips the run without the lock and writes one DLQ note, got {r.get('status')}")
     if pr._rebase_in_progress(sandbox) or "mac version" not in (sandbox / "04_Resources" / "Eval-From-Cloud.md").read_text(encoding="utf-8"):
         problems.append("phase 5: the aborted rebase must leave the Mac's own edit in place")
+    return problems
+
+
+def _mac_sync_phase(pr, sandbox: Path) -> list[str]:
+    """`sync` on a fresh clone of phase 5's upstream (the Mac, while the pipeline runs in the cloud):
+    hand edits go up and the cloud's commits come down; a held lock, a key or a conflict stops it."""
+    problems = []
+    remote, other, mac = sandbox.parent / "remote.git", sandbox.parent / "other", sandbox.parent / "mac"
+    subprocess.run(["git", "clone", "-q", str(remote), str(mac)], check=False)
+    for args in (("config", "user.email", "mac@example.org"), ("config", "user.name", "mac")):
+        _git(mac, *args)
+    _git(other, "pull", "-q")
+    (other / "04_Resources" / "Eval-Cloud-Run.md").write_text("# from the cloud run\n", encoding="utf-8")
+    _git(other, "add", "-A")
+    _git(other, "commit", "-q", "-m", "pipeline: a cloud run")
+    _git(other, "push", "-q")
+    edit = mac / "04_Resources" / "Eval-Hand-Edit.md"
+    edit.write_text("# typed on the Mac\n", encoding="utf-8")
+
+    (mac / pr.LOCK).parent.mkdir(parents=True, exist_ok=True)
+    (mac / pr.LOCK).write_text(f"{NOW.isoformat()}\nsome-local-run\n", encoding="utf-8")
+    r = pr.sync(mac, NOW + timedelta(minutes=5))
+    if r.get("status") != "busy" or "Eval-Hand-Edit.md" not in _git(mac, "status", "--porcelain", "--untracked-files=all"):
+        problems.append(f"phase 10: a held lock makes sync busy and commits nothing, got {r}")
+    (mac / pr.LOCK).unlink()
+
+    r = pr.sync(mac, NOW + timedelta(minutes=10))
+    if r.get("status") != "ok" or not r.get("pushed") or not r.get("hand_edits") or r.get("new_commits") != 1:
+        problems.append(f"phase 10: sync must commit the hand edit, pull the cloud run and push, got {r}")
+    if _git(mac, "rev-parse", "HEAD") != _git(remote, "rev-parse", "HEAD") or not (mac / "04_Resources" / "Eval-Cloud-Run.md").is_file() \
+            or "(sync)" not in _git(remote, "log", "-1", "--format=%s"):
+        problems.append("phase 10: after sync the Mac and the upstream must hold the same commits, the hand edit named (sync)")
+    if (mac / pr.LOCK).exists():
+        problems.append("phase 10: sync must release the lock it took")
+
+    head = _git(remote, "rev-parse", "HEAD")
+    leak = mac / "04_Resources" / "Eval-Pasted-Key.md"
+    leak.write_text(f"key: {FAKE_KEY}\n", encoding="utf-8")
+    r = pr.sync(mac, NOW + timedelta(minutes=20))
+    if r.get("status") != "refused" or _git(remote, "rev-parse", "HEAD") != head or FAKE_KEY in _git(mac, "log", "-p", "-3") \
+            or not leak.is_file() or not list((mac / "00_Memory" / "dlq").glob("*pipeline-secret-refused*.md")):
+        problems.append(f"phase 10: a hand edit holding a key is refused: nothing committed or pushed, the file kept, one DLQ note; got {r}")
+    leak.unlink()
+    for note in (mac / "00_Memory" / "dlq").glob("*pipeline-secret-refused*.md"):
+        note.unlink()
+
+    _git(other, "pull", "-q")
+    for root, text in ((other, "# cloud rewrote it\n"), (mac, "# Mac rewrote it\n")):
+        (root / "04_Resources" / "Eval-Hand-Edit.md").write_text(text, encoding="utf-8")
+    _git(other, "commit", "-q", "-am", "pipeline: touches the same note")
+    _git(other, "push", "-q")
+    r = pr.sync(mac, NOW + timedelta(minutes=30))
+    if r.get("status") != "conflict" or pr._rebase_in_progress(mac) or "Mac rewrote it" not in edit.read_text(encoding="utf-8") \
+            or not list((mac / "00_Memory" / "dlq").glob("*pull-conflict*.md")) or (mac / pr.LOCK).exists():
+        problems.append(f"phase 10: a conflict is aborted (no rebase left, the Mac's edit kept, one DLQ note, no lock), got {r}")
+
+    _git(mac, "rebase", "--abort")
+    _git(mac, "branch", "--unset-upstream")
+    if pr.sync(mac, NOW + timedelta(minutes=40)).get("status") != "failed":
+        problems.append("phase 10: without an upstream sync fails")
     return problems
 
 
@@ -489,6 +554,8 @@ def run(vault: Path) -> dict:
             _git(sandbox, "-c", "protocol.file.allow=always", "clone", "-q", "--depth", "1", f"file://{sandbox}", str(clone))
             if not pr.is_shallow(clone):
                 problems.append("phase 9: a depth-1 clone was not reported as shallow")
+        # 10. sync: the Mac's half of the git channel while the pipeline runs in the cloud
+        problems += _mac_sync_phase(pr, sandbox)
     finally:
         if saved is None:
             os.environ.pop("TOOLKIT_VAULT", None)
