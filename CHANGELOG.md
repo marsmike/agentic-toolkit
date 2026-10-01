@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Atlas opens its landscape with a topic map (obsidian 3.7.4).** Domains are the large nodes
+  (size: notes), each domain's leading topic tags orbit it, and a tag that several domains share sits
+  between them, so the map shows which topics bridge which domains; the domains whose notes link
+  most are joined by lines. A tag with notes added in the chosen range is filled, a quiet one hollow;
+  picking a domain lights its topics and links. The layout is a deterministic force simulation in
+  the page (no library), fitted to the canvas, with labels placed where they cover nothing.
+
 - **A tweet's title keeps its leading link text (readwise 3.1.4).** Reader titles a tweet with its
   first words but drops a leading link, so the ClaudeDevs post "Claude.dev is our new home for
   developers building with Claude" became a capture, a ledger row and a run-report item titled "is

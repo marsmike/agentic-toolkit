@@ -101,7 +101,9 @@ h1 { font-size: 26px; line-height: 1.1; margin: 0; letter-spacing: -.02em; font-
 .status .ic { width: 16px; height: 16px; border-radius: 50%; display: inline-grid; place-items: center; font: 700 10px/1 var(--sans); color: #fff; }
 .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 svg text { font-family: var(--sans); }
-.flow svg, .lanes svg, .matrix svg { display: block; max-width: none; }
+.flow svg, .lanes svg, .flow svg, .lanes svg, .matrix svg, .tmap svg { display: block; max-width: none; }
+.tmap .dn { cursor: pointer; }
+.tmap text { pointer-events: none; } max-width: none; }
 .band { cursor: default; transition: fill-opacity .12s; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--text-2); font-size: 12.5px; margin-top: 10px; }
 .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
@@ -241,9 +243,14 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
     <div class="head">
       <div class="eyebrow">Landscape</div>
       <h2 id="landTitle">What The Void knows</h2>
-      <p class="lede">Every active note by domain. Size is how many notes a domain holds; color is how many arrived in the range above. Pick a domain to see its most-linked notes, its newest and how it grew.</p>
+      <p class="lede">Every active note by domain. The map shows how the domains and the topics inside them hang together; below, size is how many notes a domain holds and color how many arrived in the range above. Pick a domain to see its most-linked notes, its newest and how it grew.</p>
     </div>
     <div class="grid">
+      <div class="card span-12">
+        <h3>Topic map <span class="hint" id="mapHint"></span></h3>
+        <div class="tmap scroll" id="topicmap" role="group" aria-label="Domains and the topics inside them"></div>
+        <div class="legend" id="mapLegend"></div>
+      </div>
       <div class="card span-12">
         <h3>Domains <span class="hint" id="tmHint"></span></h3>
         <div class="tm" id="treemap" role="group" aria-label="Domains, sized by notes"></div>
@@ -879,10 +886,136 @@ function renderMatrix() {
   box.append(svg);
 }
 
+function renderTopicMap() {
+  const box = $("topicmap");
+  box.replaceChildren(); $("mapLegend").replaceChildren();
+  const ds = DATA.domains;
+  if (!ds.length) return;
+  const W = Math.max(720, box.clientWidth || 1100), H = Math.round(Math.max(440, Math.min(640, W * 0.52)));
+  const tagInfo = {};
+  for (const [t, total, days] of DATA.tags) tagInfo[t] = {total, added: Object.entries(days).reduce((s, [d, n]) => s + (inRange(d) ? n : 0), 0)};
+  const nodes = [], idx = {}, edges = [];
+  for (const d of ds) { idx["d:" + d.id] = nodes.length; nodes.push({id: "d:" + d.id, kind: "d", label: d.title, value: d.notes, ref: d, doms: []}); }
+  for (const d of ds) for (const [t, n] of d.topics || []) {
+    if (!(("t:" + t) in idx)) {
+      idx["t:" + t] = nodes.length;
+      nodes.push({id: "t:" + t, kind: "t", label: t, value: (tagInfo[t] || {}).total || n, added: (tagInfo[t] || {}).added || 0, doms: []});
+    }
+    nodes[idx["t:" + t]].doms.push([d.title, n]);
+    edges.push({a: idx["d:" + d.id], b: idx["t:" + t], w: n});
+  }
+  const M = DATA.matrix, dd = [];
+  for (let a = 0; a < ds.length; a++) for (let b = a + 1; b < ds.length; b++) { const v = M[a][b] + M[b][a]; if (v > 0) dd.push({a: idx["d:" + ds[a].id], b: idx["d:" + ds[b].id], w: v}); }
+  dd.sort((x, y) => y.w - x.w);
+  const strong = dd.slice(0, ds.length * 2), maxDD = strong.length ? strong[0].w : 1;
+  const maxD = Math.max(...ds.map(d => d.notes)), maxT = Math.max(1, ...nodes.filter(n => n.kind === "t").map(n => n.value));
+  for (const n of nodes) n.r = n.kind === "d" ? 12 + 24 * Math.sqrt(n.value / maxD) : 3.5 + 8 * Math.sqrt(n.value / maxT);
+  // a deterministic start (domains round an ellipse, each topic near its first domain), then a fixed number of steps
+  const cx = W / 2, cy = H / 2, N = nodes.length;
+  const hash = s => { let x = 2166136261; for (const c of s) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619); } return (x >>> 0) / 4294967296; };
+  ds.forEach((d, i) => { const n = nodes[idx["d:" + d.id]], a = 2 * Math.PI * i / ds.length - Math.PI / 2; n.x = cx + Math.cos(a) * W * 0.32; n.y = cy + Math.sin(a) * H * 0.34; });
+  for (const e of edges) { const t = nodes[e.b]; if (t.x === undefined) { const d = nodes[e.a], a = 2 * Math.PI * hash(t.id); t.x = d.x + Math.cos(a) * (d.r + 40); t.y = d.y + Math.sin(a) * (d.r + 40); } }
+  const ITER = 420;
+  for (let it = 0; it < ITER; it++) {
+    const cool = 1 - it / ITER, fx = new Float64Array(N), fy = new Float64Array(N);
+    for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+      const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y, d2 = dx * dx + dy * dy || 0.01, d = Math.sqrt(d2);
+      const both = nodes[i].kind === "d" && nodes[j].kind === "d";
+      const gap = nodes[i].r + nodes[j].r + (both ? 90 : nodes[i].kind === "d" || nodes[j].kind === "d" ? 16 : 10);
+      const f = (both ? 9000 : 2600) / d2 + (d < gap ? 0.6 * (gap - d) : 0);
+      fx[i] += dx / d * f; fy[i] += dy / d * f; fx[j] -= dx / d * f; fy[j] -= dy / d * f;
+    }
+    const spring = (a, b, len, k) => {
+      const dx = nodes[b].x - nodes[a].x, dy = nodes[b].y - nodes[a].y, d = Math.sqrt(dx * dx + dy * dy) || 0.01, f = k * (d - len);
+      fx[a] += dx / d * f; fy[a] += dy / d * f; fx[b] -= dx / d * f; fy[b] -= dy / d * f;
+    };
+    for (const e of edges) spring(e.a, e.b, nodes[e.a].r + nodes[e.b].r + 30, 0.06 + 0.06 * Math.min(1, e.w / 30));
+    for (const e of strong) spring(e.a, e.b, Math.min(W, H) * 0.48, 0.006 * (0.4 + e.w / maxDD));
+    for (let i = 0; i < N; i++) { fx[i] += (cx - nodes[i].x) * 0.006; fy[i] += (cy - nodes[i].y) * 0.012; }
+    for (let i = 0; i < N; i++) {
+      const m = Math.sqrt(fx[i] * fx[i] + fy[i] * fy[i]) || 1, step = Math.min(m, 10 * cool + 0.4);
+      nodes[i].x = Math.max(nodes[i].r + 6, Math.min(W - nodes[i].r - 6, nodes[i].x + fx[i] / m * step));
+      nodes[i].y = Math.max(nodes[i].r + 6, Math.min(H - nodes[i].r - 18, nodes[i].y + fy[i] / m * step));
+    }
+  }
+  {
+    const mx = 70, my = 26;
+    const x0 = Math.min(...nodes.map(n => n.x - n.r)), x1 = Math.max(...nodes.map(n => n.x + n.r));
+    const y0 = Math.min(...nodes.map(n => n.y - n.r)), y1 = Math.max(...nodes.map(n => n.y + n.r));
+    const sx = (W - 2 * mx) / Math.max(1, x1 - x0), sy = (H - 2 * my - 16) / Math.max(1, y1 - y0);
+    for (const n of nodes) { n.x = mx + (n.x - x0) * sx; n.y = my + (n.y - y0) * sy; }
+  }
+  const sel = SELECTED ? idx["d:" + SELECTED] : -1;
+  const svg = sv("svg", {viewBox: "0 0 " + W + " " + H, width: W, height: H, role: "img", "aria-label": "Topic map: domains and the topics inside them"});
+  // labels go where they do not cover another: domains first (biggest first), then the topics
+  const placed = [];
+  const fits = b => b.x0 >= 0 && b.x1 <= W && b.y0 >= 0 && b.y1 <= H && !placed.some(p => b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0)
+    && !nodes.some(n => n.x > b.x0 - n.r * 0.6 && n.x < b.x1 + n.r * 0.6 && n.y > b.y0 - n.r * 0.6 && n.y < b.y1 + n.r * 0.6 && n.kind === "d");
+  const label = (n, size, weight) => {
+    const w = n.label.length * size * (weight > 600 ? 0.62 : 0.56), hgt = size + 4;
+    const spots = n.kind === "d"
+      ? [[n.x - w / 2, n.y + n.r + 4], [n.x - w / 2, n.y - n.r - 4 - hgt], [n.x + n.r + 6, n.y - hgt / 2], [n.x - n.r - 6 - w, n.y - hgt / 2]]
+      : [[n.x + n.r + 4, n.y - hgt / 2], [n.x - n.r - 4 - w, n.y - hgt / 2], [n.x - w / 2, n.y + n.r + 2], [n.x - w / 2, n.y - n.r - 2 - hgt]];
+    for (const [x, y] of spots) {
+      const b = {x0: x, y0: y, x1: x + w, y1: y + hgt};
+      if (fits(b)) { placed.push(b); return {x, y: y + hgt / 2}; }
+    }
+    return n.kind === "d" ? {x: n.x - w / 2, y: n.y + n.r + 4 + hgt / 2} : null;
+  };
+  const gLinks = sv("g"), gEdges = sv("g"), gNodes = sv("g"), gLabels = sv("g");
+  svg.append(gLinks, gEdges, gNodes, gLabels);
+  for (const e of strong) {
+    const a = nodes[e.a], b = nodes[e.b], on = e.a === sel || e.b === sel;
+    gLinks.append(sv("line", {x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: on ? "var(--accent)" : "var(--line)", "stroke-width": 1 + 4 * e.w / maxDD, "stroke-opacity": on ? 0.55 : 0.9}));
+  }
+  for (const e of edges) {
+    const a = nodes[e.a], b = nodes[e.b], on = e.a === sel;
+    gEdges.append(sv("line", {x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: on ? "var(--accent)" : "var(--muted)", "stroke-width": on ? 1.4 : 0.8, "stroke-opacity": on ? 0.8 : 0.35}));
+  }
+  const maxAdded = Math.max(0, ...nodes.filter(n => n.kind === "t").map(n => n.added));
+  const edgesT = bins(maxAdded);
+  for (const [i, n] of nodes.entries()) {
+    if (n.kind === "d") {
+      const c = sv("circle", {cx: n.x, cy: n.y, r: n.r, class: "dn", fill: "var(--accent)", "fill-opacity": i === sel ? 0.34 : 0.16,
+        stroke: "var(--accent)", "stroke-width": i === sel ? 3 : 1.5, tabindex: "0", role: "button", "aria-label": n.label + ", " + n.value + " notes"});
+      c.addEventListener("click", () => select(n.ref.id));
+      c.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.ref.id); } });
+      hover(c, () => [n.label, fmt(n.value) + " notes", "+" + addedIn(n.ref) + " " + rangeName()]);
+      gNodes.append(c);
+      n.labelAt = label(n, 12.5, 650);
+    } else {
+      const step = stepOf(n.added, edgesT);
+      const c = sv("circle", {cx: n.x, cy: n.y, r: n.r, fill: step ? "var(--seq-" + Math.max(2, step) + ")" : "var(--surface-2)",
+        stroke: step ? "var(--surface)" : "var(--muted)", "stroke-width": step ? 1.5 : 1, tabindex: "0"});
+      hover(c, () => [n.label, fmt(n.value) + " notes" + (n.added ? " · +" + n.added + " " + rangeName() : ""),
+        "in " + n.doms.map(([dn, k]) => dn + " (" + k + ")").join(", ")]);
+      gNodes.append(c);
+      n.wantsLabel = n.value >= maxT * 0.12 || n.added > 0;
+    }
+  }
+  for (const n of nodes.filter(n => n.kind === "d").sort((a, b) => b.value - a.value)) {
+    if (!n.labelAt) continue;
+    gLabels.append(sv("text", {x: n.labelAt.x, y: n.labelAt.y, "dominant-baseline": "middle", "font-size": 12.5, "font-weight": 650, fill: "var(--text)",
+      "paint-order": "stroke", stroke: "var(--surface)", "stroke-width": 4, "stroke-linejoin": "round", text: n.label}));
+  }
+  for (const n of nodes.filter(n => n.kind === "t" && n.wantsLabel).sort((a, b) => b.added - a.added || b.value - a.value)) {
+    const at = label(n, 11, 400);
+    if (at) gLabels.append(sv("text", {x: at.x, y: at.y, "dominant-baseline": "middle", "font-size": 11, fill: n.added ? "var(--text)" : "var(--text-2)",
+      "paint-order": "stroke", stroke: "var(--surface)", "stroke-width": 3, "stroke-linejoin": "round", text: n.label}));
+  }
+  box.append(svg);
+  $("mapHint").textContent = ds.length + " domains · " + nodes.filter(n => n.kind === "t").length + " topic tags · pick a domain";
+  $("mapLegend").append(
+    el("span", {}, el("span", {class: "sw", style: "background:var(--accent);opacity:.5;border-radius:50%"}), "domain, size = notes"),
+    el("span", {}, el("span", {class: "sw", style: "background:var(--seq-4);border-radius:50%"}), "topic tag with notes added " + rangeName()),
+    el("span", {}, el("span", {class: "sw", style: "background:var(--surface-2);border:1px solid var(--muted);border-radius:50%"}), "topic tag, quiet"),
+    el("span", {}, el("span", {class: "sw", style: "background:var(--line);height:4px"}), "domains whose notes link most"));
+}
+
 function select(id) {
   SELECTED = id;
   store.set("domain", id);
-  renderTreemap(); renderDetail(); renderMultiples(); renderMatrix();
+  renderTopicMap(); renderTreemap(); renderDetail(); renderMultiples(); renderMatrix();
 }
 
 /* ---------- range, theme, boot ---------- */
@@ -890,7 +1023,7 @@ function renderAll() {
   for (const b of document.querySelectorAll("#range button")) b.setAttribute("aria-pressed", String(+b.dataset.range === RANGE));
   $("rangeNote").textContent = RANGE === 1 ? "since midnight, your time" : "since " + new Date(since() + "T00:00:00").toLocaleDateString("en-GB", {day: "numeric", month: "short"});
   renderKPIs(); renderMachine(); renderFlow(); renderFunnel(); renderLanes(); renderItems();
-  renderTreemap(); renderDetail(); renderMoves(); renderMultiples(); renderMatrix();
+  renderTopicMap(); renderTreemap(); renderDetail(); renderMoves(); renderMultiples(); renderMatrix();
 }
 function applyTheme(choice) {
   if (choice === "light" || choice === "dark") document.documentElement.setAttribute("data-theme", choice);
@@ -912,7 +1045,7 @@ function boot() {
   for (const b of document.querySelectorAll("#range button")) b.addEventListener("click", () => { RANGE = +b.dataset.range; store.set("range", String(RANGE)); renderAll(); });
   for (const b of document.querySelectorAll("#theme button")) b.addEventListener("click", () => { store.set("theme", b.dataset.themeChoice); applyTheme(b.dataset.themeChoice); });
   let resizeTimer = null;
-  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { renderTreemap(); renderFlow(); renderLanes(); }, 120); });
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { renderTopicMap(); renderTreemap(); renderFlow(); renderLanes(); }, 120); });
   renderAll();
 }
 boot();
