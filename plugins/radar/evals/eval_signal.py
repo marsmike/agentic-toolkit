@@ -261,6 +261,33 @@ def _merge_checks(problems: list[str]) -> None:
         problems.append(f"merge: a jeff-shaped Other-sector name must be checked with disambiguating context, "
                         f"not skipped or asked bare, got {cands}")
 
+    # a name-check row from before rows recorded their context: a one-word name's bare row is no
+    # evidence (its hits are namesakes) and does not block a re-ask with context; a multi-word name's
+    # row still counts; the new row records its context [earned: 2026-10-01, the 09-30 "jeff" row]
+    import tempfile
+    from datetime import UTC, datetime
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        now = datetime(2026, 10, 1, 14, 28, tzinfo=UTC)
+        (out / "signal-tavily.jsonl").write_text(
+            json.dumps({"day": "2026-09-30", "key": "jeff", "name": "jeff",
+                        "hits": [{"title": "Jeffrey Kent Obituary", "url": "https://e.org/obit", "published": ""}]}) + "\n"
+            + json.dumps({"day": "2026-09-30", "key": "billgates", "name": "Bill Gates",
+                          "hits": [{"title": "Bill Gates on AI", "url": "https://e.org/bg", "published": ""}]}) + "\n", encoding="utf-8")
+        asked: list[tuple[str, str]] = []
+
+        def ask(name: str, context: str = "") -> list[dict]:
+            asked.append((name, context))
+            return [{"title": "Jeff: Jev-compatible decision models", "url": "https://e.org/jeff", "published": ""}]
+        cand = {"key": "jeff", "name": "jeff", "families": ["hn"], "strength": 70, "context": "Small Decision Models"}
+        mentions, status = sr._name_check(out, [cand], now, "tavily", "signal-tavily.jsonl", ask)
+        titles = {m["title"] for m in mentions}
+        last = json.loads((out / "signal-tavily.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+        if asked != [("jeff", "Small Decision Models")] or "Jeffrey Kent Obituary" in titles \
+                or not {"Bill Gates on AI", "Jeff: Jev-compatible decision models"} <= titles or last.get("context") != "Small Decision Models":
+            problems.append(f"merge: a one-word name's row without a recorded context is no evidence and is asked again "
+                            f"with context (recorded); got asked={asked}, mentions={sorted(titles)}, last row={last}")
+
     claudeai = E.from_title("Trends on r/ClaudeAI")
     if E.key("ClaudeAI") in {E.key(n) for n in claudeai}:
         problems.append(f"merge: r/ClaudeAI is a subreddit reference, must not yield a ClaudeAI entity, got {claudeai}")

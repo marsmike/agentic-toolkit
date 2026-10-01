@@ -112,7 +112,9 @@ def run(vault: Path) -> dict:
         if sub in tavily_state.get("empty", ()):
             return {"results": []}
         return {"results": [
-            {"url": f"https://www.reddit.com/r/{sub}/comments/tv{len(tavily_calls)}/a_thread/", "title": f"A thread : r/{sub}"},
+            # both page-title suffixes: " : r/<sub>" and old.reddit's " : <sub>" [earned: 2026-10-01]
+            {"url": f"https://www.reddit.com/r/{sub}/comments/tv{len(tavily_calls)}/a_thread/",
+             "title": f"A thread : r/{sub}" if len(tavily_calls) % 2 else f"A thread : {sub}"},
             {"url": "https://www.reddit.com/r/SomewhereElse/comments/zz9/off_topic/", "title": "Elsewhere"},
             {"url": f"https://evilreddit.com/r/{sub}/comments/ev1/lookalike/", "title": "Lookalike host"},
             {"url": "https://example.com/not-reddit", "title": "Not reddit"}]}
@@ -306,7 +308,7 @@ def run(vault: Path) -> dict:
         if src["status"] != "partial" or len(tavily_calls) != len(subs) or len(reddit_items) != len(subs):
             problems.append(f"phase 5b: expected partial with one tvly call and one thread per subreddit "
                             f"({len(subs)}), got {src['status']}, {len(tavily_calls)} calls, {len(reddit_items)} items")
-        if any(v["score"] is not None or not v["origin"].startswith("r/") or v["title"].endswith(v["origin"])
+        if any(v["score"] is not None or not v["origin"].startswith("r/") or v["title"] != "A thread"
                for v in reddit_items.values()):
             problems.append(f"phase 5b: Tavily threads carry no score, origin r/<sub> and a clean title, got {reddit_items}")
         if tavily_calls and not {"--include-domains", "reddit.com", "--time-range", "day", "--depth", "basic"} <= set(tavily_calls[0]):

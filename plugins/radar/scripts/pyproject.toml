@@ -1,6 +1,6 @@
 [project]
 name = "radar-plugin-scripts"
-version = "3.10.2"
+version = "3.10.3"
 description = "Standalone scripts for the radar plugin — stdlib plus pyyaml, run via `uv run`."
 requires-python = ">=3.11"
 dependencies = [

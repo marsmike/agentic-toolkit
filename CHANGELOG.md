@@ -4,6 +4,16 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Signal Radar's name check no longer counts namesakes from before it added context (radar
+  3.10.3).** check_candidates learned on 2026-10-01 to ask a one-word name with disambiguating
+  context, but the rows asked bare before that stayed evidence for their whole week, and a name asked
+  in the last week is not asked again: "jeff" (the Jev-compatible decision models, one real Hacker
+  News post) stayed HOT at 70 on an obituary, a TV host and a governor from the 09-30 row. A row now
+  records its `context`; a one-word name's row without that record is ignored, so the name is asked
+  again with context. The Reddit fallback through Tavily also strips old.reddit's " : <sub>" title
+  suffix, not only " : r/<sub>": "r/ClaudeAI List of Ongoing Megathreads : ClaudeAI" had made
+  ClaudeAI a blip.
+
 - **The Atlas shows what each interest brought, and the strongest items (obsidian 3.9.0).** The
   Dashboard's "Strong per week" and "Top feed items" had no counterpart in the Atlas, so the one page
   meant to show the whole way in left out what the radar's interests yield. Two full-width panels

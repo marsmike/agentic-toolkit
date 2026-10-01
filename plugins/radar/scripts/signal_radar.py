@@ -534,6 +534,12 @@ def _load_check_row(line: str) -> dict | None:
     return row
 
 
+def _ambiguous(name: str) -> bool:
+    """A one-word name without a digit ("Traktor", "Muse", "jeff"): asked bare, the web answers
+    about namesakes."""
+    return re.fullmatch(r"[A-Za-z]+", name) is not None
+
+
 def _name_check(out: Path, candidates: list[dict], now: datetime, family: str, log_name: str,
                 ask: Any = None) -> tuple[list[dict], dict]:
     """One backend's check: ask `ask(name)` about the newest, least corroborated names, at most
@@ -544,6 +550,12 @@ def _name_check(out: Path, candidates: list[dict], now: datetime, family: str, l
     for ln in (log.read_text(encoding="utf-8").splitlines() if log.is_file() else []):
         if ln.strip() and (row := _load_check_row(ln)) is not None:
             rows.append(row)
+    # A row records what disambiguated its name (`context`, maybe ""). A one-word name's row without
+    # that record may have been asked bare: its hits are as likely namesakes as the thing, so it is
+    # no evidence and does not stop the name being asked again with context. [earned: 2026-10-01 —
+    # the 09-30 "jeff" row (an obituary, a TV host, a governor) kept the Jeff decision models HOT at
+    # 70 for its whole week after check_candidates had learned to add context]
+    rows = [r for r in rows if "context" in r or not _ambiguous(r["name"])]
     today = now.date().isoformat()
     week_ago = (now.date() - timedelta(days=7)).isoformat()
     asked_today = sum(1 for r in rows if r["day"] == today)
@@ -563,7 +575,7 @@ def _name_check(out: Path, candidates: list[dict], now: datetime, family: str, l
         except (kagi.KagiError, tavily.TavilyError) as e:
             status.update(status="failed", detail=str(e)[:160])
             break
-        row = {"day": today, "key": b["key"], "name": b["name"], "hits": hits[:5]}
+        row = {"day": today, "key": b["key"], "name": b["name"], "context": b.get("context", ""), "hits": hits[:5]}
         rows.append(row)
         with log.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row) + "\n")
@@ -644,7 +656,7 @@ def check_candidates(blips: list[dict], names: dict[str, str], watch: list[str])
     for b in blips:
         if b["stage"] not in ("new", "rising"):
             continue
-        ambiguous = re.fullmatch(r"[A-Za-z]+", b["name"]) is not None
+        ambiguous = _ambiguous(b["name"])
         sector_name = names.get(b.get("sector"), "")
         if not sector_name and b.get("_interests"):
             top_id, top_p = next(iter(b["_interests"].most_common(1)), (None, 0))

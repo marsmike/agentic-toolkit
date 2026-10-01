@@ -422,8 +422,11 @@ def _reddit_via_tavily(vault: Path, out: Path, subs: list[str], now: datetime) -
             m = _REDDIT_ID_RE.match(urllib.parse.urlparse(hit["url"]).path)
             if host != "reddit.com" and not host.endswith(".reddit.com") or not m or m.group(1).lower() != sub.lower():
                 continue
-            rows[m.group(2)] = _row("reddit", f"r/{sub}", m.group(2), hit["title"].removesuffix(f" : r/{sub}"),
-                                    hit["url"], "via Tavily, no score", "", None, [])
+            # A page title ends in its subreddit, " : r/ClaudeAI" or old.reddit's " : ClaudeAI": a label,
+            # not a name. [earned: 2026-10-01 — "r/ClaudeAI List of Ongoing Megathreads : ClaudeAI"
+            # kept its suffix and made ClaudeAI a Signal Radar blip]
+            title = re.sub(rf"\s+:\s+(?:r/)?{re.escape(sub)}\s*$", "", hit["title"], flags=re.I)
+            rows[m.group(2)] = _row("reddit", f"r/{sub}", m.group(2), title, hit["url"], "via Tavily, no score", "", None, [])
         if not found and _empty_streak(ledger, query, now) >= REDDIT_TAVILY_LOW_YIELD_RUNS:
             low_yield.append(sub)
     note = f"via Tavily: {asked} subreddit(s) asked, {len(rows)} thread(s), no scores"
