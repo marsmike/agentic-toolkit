@@ -49,6 +49,13 @@ WIKILINK_RE = re.compile(r"\[\[([^\]|#\\]+)")
 FULL_TEXT_HEADING_RE = re.compile(r"^#{1,6}\s*Full Text\s*$", re.I | re.M)
 
 
+# The sections the capture writer puts after the full text (readwise build_captures.py and
+# tweet_enrich.py). Only these end it: the article's own headings are its content. Ending at any
+# heading judged "## guardrails" as an empty page and an Ollama model page as six words, both
+# full captures. [earned: 2026-09-30, two false "stub" dossiers in one run]
+AFTER_FULL_TEXT_RE = re.compile(r"^## (?:Linked|My notes|Processing Notes|My highlights \(\d+\)|Highlights \(\d+\))\s*$", re.M)
+
+
 def full_text_section(body: str) -> str:
     """What Reader actually saved: the capture pipeline's own `## Full Text` section, without
     the pipeline's Source line or Readwise-summary framing above it (both can be long enough to
@@ -60,5 +67,5 @@ def full_text_section(body: str) -> str:
     if not m:
         return body.strip()
     rest = body[m.end():]
-    end = re.search(r"^#{1,6}\s+\S", rest, re.M)
+    end = AFTER_FULL_TEXT_RE.search(rest)
     return rest[: end.start() if end else None].strip()

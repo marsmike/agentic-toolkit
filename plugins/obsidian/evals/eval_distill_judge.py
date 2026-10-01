@@ -17,6 +17,10 @@ Offline phases:
 5. partial failure — a request that fails is halved and the answers still arrive
 6. total failure   — exactly one DLQ note
 7. read-only       — judging changes no note in the vault (the graph index may be built)
+8. full text       — the capture's full text runs to the writer's own trailing sections (Linked,
+                     My notes, Processing Notes, highlights), not to the article's first heading:
+                     a README that opens with `## guardrails` is content, not an empty stub
+                     (2026-09-30, two false "stub" dossiers in one run)
 """
 from __future__ import annotations
 
@@ -188,6 +192,18 @@ def run(vault: Path) -> dict:
         if "failed" not in failed or len(new_dlq) != 1:
             problems.append(f"phase 6: expected one DLQ note on total failure, got {len(new_dlq)} (result keys {sorted(failed)})")
 
+        from judgments.capture import full_text_section
+        body = ("# guardrails\n\n*Source: https://github.com/x/guardrails*\n\n## Readwise summary\n\nA plugin.\n\n"
+                "## Full Text\n\n## guardrails\n\nA Claude Code plugin that puts hard limits around what Claude can do.\n\n"
+                "## Install\n\nclaude plugin install guardrails\n\n### Requirements\n\npython3\n\n"
+                "## Linked\n\n> excerpt\n\n## My notes\n\nmine\n\n## Processing Notes\n\n- Ingested\n")
+        text = full_text_section(body)
+        if not text.startswith("## guardrails") or "## Install" not in text or "### Requirements" not in text \
+                or "excerpt" in text or "mine" in text or "Ingested" in text or "A plugin." in text:
+            problems.append(f"phase 8: the full text keeps the article's own headings and stops at the writer's sections, got {text[:120]!r}")
+        if full_text_section("# t\n\n## Full Text\n\n## Models\n\nNimble is a 9B decision model.\n") != "## Models\n\nNimble is a 9B decision model.":
+            problems.append("phase 8: a capture whose text starts with a heading is not empty")
+
         live_detail = "live phase skipped (set TOOLKIT_EVAL_LIVE_JEV=1 with a key to run it)"
         if os.environ.get("TOOLKIT_EVAL_LIVE_JEV") == "1":
             judge._post = real_post
@@ -203,7 +219,7 @@ def run(vault: Path) -> dict:
 
     if problems:
         return {"eval": NAME, "pass": False, "detail": "; ".join(problems)}
-    return {"eval": NAME, "pass": True, "detail": f"7 offline phases ok ({len(calls)} stubbed requests); {live_detail}"}
+    return {"eval": NAME, "pass": True, "detail": f"8 offline phases ok ({len(calls)} stubbed requests); {live_detail}"}
 
 
 def _live_phase(dj, sandbox: Path, saved_env: dict, problems: list[str]) -> str:

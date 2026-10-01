@@ -4,6 +4,16 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The dossier reads the whole capture, not its first heading (obsidian 3.5.2).** The content check
+  (`content_match`) judged the text from `## Full Text` up to the next heading of any level, so an
+  article with its own headings ended at its first one. A GitHub README that opens with `## guardrails`
+  was "empty", which made it a stub without a model call. An Ollama model page ended at `## Models`
+  after six words, and the model rightly called that too little. Of the 328 captures archived in
+  September 2026, 42 (13%, mostly READMEs) reached the check with under 300 characters where they held
+  1,000 or more. The text now runs to the writer's own trailing sections (`## Linked`, `## My notes`,
+  `## Processing Notes`, highlights).
+  [earned: 2026-09-30, two false "stub" dossiers in one run; distill caught both by reading the text]
+
 - **The briefing links what distill just wrote (radar 3.8.1, obsidian 3.5.1).** The scan writes
   `Bubbles-<day>.md` before distill, so a promoted item's "→ note" waited a whole run: Gemini 4
   Argon was distilled at 20:46 on 2026-09-30 and the daily note still had no link to it. The new
