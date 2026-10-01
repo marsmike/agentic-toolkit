@@ -4,6 +4,20 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Mac's sync never pushes a stale copy (obsidian 3.8.0).** Obsidian Sync merges files too,
+  and on 2026-10-01 it merged older copies into the Mac's vault when Obsidian started: Signal-Radar.md
+  went back to the 08:30 run, Log.md gained 59 repeated lines from the day before, a note lost the 24
+  lines the 07:10 run had added, and `readwise-state.md` got `lastSyncedAt: '2026-110-01T13:00…'`,
+  which the next ingest would have read. The 13:32 UTC sync committed and pushed all four as hand
+  edits (undone in the vault by b222403). `sync` now puts back to HEAD any local change to what the
+  cloud routines own (`CLOUD_OWNED`: Log.md, `00_Memory/radar/`, the pipeline and Readwise ledgers and
+  state, beside the generated navigation), and holds a change to any other file that is byte for byte
+  an earlier version of it or only drops lines a pipeline run added in the last 24 hours: not
+  committed, left in the working copy, one `sync-held-…` DLQ note and one notification, never
+  reverted, since deleting exactly what a run added looks the same. A deletion is always the
+  owner's. Excluded paths are now literal pathspecs (vault paths hold brackets and spaces).
+  [earned: 2026-10-01, the 13:32 UTC sync commit 8114a63]
+
 - **A feed that answers in gzip unasked still parses (radar 3.10.2).** deepmind.google's blog feed
   began answering `text/xml` with a gzip body, and the 11:28 UTC Signal Radar run read it as "not
   XML: not well-formed (invalid token): line 1, column 0" (rss: partial). `sensors._request` now

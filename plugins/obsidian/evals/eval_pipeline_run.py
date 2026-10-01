@@ -233,6 +233,42 @@ def _mac_sync_phase(pr, sandbox: Path) -> list[str]:
             or "Maps/my-sketch.canvas" not in _git(remote, "log", "--name-only", "--format=", "-1"):
         problems.append(f"phase 10: a local change to generated navigation yields to the run's, a hand-made file is kept; got {r}")
 
+    # a second sync (Obsidian Sync) merging older copies in [earned: 2026-10-01]: a cloud-owned file
+    # goes back to HEAD; a note that is byte for byte an earlier version, or only drops lines a pipeline
+    # run just added, is held (not committed, kept locally, one DLQ note each), never reverted
+    def cloud_commit(rel: str, text: str, subject: str) -> None:
+        _git(other, "pull", "-q")
+        (other / rel).parent.mkdir(parents=True, exist_ok=True)
+        (other / rel).write_text(text, encoding="utf-8")
+        _git(other, "add", "-A")
+        _git(other, "commit", "-q", "-m", subject)
+        _git(other, "push", "-q")
+    note_v1 = "# Stale\n\nfirst version\n"
+    cloud_commit("Log.md", "- one run\n", "pipeline 2026-09-23 12:40: 1 distilled")
+    cloud_commit("04_Resources/Eval-Stale.md", note_v1, "pipeline 2026-09-23 12:41: 1 distilled")
+    cloud_commit("04_Resources/Eval-Stale.md", note_v1 + "added by the next run\n", "pipeline 2026-09-23 12:42: 1 distilled")
+    cloud_commit("04_Resources/Eval-Regress.md", "# Regress\n\nmine\n", "vault: hand edits")
+    cloud_commit("04_Resources/Eval-Regress.md", "# Regress\n\nmine\n\n## Update\nthe run's enrichment\n",
+                 "pipeline 2026-09-23 12:43: 1 distilled")
+    pr.sync(mac, NOW + timedelta(minutes=26))
+    (mac / "Log.md").write_text("- one run\n- an old line merged back in\n", encoding="utf-8")
+    (mac / "04_Resources" / "Eval-Stale.md").write_text(note_v1, encoding="utf-8")
+    (mac / "04_Resources" / "Eval-Regress.md").write_text("# Regress\n\nmine\n", encoding="utf-8")
+    (mac / "04_Resources" / "Eval-Real-Edit.md").write_text("# typed today\n", encoding="utf-8")
+    head = _git(remote, "rev-parse", "HEAD")
+    r = pr.sync(mac, NOW + timedelta(minutes=27))
+    pushed = _git(remote, "log", "--name-only", "--format=", f"{head.strip()}..HEAD")
+    if r.get("status") != "ok" or r.get("restored") != ["Log.md"] or (mac / "Log.md").read_text(encoding="utf-8") != "- one run\n":
+        problems.append(f"phase 10: a cloud-owned file goes back to HEAD, got {r}")
+    if r.get("held") != ["04_Resources/Eval-Regress.md", "04_Resources/Eval-Stale.md"] or "Eval-Regress" in pushed \
+            or "Eval-Stale" in pushed or "Eval-Real-Edit.md" not in pushed \
+            or "the run's enrichment" in (mac / "04_Resources" / "Eval-Regress.md").read_text(encoding="utf-8") \
+            or (mac / "04_Resources" / "Eval-Stale.md").read_text(encoding="utf-8") != note_v1 \
+            or len(list((mac / "00_Memory" / "dlq").glob("*sync-held-*.md"))) != 2:
+        problems.append(f"phase 10: an exact older copy and a take-back of a run's lines are held (kept locally, not "
+                        f"pushed, one DLQ each), a real edit still goes up; got {r}, pushed {pushed.split()}")
+    _git(mac, "checkout", "HEAD", "--", "04_Resources/Eval-Regress.md", "04_Resources/Eval-Stale.md")
+
     _git(other, "pull", "-q")
     for root, text in ((other, "# cloud rewrote it\n"), (mac, "# Mac rewrote it\n")):
         (root / "04_Resources" / "Eval-Hand-Edit.md").write_text(text, encoding="utf-8")

@@ -50,7 +50,9 @@ if r.get("hand_edits"):
 if r.get("new_commits"):
     facts.append(str(r["new_commits"]) + " new")
 if r.get("restored"):
-    facts.append("generated file(s) left to the run: " + ", ".join(r["restored"])[:120])
+    facts.append("cloud-owned file(s) left to the run: " + ", ".join(r["restored"])[:120])
+if r.get("held"):
+    facts.append("HELD as a likely stale copy: " + ", ".join(r["held"])[:160])
 print(r.get("status", "failed"), "; ".join(facts) or r.get("detail", "") or "up to date")
 ' 2>/dev/null || echo "failed unreadable output")"
 [[ -z "${token}" ]] && detail="${detail}; no GH_TOKEN in ${keys}"
@@ -68,6 +70,14 @@ case "$sync_status" in
   refused) [[ $count -eq 1 ]] && message="Vault sync refused: a note holds a key-shaped string. See 00_Memory/dlq/ (pipeline-secret-refused)." ;;
   failed) [[ $count -eq 6 ]] && message="Vault sync has failed for an hour: ${detail}" ;;
 esac
+# A change held as a likely stale copy (another sync merging an older version in) is named once per
+# new set of held files: it waits for the owner. [earned: 2026-10-01]
+held_now="$(printf '%s' "$detail" | sed -n 's/.*HELD as a likely stale copy: //p')"
+held_seen="$(cat "${STATE}.held" 2>/dev/null)"
+if [[ -n "$held_now" && "$held_now" != "$held_seen" && -z "$message" ]]; then
+  message="Vault sync held back a change that looks like a stale copy: ${held_now}. See 00_Memory/dlq/ (sync-held)."
+fi
+print -r -- "$held_now" > "${STATE}.held"
 if [[ -n "$message" ]]; then
   osascript -e "display notification \"${message//\"/\'}\" with title \"The Void\"" >/dev/null 2>&1 || true
 fi

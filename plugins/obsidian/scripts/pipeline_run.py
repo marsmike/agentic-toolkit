@@ -438,7 +438,8 @@ def scan_staged(vault: Path) -> list[dict[str, Any]]:
 
 def _commit(vault: Path, message: str, exclude: tuple[str, ...] = ()) -> dict[str, Any]:
     """Stage everything and commit, unless the diff holds a key-shaped string: then unstage and DLQ."""
-    added = _git(vault, "add", "-A", "--", ".", *(f":(exclude){e}" for e in exclude))
+    # literal: vault paths hold brackets and spaces a pathspec would read as patterns
+    added = _git(vault, "add", "-A", "--", ".", *(f":(exclude,literal){e}" for e in exclude))
     if added.returncode != 0:
         # An empty index after a failed add is not "nothing to commit". [earned: PR #24 review]
         return {"commit": None, "secrets": [], "error": "git add: " + (added.stderr.strip().splitlines() or ["?"])[-1][:200]}
@@ -467,20 +468,23 @@ def _rebase_in_progress(vault: Path) -> bool:
                for d in ("rebase-merge", "rebase-apply"))
 
 
-def _pull(vault: Path, now: datetime, sweep: bool = True, message: str | None = None) -> dict[str, Any]:
+def _pull(vault: Path, now: datetime, sweep: bool = True, message: str | None = None,
+          hold: tuple[str, ...] = ()) -> dict[str, Any]:
     """Bring the upstream's commits in under the vault's own; hand edits are committed first, so
     nothing sits in a stash. A conflict is aborted and recorded, never resolved by guessing.
     `sweep=False` (`commit`) commits nothing else: what it did not name is stashed around the pull.
-    `message` names the hand-edits commit (`sync` says it was not a pipeline run)."""
+    `message` names the hand-edits commit (`sync` says it was not a pipeline run); `hold` paths stay
+    out of it and are stashed around the pull (`sync`'s suspected stale copies)."""
     if not _is_repo(vault) or not _has_upstream(vault):
         return {"pulled": False, "detail": "no git upstream"}
     local = {"commit": None, "secrets": []}
     if sweep:
-        local = _commit(vault, message or f"vault: hand edits before pipeline {now.strftime('%Y-%m-%d %H:%M')}", exclude=(LOCK.as_posix(),))
+        local = _commit(vault, message or f"vault: hand edits before pipeline {now.strftime('%Y-%m-%d %H:%M')}",
+                        exclude=(LOCK.as_posix(), *hold))
     if local["secrets"]:
         return {"pulled": False, "secrets": local["secrets"], "detail": "hand edits hold a key-shaped string; see the DLQ"}
     before = _git(vault, "rev-parse", "HEAD").stdout.strip()
-    pull = _git(vault, "pull", "--rebase", "--no-edit", *(() if sweep else ("--autostash",)))
+    pull = _git(vault, "pull", "--rebase", "--no-edit", *(() if sweep and not hold else ("--autostash",)))
     if pull.returncode != 0:
         if _rebase_in_progress(vault):
             _git(vault, "rebase", "--abort")
@@ -498,10 +502,11 @@ def _pull(vault: Path, now: datetime, sweep: bool = True, message: str | None = 
     return {"pulled": True, "hand_edits": local["commit"], "new_commits": int(count) if count.isdigit() else 0}
 
 
-def _push(vault: Path, now: datetime, sweep: bool = True, message: str | None = None) -> dict[str, Any]:
+def _push(vault: Path, now: datetime, sweep: bool = True, message: str | None = None,
+          hold: tuple[str, ...] = ()) -> dict[str, Any]:
     if not _has_upstream(vault):
         return {"pushed": False, "detail": "no git upstream"}
-    sync = _pull(vault, now, sweep, message)
+    sync = _pull(vault, now, sweep, message, hold)
     if not sync.get("pulled"):
         # A conflict or a refused key must reach the caller as such, not as a failed push to retry.
         # [earned: 2026-10-01 — commit_paths' retry loop checked `conflict`, which never got here]
@@ -516,6 +521,64 @@ def _push(vault: Path, now: datetime, sweep: bool = True, message: str | None = 
     if push.returncode != 0:
         return {"pushed": False, "detail": "push failed: " + (push.stderr.strip().splitlines() or ["?"])[-1], **sync_facts}
     return {"pushed": True, **sync_facts}
+
+
+# Files only the cloud routines write: the ledgers and state the pipeline and the radar keep, beside
+# the generated navigation (GENERATORS; a daily note's text outside its block is the owner's). On the
+# Mac a change to them is never a hand edit: a second sync merged an older copy in, or a session left
+# one behind. [earned: 2026-10-01 — Obsidian Sync merged older copies into Log.md, Signal-Radar.md and
+# readwise-state.md (lastSyncedAt '2026-110-01…'), and the 13:32 UTC sync pushed them]
+CLOUD_OWNED = ("Log.md", "00_Memory/radar/", "00_Memory/imports.jsonl", "00_Memory/pipeline-state.json",
+               "00_Memory/readwise-ingested.jsonl", "00_Memory/readwise-archived.jsonl", "00_Memory/readwise-state.md",
+               "00_Memory/tavily-extract-ledger.jsonl")
+STALE_WINDOW = 20       # the earlier versions of a file a stale copy is looked for among
+REGRESSION_HOURS = 24   # how far back a pipeline run's additions are guarded against a silent take-back
+
+
+def _changed(vault: Path, *paths: str) -> list[str]:
+    """Tracked files that differ from HEAD (NUL-separated: vault paths have spaces)."""
+    return [p for p in _git(vault, "diff", "--name-only", "-z", "HEAD", "--", *paths).stdout.split("\0") if p]
+
+
+def _stale_copy(vault: Path, rel: str) -> bool:
+    """The working file is, byte for byte, one of its own earlier committed versions: a sync handing
+    an old copy back, which a hand edit never produces."""
+    blob = _git(vault, "hash-object", "--", rel).stdout.strip()
+    return bool(blob) and any(_git(vault, "rev-parse", f"{sha}:{rel}").stdout.strip() == blob
+                              for sha in _git(vault, "log", f"-{STALE_WINDOW}", "--format=%H", "--", rel).stdout.split())
+
+
+def _takes_back(vault: Path, rel: str, now: datetime) -> str:
+    """The working file only drops lines a pipeline run added to it in the last REGRESSION_HOURS, the
+    shape of a merged-in older copy: the run's commit subject, else "". A deletion of one's own looks
+    the same, so the caller holds such a change and asks; it never reverts it."""
+    diff = _git(vault, "diff", "--unified=0", "HEAD", "--", rel).stdout.splitlines()
+    if any(ln[1:].strip() for ln in diff if ln.startswith("+") and not ln.startswith("+++")):
+        return ""
+    removed = {ln[1:] for ln in diff if ln.startswith("-") and not ln.startswith("---") and ln[1:].strip()}
+    if not removed:
+        return ""
+    since = (now - timedelta(hours=REGRESSION_HOURS)).isoformat()
+    for line in _git(vault, "log", f"--since={since}", "--format=%H%x09%s", "--", rel).stdout.splitlines():
+        sha, _, subject = line.partition("\t")
+        if subject.startswith("pipeline "):
+            added = {ln[1:] for ln in _git(vault, "diff", "--unified=0", f"{sha}~1", sha, "--", rel).stdout.splitlines()
+                     if ln.startswith("+") and not ln.startswith("+++")}
+            if removed <= added:
+                return subject[:80]
+    return ""
+
+
+def _suspect(vault: Path, rel: str, now: datetime) -> str:
+    """Why a change to an owner's file looks like a stale copy rather than an edit, or "": an exact
+    earlier version of the file, or a take-back of a recent run's lines. Both are held, never
+    reverted: deleting exactly what a run added reproduces the earlier version too."""
+    if not (vault / rel).is_file():
+        return ""  # a deletion is the owner's: a merged-in older copy changes a file, it does not remove it
+    if _stale_copy(vault, rel):
+        return "it is, byte for byte, an earlier version of the file"
+    run = _takes_back(vault, rel, now)
+    return f"it only drops lines the cloud run '{run}' added" if run else ""
 
 
 def sync(vault: Path, now: datetime) -> dict[str, Any]:
@@ -540,15 +603,25 @@ def sync(vault: Path, now: datetime) -> dict[str, Any]:
         # that run's version in a rebase conflict and stop the sync. It goes back to HEAD first; a
         # daily note's text outside its block is the owner's and is kept. [earned: 2026-10-01]
         generated = [p for paths in GENERATORS.values() for p in paths if not p.startswith("00_Daily")]
-        restored = _git(vault, "diff", "--name-only", "HEAD", "--", *generated).stdout.split()
+        restored = _changed(vault, *generated, *CLOUD_OWNED)
         if restored:
             _git(vault, "checkout", "HEAD", "--", *restored)
-        result = _push(vault, now, message=f"vault: hand edits {now.strftime('%Y-%m-%d %H:%M')} (sync)")
+        held = {p: why for p in _changed(vault) if (why := _suspect(vault, p, now))}
+        for p, why in held.items():
+            _dlq_once(vault, slug="sync-held-" + re.sub(r"[^a-z0-9]+", "-", p.lower()).strip("-")[-60:],
+                      title=f"The Mac sync held back a change to {Path(p).name}",
+                      what_happened=f"A change to {p} looks like an older copy merged in by another sync (Obsidian Sync): "
+                                    f"{why}. It was not committed or pushed; it stays in the working copy on the Mac.",
+                      why_recorded="A stale copy would silently undo a pipeline run's work on GitHub and every device.",
+                      resolution=f"If you deleted those lines yourself, commit it: git add '{p}' && git commit. "
+                                 f"If not, restore the run's version: git checkout HEAD -- '{p}'.",
+                      confidence="medium")
+        result = _push(vault, now, message=f"vault: hand edits {now.strftime('%Y-%m-%d %H:%M')} (sync)", hold=tuple(held))
     finally:
         _release(lock, token)
     status = ("ok" if result.get("pushed") else "conflict" if result.get("conflict")
               else "refused" if result.get("secrets") else "failed")
-    return {"status": status, **result, **({"restored": restored} if restored else {})}
+    return {"status": status, **result, **({"restored": restored} if restored else {}), **({"held": sorted(held)} if held else {})}
 
 
 def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "",

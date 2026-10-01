@@ -91,6 +91,16 @@ launchctl unload ~/Library/LaunchAgents/io.agentic-toolkit.vault-sync.plist   # 
 One machine per vault: two checkouts that Obsidian Sync keeps alike would each commit the same
 hand edits.
 
+**Obsidian Sync beside git.** Obsidian Sync merges files too, and a device or server with an older
+copy of the vault can merge stale versions in (2026-10-01: Signal-Radar.md back to an earlier run,
+59 old Log.md lines appended, a pipeline enrichment dropped from a note, `readwise-state.md`'s
+`lastSyncedAt` corrupted to "2026-110-01…"). So `sync` never commits what the cloud routines own
+(`CLOUD_OWNED`: Log.md, `00_Memory/radar/`, the pipeline and Readwise ledgers and state, and the
+generated navigation): a local change to those goes back to HEAD. A change to any other file that
+is byte for byte an earlier version of it, or only drops lines a pipeline run added in the last 24
+hours, is held: not committed, left in the working copy, one DLQ note (`sync-held-…`) and one
+notification. A deletion is always the owner's.
+
 ## Reading a run
 
 - `Now.md`: this week's new and enriched notes, radar, stuck work and inbox (rebuilt every run).
