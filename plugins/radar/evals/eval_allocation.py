@@ -13,7 +13,9 @@
 4. credit     — each run adds budget × weight share, a new day halves what was left, clamped
 5. hold       — a held feed item stays in Reader and comes back next run; after HOLD_DAYS it is
                 archived and written to missed.jsonl; a sensor row that leaves unpromoted is missed
-6. briefing   — bubbles heaviest first; ★ must-see, ⏳ held, ✗ missed, → the note, queued
+6. briefing   — bubbles heaviest first; ★ must-see, ⏳ held, ✗ missed, → the note, queued; a link is
+                the address as saved (the row's `url`, else as a note or capture wrote it), never the
+                lower-cased canonical key [earned: 2026-10-01 — a TradingView link was a 404]
 [earned: 2026-09-30 — Music 23 promotions, Local AI and AI Agents 1 each, Muse 14 of a run]
 """
 from __future__ import annotations
@@ -169,6 +171,8 @@ def run(vault: Path) -> dict:
         radar.settle(items, {it.canonical for it in items}, rows, {}, DAY, True, True, "later", out, per_run=1)
         if promoted != ["f0"] or "f1" in archived or "f2" in archived:
             problems.append(f"phase 5: one promoted, the two held stay in Reader; promoted {promoted}, archived {archived}")
+        if [r.get("url") for r in radar.read_jsonl(out / "promoted.jsonl")] != ["https://feed0.example.org/p"]:
+            problems.append("phase 5: a feed promotion's ledger row carries the item's URL")
         from allocation import Cand
         held = [Cand(kind="feed", key=it.canonical, title=it.title, url=it.url, source=it.feed, p={"agents": 0.9},
                      bubble="agents", strength=0.9, ref=it) for it in items[1:]]
@@ -215,9 +219,19 @@ def run(vault: Path) -> dict:
         (sandbox / "04_Resources" / "Merged-Note.md").write_text(
             "---\nsource: https://first.example/1\nsources:\n  - https://first.example/1\n  - https://m.example/7\n---\n# M\n",
             encoding="utf-8")
-        idx = briefing.note_index(sandbox)
+        (sandbox / "04_Resources" / "Case-Note.md").write_text(
+            "---\nsource: https://www.Example.org/news/ID_AbC123/story/\n---\n# C\n", encoding="utf-8")
+        urls: dict[str, str] = {}
+        idx = briefing.note_index(sandbox, urls)
         if idx.get("m.example/7") != "04_Resources/Merged-Note.md":
             problems.append(f"phase 6: an item merged into a note's `sources` maps to that note, not its archived capture; got {idx.get('m.example/7')}")
+        cased = briefing.render(DAY, [Interest(id="agents", name="AI Agents")], alloc,
+                                [{"canonical": "example.org/news/id_abc123/story", "date": DAY, "bubble": "agents", "title": "Old row"},
+                                 {"canonical": "x.example/Y", "date": DAY, "bubble": "agents", "title": "New row",
+                                  "url": "https://x.example/Y?ref=1"}],
+                                [], [], idx, datetime(2026, 9, 30, 12, tzinfo=UTC), urls=urls)
+        if "(https://www.Example.org/news/ID_AbC123/story/)" not in cased or "(https://x.example/Y?ref=1)" not in cased:
+            problems.append(f"phase 6: links are the address as saved, not the lower-cased key: {cased}")
         if briefing._tail("05_Archive/X/cap--FULLCAPTURE.md") != " · archived":
             problems.append("phase 6: the archive is never linked")
         if radar.briefing_cmd(sandbox, sandbox / "00_Memory" / "no-radar-here", datetime(2026, 9, 30, tzinfo=UTC))["status"] != "skipped":

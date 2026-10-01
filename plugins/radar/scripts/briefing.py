@@ -57,9 +57,13 @@ def _tail(note: str | None) -> str:
 ACTIVE = ("02_Projects/", "03_Areas/", "04_Resources/")
 
 
-def note_index(vault: Path) -> dict[str, str]:
+def note_index(vault: Path, urls: dict[str, str] | None = None) -> dict[str, str]:
     """canonical source → the note that holds it: a note in 02–04 by its `source` or any of its
-    `sources` (an enrichment adds the item there), else the capture in the inbox or archive."""
+    `sources` (an enrichment adds the item there), else the capture in the inbox or archive.
+    With `urls`, also canonical → the address as written there: the link for a promotion
+    recorded before its row carried `url` (the canonical key is lower-cased, and a path is not
+    always case-insensitive). [earned: 2026-10-01 — a Reuters link on TradingView, lower-cased
+    from its key, was a 404 in the briefing]"""
     from radar import _canonical, contained, read_frontmatter  # lazy: radar imports this module
 
     index: dict[str, str] = {}
@@ -80,6 +84,8 @@ def note_index(vault: Path) -> dict[str, str]:
                 c = _canonical(src)
                 if c not in index or (rel.startswith(ACTIVE) and not index[c].startswith(ACTIVE)):
                     index[c] = rel
+                if urls is not None:
+                    urls.setdefault(c, src.strip())
     return index
 
 
@@ -116,9 +122,17 @@ def bubble_index(out: Path) -> dict[str, str]:
 
 
 def render(day: str, interests: list[Interest], alloc: dict[str, Any], promoted: list[dict], held: list[dict],
-           missed: list[dict], notes: dict[str, str], now: datetime, index: dict[str, str] | None = None) -> str:
+           missed: list[dict], notes: dict[str, str], now: datetime, index: dict[str, str] | None = None,
+           urls: dict[str, str] | None = None) -> str:
     names = {i.id: i.name for i in interests} | {OTHER: "Other"}
     index = index or {}
+    urls = urls or {}
+
+    def url_of(r: dict) -> str:
+        """The address as saved: the row's own, else as the vault wrote it, else the canonical key."""
+        c = r.get("canonical", "")
+        return r.get("url") or urls.get(c) or (f"https://{c}" if c else "")
+
     for r in promoted + held + missed:
         if not r.get("bubble"):
             r["bubble"] = index.get(r.get("canonical", "")) or index.get(r.get("google_news", "")) or OTHER
@@ -144,7 +158,7 @@ def render(day: str, interests: list[Interest], alloc: dict[str, Any], promoted:
             ev = events.get(r.get("event") or "", {})
             state = "promoted" if r in today else "held"
             tail = _tail(notes.get(r.get("canonical", "")))
-            lines.append(f"- ★ **{ev.get('name') or r.get('title')}** — {_link(r.get('title', ''), r.get('url') or 'https://' + r.get('canonical', ''))} "
+            lines.append(f"- ★ **{ev.get('name') or r.get('title')}** — {_link(r.get('title', ''), url_of(r))} "
                          f"({state}, {names.get(r.get('bubble'), r.get('bubble'))}){tail}")
         lines.append("")
     for b in order:
@@ -159,8 +173,7 @@ def render(day: str, interests: list[Interest], alloc: dict[str, Any], promoted:
         for r in got:
             tail = _tail(notes.get(r.get("canonical", "")))
             star = "★ " if r.get("must_see") else ""
-            url = r.get("url") or ("https://" + r["canonical"] if r.get("canonical") else "")
-            lines.append(f"- {star}{_link(r.get('title') or r.get('canonical', ''), url)} — {r.get('source') or r.get('via', 'feed')}{tail}")
+            lines.append(f"- {star}{_link(r.get('title') or r.get('canonical', ''), url_of(r))} — {r.get('source') or r.get('via', 'feed')}{tail}")
         for r in sorted(wait, key=lambda r: -float(r.get("strength") or 0))[:HELD_SHOWN]:
             lines.append(f"- ⏳ {_link(r.get('title', ''), r.get('url', ''))} — {r.get('source', '')}, held since {r.get('first_held')}")
         if len(wait) > HELD_SHOWN:
@@ -180,9 +193,10 @@ def write(vault: Path, out: Path, day: str, interests: list[Interest], now: date
         alloc = json.loads((out / "allocation.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         alloc = {}
-    notes = note_index(vault)
+    urls: dict[str, str] = {}
+    notes = note_index(vault, urls)
     text = render(day, interests, alloc, _read_jsonl(out / "promoted.jsonl"), _read_jsonl(out / "promote_hold.jsonl"),
-                  _read_jsonl(out / "missed.jsonl"), notes, now, bubble_index(out))
+                  _read_jsonl(out / "missed.jsonl"), notes, now, bubble_index(out), urls)
     path = out / f"Bubbles-{day}.md"
     atomic_write(path, text)
     return path

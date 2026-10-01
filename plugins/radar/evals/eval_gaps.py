@@ -8,7 +8,11 @@
                 (a second run is `exists`, no call)
 3. promote    — with --promote the strongest are saved to Reader Later tagged radar/<interest>,
                 within one run's promotion budget (an earlier promotion that day does not count),
-                and counted in promoted.jsonl (3b: the budget is `promote_per_run` from the profile/env)
+                and counted in promoted.jsonl (3b: the budget is `promote_per_run` from the profile/env);
+                3c: through the scan's allocation — one source at most per_source_run, the bubble's
+                credit charged in allocation.json, every row with its `url`, the rest held as `gap`
+                rows the next scan offers again (and promotes), gone after HOLD_DAYS, and another
+                kind's hold row left alone [earned: 2026-10-01 review — gaps bypassed the allocator]
 4. digest     — the week's digest has a "Found outside your feeds" section
 5. kagi       — `kagi answer` returns FastGPT's output and references, recorded in the ledger;
                 over the weekly budget nothing is sent (5b: a non-numeric kagi_weekly_budget_usd
@@ -19,6 +23,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -61,6 +66,7 @@ NEWS = [_hit("blog.example.org/strong-one", "Agent memory STRONG one", 1),
 
 def run(vault: Path) -> dict:
     import gaps
+    import interests as interests_mod
     import judge
     import kagi
     import radar
@@ -143,16 +149,51 @@ def run(vault: Path) -> dict:
         # 3b. the budget is the profile's promote_per_run (env override), not the constant: 0 saves
         # nothing; 5 saves the one strong row phase 3 could not fit (the other is already promoted)
         strong_rows = [g for g in data.get("rows", []) if g["strong"]]
-        names = {i: i for g in strong_rows for i in g["strong"]}
+        interests = interests_mod.load(sandbox)
         os.environ["TOOLKIT_RADAR_PROMOTE_PER_RUN"] = "0"
         saves.clear()
-        gaps._promote(out, strong_rows, names, NOW, sandbox)
+        gaps._promote(out, strong_rows, interests, NOW, sandbox)
         if saves:
             problems.append(f"phase 3b: promote_per_run=0 must save nothing, got {len(saves)}")
         os.environ["TOOLKIT_RADAR_PROMOTE_PER_RUN"] = "5"
-        gaps._promote(out, strong_rows, names, NOW, sandbox)
+        gaps._promote(out, strong_rows, interests, NOW, sandbox)
         if len(saves) != 1:
             problems.append(f"phase 3b: with the budget raised the remaining strong row is saved once, got {len(saves)}")
+
+        # 3c. the scan's allocation: five strong rows from one site and one from another, a budget of five
+        out3 = sandbox.parent / "radar-3c"
+        out3.mkdir()
+        day = NOW.date().isoformat()
+        (out3 / radar.HOLD_FILE).write_text(json.dumps({"canonical": "feed.example.org/held", "id": "f9", "kind": "feed",
+                                                        "first_held": day, "last_held": day}) + "\n", encoding="utf-8")
+        rows3 = [{"title": f"Agent memory story {i}", "url": f"https://blog.example.org/s{i}", "canonical": f"blog.example.org/s{i}",
+                  "site": "blog.example.org", "p": {"agent-memory": 0.9 - i / 100}, "strong": ["agent-memory"]} for i in range(5)]
+        rows3.append({"title": "Agent memory elsewhere", "url": "https://other.example.org/x", "canonical": "other.example.org/x",
+                      "site": "other.example.org", "p": {"agent-memory": 0.8}, "strong": ["agent-memory"]})
+        saves.clear()
+        r3 = gaps._promote(out3, rows3, interests, NOW, sandbox)
+        got = sorted(x["url"] for x in saves)
+        want = ["https://blog.example.org/s0", "https://blog.example.org/s1", "https://blog.example.org/s2", "https://other.example.org/x"]
+        if got != want or r3.get("promoted") != 4 or r3.get("held") != 2:
+            problems.append(f"phase 3c: one site takes at most per_source_run of a run, the rest is held; saved {got}, result {r3}")
+        prom3 = radar.read_jsonl(out3 / "promoted.jsonl")
+        if any(x.get("via") != "gaps" or not x.get("url") or x.get("bubble") != "agent-memory" for x in prom3):
+            problems.append(f"phase 3c: every gap promotion records via, url and bubble: {prom3}")
+        alloc3 = json.loads((out3 / radar.ALLOCATION_FILE).read_text(encoding="utf-8"))
+        if not math.isclose(alloc3["credit"].get("agent-memory", 0.0), 5 * 0.5 - 4):
+            problems.append(f"phase 3c: the bubble's credit is charged one per promotion, got {alloc3['credit']}")
+        hold3 = {x["canonical"]: x for x in radar.read_jsonl(out3 / radar.HOLD_FILE)}
+        if sorted(k for k, x in hold3.items() if x.get("kind") == "gap") != ["blog.example.org/s3", "blog.example.org/s4"] \
+                or "feed.example.org/held" not in hold3 or hold3["blog.example.org/s3"].get("p") != {"agent-memory": 0.87}:
+            problems.append(f"phase 3c: the two left are held with their p, the feed's hold row is left alone: {hold3}")
+        if [c.key for c in gaps.held_candidates(out3, (NOW + timedelta(days=policy.HOLD_DAYS)).date().isoformat(), set(), [], None)]:
+            problems.append("phase 3c: a gap row held HOLD_DAYS is not offered again")
+        saves.clear()
+        rs = radar.allocate(sandbox, out3, interests, [], set(), [], day, NOW, False, "later")  # nothing judged to archive
+        if sorted(x["url"] for x in saves) != ["https://blog.example.org/s3", "https://blog.example.org/s4"] or rs.get("gaps_promoted") != 2:
+            problems.append(f"phase 3c: the next scan promotes the held gap rows; saved {[x['url'] for x in saves]}, result {rs}")
+        if any(x.get("kind") == "gap" for x in radar.read_jsonl(out3 / radar.HOLD_FILE)):
+            problems.append("phase 3c: a promoted gap row leaves the hold file")
         os.environ.pop("TOOLKIT_RADAR_PROMOTE_PER_RUN", None)
 
         # 4. digest

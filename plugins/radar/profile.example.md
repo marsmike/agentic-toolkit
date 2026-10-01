@@ -51,7 +51,9 @@ shown here. Each field can also come from the environment as `TOOLKIT_RADAR_<FIE
   `shortlist` or `new`.
 - **`promote_per_run`** — how many strong items one `scan --promote` (or one `gaps --promote`) may
   save into Reader (default 5), sensor items first and the feed's strong items after them. The
-  budget starts fresh every run, so a busy morning cannot starve the rest of the day. The 0.80
+  budget starts fresh every run, so a busy morning cannot starve the rest of the day. Both
+  commands allocate the same way (the keys below, the bubbles' weights and credit); the strong
+  gap items a weekly run has no slot for wait in the hold file, and the next scans offer them again. The 0.80
   "strong" bar is policy and stays in code; this is the owner's appetite. Raise it when the daily
   radar note shows strong items the cap discarded.
 - **`promote_per_name_per_run`**, **`promote_per_name_per_day`** — how many sensor promotions one

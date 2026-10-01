@@ -380,9 +380,13 @@ def _hold_rows(out: Path | None, run_date: str, promoted_keys: set[str]) -> tupl
     return waiting, expired
 
 
-def write_hold(out: Path, run_date: str, held: list[Cand], promoted_keys: set[str]) -> None:
+def write_hold(out: Path, run_date: str, held: list[Cand], promoted_keys: set[str],
+               kinds: set[str] | None = None) -> None:
     """Rewrite the hold file: this run's held candidates, each keeping the day it was first held.
-    A sensor row that fell out of the window without a promotion of it or of its story is missed."""
+    A sensor row that fell out of the window without a promotion of it or of its story is missed.
+    A gap row (`gaps --promote`, once a week) keeps its interests' p, because only this file
+    brings it back: it waits until it is promoted or HOLD_DAYS pass (then `_hold_rows` calls it
+    missed). With `kinds`, the run offered only those, and every other row is kept as it was."""
     before = {r["canonical"]: r for r in read_jsonl(out / HOLD_FILE) if r.get("canonical")}
     now = {}
     for c in held:
@@ -390,11 +394,17 @@ def write_hold(out: Path, run_date: str, held: list[Cand], promoted_keys: set[st
         now[c.key] = {"canonical": c.key, "id": getattr(c.ref, "id", None) if c.kind == "feed" else None,
                       "kind": c.kind, "url": c.url, "title": c.title, "source": c.source, "bubble": c.bubble,
                       "strength": round(c.strength, 3), **({"event": c.event} if c.event else {}),
-                      **({"must_see": True} if c.must_see else {}),
+                      **({"must_see": True} if c.must_see else {}), **({"p": c.p} if c.kind == "gap" else {}),
                       "first_held": old.get("first_held", run_date), "last_held": run_date}
     promoted = read_jsonl(out / "promoted.jsonl")
     events = {r["event"] for r in promoted if r.get("event")}
     limit = (date.fromisoformat(run_date) - timedelta(days=policy.HOLD_DAYS)).isoformat()
+    for k, r in before.items():
+        if k in now or k in promoted_keys:
+            continue
+        if (kinds is not None and r.get("kind") not in kinds) or (
+                r.get("kind") == "gap" and (kinds is not None or str(r.get("first_held", run_date)) > limit)):
+            now[k] = r
     gone = [r for k, r in before.items() if k not in now and k not in promoted_keys and r.get("kind") == "sensor"
             and not (r.get("event") and r["event"] in events) and str(r.get("first_held", run_date)) > limit]
     if gone:
@@ -529,7 +539,7 @@ def settle(fetched: list[Item], recorded: set[str], state_rows: list[dict], name
             if archive and gave_up_ids:
                 archive_ids += [{"id": i, "location": "archive"} for i in gave_up_ids]
         if ledger and done:
-            append_jsonl(ledger, [{"canonical": item_key(by_id[i]), "id": i, "date": run_date,
+            append_jsonl(ledger, [{"canonical": item_key(by_id[i]), "id": i, "date": run_date, "url": by_id[i].url,
                                    "title": by_id[i].title, "source": by_id[i].feed or by_id[i].site,
                                    **({"bubble": by_key[i].bubble} if i in by_key else {}),
                                    **({"event": by_key[i].event} if i in by_key and by_key[i].event else {})}
@@ -589,14 +599,12 @@ def comment_epics(out: Path, rows: list[dict], interests: list[Interest], run_da
 ALLOCATION_FILE = "allocation.json"
 
 
-def allocate(vault: Path, out: Path, interests: list[Interest], fetched: list[Item], recorded: set[str],
-             state_rows: list[dict], run_date: str, now: datetime, archive: bool, location: str) -> dict[str, Any]:
-    """One run's promotions, sensors and feed together (`allocation.Selector`): must-see events
-    and labs' own posts first, then a weighted turn for every bubble (`bubbles.weights`, credit
-    carried in ALLOCATION_FILE), one event one promotion, every source and watched name capped.
-    What is not taken is held (HOLD_FILE) and the day's briefing says so (`briefing`).
-    [earned: 2026-09-30 — Music 23 promotions, Local AI and AI Agents 1 each, Muse 14 of a run]"""
-    names = {i.id: i.name for i in interests}
+def allocation_context(vault: Path, out: Path, interests: list[Interest], run_date: str, now: datetime) -> dict[str, Any]:
+    """What every promoting run starts from, `scan --promote` and `gaps --promote` alike: the run's
+    budget and caps (profile), the Signal Radar's events, the watched names, the bubbles' weights,
+    their credit for this run (ALLOCATION_FILE) and today's promotions so far (`today`: by bubble,
+    by event, by watched name). [earned: 2026-10-01 review — gaps promoted outside it: no weights,
+    no caps, no credit charged, nothing held]"""
     per_run = profile_number(vault, "promote_per_run", policy.PROMOTE_PER_RUN, cast=int)
     share = min(1.0, max(0.0, profile_number(vault, "promote_sensor_share", policy.SENSOR_SHARE, cast=float)))
     caps = Caps(per_source_run=profile_number(vault, "promote_per_source_per_run", policy.PROMOTE_PER_SOURCE_PER_RUN, cast=int),
@@ -617,10 +625,38 @@ def allocate(vault: Path, out: Path, interests: list[Interest], fetched: list[It
     except (OSError, json.JSONDecodeError):
         saved = {}
     credit = credit_for_run(saved.get("credit") or {}, weights, per_run, new_day=saved.get("date") != run_date)
-    b_n, e_n, n_n = sensor_promote.today_counts(out, run_date, pattern)
+    return {"per_run": per_run, "caps": caps, "evs": evs, "pattern": pattern, "weights": weights, "credit": credit,
+            "today": sensor_promote.today_counts(out, run_date, pattern)}
+
+
+def save_allocation(out: Path, run_date: str, now: datetime, ctx: dict[str, Any], credit: dict[str, float]) -> None:
+    """ALLOCATION_FILE after a run: the weights and events it used, the credit it left."""
+    atomic_write(out / ALLOCATION_FILE, json.dumps({
+        "date": run_date, "at": now.isoformat(timespec="minutes"),
+        "weights": {k: round(v, 3) for k, v in sorted(ctx["weights"].items(), key=lambda kv: -kv[1])},
+        "credit": {k: round(v, 3) for k, v in credit.items()},
+        "events": [{"key": e.key, "name": e.name, "strength": e.strength, "must_see": e.must_see} for e in ctx["evs"]],
+    }, indent=2, ensure_ascii=False) + "\n")
+
+
+def allocate(vault: Path, out: Path, interests: list[Interest], fetched: list[Item], recorded: set[str],
+             state_rows: list[dict], run_date: str, now: datetime, archive: bool, location: str) -> dict[str, Any]:
+    """One run's promotions, sensors, held gap items and feed together (`allocation.Selector`):
+    must-see events and labs' own posts first, then a weighted turn for every bubble
+    (`bubbles.weights`, credit carried in ALLOCATION_FILE), one event one promotion, every source
+    and watched name capped. What is not taken is held (HOLD_FILE) and the day's briefing says so
+    (`briefing`). [earned: 2026-09-30 — Music 23 promotions, Local AI and AI Agents 1 each, Muse 14
+    of a run]"""
+    names = {i.id: i.name for i in interests}
+    actx = allocation_context(vault, out, interests, run_date, now)
+    per_run, caps, evs, pattern = actx["per_run"], actx["caps"], actx["evs"], actx["pattern"]
+    b_n, e_n, n_n = actx["today"]
     t = policy.thresholds(judge.load_config(vault)["backend"])
     known = set(vault_sources(vault))
+    done = read_jsonl(out / "promoted.jsonl")
+    promoted_keys = {r["canonical"] for r in done} | {r["google_news"] for r in done if r.get("google_news")}
     sensor_cands = sensor_promote.candidates(out, t, run_date, known, pattern, evs)
+    gap_cands = gaps_mod.held_candidates(out, run_date, known | promoted_keys | {c.key for c in sensor_cands}, evs, pattern)
     ctx: dict[str, Any] = {}
 
     def select(feed_cands: list[Cand]) -> tuple[set[str], set[str]]:
@@ -629,11 +665,12 @@ def allocate(vault: Path, out: Path, interests: list[Interest], fetched: list[It
             if ev:
                 c.event, c.event_name, c.must_see = ev.key, ev.name, ev.must_see
             c.names = frozenset(sensor_promote.named(c.title, pattern))
-        sel = Selector(sensor_cands + feed_cands, per_run, credit, caps=caps,
-                       today_bubbles=b_n, today_events=e_n, today_names=n_n)
+        feed_keys = {c.key for c in feed_cands}
+        sel = Selector(sensor_cands + [g for g in gap_cands if g.key not in feed_keys] + feed_cands, per_run,
+                       actx["credit"], caps=caps, today_bubbles=b_n, today_events=e_n, today_names=n_n)
         stats: dict[str, Any] = {}
-        sel.run(lambda c: sensor_promote.save(c, out, t, run_date, location, names, known, stats)
-                if c.kind == "sensor" else True)
+        sel.run(lambda c: sensor_promote.save(c, out, t, run_date, location, names, known, stats) if c.kind == "sensor"
+                else gaps_mod.save(c, out, run_date, location, names, stats) if c.kind == "gap" else True)
         ctx.update(sel=sel, stats=stats)
         return ({c.ref.id for c in sel.taken if c.kind == "feed"}, {c.ref.id for c in sel.held() if c.kind == "feed"})
 
@@ -644,13 +681,11 @@ def allocate(vault: Path, out: Path, interests: list[Interest], fetched: list[It
         result |= sensor_promote.report(sel, ctx["stats"])
         result["bubbles"] = dict(Counter(c.bubble for c in sel.taken))
         result["must_see"] = sum(1 for c in sel.taken if c.must_see)
-        write_hold(out, run_date, sel.held(), {r["canonical"] for r in read_jsonl(out / "promoted.jsonl")})
-    atomic_write(out / ALLOCATION_FILE, json.dumps({
-        "date": run_date, "at": now.isoformat(timespec="minutes"),
-        "weights": {k: round(v, 3) for k, v in sorted(weights.items(), key=lambda kv: -kv[1])},
-        "credit": {k: round(v, 3) for k, v in (sel.credit if sel is not None else credit).items()},
-        "events": [{"key": e.key, "name": e.name, "strength": e.strength, "must_see": e.must_see} for e in evs],
-    }, indent=2, ensure_ascii=False) + "\n")
+        if gaps_taken := sum(1 for c in sel.taken if c.kind == "gap"):
+            result["gaps_promoted"] = gaps_taken
+        write_hold(out, run_date, sel.held(), {r["canonical"] for r in read_jsonl(out / "promoted.jsonl")} | known
+                   | {c.key for c in sel.taken})
+    save_allocation(out, run_date, now, actx, sel.credit if sel is not None else actx["credit"])
     briefing.write(vault, out, run_date, interests, now)
     return result
 

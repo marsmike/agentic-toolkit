@@ -215,8 +215,9 @@ def run(vault: Path) -> dict:
                 if [s["url"] for s in saves] != ["https://pub.example.org/new-story"] or r.get("sensors_unresolved") != 1:
                     problems.append(f"phase 5: the resolved link is saved as the publisher's URL, the other counted, got {saves}, {r}")
                 rows = [json.loads(x) for x in (out5 / "promoted.jsonl").read_text(encoding="utf-8").splitlines()]
-                if rows and (rows[0]["canonical"] != "pub.example.org/new-story" or "news.google.com" not in rows[0].get("google_news", "")):
-                    problems.append(f"phase 5: the ledger row names the publisher and keeps the Google link, got {rows}")
+                if rows and (rows[0]["canonical"] != "pub.example.org/new-story" or "news.google.com" not in rows[0].get("google_news", "")
+                             or rows[0].get("url") != "https://pub.example.org/new-story"):
+                    problems.append(f"phase 5: the ledger row names the publisher, its URL as saved, and keeps the Google link, got {rows}")
                 n = len(asked)
                 saves.clear()
                 sensor_promote.promote(out5, T, DAY, 10, "later", known, names, WATCH)

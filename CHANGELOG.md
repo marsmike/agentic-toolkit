@@ -18,6 +18,29 @@ Every release entry links the change to the research or the dated failure that m
   the capture's source to a note that only links to it.
   [earned: 2026-10-01, review of the day's cloud runs]
 
+- **Gap promotions go through the scan's allocation (radar 3.9.0).** `gaps --promote` saved its
+  strongest items by probability alone, up to `promote_per_run` (25 on the owner's profile): no
+  bubble weights, no credit charged, no per-source, per-name or per-event cap, and nothing held.
+  `scan --promote` has allocated sensors and feed together since 3.8.0. Gaps now builds the same
+  allocation (`radar.allocation_context`: the profile's budget and caps, the Signal Radar's events,
+  the watched names, the weights, this run's credit and today's promotions) and walks the same
+  `Selector`, and its promotions are charged to their bubbles' credit in `allocation.json`. What
+  gets no slot waits in `promote_hold.jsonl` as a `gap` row that keeps its interests' p. The next
+  scans offer it again beside the sensors and the feed (`gaps_promoted` in the scan's result), and
+  after `HOLD_DAYS` it is missed like any held item. A Google News link from Kagi is resolved like
+  a sensor's.
+  [earned: 2026-10-01, review: the weekly run (Saturdays) could put a whole run's budget into one
+  bubble or one site]
+
+- **Every promotion records the address it was saved under, and the briefing links that (radar
+  3.9.0).** `promoted.jsonl` rows carried only the canonical key, which is lower-cased, so the
+  Bubbles briefing linked `https://` plus the key. The Reuters story on TradingView
+  (`newsml_L6N45M1EL`) became a 404, and 46 of the 120 promotions of 2026-09-30 and 2026-10-01 had
+  capitals in their path. Google News ids, LessWrong and TradingView break on that; Reddit and
+  GitHub forgive it. Feed, sensor and gap rows now carry `url`. An older row takes the address as a
+  note or capture wrote it (`briefing.note_index(vault, urls)`), and only then the key.
+  [earned: 2026-10-01, review of the day's briefing]
+
 - **The dossier reads the whole capture, not its first heading (obsidian 3.5.2).** The content check
   (`content_match`) judged the text from `## Full Text` up to the next heading of any level, so an
   article with its own headings ended at its first one. A GitHub README that opens with `## guardrails`

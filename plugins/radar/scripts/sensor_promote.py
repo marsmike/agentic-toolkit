@@ -207,7 +207,7 @@ def save(c: Cand, out: Path, t: dict[str, float], run_date: str, location: str, 
         stats.setdefault("errors", []).append(str(e)[:120])
         return False
     append_jsonl(out / "promoted.jsonl", [{
-        "canonical": canonical, "id": doc_id, "date": run_date, "via": "sensors", "source": it.get("source"),
+        "canonical": canonical, "id": doc_id, "date": run_date, "via": "sensors", "url": url, "source": it.get("source"),
         "title": c.title, "bubble": c.bubble, **({"event": c.event} if c.event and not c.event.startswith("story:") else {}),
         **({"must_see": True} if c.must_see else {}), **({"google_news": google_news} if google_news else {})}])
     stats.setdefault("saved", set()).add(canonical)

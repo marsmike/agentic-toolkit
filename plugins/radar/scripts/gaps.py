@@ -9,9 +9,12 @@ the last 7 days whose address the radar has not seen and the vault does not hold
 `worth_reading` per item x interest, exactly as `scan` judges feed items. The week's result is
 `00_Memory/radar/gaps-YYYY-Www.json` (run once per ISO week; a second run that week is `exists`)
 and a "Found outside your feeds" section in that week's digest, with the sites that carried
-strong items as feed candidates for `discover --seed`. With `--promote`, the strongest strong
-items are saved to Reader's Later list tagged `radar` and `radar/<interest>`, within the same daily
-promotion budget as `scan`, so the one pipeline captures and distills them.
+strong items as feed candidates for `discover --seed`. With `--promote`, the strong items go
+through the scan's own allocation (`radar.allocation_context`, `allocation.Selector`): one run's
+`promote_per_run`, must-see events first, a weighted turn for every bubble with its credit
+charged, one event one promotion, every source and watched name capped. The chosen are saved to
+Reader's Later list tagged `radar` and `radar/<interest>`, so the one pipeline captures and
+distills them; the rest wait in the hold file, and the next scans offer them again for HOLD_DAYS.
 
 What leaves the machine: one query per interest to Kagi; titles and snippets of what it found to
 the judgment backend; with --promote, the saved addresses to Reader.
@@ -20,16 +23,22 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+import bubbles
+import fairness
+import gnews
 import interests as interests_mod
 import judge
 import kagi
 import reader
 import reports
+import sensor_promote
+from allocation import Cand, Selector
+from interests import Interest
 from judgments import policy
 from judgments.urls import _canonical
 from reader import Item
@@ -124,36 +133,96 @@ def gaps(vault: Path, out: Path, now: datetime, promote: bool = False) -> dict[s
                               "kagi_usd": round(ledger.spent_this_week(now) - spent_before, 4),
                               "judgment_usd": round(run.usd, 5)}
     if promote and strong:
-        result |= _promote(out, strong, {i.id: i.name for i in interests}, now, vault)
+        result |= _promote(out, strong, interests, now, vault)
     out.mkdir(parents=True, exist_ok=True)
     atomic_write(path, json.dumps({"week": week, "rows": rows, "sites": sites.most_common(), **{k: result[k] for k in (
         "searched", "found", "strong")}}, indent=2, ensure_ascii=False) + "\n")
     return {**result, "file": str(path)}
 
 
-def _promote(out: Path, strong: list[dict], names: dict[str, str], now: datetime, vault: Path) -> dict:
-    """Save the strongest to Reader within one run's promotion budget."""
-    from radar import append_jsonl, profile_number, read_jsonl
+def candidate(r: dict, evs: list, pattern) -> Cand:
+    """A strong gap row (or a held one, which keeps only its strong interests' p) as an allocation
+    candidate: its bubble, its event (`bubbles.event_of`) and the watched names in its title."""
+    from radar import release_stream  # lazy: radar imports this module
+
+    strong = r.get("strong")
+    p = {i: float(v) for i, v in (r.get("p") or {}).items() if not strong or i in strong}
+    url, title = str(r["url"]), str(r.get("title") or "")
+    ev = bubbles.event_of(title, evs)
+    return Cand(kind="gap", key=str(r["canonical"]), title=title, url=url,
+                source=str(r.get("site") or r.get("source") or urlparse(url).netloc.lower().removeprefix("www.")),
+                p=p, bubble=fairness.top_interest(p), strength=max(p.values(), default=0.0),
+                last_choice=sensor_promote.last_choice(url), event=ev.key if ev else None,
+                event_name=ev.name if ev else None, must_see=bool(ev and ev.must_see),
+                stream=release_stream(str(r["canonical"])),
+                names=frozenset(sensor_promote.named(title, pattern)), ref=r)
+
+
+def held_candidates(out: Path, run_date: str, exclude: set[str], evs: list, pattern) -> list[Cand]:
+    """The gap rows the hold file keeps (strong, but a weekly run had no slot for them), for the
+    scan to offer again until HOLD_DAYS pass; none already promoted, held by the vault or in
+    `exclude`."""
+    from radar import HOLD_FILE, read_jsonl  # lazy: radar imports this module
+
+    limit = (date.fromisoformat(run_date) - timedelta(days=policy.HOLD_DAYS)).isoformat()
+    return [candidate(r, evs, pattern) for r in read_jsonl(out / HOLD_FILE)
+            if r.get("kind") == "gap" and r.get("canonical") and r.get("url") and r.get("p")
+            and r["canonical"] not in exclude and str(r.get("first_held", run_date)) > limit]
+
+
+def save(c: Cand, out: Path, run_date: str, location: str, names: dict[str, str], stats: dict[str, Any]) -> bool:
+    """Save one gap candidate to Reader (a Google News link as the publisher's URL, or not at all);
+    one `promoted.jsonl` row with `via: gaps` and the address it was saved under."""
+    from radar import append_jsonl  # lazy: radar imports this module
+
+    url, canonical, google_news = c.url, c.key, None
+    if gnews.is_google_news(url):
+        google_news, url = canonical, gnews.resolve(url) or ""
+        if not sensor_promote.usable(url):
+            stats["unresolved"] = stats.get("unresolved", 0) + 1
+            return False
+        canonical = _canonical(url)
+    note = f"[radar gap {run_date}] " + "; ".join(f"{names.get(i, i)} p={v:.2f}" for i, v in sorted(c.p.items()))
+    try:
+        doc_id = reader.save(url, location, ["radar", *(f"radar/{i}" for i in sorted(c.p))], note)
+    except (reader.ReaderError, ValueError) as e:
+        stats.setdefault("errors", []).append(str(e)[:120])
+        return False
+    append_jsonl(out / "promoted.jsonl", [{
+        "canonical": canonical, "id": doc_id, "date": run_date, "via": "gaps", "url": url, "title": c.title,
+        "source": c.source, "bubble": c.bubble, **({"event": c.event} if c.event else {}),
+        **({"must_see": True} if c.must_see else {}), **({"google_news": google_news} if google_news else {})}])
+    return True
+
+
+def _promote(out: Path, strong: list[dict], interests: list[Interest], now: datetime, vault: Path) -> dict:
+    """The week's strong items through the scan's allocation: one run's `promote_per_run`, must-see
+    first, a weighted turn per bubble with its credit charged, every source, watched name and
+    event capped. What is not taken waits in the hold file for the next scans.
+    [earned: 2026-10-01 review — gaps saved its strongest 25 with no weights, caps or credit, and
+    held nothing]"""
+    from radar import allocation_context, read_jsonl, release_stream, save_allocation, write_hold  # lazy
 
     run_date = now.date().isoformat()
-    ledger = out / "promoted.jsonl"
-    done = read_jsonl(ledger)
-    budget = max(0, profile_number(vault, "promote_per_run", policy.PROMOTE_PER_RUN, cast=int))
-    already = {r["canonical"] for r in done}
+    ctx = allocation_context(vault, out, interests, run_date, now)
+    done = read_jsonl(out / "promoted.jsonl")
+    already = {r["canonical"] for r in done} | {r["google_news"] for r in done if r.get("google_news")}
+    since = (now.date() - timedelta(days=policy.RELEASE_STREAM_DAYS)).isoformat()
+    streams = {release_stream(r["canonical"]) for r in done if str(r.get("date", "")) > since} - {None}
+    b_n, e_n, n_n = ctx["today"]
+    sel = Selector([candidate(r, ctx["evs"], ctx["pattern"]) for r in strong if r["canonical"] not in already],
+                   ctx["per_run"], ctx["credit"], caps=ctx["caps"], today_bubbles=b_n, today_events=e_n,
+                   today_names=n_n, streams_taken=streams)
     location = str(profile_value(vault, "promote_location", "later"))
-    saved, errors = 0, []
-    for r in [r for r in strong if r["canonical"] not in already][:budget]:
-        p = {i: r["p"][i] for i in r["strong"]}
-        note = f"[radar gap {run_date}] " + "; ".join(f"{names.get(i, i)} p={v:.2f}" for i, v in sorted(p.items()))
-        try:
-            doc_id = reader.save(r["url"], location, ["radar", *(f"radar/{i}" for i in sorted(p))], note)
-        except reader.ReaderError as e:
-            errors.append(str(e)[:120])
-            continue
-        append_jsonl(ledger, [{"canonical": r["canonical"], "id": doc_id, "date": run_date, "via": "gaps",
-                               "title": r.get("title", ""), "bubble": max(p, key=p.get) if p else None}])
-        saved += 1
-    return {"promoted": saved, **({"promote_errors": errors} if errors else {})}
+    names = {i.id: i.name for i in interests}
+    stats: dict[str, Any] = {}
+    sel.run(lambda c: save(c, out, run_date, location, names, stats))
+    write_hold(out, run_date, sel.held(), already | {c.key for c in sel.taken}, kinds={"gap"})
+    save_allocation(out, run_date, now, ctx, sel.credit)
+    held = len(sel.held())
+    return {"promoted": len(sel.taken), **({"held": held} if held else {}),
+            **({"unresolved": stats["unresolved"]} if stats.get("unresolved") else {}),
+            **({"promote_errors": stats["errors"]} if stats.get("errors") else {})}
 
 
 def load_week(out: Path, week: str) -> dict | None:
