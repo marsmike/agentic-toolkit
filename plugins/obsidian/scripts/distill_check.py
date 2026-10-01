@@ -13,7 +13,8 @@ Hard gates (fail the check):
   attachment    a capture with `attachment:` is linked from the note
   links         no wikilink into 01_Capture/ or 05_Archive/; every wikilink resolves
   index         Index.md has a line for the note
-Soft gates (reported, never fail): the capture's other URLs not carried by the note (a
+Soft gates (reported, never fail): a description over DESCRIPTION_MAX characters (it is the
+note's one line in Index.md and its map); the capture's other URLs not carried by the note (a
 thread's reply links are usually fine to drop; a paper or repo is not), findability of each
 --ask question (top three by widened rerank, plain search without a backend), and the
 preservation check against the capture's kept passages (needs a judgment backend).
@@ -39,6 +40,10 @@ from search import search
 from vault_utils import discover_notes, read_frontmatter, require_vault, vault_file
 
 NEVER_LINK = ("01_Capture/", "05_Archive/")
+# A description is the note's one line in Index.md and its map, not its summary. [earned: 2026-10-01
+# — since the pipeline moved to the cloud (09-23) the median description grew from ~160 to ~440
+# characters, one sentence held together by semicolons, and Index.md reached 452 KB]
+DESCRIPTION_MAX = 250
 IMAGE_HOSTS = ("readwise-assets", "substackcdn", "pbs.twimg.com", "images.unsplash", "cdn-images", "gravatar")
 WIKILINK_RE = re.compile(r"\[\[([^\]|#\\]+)")
 
@@ -87,6 +92,10 @@ def check(note: Path, capture: Path, vault: Path, asks: list[str]) -> dict:
     hard["index"] = (f"[[{rel}|" in index or f"[[{rel}]]" in index, "add an Index.md line" if f"[[{rel}" not in index else "ok")
 
     soft: dict[str, object] = {"urls_not_in_note": {"count": len(lost), "sample": lost[:5]}}
+    desc = " ".join(str(fm.get("description") or "").split())
+    if len(desc) > DESCRIPTION_MAX:
+        soft["description"] = {"chars": len(desc), "max": DESCRIPTION_MAX,
+                               "fix": "one plain sentence: what the note is and why it is kept; the body carries the detail"}
     if asks:
         target = note.relative_to(vault).as_posix()
         ranks = []
@@ -129,6 +138,9 @@ def main() -> int:
     else:
         for gate, (ok, why) in report["hard"].items():
             print(f"  {'ok  ' if ok else 'FAIL'} {gate:<12} {why}")
+        d = report["soft"].get("description")
+        if d:
+            print(f"  soft description: {d['chars']} characters, over {d['max']}: {d['fix']}")
         u = report["soft"]["urls_not_in_note"]
         if u["count"]:
             print(f"  soft urls: {u['count']} capture URL(s) not in the note, e.g. {u['sample'][:2]}")

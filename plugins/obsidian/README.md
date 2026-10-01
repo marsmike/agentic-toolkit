@@ -61,7 +61,7 @@ flowchart LR
 | Script | Question it answers | Writes |
 |---|---|---|
 | `distill_judge.py --dossier` | per capture: what kind of material, which notes it is really about and at which enrichment level, is it already covered, where it goes, which passages carry its substance, how the pipeline's synthesis relates to the source; per batch: duplicates and near-duplicates | nothing |
-| `distill_check.py` | is this note done: frontmatter, own-source line, stored document linked, no forbidden or dangling links, Index line; softly: dropped URLs, findability of the reader's questions, kept passages carried | nothing |
+| `distill_check.py` | is this note done: frontmatter, own-source line, stored document linked, no forbidden or dangling links, Index line; softly: a description over 250 characters, dropped URLs, findability of the reader's questions, kept passages carried | nothing |
 | `search_judge.py` | which note answers this question: keyword hits, widened by their wikilink neighbours, reranked by one judgment each | nothing |
 | `link_judge.py` | which of gaiafield's suggested links would help a reader | nothing |
 | `vault_judge.py` | which descriptions are too vague to find, which domain tags are missing | nothing |

@@ -4,6 +4,14 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A description over 250 characters is a soft finding of the check (obsidian 3.9.1).** A note's
+  `description` is its one line in Index.md and its map (contract/VAULT_SCHEMA.md: "one-sentence
+  purpose"). Since the pipeline moved to the cloud on 2026-09-23 the median grew from ~160 to ~440
+  characters — still one sentence, held together by semicolons — 32 of the 34 notes distilled on
+  2026-10-01 were over 320, and Index.md reached 452 KB. `distill_check.py` now reports
+  `soft.description` (characters, the limit, the fix) and the skill says what a description is;
+  like every soft finding it is answered, never a failed gate, so no unattended run can stall on it.
+
 - **The Signal Radar's name check no longer counts namesakes from before it added context (radar
   3.10.3).** check_candidates learned on 2026-10-01 to ask a one-word name with disambiguating
   context, but the rows asked bare before that stayed evidence for their whole week, and a name asked

@@ -149,6 +149,21 @@ def run(vault: Path) -> dict:
                 why = {g: report["hard"][g][1] for g in failed}
                 problems.append(f"{name}: expected {expected or 'a pass'}, failed {failed} {why}")
 
+        # A description that is a summary, not a line: reported soft over DESCRIPTION_MAX, never a
+        # failed gate; the good note's short one is not reported [earned: 2026-10-01]
+        long_note = sandbox / "04_Resources" / "Eval-Check-long-description.md"
+        long_note.write_text(_note({**GOOD_FM, "description": "A note whose description runs on and on; " * 10}, GOOD_BODY),
+                             encoding="utf-8")
+        index.write_text(index.read_text(encoding="utf-8") +
+                         "\n- [[04_Resources/Eval-Check-long-description|Eval long-description]] — fixture\n", encoding="utf-8")
+        long_rep = distill_check.check(long_note, capture, sandbox, asks=[])
+        good_rep = distill_check.check(sandbox / "04_Resources" / "Eval-Check-good.md", capture, sandbox, asks=[])
+        if not long_rep["pass"] or long_rep["soft"].get("description", {}).get("chars", 0) <= distill_check.DESCRIPTION_MAX \
+                or "description" in good_rep["soft"]:
+            problems.append(f"long-description: a description over {distill_check.DESCRIPTION_MAX} characters is a soft finding, "
+                            f"never a failed gate, and a short one none; got pass={long_rep['pass']}, "
+                            f"{long_rep['soft'].get('description')}, good={good_rep['soft'].get('description')}")
+
         # A capture with no `attachment` field at all (a PDF, since 2026-09-24) must pass the
         # attachment gate on a note that links nothing — there is no stored file to require.
         pdf_capture = sandbox / "01_Capture" / "Eval-Check-PDF-Capture.md"

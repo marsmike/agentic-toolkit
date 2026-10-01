@@ -40,7 +40,10 @@ distilled`, `processed_date`, `description`), a `*Source: …*` line naming the 
 source (one line, never wrapped; an enrichment adds the capture's line beside the note's own), a stored document linked when the capture has one (legacy captures only — a PDF captured
 since 2026-09-24 has no file in the vault to link; its Source line already names the PDF URL,
 so the note cites page ranges against that instead), no wikilink into `01_Capture/`
-or `05_Archive/`, no dangling wikilink, an Index.md line. Soft, reported: which of the
+or `05_Archive/`, no dangling wikilink, an Index.md line. Soft, reported: a `description` over
+250 characters (it is the note's one line in Index.md and its map, not its summary: one plain
+sentence saying what the note is and why it is kept; the body carries the detail — [earned:
+2026-10-01, descriptions had grown to a median of ~440 characters]), which of the
 capture's other URLs the note dropped, whether your `--ask` questions find the note in the
 top three, and which of the capture's kept passages the note does not carry. A capture is
 retired only after the check passes and you have answered every soft finding: put it in,
