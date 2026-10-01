@@ -421,6 +421,9 @@ def run(vault: Path) -> dict:
             problems.append("phase 2: the lock must be released and never committed")
         if "Log.md" not in committed or "pipeline |" not in (sandbox / "Log.md").read_text(encoding="utf-8"):
             problems.append("phase 2: one Log.md line for the run")
+        # the inbox survives being emptied: git keeps no empty folder [earned: 2026-10-01]
+        if not _git(sandbox, "ls-files", "01_Capture/.gitkeep").strip():
+            problems.append("phase 2: end must keep 01_Capture/ in git with a .gitkeep, so emptying the inbox keeps the folder")
         daily = [p for p in committed if p.startswith("00_Daily/")]
         if not daily or any("%% daily:start %%" not in (sandbox / p).read_text(encoding="utf-8") for p in daily):
             problems.append(f"phase 2: end builds and commits the day's daily note (daily_build.py), got {committed}")

@@ -4,6 +4,12 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **Emptying the inbox keeps the inbox (obsidian 3.9.2).** Git keeps no empty directory: on
+  2026-10-01 the 15:58 UTC run retired the only capture, the Mac's sync pulled it and removed
+  `01_Capture/`, and the folder vanished from Obsidian, where the Capture template writes. `end` now
+  keeps a hidden `01_Capture/.gitkeep` (created when missing, committed with the run); the pipeline
+  eval's phase 2 checks it is tracked. contract/VAULT_SCHEMA.md says so.
+
 - **A description over 250 characters is a soft finding of the check (obsidian 3.9.1).** A note's
   `description` is its one line in Index.md and its map (contract/VAULT_SCHEMA.md: "one-sentence
   purpose"). Since the pipeline moved to the cloud on 2026-09-23 the median grew from ~160 to ~440

@@ -10,7 +10,7 @@ executable version of this contract: a schema change that isn't reflected there 
 | Folder | Rules |
 |---|---|
 | `00_Memory/` | Agent self-memory — operational state, not vault content. Never distill into it, never enrich from it, never link to it from active notes. |
-| `01_Capture/` | Inbox. Raw and untrusted, ephemeral. **Flat — no subfolders, ever.** Filenames are hyphenated and prefixed by origin (e.g. `Readwise-`, `Research-`, `<Source>-`) so a directory listing alone shows provenance. Never link *to* a capture from active content — a distilled note's source points at the original external source, never at the capture file. Remove a capture after distilling it via the vault's safe-delete surface (`contract/KNOWLEDGE_API.md`), never an irreversible raw delete. |
+| `01_Capture/` | Inbox. Raw and untrusted, ephemeral. **Flat — no subfolders, ever.** Filenames are hyphenated and prefixed by origin (e.g. `Readwise-`, `Research-`, `<Source>-`) so a directory listing alone shows provenance. Never link *to* a capture from active content — a distilled note's source points at the original external source, never at the capture file. Remove a capture after distilling it via the vault's safe-delete surface (`contract/KNOWLEDGE_API.md`), never an irreversible raw delete. A hidden `.gitkeep` keeps the folder in git when the inbox is empty (the pipeline's `end` restores it). |
 | `02_Projects/` | Active projects with a specific, closable outcome. One subfolder per project. |
 | `03_Areas/` | Ongoing responsibilities with no end date. |
 | `04_Resources/` | Reference material not tied to one project, grouped by kind. |

@@ -644,6 +644,15 @@ def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[s
     untouched = [c for c in state.pop("batch", []) if (vault / c).is_file() and c not in failed]
     _save_state(vault, state)
 
+    # The inbox stays a folder when a run empties it: git keeps no empty directory, so retiring the
+    # last capture took 01_Capture/ off every checkout that pulled, and out of Obsidian, where the
+    # Capture template writes. A hidden `.gitkeep` keeps it. [earned: 2026-10-01 — the 15:58 UTC
+    # run retired the only capture and the Mac's sync removed the folder; the owner missed it]
+    keep = vault / "01_Capture" / ".gitkeep"
+    if not keep.exists():
+        keep.parent.mkdir(exist_ok=True)
+        keep.write_text("", encoding="utf-8")
+
     summary = f"{distilled} distilled, {dropped} dropped, {len(failed)} failed"
     if marks is not None:
         summary += f"; in: {came_in(vault, marks)}"
