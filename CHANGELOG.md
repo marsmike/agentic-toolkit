@@ -4,6 +4,16 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **An unusable Readwise cursor falls back to the window (readwise 3.1.6).** Only ingest writes
+  `lastSyncedAt`, but on 2026-10-01 a stale Obsidian Sync merge wrote `'2026-110-01T13:00…'`, which
+  `_utc` raises on: the next ingest would have failed before fetching anything. A cursor that is no
+  timestamp, or lies in the future, now counts as none: the run fetches the four-week window (the
+  ledger keeps anything from coming in twice), writes one `readwise-cursor-…` DLQ note (none in a dry
+  run) and rewrites the cursor when it ends cleanly. The ingest eval's phase 6 covers both cases.
+- **Index rebuilds are logged only when notes came or went (obsidian 3.8.1).** A pipeline run
+  rebuilds Index.md three or four times, and the identical "Index.md rebuilt" lines were 324 of
+  Log.md's 873. The line now carries `+added -dropped` and is written only when either is non-zero.
+
 - **The Mac's sync never pushes a stale copy (obsidian 3.8.0).** Obsidian Sync merges files too,
   and on 2026-10-01 it merged older copies into the Mac's vault when Obsidian started: Signal-Radar.md
   went back to the 08:30 run, Log.md gained 59 repeated lines from the day before, a note lost the 24

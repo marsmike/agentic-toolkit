@@ -161,9 +161,27 @@ def vault_index(vault: Path) -> tuple[dict[str, str], dict[str, str]]:
     return ids, sources
 
 
-def last_synced(vault: Path, now: datetime) -> str:
+def cursor_problem(vault: Path, now: datetime) -> str:
+    """The cursor's raw value when it cannot be the last sync: no timestamp, or one in the future
+    (only ingest writes it, with the run's own clock). "" when it is fine or absent. [earned:
+    2026-10-01 — a stale Obsidian Sync merge wrote lastSyncedAt: '2026-110-01T13:00…', which `_utc`
+    raises on: the next ingest would have failed before fetching anything]"""
     path = vault / STATE_NOTE
-    if path.is_file():
+    stamp = str(read_frontmatter(path)[0].get("lastSyncedAt") or "") if path.is_file() else ""
+    if not stamp:
+        return ""
+    try:
+        return stamp if _utc(stamp) > now else ""
+    except ValueError:
+        return stamp
+
+
+def last_synced(vault: Path, now: datetime) -> str:
+    """Where the windowed fetch starts: the cursor, never earlier than the window. An unusable
+    cursor counts as none: the window's re-fetch imports nothing twice (the ledger) and the clean
+    run's end rewrites it."""
+    path = vault / STATE_NOTE
+    if path.is_file() and not cursor_problem(vault, now):
         fm, _ = read_frontmatter(path)
         if fm.get("lastSyncedAt"):
             return max(str(fm["lastSyncedAt"]), window_start(now), key=_utc)
@@ -393,6 +411,17 @@ def archive_settled(vault: Path, now: datetime, dry_run: bool = False) -> dict[s
 
 def ingest(vault: Path, now: datetime, dry_run: bool = False) -> dict[str, Any]:
     since = last_synced(vault, now)
+    bad_cursor = cursor_problem(vault, now)
+    if bad_cursor and not dry_run:
+        write_dlq_note(
+            vault, slug=f"readwise-cursor-{now.strftime('%Y%m%d-%H%M')}",
+            title="The Readwise cursor was not a usable timestamp",
+            what_happened=f"{STATE_NOTE.as_posix()} had lastSyncedAt {bad_cursor[:60]!r}. This run fetched the "
+                          "whole four-week window instead (the ledger keeps anything from coming in twice) and "
+                          "rewrites the cursor when it ends cleanly.",
+            why_recorded="Only ingest writes the cursor; a bad one means a second writer (a stale sync merge, an edit).",
+            resolution="Nothing to do if it does not recur. If it does, find what else writes the state note.",
+            confidence="high")
     try:
         items = _patient(rw.reader_list_all, updated_after=since)
         for loc in SWEEP_LOCATIONS:

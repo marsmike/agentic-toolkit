@@ -142,8 +142,12 @@ def main(argv: list[str] | None = None) -> int:
     stats["added"] = len(current - set(previous))
     if not args.dry_run:
         atomic_write(vault / "Index.md", text)
-        log_script = Path(__file__).resolve().parent / "log_vault.py"
-        subprocess.run([sys.executable, str(log_script), "index", f"Index.md rebuilt ({stats['entries']} entries)"], check=False)
+        # Logged only when notes came or went: a pipeline run rebuilds the index three or four times,
+        # and the identical lines were a third of Log.md. [earned: 2026-10-01, 324 of 873 lines]
+        if stats["added"] or stats["dropped"]:
+            log_script = Path(__file__).resolve().parent / "log_vault.py"
+            subprocess.run([sys.executable, str(log_script), "index",
+                            f"Index.md rebuilt ({stats['entries']} entries, +{stats['added']} -{stats['dropped']})"], check=False)
     print(json.dumps(stats, indent=2) if args.json else
           f"{'would write' if args.dry_run else 'wrote'} Index.md: {stats['entries']} entries "
           f"({stats['from_description']} from descriptions, {stats['entries'] - stats['from_description']} {COG}); "

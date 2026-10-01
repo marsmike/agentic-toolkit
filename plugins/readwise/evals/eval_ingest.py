@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import os
 import urllib.parse
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from _sandbox import make_sandbox, teardown_sandbox
@@ -69,7 +69,7 @@ def run(vault: Path) -> dict:
         sys.path.insert(0, str(scripts_dir))
     import ingest
     import readwise_api as rw
-    from vault_utils import read_frontmatter
+    from vault_utils import read_frontmatter, write_frontmatter
 
     problems: list[str] = []
     real = (rw._request, ingest.GET_DELAY_S)
@@ -166,6 +166,26 @@ def run(vault: Path) -> dict:
                 or not ledger.get("copy1", {}).get("capture"):
             problems.append(f"phase 5: the copy must be captured and the unfetchable save recorded as its duplicate, "
                             f"got {r.get('status')}, written={r.get('written')}, {ledger.get('gone1')}")
+
+        # 6. a cursor that is no timestamp (a stale sync merge wrote one, 2026-10-01) or lies in the
+        # future: the run falls back to the window, writes one DLQ note (none in a dry run), finds
+        # nothing new and rewrites the cursor
+        state = sandbox / ingest.STATE_NOTE
+        for bad in ("2026-110-01T13:00:37.835375+00:00", "2027-01-01T00:00:00+00:00"):
+            fm, body = read_frontmatter(state)
+            write_frontmatter(state, {**fm, "lastSyncedAt": bad}, body)
+            dlq_before = len(list((sandbox / "00_Memory" / "dlq").glob("*readwise-cursor-*.md")))
+            dry = ingest.ingest(sandbox, NOW, dry_run=True)
+            dlq_dry = len(list((sandbox / "00_Memory" / "dlq").glob("*readwise-cursor-*.md")))
+            r = ingest.ingest(sandbox, NOW + timedelta(minutes=len(bad)))
+            fm, _ = read_frontmatter(state)
+            if dry.get("status") not in ("ok", "dry-run") or dlq_dry != dlq_before or r.get("status") != "ok" \
+                    or r.get("written") != 0 \
+                    or len(list((sandbox / "00_Memory" / "dlq").glob("*readwise-cursor-*.md"))) != dlq_before + 1 \
+                    or not str(fm.get("lastSyncedAt", "")).startswith("2026-09-23"):
+                problems.append(f"phase 6: an unusable cursor ({bad[:12]}…) falls back to the window with one DLQ note "
+                                f"(none in a dry run) and is rewritten; got {dry.get('status')}, {r.get('status')}, "
+                                f"written={r.get('written')}, cursor={fm.get('lastSyncedAt')}")
     finally:
         rw._request, ingest.GET_DELAY_S = real
         os.environ.pop("READWISE_TOKEN", None)
@@ -175,4 +195,4 @@ def run(vault: Path) -> dict:
             teardown_sandbox(sandbox)
 
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) if problems else f"5 offline phases ok ({len(calls)} stubbed Reader calls, all GET)"}
+            "detail": "; ".join(problems) if problems else f"6 offline phases ok ({len(calls)} stubbed Reader calls, all GET)"}
