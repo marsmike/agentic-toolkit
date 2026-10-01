@@ -118,6 +118,28 @@ svg text { font-family: var(--sans); }
 .funnel .num { text-align: right; font-variant-numeric: tabular-nums; }
 .funnel .num small { display: block; color: var(--muted); font-size: 11px; }
 .empty { color: var(--muted); font-size: 13px; padding: 18px 0; }
+.ints { display: grid; gap: 9px; }
+.ints .row { display: grid; grid-template-columns: minmax(0, 270px) minmax(0, 1fr) 76px 98px; gap: 12px; align-items: center; font-size: 13px; }
+.ints .name { color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ints .rise { margin-left: 6px; font-size: 11px; color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 0 6px; }
+.ints .track { height: 18px; background: var(--surface-2); border-radius: 4px; position: relative; overflow: hidden; }
+.ints .bar { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.ints .bar + .bar { box-shadow: 2px 0 0 var(--surface); }
+.ints .num { text-align: right; font-variant-numeric: tabular-nums; }
+.ints .num small { color: var(--muted); font-size: 11px; }
+.ints .spark { display: block; }
+@media (max-width: 600px) {
+  .ints .row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .ints .name { grid-row: 1; grid-column: 1; } .ints .num { grid-row: 1; grid-column: 2; }
+  .ints .track { grid-row: 2; grid-column: 1 / -1; } .ints .spark, .spark-lg { display: none; }
+}
+.tops { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 32px; }
+.tops li { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 10px; align-items: start; break-inside: avoid; margin-bottom: 12px; }
+@media (max-width: 900px) { .tops { columns: 1; } }
+.tops .p { font-variant-numeric: tabular-nums; font-size: 12px; text-align: center; border-radius: 6px; padding: 2px 0; background: var(--surface-2); color: var(--text); }
+.tops a, .tops .t { font-size: 13.5px; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.tops a:hover { text-decoration: underline; }
+.tops .m { color: var(--muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
 .machine { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1.25fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr); align-items: stretch; gap: 0; }
 .machine .col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .machine .colhead { font: 600 10.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
@@ -232,6 +254,15 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
         <h3>The routines <span class="hint" id="lanesHint"></span></h3>
         <div class="lanes-wrap"><svg class="lane-labels" id="laneLabels" aria-hidden="true"></svg><div class="lanes scroll" id="lanes"></div></div>
         <div class="legend" id="lanesLegend"></div>
+      </div>
+      <div class="card span-12">
+        <h3>What each interest brought <span class="hint" id="intsHint"></span></h3>
+        <div class="ints" id="ints"></div>
+        <div class="legend" id="intsLegend"></div>
+      </div>
+      <div class="card span-12">
+        <h3>Strongest items <span class="hint" id="topsHint"></span></h3>
+        <ol class="tops" id="tops"></ol>
       </div>
       <div class="card span-12">
         <details class="items" id="itemsBox">
@@ -601,6 +632,59 @@ function renderFunnel() {
     box.append(el("div", {class: "row"}, el("div", {class: "name", text: name}), el("div", {class: "track"}, fill),
       el("div", {class: "num"}, fmt(v), el("small", {text: i ? pct + "%" : "items"}))));
   });
+}
+
+/* ---------- inflow: what each interest brought, the strongest items ---------- */
+const RADAR = (DATA && DATA.radar) || {weeks: [], interests: {}, top: []};
+const dayShort = day => new Date(day + "T00:00:00").toLocaleDateString("en-GB", {day: "numeric", month: "short"});
+function renderInterests() {
+  const box = $("ints");
+  box.replaceChildren(); $("intsLegend").replaceChildren();
+  const rows = Object.entries(RADAR.interests).map(([id, it]) => {
+    const s = [0, 0, 0];
+    for (const [day, c] of Object.entries(it.days)) if (inRange(day)) for (let k = 0; k < 3; k++) s[k] += c[k] || 0;
+    return {id, name: it.name, worth: s[0], strong: s[1], promoted: s[2], weeks: it.weeks || [], rising: it.rising};
+  }).filter(r => r.worth).sort((a, b) => b.strong - a.strong || b.worth - a.worth || a.name.localeCompare(b.name));
+  $("intsHint").textContent = rows.length ? "feed items " + rangeName() : "";
+  if (!rows.length) { box.append(el("div", {class: "empty", text: "No feed item was worth reading " + rangeName() + "."})); return; }
+  const max = Math.max(...rows.map(r => r.worth));
+  const wmax = Math.max(1, ...rows.flatMap(r => r.weeks));
+  for (const r of rows) {
+    const bar = (v, c) => v ? el("div", {class: "bar", style: "width:" + Math.max(1.5, 100 * v / max) + "%; background: var(" + c + ")"}) : null;
+    const W = 98, H = 20, n = Math.max(1, r.weeks.length), bw = Math.min(14, W / n), x0 = W - n * bw;
+    const spark = sv("svg", {class: "spark", viewBox: "0 0 " + W + " " + H, width: W, height: H, "aria-hidden": "true"});
+    r.weeks.forEach((v, i) => {
+      const h = v ? Math.max(2, (H - 2) * v / wmax) : 1;
+      spark.append(sv("rect", {x: x0 + i * bw + 1, y: H - h, width: Math.max(1, bw - 2), height: h, rx: 1, fill: v ? "var(--seq-3)" : "var(--line)"}));
+    });
+    const row = el("div", {class: "row", tabindex: "0"},
+      el("div", {class: "name", title: r.name}, r.name, r.rising ? el("span", {class: "rise", text: "rising"}) : null),
+      el("div", {class: "track"}, bar(r.worth, "--seq-4"), bar(r.strong, "--seq-3"), bar(r.promoted, "--seq-2")),
+      el("div", {class: "num"}, fmt(r.strong), el("small", {text: " strong"})),
+      spark);
+    hover(row, () => [r.name, fmt(r.worth) + " worth reading or better", fmt(r.strong) + " strong",
+      fmt(r.promoted) + " promoted to Reader", "strong per week: " + (r.weeks.join(" · ") || "none yet")]);
+    box.append(row);
+  }
+  for (const [name, c] of [["Worth reading or better", "--seq-4"], ["Strong", "--seq-3"], ["Promoted to Reader", "--seq-2"]])
+    $("intsLegend").append(el("span", {}, el("span", {class: "sw", style: "background: var(" + c + ")"}), name));
+  $("intsLegend").append(el("span", {class: "spark-lg"}, el("span", {class: "sw", style: "background: var(--seq-3); height: 10px; width: 4px"}),
+    "at the right: strong per week, last " + RADAR.weeks.length + (RADAR.weeks.length === 1 ? " week" : " weeks")));
+}
+function renderTops() {
+  const box = $("tops");
+  box.replaceChildren();
+  const list = RADAR.top.filter(t => inRange(t.d)).sort((a, b) => b.p - a.p || (a.d < b.d ? 1 : -1)).slice(0, 10);
+  $("topsHint").textContent = list.length ? "highest radar scores " + rangeName() : "";
+  if (!list.length) { box.append(el("li", {class: "empty", text: "Nothing strong " + rangeName() + "."})); return; }
+  for (const t of list) {
+    const name = (RADAR.interests[t.i] || {}).name || "a retired interest";
+    const status = t.s === "promoted" ? "promoted to Reader" : t.s === "vault" ? "already in the vault" : "not promoted";
+    const title = t.u ? el("a", {href: t.u, target: "_blank", rel: "noopener noreferrer", text: t.t || "(untitled)"})
+                      : el("span", {class: "t", text: t.t || "(untitled)"});
+    box.append(el("li", {}, el("span", {class: "p", text: t.p.toFixed(2), title: "best interest score"}),
+      el("div", {}, title, el("div", {class: "m", text: [name, t.f, dayShort(t.d), status].filter(Boolean).join(" · ")}))));
+  }
 }
 
 /* ---------- inflow: routine lanes ---------- */
@@ -1031,7 +1115,7 @@ function select(id) {
 function renderAll() {
   for (const b of document.querySelectorAll("#range button")) b.setAttribute("aria-pressed", String(+b.dataset.range === RANGE));
   $("rangeNote").textContent = RANGE === 1 ? "since midnight, your time" : "since " + new Date(since() + "T00:00:00").toLocaleDateString("en-GB", {day: "numeric", month: "short"});
-  renderKPIs(); renderMachine(); renderFlow(); renderFunnel(); renderLanes(); renderItems();
+  renderKPIs(); renderMachine(); renderFlow(); renderFunnel(); renderLanes(); renderInterests(); renderTops(); renderItems();
   renderTopicMap(); renderTreemap(); renderDetail(); renderMoves(); renderMultiples(); renderMatrix();
 }
 function applyTheme(choice) {

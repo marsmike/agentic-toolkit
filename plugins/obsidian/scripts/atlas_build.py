@@ -12,8 +12,9 @@ file was built hours earlier. Two halves:
                sensor news, a newsletter), what became of it (a new note, an enriched one, dropped,
                waiting, …), how long it took from ingest to retirement, and the domains of the
                notes it became; the radar's funnel per day (`radar_ledger`: judged, worth reading,
-               strong, promoted); and the routines' runs, the pipeline's from the ledger and the
-               Signal Radar's and the Mac sync's from their commits
+               strong, promoted) and per interest (worth reading or better, strong, promoted; strong
+               per week), with the strongest items; and the routines' runs, the pipeline's from the
+               ledger and the Signal Radar's and the Mac sync's from their commits
     landscape  every active note by domain (the notes and links `map_build` reads): how many, how
                many each day of the window added, the most-linked and the newest notes, the kinds,
                and how often notes in one domain link to notes in another
@@ -293,6 +294,52 @@ def routines() -> list[dict]:
             for r in rows if isinstance(r, dict)]
 
 
+TOP_RECENT_DAYS, TOP_RECENT, TOP_OLDER = 7, 10, 3
+
+
+def radar_view(radar: dict, today: date) -> dict:
+    """What each interest brought, by day so the page's range filters it, and the strongest items.
+    `interests`: id → name, `days` {day: [worth reading or better, strong, promoted]}, `weeks`
+    (strong items per ISO week, counted like `days`: once for every interest an item is strong for;
+    the ledger's last 8 weeks, labels in `weeks`) and `rising`; a retired interest is left out. `top`: the strongest items, the 10 best
+    a day for the last week and the 3 best a day before it (the page shows its range's 10 best),
+    with a link only to a web address. [earned: 2026-10-01 — the Dashboard's "Strong per week" and
+    "Top feed items" had no counterpart here]"""
+    items = radar.get("items") or []
+    per: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(lambda: [0, 0, 0]))
+    strong_weeks: dict[str, Counter] = defaultdict(Counter)
+    for it in items:
+        y, w, _ = date.fromisoformat(it["day"]).isocalendar()
+        for iid in set(it["worth"]) | set(it["strong"]):
+            if iid == radar_ledger.RETIRED_ID:
+                continue
+            c = per[iid][it["day"]]
+            c[0] += 1
+            if iid in it["strong"]:
+                c[1] += 1
+                c[2] += bool(it["promoted"])
+                strong_weeks[iid][f"{y}-W{w:02d}"] += 1
+    labels = list(radar.get("weeks") or {})
+    names = {iid: str(v.get("name") or iid) for iid, v in (radar.get("interests") or {}).items()}
+    rising = set(radar.get("rising") or [])
+    interests = {iid: {"name": names.get(iid, iid), "days": dict(sorted(days.items())),
+                       "weeks": [strong_weeks[iid].get(w, 0) for w in labels], "rising": iid in rising}
+                 for iid, days in per.items()}
+    recent = (today - timedelta(days=TOP_RECENT_DAYS - 1)).isoformat()
+    by_day: dict[str, list[dict]] = defaultdict(list)
+    for it in items:
+        if it["strong"]:
+            by_day[it["day"]].append(it)
+    top = []
+    for day, rows in sorted(by_day.items()):
+        for it in sorted(rows, key=lambda r: -r["p"])[:TOP_RECENT if day >= recent else TOP_OLDER]:
+            url = it["url"] if urlsplit(it["url"]).scheme in ("http", "https") else ""
+            top.append({"d": day, "t": it["title"][:140], "u": url, "f": it["feed"][:60],
+                        "i": it["top"] if it["top"] in it["strong"] else it["strong"][0], "p": it["p"],
+                        "s": "promoted" if it["promoted"] else "vault" if it["in_vault"] else ""})
+    return {"weeks": labels, "interests": interests, "top": top}
+
+
 def build(vault: Path, today: date) -> dict:
     since = (today - timedelta(days=WINDOW_DAYS - 1)).isoformat()
     notes, days, titles, topics, cited = collect(vault)
@@ -307,6 +354,7 @@ def build(vault: Path, today: date) -> dict:
         "totals": land["totals"], "domains": land["domains"], "matrix": land["matrix"], "tags": land["tags"],
         "inflow": inflow(vault, since, runs, land["note_domains"], _resolver(notes), cited),
         "funnel": radar.get("days", {}),
+        "radar": radar_view(radar, today),
         "runs": routine_runs(vault, since, runs),
         "routines": routines(),
     }

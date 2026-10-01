@@ -192,7 +192,45 @@ def run(vault: Path) -> dict:
         if day != {"judged": 6, "worth": 4, "strong": 3, "promoted": 1}:
             problems.append(f"funnel: today's counts are 6 judged, 4 worth, 3 strong, 1 promoted, got {day}")
 
+        # 5. what each interest brought and the strongest items [earned: 2026-10-01]: an alias maps
+        # "x" to its interest; a retired interest is left out of the rows; an older day keeps its 3
+        # best; a non-web address loses its link
+        names_env = os.environ.get("TOOLKIT_RADAR_INTERESTS_NOTE")
+        (sandbox / "00_Memory" / "eval-interests.md").write_text(
+            "---\ninterests:\n  - name: Eval Interest\n    aliases: [x]\n  - name: Second Interest\n---\n", encoding="utf-8")
+        os.environ["TOOLKIT_RADAR_INTERESTS_NOTE"] = "00_Memory/eval-interests.md"
+        try:
+            old = (today - timedelta(days=20)).isoformat()
+            extra = [{"run": old, "canonical": f"e.org/old{i}", "url": f"https://e.org/old{i}", "title": f"old {i}", "feed": "f",
+                      "kind": "paper", "p": {"second-interest": 0.8 + i / 100}, "worth": ["second-interest"], "strong": ["second-interest"]}
+                     for i in range(5)]
+            extra += [{"run": today.isoformat(), "canonical": "e.org/js", "url": "javascript:alert(1)", "title": "js", "feed": "f",
+                       "kind": "news", "p": {"x": 0.99}, "worth": ["x"], "strong": ["x"]},
+                      {"run": today.isoformat(), "canonical": "e.org/gone", "url": "https://e.org/gone", "title": "gone", "feed": "f",
+                       "kind": "news", "p": {"dropped-interest": 0.97}, "worth": ["dropped-interest"], "strong": ["dropped-interest"]}]
+            with (rd / "state.jsonl").open("a", encoding="utf-8") as fh:
+                fh.write("".join(json.dumps(r) + "\n" for r in extra))
+            view = atlas_build.build(sandbox, today)["radar"]
+        finally:
+            if names_env is None:
+                os.environ.pop("TOOLKIT_RADAR_INTERESTS_NOTE", None)
+            else:
+                os.environ["TOOLKIT_RADAR_INTERESTS_NOTE"] = names_env
+        ev, second = view["interests"].get("eval-interest", {}), view["interests"].get("second-interest", {})
+        if ev.get("name") != "Eval Interest" or ev.get("days", {}).get(today.isoformat()) != [5, 4, 1] or sum(ev.get("weeks", [])) != 4 \
+                or second.get("days") != {old: [5, 5, 0]} or "retired" in view["interests"]:
+            problems.append(f"radar: per interest, today's eval-interest is 5 worth, 4 strong, 1 promoted (4 strong this week), "
+                            f"the second interest's 5 strong are on one older day, no retired row; got {view['interests']}")
+        tops = {t["t"]: t for t in view["top"]}
+        if [t["t"] for t in view["top"] if t["d"] == old] != ["old 4", "old 3", "old 2"] or tops.get("js", {}).get("u") != "" \
+                or tops.get("b", {}).get("u") != "https://e.org/b" or tops.get("b", {}).get("s") != "promoted" \
+                or tops.get("gone", {}).get("i") != "retired":
+            problems.append(f"radar: an older day keeps its 3 best, a javascript: address loses its link, a promoted item says so; "
+                            f"got {view['top']}")
+
         page = atlas_build.render(data)
+        if 'id="ints"' not in page or 'id="tops"' not in page:
+            problems.append("radar: the page lacks the interests and strongest-items panels")
         if len(re.findall(r"<script\b", page)) != 2:
             problems.append("safe: a title opened a script element")
         m = re.search(r'<script id="data" type="application/json">(.*?)</script>', page, re.S)
@@ -206,4 +244,4 @@ def run(vault: Path) -> dict:
         if sandbox:
             teardown_sandbox(sandbox)
     return {"eval": NAME, "pass": not problems,
-            "detail": "; ".join(problems) or "landscape, inflow, runs, funnel and escaping as expected"}
+            "detail": "; ".join(problems) or "landscape, inflow, runs, funnel, interests and escaping as expected"}

@@ -4,6 +4,17 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Atlas shows what each interest brought, and the strongest items (obsidian 3.9.0).** The
+  Dashboard's "Strong per week" and "Top feed items" had no counterpart in the Atlas, so the one page
+  meant to show the whole way in left out what the radar's interests yield. Two full-width panels
+  under the funnel now do: per interest, nested bars of worth reading or better, strong and promoted
+  in the page's range (the funnel's colour steps), the strong count, and strong per week for the
+  ledger's last 8 weeks (each item counted once for every interest it is strong for, like the bars);
+  and the range's 10 highest-scored items with interest, feed, day and whether they were promoted,
+  linked only when the address is a web one. The data (`radar_view`) keeps the 10 best a day for the
+  last week and the 3 best a day before it; a retired interest has no row. The atlas eval's phase 5
+  covers aliases, the retired row, the older days' cut and a `javascript:` address.
+
 - **An unusable Readwise cursor falls back to the window (readwise 3.1.6).** Only ingest writes
   `lastSyncedAt`, but on 2026-10-01 a stale Obsidian Sync merge wrote `'2026-110-01T13:00…'`, which
   `_utc` raises on: the next ingest would have failed before fetching anything. A cursor that is no
