@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Atlas opens on now on a phone (obsidian 3.7.6).** The routines chart and the topic map are
+  drawn at their true size and scroll sideways on a narrow screen; the chart now opens on its right
+  end (now) instead of the range's first day, with its row labels in a column that stays put, and
+  the map opens on its middle.
+
 - **A blind spot is the owner's business (radar 3.10.1).** Any blip at strength 30 that no note
   anchored was a blind spot, so world news the sensors carried ("Delhi", "Netherlands", "Ukraine",
   "Pac-Man", "White House") stood beside Anthropic IPO on Now.md and in the morning push ("Not in
