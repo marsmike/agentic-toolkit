@@ -108,6 +108,23 @@ def _html_to_md_basic(html: str, keep_media: bool = False) -> str:
     return re.sub(r"\n\s*\n\s*\n+", "\n\n", h).strip()
 
 
+_MD_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+
+
+def _tweet_title(title: str, html: str) -> str:
+    """Reader titles a tweet with its first words, but drops a leading link: "is our new home for
+    developers building with Claude" for "[Claude.dev](https://claude.dev) is our new home…". The
+    tweet's own first line gives the dropped words back; any other title stays Reader's.
+    [earned: 2026-10-01 — a ClaudeDevs capture titled from the middle of its first sentence]"""
+    if not title or not html:
+        return title
+    first = next((ln for ln in _html_to_md_basic(html).splitlines() if ln.strip()), "")
+    plain = " ".join(re.sub(r"^[#>*\-\s]+", "", _MD_LINK.sub(r"\1", first)).split())
+    want = " ".join(title.split())
+    at = plain.find(want)
+    return plain[: at + len(want)] if 0 < at <= 40 else title
+
+
 def _radar_title(vault: Path, doc_id: str) -> str:
     """The title the radar saw when it promoted this document (`00_Memory/radar/promoted.jsonl`,
     matched by id): Reader leaves a paywalled or consent-walled page untitled, and the radar already
@@ -149,6 +166,8 @@ def write_capture(vault: Path, item: dict[str, Any], provenance: dict[str, Any] 
     category = item.get("category") or "article"
     label = CATEGORY_LABEL.get(category, category.capitalize())
     title_raw = (item.get("title") or "").strip() or _radar_title(vault, doc_id)
+    if category == "tweet":
+        title_raw = _tweet_title(title_raw, item.get("html_content") or "")
     title = title_raw or "(untitled)"
     author = (item.get("author") or "").strip()
     source_url = item.get("source_url") or item.get("url") or ""

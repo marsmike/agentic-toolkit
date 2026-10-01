@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A tweet's title keeps its leading link text (readwise 3.1.4).** Reader titles a tweet with its
+  first words but drops a leading link, so the ClaudeDevs post "Claude.dev is our new home for
+  developers building with Claude" became a capture, a ledger row and a run-report item titled "is
+  our new home…". `write_capture` takes the dropped words back from the tweet's own first line when
+  Reader's title sits inside it a few words in; any other title stays Reader's. [earned:
+  2026-10-01, the 04:05 UTC run's report]
+
 - **The Mac's sync leaves generated navigation to the run (obsidian 3.7.3).** A local change to a
   generated file (a plugin rewriting the Kanban board, a stray edit to Now.md) was committed as a
   hand edit; meeting the cloud run's rebuild of the same file in the rebase, it would stop the sync

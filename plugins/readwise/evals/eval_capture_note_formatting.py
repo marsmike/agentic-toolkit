@@ -53,6 +53,14 @@ def run(vault: Path) -> dict:
         if "## Full Text" not in body:
             problems.append("capture body is missing the '## Full Text' section")
 
+        # a tweet whose leading link Reader left out of its title gets the dropped words back
+        tw, _ = bc.write_capture(sandbox_vault, {"id": "twtitle1", "category": "tweet", "title": "is our new home for developers",
+                                                 "source_url": "https://x.com/ClaudeDevs/status/1", "author": "ClaudeDevs",
+                                                 "html_content": '<p><a href="https://claude.dev">Claude.dev</a> is our new home for developers. More soon.</p>'})
+        if tw is None or "# Claude.dev is our new home for developers\n" not in tw.read_text(encoding="utf-8"):
+            problems.append("a tweet title must get back the leading link text Reader dropped")
+        if bc._tweet_title("Plain title", "<p>Something else entirely</p>") != "Plain title" or bc._tweet_title("x", "") != "x":
+            problems.append("a tweet title Reader got right must stay as it is")
         walls = {"wall1": ("article", "<p>Explore the Resource Hub.</p><p><a href='/sign-up'>Create a free account</a></p>"),
                  "gone1": ("article", "<p>DeveloPassion</p><p>Not found</p><p>This page does not exist</p>" + "<p>menu</p>" * 40),
                  "twt1": ("tweet", "<p>This is actually insane.</p>"),
