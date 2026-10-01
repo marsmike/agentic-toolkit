@@ -3,6 +3,12 @@ graph — offline (gaiafield and Kagi stubbed).
 
 1. entities  — "Qwen 3.8 Next", "Qwen3.8-27B", "unsloth/Qwen3.8-27B-GGUF" share one key; a version,
                a size, "I've" and "128GB" are no names; "Show HN: Zither – …" names Zither
+1b. merge    (pure, no sandbox) — real cases, Signal Radar 2026-10-01 04:15 UTC: Scope and Dental
+               Scope share an ending, not a subject, and must not merge; Muse (fewer mentions)
+               folds into Meta Muse (more), Sol into GPT-6.1 Sol, never the reverse; a jeff-shaped
+               Other-sector bare name is checked with disambiguating context, not skipped or asked
+               bare; "r/ClaudeAI" names no ClaudeAI entity; a demonym ("Chinese AI model …") names
+               nothing on its own
 2. join      — Qwen3.8 is one blip across Reddit (feed) and Hugging Face (sensor), anchored in the
                vault note tagged `qwen` with the graph hub it links to; its older note means it is
                not "new" although the feed saw it only this week
@@ -185,6 +191,82 @@ def _entity_checks(problems: list[str]) -> None:
             problems.append(f"entities: {title!r} must not name {not_want!r}, got {got}")
     if E.from_url("https://github.com/ggml-org/llama.cpp/releases/tag/b1") != ["llama.cpp"]:
         problems.append("entities: a GitHub release address names its repo")
+
+
+def _merge_checks(problems: list[str]) -> None:
+    """Pure function-level checks (no sandbox) for the 2026-10-01 data-quality pass, real cases
+    from the Signal Radar generated 2026-10-01 04:15 UTC (60 blips): junk blips "Machines" (the
+    GitHub repo sleeping_machines merged in by pure string containment), "Scope" (merged with
+    Dental Scope), "Sift" (merged with LatentSift), "Chinese" (a demonym named as a product),
+    "ClaudeAI" (the subreddit r/ClaudeAI's own prefix stripped bare) and "jeff" (HOT, strength 70,
+    on one real mention plus five unrelated Tavily namesakes, asked with no disambiguating
+    context); and three qualified names a fragment with fewer mentions never folded into:
+    Muse(12)->Meta Muse(65), Sol(2)->GPT-6.1 Sol(8), Gemini 4(3)->Gemini 4 Argon(11)."""
+    import entities as E
+    import signal_radar as sr
+
+    def ent(key: str, name: str, titles: list[str]) -> sr.Entity:
+        e = sr.Entity(key)
+        for i, t in enumerate(titles):
+            e.names[name] += 1
+            e.mentions.append({"title": t, "url": f"https://example.org/{key}/{i}", "family": "rss"})
+        return e
+
+    # "Apollo View releases Scope..." and "Dental Scope – ..." are unrelated: a shared ending is
+    # not a shared subject, and must not merge.
+    scope = ent("scope", "Scope", ["Apollo View releases Scope, a FREE oscilloscope plugin for Mac and Windows"])
+    dental = ent("dentalscope", "Dental Scope", ["Show HN: Dental Scope – Interactive 3D dental anatomy"])
+    # Muse (fewer mentions, the fragment) must fold into Meta Muse (more mentions, the qualified
+    # name) — never the reverse, and never stay apart for want of relatedness evidence: two of
+    # Muse's own mentions name "Meta" too.
+    muse = ent("muse", "Muse", [
+        "Maybe don't let Muse run your Facebook Marketplace account",
+        "Meta's AI agent Muse is stirring growing privacy fears",
+        "YouTuber says Muse gave his address to a buyer",
+        "Meta's AI agent Muse gives out a user's home address",
+        "Liked Muse, so I cut the model in half",
+    ])
+    metamuse = ent("metamuse", "Meta Muse",
+                   [f"OpenAI takes on Meta Muse with always-on Dots agents, round {i}" for i in range(12)])
+    # Sol (fewer mentions) must fold into GPT-6.1 Sol (more mentions) the same way.
+    sol = ent("sol", "Sol", [
+        "OpenAI shelves GPT-6.1 Astra and launches lower-cost Sol",
+        "With Opus 5.5 and Sonnet 5.5 both apparently outperforming Sol and Astra",
+    ])
+    gpt61sol = ent("gpt61sol", "GPT-6.1 Sol", [f"Introducing GPT-6.1 Sol, round {i}" for i in range(8)])
+
+    merged = sr.merge_variants({"scope": scope, "dentalscope": dental, "muse": muse, "metamuse": metamuse,
+                                "sol": sol, "gpt61sol": gpt61sol})
+    if not ({"scope", "dentalscope"} <= merged.keys()):
+        problems.append(f"merge: Apollo View's Scope and Dental Scope are unrelated and must keep separate keys, "
+                        f"got {sorted(merged)}")
+    if "muse" in merged or "metamuse" not in merged \
+            or len(merged["metamuse"].mentions) != len(muse.mentions) + len(metamuse.mentions):
+        problems.append(f"merge: Muse (fewer mentions) must fold into Meta Muse, not the reverse, got {sorted(merged)}")
+    if "sol" in merged or "gpt61sol" not in merged \
+            or len(merged["gpt61sol"].mentions) != len(sol.mentions) + len(gpt61sol.mentions):
+        problems.append(f"merge: Sol (fewer mentions) must fold into GPT-6.1 Sol, not the reverse, got {sorted(merged)}")
+
+    # jeff: a bare one-word Other-sector name (one real mention, judged 0.87 on a real interest but
+    # under assign_sectors' two-mention support bar) must be checked with disambiguating context,
+    # not silently skipped (the pre-2026-10-01 fix) or asked bare (how it inflated to HOT on five
+    # unrelated Tavily namesakes).
+    jeff_mentions = [{"p": {"small-decision-models-typed-judgments": 0.87, "local-ai-self-hosted-inference": 0.6}}]
+    weight, support = sr._interest_weights(jeff_mentions)
+    names = {"small-decision-models-typed-judgments": "Small Decision Models & Typed Judgments"}
+    jeff = {"key": "jeff", "name": "jeff", "stage": "new", "sector": "other",
+            "_interests": weight, "_interest_support": support}
+    cands = sr.check_candidates([jeff], names, [])
+    if len(cands) != 1 or not cands[0]["context"]:
+        problems.append(f"merge: a jeff-shaped Other-sector name must be checked with disambiguating context, "
+                        f"not skipped or asked bare, got {cands}")
+
+    claudeai = E.from_title("Trends on r/ClaudeAI")
+    if E.key("ClaudeAI") in {E.key(n) for n in claudeai}:
+        problems.append(f"merge: r/ClaudeAI is a subreddit reference, must not yield a ClaudeAI entity, got {claudeai}")
+    chinese = E.from_title("Anthropic says a Chinese AI model anyone can download can now build working hacks on its own")
+    if E.key("Chinese") in {E.key(n) for n in chinese}:
+        problems.append(f"merge: a Chinese AI model headline must not name bare 'Chinese', got {chinese}")
 
 
 def _sector_and_early_checks(problems: list[str]) -> None:
@@ -403,6 +485,7 @@ def run(vault: Path) -> dict:
     sandbox = None
     try:
         _entity_checks(problems)
+        _merge_checks(problems)
         _sector_and_early_checks(problems)
         _alias_checks(problems)
         _note_checks(problems)

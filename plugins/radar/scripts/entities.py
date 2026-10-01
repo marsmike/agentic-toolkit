@@ -34,6 +34,13 @@ china usa america europe japan germany india russia korea taiwan france britain 
 gemini vst vst3 au aax daw synth python rust audio image video speech voice vision music code coder
 beginners awesome java
 """.split())
+# Common nouns a headline capitalises (a sentence's first word, or the word after one) without
+# meaning them as a name: excluded only when that is *all* a span is (`_usable`'s single-word
+# check below), never edge-trimmed out of a real compound name ("Dental Scope" keeps its Scope).
+# [earned: 2026-10-01, Signal Radar 2026-10-01 04:15 UTC: bare "Machines" absorbed the GitHub repo
+# sleeping_machines, "Scope" absorbed Dental Scope, "Sift" absorbed LatentSift — a generic noun
+# merging with whatever else happened to share its ending]
+BRANDS |= set("machines scope sift".split())
 # The words headlines are built from: cut from either end of a span.
 FILLER = set("""
 new update updated release released releases introducing announcing announced show ask tell launch launches
@@ -46,6 +53,19 @@ flash omni local open-source opensource
 monday tuesday wednesday thursday friday saturday sunday january february march april may june july august
 september october november december
 """.split())
+# Nationality and ethnicity adjectives: they describe the real subject of a story, never are it.
+# PLACES below already excludes the place names themselves. [earned: 2026-10-01, Signal Radar
+# 2026-10-01 04:15 UTC: "Chinese" became its own 5-mention blip from "a Chinese calligraphy
+# workshop", "Chinese releases", "a ban of Chinese open weight models" and "responded in Chinese"
+# — PLACES had "China" the country but nothing for the demonym]
+DEMONYMS = set("""
+chinese korean american european japanese indian german french british russian israeli iranian
+canadian australian mexican brazilian italian spanish dutch swedish ukrainian taiwanese turkish
+vietnamese thai swiss polish norwegian danish finnish austrian belgian portuguese greek egyptian
+saudi pakistani indonesian malaysian filipino singaporean irish scottish welsh english african
+asian arab emirati
+""".split())
+FILLER |= DEMONYMS
 GENERIC = BRANDS | FILLER
 # Places are the setting of a story, never its subject, in one word or several. [earned:
 # 2026-09-27, "China" became a signal; Copilot on #63: "South Korea", "United States"]
@@ -55,6 +75,11 @@ _CLAUSE = re.compile(r"\s*(?:[:|·!?]|\s[-–—]\s|\.\s)\s*")
 
 _PREFIXES = {"show", "launch", "ask", "tell"}
 _OWNER = re.compile(r"(?<![\w.])[\w.-]+/(?=[\w.-])")
+# "r/ClaudeAI", "u/spez": a subreddit or redditor reference, not a name — the whole token goes,
+# where `_OWNER` below would strip only the "r/" and leave the subreddit name standing as if it
+# were an "owner/repo" address's repo. [earned: 2026-10-01, Signal Radar 2026-10-01 04:15 UTC:
+# "r/ClaudeAI" became entity "ClaudeAI" on 9 Reddit meta-mentions, strength 44]
+_REDDIT_REF = re.compile(r"(?<![\w.])[ru]/[\w-]+", re.I)
 _UNIT = re.compile(r"^\d+(?:[kmgt]b|gbps|k|x|hz|khz|fps|ms|w|tok|tps|gb|tb|mb|mm|nm|p|th|st|nd|rd)?$")
 _STRONG_NAME = re.compile(r"(?:\d.*[A-Za-z]|[A-Za-z].*\d|[a-z][A-Z]|[A-Za-z][.+][A-Za-z])")
 _GITHUB_SKIP = {"orgs", "topics", "features", "settings", "marketplace", "sponsors", "collections", "trending"}
@@ -129,7 +154,8 @@ def from_title(title: str) -> list[str]:
     """Entity names in a title, longest spans first, at most five. A title's head before a colon
     or dash names its subject ("Show HN: Foo – …", "BuildBench: …") when it is one to three
     capitalised words."""
-    title = _OWNER.sub("", title or "")  # "owner/repo": the repo is the thing
+    title = _REDDIT_REF.sub("", title or "")  # "r/ClaudeAI", "u/spez": a reference, not a name
+    title = _OWNER.sub("", title)  # "owner/repo": the repo is the thing
     clauses = [[w for w in (_clean(x) for x in _WORD.findall(c)) if w] for c in _CLAUSE.split(title)]
     clauses = [c for c in clauses if c]
     words = [w for c in clauses for w in c]
@@ -181,6 +207,14 @@ def hf_family(model_id: str) -> str:
     while len(parts) > 1 and _SUFFIX.fullmatch("-" + parts[-1]):
         parts.pop()
     return "-".join(parts)
+
+
+def title_words(title: str) -> set[str]:
+    """Every word of a title, keyed the same way a name is. What `merge_variants` checks a
+    fragment's own mentions for: not just any shared word (two distinct things compared in the
+    same sentence share plenty), but the exact qualifier the longer name adds over the shorter —
+    "meta" for "Meta Muse" over "Muse", "gpt61" for "GPT-6.1 Sol" over "Sol"."""
+    return {key(_clean(w)) for w in _WORD.findall(title or "")}
 
 
 def lowercase_vocabulary(titles) -> Counter:

@@ -13,8 +13,10 @@
                 carried (below LAB_RSS_MIN_P) are never saved; `Metadata` does not match the watched name `Meta`
 3. budget     — at most the run's budget, however many were promoted earlier that day (the budget
                 is per run); a second run saves nothing new; a Reader failure is reported, not raised
-4. check      — the web check never spends a check on an Other-sector name, asks watched names
-                first, and gives a one-word name its interest's name as context
+4. check      — the web check spends on a new/rising name whatever its sector, asks watched names
+                first, and gives a one-word name disambiguating context: its sector's name, or
+                (Other has none of its own) its best-judged interest when one cleared the judge's
+                bar — never a manufactured context for a name with no judged interest at all
 5. google     — a Google News link is saved as the publisher's URL, its ledger row keeps the Google
                 link (a later run skips it without resolving it again); one that cannot be resolved
                 is never saved and is counted; `gnews` reads an old-format id from its payload and
@@ -146,20 +148,33 @@ def run(vault: Path) -> dict:
         fail["on"] = False
 
         # 4. the web check's candidates
-        def blip(name, sector, families=1, strength=50):
+        from collections import Counter
+
+        def blip(name, sector, families=1, strength=50, interests=None):
             return {"key": name.lower(), "name": name, "stage": "new", "sector": sector,
-                    "families": ["hn"] * families, "strength": strength}
+                    "families": ["hn"] * families, "strength": strength,
+                    "_interests": Counter(interests or {}), "_interest_support": Counter({k: 1 for k in (interests or {})})}
+        # "jeff" carries a real judged interest (0.8, like the 2026-10-01 case: 0.87 on "Small
+        # Decision Models & Typed Judgments") that never earned it a sector — assign_sectors wants
+        # a second mention or a name match, neither of which one judged mention gives it; "Delhi"
+        # carries no judged interest at all, so it gets no manufactured context.
         cands = signal_radar.check_candidates(
-            [blip("jeff", "other", strength=66), blip("Delhi", "other"), blip("Traktor", "music"),
-             blip("GPT-6.1 Sol", "frontier", families=2), blip("Ember-1", "frontier")],
+            [blip("jeff", "other", strength=66, interests={"frontier": 0.8}), blip("Delhi", "other"),
+             blip("Traktor", "music"), blip("GPT-6.1 Sol", "frontier", families=2), blip("Ember-1", "frontier")],
             {"music": "Music Production & DJing", "frontier": "Frontier Models & Labs"}, WATCH)
         by = {c["name"]: c for c in cands}
-        if set(by) != {"Traktor", "GPT-6.1 Sol", "Ember-1"}:
-            problems.append(f"phase 4: Other-sector names are never checked, got {sorted(by)}")
+        if set(by) != {"jeff", "Delhi", "Traktor", "GPT-6.1 Sol", "Ember-1"}:
+            problems.append(f"phase 4: a new/rising name is checked whatever its sector, got {sorted(by)}")
         if not by.get("GPT-6.1 Sol", {}).get("watched") or by.get("Ember-1", {}).get("watched"):
             problems.append("phase 4: a watched name is marked watched, another is not")
         if by.get("Traktor", {}).get("context") != "Music Production DJing" or by.get("Ember-1", {}).get("context"):
             problems.append(f"phase 4: only a one-word name gets its interest as context, got {by.get('Traktor')}")
+        if by.get("jeff", {}).get("context") != "Frontier Models Labs":
+            problems.append(f"phase 4: an Other-sector one-word name still gets its best-judged interest as "
+                            f"context, got {by.get('jeff')}")
+        if by.get("Delhi", {}).get("context"):
+            problems.append(f"phase 4: a name with no judged interest gets no manufactured context, "
+                            f"got {by.get('Delhi')}")
         asked = []
         signal_radar._name_check(out, cands, NOW, "tavily", "signal-tavily.jsonl",
                                  lambda name, context="": asked.append(name) or [])

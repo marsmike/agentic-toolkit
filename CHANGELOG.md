@@ -4,6 +4,46 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A fragment folds into its qualified name instead of a generic word absorbing whatever shares
+  its ending, and a bare word names nothing on its own (radar 3.10.0).** `merge_variants` merged
+  key `k` into `base` on pure string containment — `base` a prefix or suffix of `k`, `base`'s
+  mentions `>=` `k`'s — with no check the two were actually about the same thing, and direction
+  fixed to the *shorter* string, so a fragment could never fold into a longer, more-mentioned
+  qualified name. It now merges a candidate pair only on evidence of relatedness: either the
+  longer key is exactly the shorter plus a trailing version number (`entities._spans` only ever
+  attaches one there, so that shape is never a coincidence), or the qualifier the longer name
+  adds over the shorter appears as a whole word in the shorter entity's own mention titles — and
+  the more-mentioned of the two, not the shorter string, is what the merged thing is called.
+  `entities.py` separately stopped manufacturing the fragments in the first place: `_name_like`
+  treated any capitalised non-first word not in `GENERIC`/`FILLER` as a name, so a bare common
+  noun ("Machines", "Scope", "Sift") or a demonym ("Chinese", "Korean", "American", …, `PLACES`
+  had the countries but not their adjectives) became its own entity, and `_OWNER` stripped
+  `owner/`-style prefixes from prose generally, so Reddit's `r/ClaudeAI` became entity "ClaudeAI".
+  `BRANDS` gained the observed common nouns (excluded only as a standalone span, never trimmed out
+  of a real compound like "Dental Scope"), `FILLER` gained a `DEMONYMS` set, and a new
+  `_REDDIT_REF` pattern drops a subreddit or redditor reference whole before `_OWNER` ever sees
+  it. On the Signal Radar generated 2026-10-01 04:15 UTC (60 blips): Machines, Scope, Sift,
+  Chinese and ClaudeAI were junk blips in their own right, "Scope" had absorbed the unrelated HN
+  launch Dental Scope and "Machines" the unrelated GitHub repo sleeping_machines, while Muse (12
+  mentions), Sol (2), Astra and Gemini 4 (3) sat beside their qualified names (Meta Muse 65,
+  GPT-6.1 Sol 8, GPT-6.1 Astra, Gemini 4 Argon 11) instead of folding into them.
+  [earned: 2026-10-01, Signal Radar 2026-10-01 04:15 UTC: jeff (HOT, 70), Machines, Scope, Sift,
+  Chinese, ClaudeAI as blips; Muse/Sol/Astra/Gemini 4 beside their qualified names]
+
+- **An Other-sector bare word is checked with disambiguating context too, not silently skipped or
+  asked with none (radar 3.10.0).** `check_candidates` added a one-word name's sector as web-check
+  context only when the sector was not `None`/`"other"` — the function's own comment already
+  documented why that is backwards: an unsectored name is often exactly what the web check exists
+  to corroborate or dismiss, and a bare ambiguous name needs disambiguating context *more*, not
+  less, for having none. "jeff" judged 0.87 on Small Decision Models & Typed Judgments from one
+  real mention never earned a sector (`assign_sectors` wants a second mention or a name match,
+  neither of which one mention gives it), so it was asked bare and five unrelated people named
+  Jeff came back as a second, third, fourth, fifth and sixth source — strength 70, stage HOT.
+  `check_candidates` now checks a new/rising name whatever its sector, and falls back to its
+  single best-scoring judged interest (if any mention cleared `_interest_weights`' own 0.5 bar)
+  when there is no real sector to name; a name with no judged interest at all still gets no
+  manufactured context. [earned: 2026-10-01, Signal Radar 2026-10-01 04:15 UTC: jeff, HOT,
+  strength 70, one real mention plus five unrelated Tavily namesakes]
 - **The Atlas opens its landscape with a topic map (obsidian 3.7.4).** Domains are the large nodes
   (size: notes), each domain's leading topic tags orbit it, and a tag that several domains share sits
   between them, so the map shows which topics bridge which domains; the domains whose notes link
@@ -65,6 +105,7 @@ Every release entry links the change to the research or the dated failure that m
   an enriched note's own `distilled_at`, the day it was first written: "ingested 2026-10-01 03:59
   UTC · distilled 2026-09-30 19:10 UTC". A fate now carries `retired_at` from its `retired` row,
   and an enrichment shows "enriched <retired_at>". [earned: 2026-10-01, review of the day's runs]
+||||||| parent of 5d5b696 (radar 3.10.0: a fragment folds into its qualified name, not whatever shares its ending; Other gets web-check context too)
 
 - **The Mac syncs the vault itself while the pipeline runs in the cloud (obsidian 3.6.0).**
   `pipeline_run.py sync` commits hand edits through the pipeline's secret scan, pulls the

@@ -191,22 +191,94 @@ def collect(mentions: list[dict], vault_keys: dict[str, str], vocab: Counter | N
     return merge_variants(ents)
 
 
+def _merge_qualifier(short_key: str, long_key: str) -> str:
+    """What `long_key` adds over `short_key` — "meta" for metamuse/muse, "gpt61" for
+    gpt61sol/sol — or "" when `long_key` does not actually contain `short_key` whole."""
+    if long_key.startswith(short_key):
+        return long_key[len(short_key):]
+    if long_key.endswith(short_key):
+        return long_key[:len(long_key) - len(short_key)]
+    return ""
+
+
+def _related(short_key: str, long_key: str, short_mentions: list[dict]) -> bool:
+    """Whether `long_key` is really `short_key`, not just a string that happens to contain or be
+    contained by it. Two kinds of evidence:
+
+    - `long_key` is exactly `short_key` plus a trailing version number ("zither10" over "zither",
+      "astra6" over "astra") — `entities._spans` only ever attaches a bare version right after a
+      name it already matched, so this shape is never a coincidence, the way a shared word is.
+    - failing that, the qualifier `long_key` adds over `short_key` ("meta" for metamuse/muse,
+      "gpt61" for gpt61sol/sol) appears as a whole word in one of the shorter entity's own mention
+      titles. Two or three characters are too easily a coincidence ("6", "ai"); a bare digit here
+      (unlike the version-number case above, which is the whole remainder, not a word found loose
+      in running text) never qualifies anything on its own.
+
+    [earned: 2026-10-01, Signal Radar 2026-10-01 04:15 UTC: pure string containment let "machines"
+    absorb the unrelated GitHub repo sleeping_machines, "scope" absorb Dental Scope and "sift"
+    absorb LatentSift — merge_variants had no way to tell a shared ending from a shared subject]"""
+    if entities.family_key(long_key) == short_key:
+        return True
+    qualifier = _merge_qualifier(short_key, long_key)
+    if len(qualifier) < 3 or qualifier.isdigit():
+        return False
+    return any(qualifier in entities.title_words(m.get("title")) for m in short_mentions)
+
+
 def merge_variants(ents: dict[str, Entity]) -> dict[str, Entity]:
-    """'Claude Code Projects' into 'Claude Code', 'Claude Opus 5.5' into 'Opus 5.5': a key that
-    starts or ends with a more-mentioned key of at least four characters is that thing."""
-    order = sorted(ents, key=lambda k: (-len(ents[k].mentions), len(k)))
-    for k in sorted(ents, key=len, reverse=True):
-        if k not in ents:
-            continue
-        for base in order:
-            if base == k or base not in ents or len(base) < 4 or len(base) >= len(k):
+    """'Claude Code Projects' into 'Claude Code', 'Claude Opus 5.5' into 'Opus 5.5', 'Muse' into
+    'Meta Muse': a key that starts or ends with another of at least three characters is a
+    *candidate* to be the same thing — string containment alone over- and under-merges (see
+    `_related`'s earned-note and `_merge_checks` in the eval). The candidate only merges on
+    evidence of relatedness (`_related`), and then the more-mentioned of the two is what the
+    merged thing is called: a fragment with fewer mentions folds into the qualified name with
+    more, never the reverse, regardless of which string is longer. [earned: 2026-10-01, Signal
+    Radar 2026-10-01 04:15 UTC: direction used to require the *shorter* key to have the most
+    mentions, so Muse(12) could never fold into Meta Muse(65), Sol(2) into GPT-6.1 Sol(8), Gemini
+    4(3) into Gemini 4 Argon(11) — the fragment always has fewer mentions than the qualified name
+    that grew past it]"""
+    keys = list(ents)
+    parent = {k: k for k in keys}
+
+    def find(k: str) -> str:
+        root = k
+        while parent[root] != root:
+            root = parent[root]
+        while parent[k] != root:
+            parent[k], k = root, parent[k]
+        return root
+
+    for i, a in enumerate(keys):
+        for b in keys[i + 1:]:
+            short, long_ = (a, b) if len(a) <= len(b) else (b, a)
+            if len(short) < 3 or len(short) >= len(long_):
                 continue
-            if (k.startswith(base) or k.endswith(base)) and len(ents[base].mentions) >= len(ents[k].mentions):
-                ents[base].names.update(ents[k].names)
-                ents[base].mentions += [m for m in ents[k].mentions if m not in ents[base].mentions]
-                del ents[k]
-                break
-    return ents
+            if not (long_.startswith(short) or long_.endswith(short)):
+                continue
+            if _related(short, long_, ents[short].mentions):
+                ra, rb = find(short), find(long_)
+                if ra != rb:
+                    parent[ra] = rb
+
+    groups: dict[str, list[str]] = defaultdict(list)
+    for k in keys:
+        groups[find(k)].append(k)
+
+    merged: dict[str, Entity] = {}
+    for members in groups.values():
+        # the most-mentioned member is what the group is; on a tie, a key that is just another
+        # member plus a trailing version number is the version, not the identity ("zither", not
+        # "zither10"), so it loses the tie to one that isn't; failing that the more qualified
+        # (longer) key wins ("Claude Red" over bare "Red", both from the same one mention)
+        head = max(members, key=lambda k: (len(ents[k].mentions), not entities.family_key(k), len(k)))
+        e = Entity(head)
+        for mk in members:
+            e.names.update(ents[mk].names)
+            for m in ents[mk].mentions:
+                if m not in e.mentions:
+                    e.mentions.append(m)
+        merged[head] = e
+    return merged
 
 
 def _clamp(x: float) -> float:
@@ -553,18 +625,28 @@ def _profile_watch(vault: Path) -> list[str]:
 
 
 def check_candidates(blips: list[dict], names: dict[str, str], watch: list[str]) -> list[dict]:
-    """What the web check may spend its CHECKS_PER_DAY on: new or rising things that belong to an
-    interest. An Other-sector name is how "jeff", "Delhi" and "Netherlands" took three of six checks
-    on 2026-09-30, and their unrelated hits then counted as a second source for them. A one-word
-    name without a digit ("Traktor", "Muse") is asked with its interest's name beside it, or the web
-    answers about a Turkish tractor maker. [earned: 2026-09-30, DevDay 2026 never checked]"""
+    """What the web check may spend its CHECKS_PER_DAY on: new or rising things, Other sector
+    included — unsectored is not evidence a thing is not real, it is often exactly what the web
+    check exists to help corroborate or dismiss. A one-word name without a digit ("Traktor",
+    "Muse", "jeff") is asked with disambiguating context beside it — its sector's name when it has
+    a real one, else its single best-scoring judged interest if any mention cleared the judge's
+    own bar (`_interest_weights`' 0.5) even without the two-mention support `assign_sectors` wants
+    — or the web answers about a Turkish tractor maker, a Muse fan outlet, or five unrelated people
+    named Jeff. [earned: 2026-09-30, DevDay 2026 never checked; earned: 2026-10-01, Signal Radar
+    2026-10-01 04:15 UTC: excluding Other from the context fix meant for it left "jeff" HOT (70)
+    on one real mention plus five unrelated Tavily namesakes, asked with no context at all]"""
     pattern = re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(w) for w in watch) + r")(?![a-z])", re.I) if watch else None
     out = []
     for b in blips:
-        if b["stage"] not in ("new", "rising") or b.get("sector") in (None, "other"):
+        if b["stage"] not in ("new", "rising"):
             continue
         ambiguous = re.fullmatch(r"[A-Za-z]+", b["name"]) is not None
-        context = re.sub(r"[^\w ]+", " ", names.get(b["sector"], "")).split() if ambiguous else []
+        sector_name = names.get(b.get("sector"), "")
+        if not sector_name and b.get("_interests"):
+            top_id, top_p = next(iter(b["_interests"].most_common(1)), (None, 0))
+            if top_p >= 0.5:
+                sector_name = names.get(top_id, "")
+        context = re.sub(r"[^\w ]+", " ", sector_name).split() if ambiguous else []
         out.append({**b, "watched": bool(pattern and pattern.search(b["name"])), "context": " ".join(context)})
     return out
 
