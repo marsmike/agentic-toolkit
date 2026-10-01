@@ -12,7 +12,8 @@ from it, never from `git log` (a cloud checkout can be shallow). Two kinds of ro
              items being the run's new Readwise ledger rows (appended since `begin`) with what the
              capture said at the time (title, source, category, author, enrichment, media)
     retired  `retire_capture.py` writes one per capture it retires: `{"retired": <capture>, "at",
-             "kind": new|enriched|dropped|duplicate, "notes", "reason", "what", "archived_to"}`
+             "kind": new|enriched|dropped|duplicate, "notes", "reason", "what", "archived_to"}`, plus
+             `"linked"` (the notes it only backlinked) when there are any
 
 A run row written before 2026-09-29 carries only `run` and `items`: its counts come from its own
 `pipeline <run>: …` commit when this checkout has it, else they are "not recorded" (the run still

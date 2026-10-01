@@ -36,6 +36,12 @@ and its folder's manifest together, under a lock.
                   "Google News" captures)
 12. ledger        — every retirement appends one `retired` row to 00_Memory/imports.jsonl with its
                   kind (new, enriched, dropped, duplicate), notes, reason and what; a refusal none
+13. linked        — a note that only got a backlink (`--linked`) is not held to the capture's
+                  source or any distill gate: it gets `updated_at` alone (no `distilled_at`, no
+                  `ingested_at`, nothing else changed) and its own `linked` list in the ledger row;
+                  one with no wikilink to a `--note`, one outside 02–04, and `--linked` with
+                  `--dropped` refuse and move nothing (2026-10-01: the skill said to name every
+                  changed note with `--note`, the source-line gate refused a backlink-only one)
 
 Offline: judgment keys are removed so distill_check's soft findability/preservation calls (which
 need a backend) never run; retire_capture only needs the hard gates, which don't.
@@ -349,6 +355,57 @@ def run(vault: Path) -> dict:
             problems.append(f"phase 12: ledger rows {got}")
         if len(rows) != 7 or any(not _re.match(ts_re, str(r.get("at") or "")) or "run" in r for r in rows.values()):
             problems.append(f"phase 12: expected 7 timestamped retired rows and no run key, got {sorted(rows)}")
+
+        # --- 13. linked: a backlink-only note is stamped updated_at alone and listed, never source-checked ---
+        linked_src = SOURCE + "-linked"
+        (sandbox / "01_Capture" / "Readwise-Retire-Linked.md").write_text(
+            _capture("clip", STAMP_INGESTED_AT).replace(SOURCE, linked_src), encoding="utf-8")
+        (sandbox / "04_Resources" / "Retire-Eval-Linked-Main.md").write_text(GOOD_NOTE.replace(SOURCE, linked_src), encoding="utf-8")
+        index.write_text(index.read_text(encoding="utf-8") +
+                         "- [[04_Resources/Retire-Eval-Linked-Main|Retire Eval Linked Main]] — fixture\n", encoding="utf-8")
+        related = sandbox / "04_Resources" / "Retire-Eval-Related.md"
+        # Its own source, `status: active`, no Index line: no distill gate may apply to it.
+        related.write_text("---\ndescription: An older note on the same topic.\nstatus: active\n"
+                           "source: https://example.org/an-older-source\n---\n\n# Related eval note\n\n"
+                           "*Source: [older](https://example.org/an-older-source)*\n\n## Related\n\n"
+                           "- [[Retire-Eval-Linked-Main]]: the new note on the same topic\n", encoding="utf-8")
+        unrelated = sandbox / "04_Resources" / "Retire-Eval-Unrelated.md"
+        unrelated.write_text("---\ndescription: A note that links nowhere new.\nstatus: distilled\n---\n\n# Unrelated\n\n"
+                             "- [[Retire-Eval-Good]]\n", encoding="utf-8")
+        archived_note = next((sandbox / "05_Archive").rglob("*--FULLCAPTURE.md"))
+        main_note = "04_Resources/Retire-Eval-Linked-Main.md"
+        unrelated_before = unrelated.read_text(encoding="utf-8")
+        (sandbox / "01_Capture" / "Readwise-Retire-Linked-Radar.md").write_text(
+            _capture("radar").replace(SOURCE, linked_src + "-radar"), encoding="utf-8")
+        for name, linked, line, dropped, why in (
+                ("Readwise-Retire-Linked.md", ["04_Resources/Retire-Eval-Unrelated.md"], "→ [[Retire-Eval-Linked-Main]].", None, "no wikilink"),
+                ("Readwise-Retire-Linked.md", [archived_note.relative_to(sandbox).as_posix()], "→ [[Retire-Eval-Linked-Main]].", None, "must be a note in"),
+                ("Readwise-Retire-Linked-Radar.md", ["04_Resources/Retire-Eval-Related.md"], None, "a discard", "goes with --line")):
+            try:
+                rc.retire(cap(name), sandbox, [main_note] if line else [], line, dropped, linked=linked)
+                problems.append(f"phase 13: --linked {linked} (line={line!r}, dropped={dropped!r}) was not refused")
+            except rc.RetireRefused as e:
+                if why not in str(e):
+                    problems.append(f"phase 13: --linked {linked} refused for the wrong reason: {e}")
+        if not cap("Readwise-Retire-Linked.md").is_file() or not cap("Readwise-Retire-Linked-Radar.md").is_file() \
+                or unrelated.read_text(encoding="utf-8") != unrelated_before:
+            problems.append("phase 13: a refused --linked retirement moved the capture or changed a note")
+        related_before = related.read_text(encoding="utf-8")
+        r = rc.retire(cap("Readwise-Retire-Linked.md"), sandbox, [main_note], "→ [[Retire-Eval-Linked-Main]].", None,
+                      linked=["04_Resources/Retire-Eval-Related.md"])
+        if r.get("linked") != ["04_Resources/Retire-Eval-Related.md"] or r.get("notes") != [main_note] or \
+                sorted(r.get("stamped") or []) != sorted([main_note, "04_Resources/Retire-Eval-Related.md"]):
+            problems.append(f"phase 13: unexpected result {r}")
+        rel_fm, _ = vault_utils.read_frontmatter(related)
+        rel_updated = str(rel_fm.get("updated_at") or "")
+        if not _re.match(ts_re, rel_updated) or rel_fm.get("distilled_at") or rel_fm.get("ingested_at"):
+            problems.append(f"phase 13: a --linked note gets updated_at alone, got {rel_fm}")
+        if related.read_text(encoding="utf-8").replace(f"updated_at: '{rel_updated}'\n", "", 1) != related_before:
+            problems.append("phase 13: stamping a --linked note changed more than its updated_at line")
+        row = next((x for x in vault_utils.read_jsonl(sandbox / rc.LEDGER)
+                    if str(x.get("retired", "")).endswith("Readwise-Retire-Linked.md")), {})
+        if row.get("kind") != "new" or row.get("notes") != [main_note] or row.get("linked") != ["04_Resources/Retire-Eval-Related.md"]:
+            problems.append(f"phase 13: ledger row {row}")
     finally:
         for k, v in saved.items():
             if v is not None:
@@ -360,4 +417,4 @@ def run(vault: Path) -> dict:
             "detail": "; ".join(problems) if problems else
             "lock serializes; move+manifest succeed for --line and --dropped; refuses a dropped clip, a bad --note, a bad mode and --line without --note; appends accumulate; "
             "new and enriched notes get updated_at and nothing else changes; a refused re-retirement stamps nothing; "
-            "one structured ledger row per retirement"}
+            "one structured ledger row per retirement; a backlink-only --linked note gets updated_at alone and its own ledger list"}

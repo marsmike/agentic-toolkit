@@ -20,8 +20,8 @@ decide how; two tools do the mechanical parts and check the result.
 S() { uv run --locked --project "$CLAUDE_PLUGIN_ROOT/scripts" python3 "$CLAUDE_PLUGIN_ROOT/scripts/$1" "${@:2}"; }  # a function, not a string: zsh does not word-split [earned: 2026-09-23 first pipeline run]
 S distill_judge.py 01_Capture/<capture>.md --dossier --json   # everything known about it, before you read it
 S distill_check.py <note> 01_Capture/<capture>.md --ask "<a question a reader would type>" --ask "…"
-S retire_capture.py 01_Capture/<capture>.md --note <note> --line "<what became of it>"   # invariant 6, one call
-#   it also appends a ledger row to 00_Memory/imports.jsonl (kind new|enriched|dropped|duplicate, notes, reason, what): name EVERY note you produced or changed with --note, and give --dropped its reason
+S retire_capture.py 01_Capture/<capture>.md --note <note> --linked <note> --line "<what became of it>"   # invariant 6, one call
+#   it also appends a ledger row to 00_Memory/imports.jsonl (kind new|enriched|dropped|duplicate, notes, linked, reason, what): name EVERY note you produced or changed — --note for one that carries the capture's Source line, --linked for one that only got a backlink (L1) — and give --dropped its reason
 S fetch_source.py 01_Capture/<capture>.md --json   # a stub's own source, through the Tavily CLI (tvly extract)
 ```
 
@@ -137,7 +137,8 @@ worker renamed a note to dodge the secrets entry]
    stamps them, deterministically, the moment it retires the capture, on every `--note` it names
    — `distilled_at` to now and `ingested_at` carried over from the capture's own, both only on a
    note that has none yet; `updated_at` to now on the new note *and* on every note you enriched
-   (so name each of those as a `--note` too). Leave them out of a note you're writing or enriching; they land when you retire the capture.
+   or backlinked (so name each: `--note` if it carries the capture's Source line, `--linked` if it
+   only got a backlink, which gets `updated_at` alone). Leave them out of a note you're writing or enriching; they land when you retire the capture.
 3. **Advice never writes.** Dossier rows, inferred edges, adjudications: candidates for your
    decision, never applied by a script.
 4. **L1 is the default; L2 and L3 need a cited sentence** in the note being enriched. Never
@@ -146,11 +147,16 @@ worker renamed a note to dodge the secrets entry]
    specifics, a hub that states the shared principle and links them. A synthesis alone
    dropped two thirds of the specifics [earned: 2026-09-22 acceptance run].
 6. **The capture leaves `01_Capture/`** through `retire_capture.py <capture> --note <note>...
-   --line "<what became of it>"` (or `--dropped "<reason>"` for a discard) — one call moves it
+   [--linked <note>...] --line "<what became of it>"` (or `--dropped "<reason>"` for a discard) — one call moves it
    to `05_Archive/<Origin>-Captures-<YYYY-MM>/<stem>--FULLCAPTURE.md`, creates the folder and
    manifest `README.md` if this is the first capture retired there, and appends the manifest
-   line under a lock. It refuses a `--note` that doesn't exist or fails `distill_check`, and
-   refuses `--dropped` on a clip (invariant 8). Never `printf` a manifest line by hand: five
+   line under a lock. It refuses a `--note` that doesn't exist or fails `distill_check`, a
+   `--linked` note outside 02–04 or without a wikilink to a `--note`, and `--dropped` on a clip
+   (invariant 8). Never add the capture's Source line or `sources:` entry to a note you only
+   backlinked to get it past the check: that claims a source the note does not draw on. Name it
+   with `--linked`. [earned: 2026-10-01 — a cloud run added a "(Related link)" source to a
+   backlink-only note; the next left its backlinked notes out of the ledger]
+   Never `printf` a manifest line by hand: five
    workers doing that in parallel raced the appends and one literal `%` broke a line
    [earned: 2026-09-24]. **Nothing is deleted**, ever: a duplicate is retired with
    `--duplicate-of <the capture or note it repeats>` (kept whole in the archive), a stub is

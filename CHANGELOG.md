@@ -4,6 +4,20 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A note that only got a backlink is retired with `--linked`, never given the capture's source
+  (obsidian 3.5.3).** The distill skill said to name every changed note with `retire_capture.py
+  --note` (since 3.4.0), and `--note` holds each note to `distill_check`, whose source-line gate
+  refuses a note that does not cite the capture. A note with only an L1 backlink never does. Two
+  cloud runs on 2026-10-01 worked around it in two ways. The 01:08 UTC run added the capture as a
+  "(Related link)" Source line and `sources:` entry on notes it had only linked to; seven notes
+  carry such lines (the 2026-09-29 19:03 run made three), and the Bubbles briefing's "→ note" for
+  the Dirk-Qwen item pointed at the Swift 1.5 note. The 04:05 UTC run left its backlinked notes
+  out of the ledger instead. `--linked <note>` now takes such a note. It must sit in 02–04 and
+  link to a `--note`. It gets `updated_at` alone (it was changed, not distilled) and its own
+  `linked` list in the ledger row. The skill says which flag takes which note, and never to add
+  the capture's source to a note that only links to it.
+  [earned: 2026-10-01, review of the day's cloud runs]
+
 - **The dossier reads the whole capture, not its first heading (obsidian 3.5.2).** The content check
   (`content_match`) judged the text from `## Full Text` up to the next heading of any level, so an
   article with its own headings ended at its first one. A GitHub README that opens with `## guardrails`

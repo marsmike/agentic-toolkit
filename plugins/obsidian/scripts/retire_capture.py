@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Retire one capture out of `01_Capture/` — distill invariant 6, in one call.
 
-    retire_capture.py 01_Capture/<capture>.md --note <note> [--note <note>...] \\
+    retire_capture.py 01_Capture/<capture>.md --note <note> [--note <note>...] [--linked <note>...] \\
         --line "<what became of it, in your own words, with [[wikilinks]] to the notes>"
     retire_capture.py 01_Capture/<capture>.md --dropped "<reason, from the dossier's triage>"
     retire_capture.py 01_Capture/<capture>.md --duplicate-of <capture, archived capture or note>
@@ -21,6 +21,8 @@ create-folder-move-append sequence, not just the write.
 Refuses, and moves nothing:
   - a `--note` that does not exist, or that fails `distill_check`'s hard gates for this
     capture (imported, not reimplemented — the same definition of done as the skill)
+  - a `--linked` note outside 02–04, whose frontmatter does not parse, or with no wikilink to a
+    `--note`; and `--linked` without `--line`
   - `--dropped` on a clip (`via: clip`, or no `via` at all): invariant 8, the owner's own
     clips never leave without a note
   - `--line` with no `--note`: a capture archived as distilled must name the note it became
@@ -40,11 +42,19 @@ pipeline last changed it, since git resets `file.mtime`. It is stamped under the
 after the already-archived refusal, so a retirement that moves nothing changes no note.
 [earned: 2026-09-29 — the owner asked for "recently changed notes"; a pull touched 133 mtimes]
 
+A `--linked` note only got a backlink (L1) to a `--note`. It does not cite the capture, so it
+skips `distill_check` (whose source-line gate would refuse it) and gets `updated_at` only: it was
+changed, not distilled. It must sit in 02–04 and link to one of the `--note` notes.
+[earned: 2026-10-01 — the skill said to name every changed note with `--note`, the gate refused
+a backlink-only one, and two cloud runs worked around it two ways: one added the capture as a
+"(Related link)" source on a note that does not draw on it, one left the notes out of the ledger]
+
 After the move it appends one row to the pipeline's ledger, `00_Memory/imports.jsonl`, under that
 ledger's own lock: `{"retired": <capture>, "at", "kind", "notes", "reason", "what", "archived_to"}`,
 `kind` one of `new` (a `--note` got its first `distilled_at` here), `enriched` (every `--note` was
 distilled before), `dropped` or `duplicate`; `reason` is the `--dropped` text or what it duplicates;
-`what` is the `--line`. The manifest line stays the human record; every page reads the row.
+`what` is the `--line`; `linked` (only when given) the `--linked` notes. The manifest line stays
+the human record; every page reads the row.
 [earned: 2026-09-29 — pages parsed the manifest's prose for what a capture became, and a `--line`
 without a wikilink named no note at all]
 
@@ -61,8 +71,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-from distill_check import check
+from distill_check import WIKILINK_RE, check
 from vault_utils import (
+    ACTIVE_CONTENT_FOLDERS,
+    UnparseableFrontmatter,
     append_jsonl,
     inside,
     jsonl_lock,
@@ -123,7 +135,33 @@ def _validate_notes(notes: list[str], capture: Path, vault: Path) -> list[str]:
     return resolved
 
 
-def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None) -> bool:
+def _validate_linked(linked: list[str], notes: list[str], vault: Path) -> list[str]:
+    """A `--linked` note is an active note that links to one of the `--note` notes (its L1
+    backlink): checked for that, never for the capture's source, which it does not cite."""
+    targets = [n.removesuffix(".md") for n in notes]
+    resolved = []
+    for n in linked:
+        note_path = vault / n
+        if not inside(note_path, vault) or not note_path.is_file():
+            raise RetireRefused(f"--linked does not exist: {n}")
+        rel = note_path.resolve().relative_to(vault.resolve()).as_posix()
+        if rel in notes:
+            continue  # named with --note too: checked and stamped as one
+        if not rel.startswith(tuple(f"{d}/" for d in ACTIVE_CONTENT_FOLDERS)):
+            raise RetireRefused(f"--linked must be a note in {', '.join(ACTIVE_CONTENT_FOLDERS)}: {n}")
+        try:
+            _, body = read_frontmatter(note_path, strict=True)
+        except UnparseableFrontmatter as e:  # the stamp rewrites the frontmatter: it has to parse first
+            raise RetireRefused(f"--linked {n}: frontmatter does not parse ({e})") from e
+        links = [t.strip().removesuffix(".md") for t in WIKILINK_RE.findall(body)]
+        if not any(t == w or w.endswith("/" + t) for t in links for w in targets):
+            raise RetireRefused(f"--linked {n} has no wikilink to a --note; a backlink-only note links to the note "
+                                "the capture became (name a note that carries the capture's source with --note)")
+        resolved.append(rel)
+    return resolved
+
+
+def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None, linked: list[str] | None = None) -> bool:
     """Deterministically stamp every note the capture became or enriched: `updated_at` to now,
     always; `distilled_at` to the same now and `ingested_at` carried from the capture, each only
     where the note has none yet (an earlier distillation's own timestamps stand). Never left to
@@ -146,6 +184,11 @@ def _stamp_notes(vault: Path, notes: list[str], capture_ingested_at: str | None)
         # The edit is textual, so prove it: the note still parses and carries exactly this stamp.
         if read_frontmatter(path, strict=True)[0].get("updated_at") != now:
             raise RetireRefused(f"--note {rel} did not take its updated_at stamp; capture not moved")
+    for rel in linked or []:  # a backlink changed it; it was not distilled from this capture
+        path = vault / rel
+        set_frontmatter_fields(path, {"updated_at": now})
+        if read_frontmatter(path, strict=True)[0].get("updated_at") != now:
+            raise RetireRefused(f"--linked {rel} did not take its updated_at stamp; capture not moved")
     return first
 
 
@@ -161,7 +204,7 @@ def _same_capture(archived: Path, fm: dict[str, Any], capture: Path) -> bool:
 
 
 def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropped: str | None,
-           duplicate_of: str | None = None) -> dict[str, Any]:
+           duplicate_of: str | None = None, linked: list[str] | None = None) -> dict[str, Any]:
     if sum(map(bool, (line, dropped, duplicate_of))) != 1:
         raise RetireRefused("give exactly one of --line, --dropped or --duplicate-of")
     if not capture.is_file():
@@ -184,8 +227,11 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
             raise RetireRefused(f"--duplicate-of is not another file in the vault: {duplicate_of}")
     if line and not notes:
         raise RetireRefused("--line needs at least one --note: a distilled capture names the note it became")
+    if linked and not line:
+        raise RetireRefused("--linked goes with --line: a backlink points at the note the capture became")
 
     resolved_notes = _validate_notes(list(dict.fromkeys(notes)), capture, vault)
+    resolved_linked = _validate_linked(list(dict.fromkeys(linked or [])), resolved_notes, vault)
     ingested_at = fm.get("ingested_at") if isinstance(fm.get("ingested_at"), str) else None
 
     origin = _origin(capture.stem)
@@ -204,7 +250,7 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
             if _same_capture(dest, fm, capture):
                 raise RetireRefused(f"already archived: {dest.relative_to(vault).as_posix()}")
             n += 1
-        first = _stamp_notes(vault, resolved_notes, ingested_at)
+        first = _stamp_notes(vault, resolved_notes, ingested_at, resolved_linked)
         if not readme.exists():
             readme.write_text(_manifest_header(origin, yyyymm, today), encoding="utf-8")
         capture.rename(dest)
@@ -222,6 +268,7 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         row = {"retired": rel, "at": utc_timestamp(), "kind": kind, "notes": resolved_notes,
                "reason": reason, "what": line.strip() if line else None,
                "archived_to": dest.relative_to(vault).as_posix(),
+               **({"linked": resolved_linked} if resolved_linked else {}),
                **({"duplicate_of": duplicate_of} if duplicate_of else {})}
         with jsonl_lock(vault / LEDGER):
             append_jsonl(vault / LEDGER, row)
@@ -231,7 +278,8 @@ def retire(capture: Path, vault: Path, notes: list[str], line: str | None, dropp
         "archived_to": dest.relative_to(vault).as_posix(),
         "manifest": readme.relative_to(vault).as_posix(),
         "notes": resolved_notes,
-        "stamped": resolved_notes,
+        **({"linked": resolved_linked} if resolved_linked else {}),
+        "stamped": resolved_notes + resolved_linked,
         "via": via,
         "mode": "duplicate" if duplicate_of else "dropped" if dropped else "line",
         "kind": kind,
@@ -243,6 +291,9 @@ def main() -> int:
     ap.add_argument("capture")
     ap.add_argument("--note", action="append", default=[], dest="notes",
                     help="a note the capture was distilled into or enriched (repeatable; each must pass distill_check)")
+    ap.add_argument("--linked", action="append", default=[],
+                    help="a note that only got a backlink (L1) to a --note: stamped updated_at, listed in the ledger, "
+                         "never checked for the capture's source (repeatable)")
     ap.add_argument("--line", help="manifest prose: what became of the capture")
     ap.add_argument("--dropped", help="manifest prose: why it was retired without a note (never for a clip)")
     ap.add_argument("--duplicate-of", help="vault path of the capture or note this one duplicates (any via)")
@@ -251,7 +302,7 @@ def main() -> int:
     capture = Path(args.capture) if Path(args.capture).is_absolute() else vault / args.capture
 
     try:
-        result = retire(capture, vault, args.notes, args.line, args.dropped, args.duplicate_of)
+        result = retire(capture, vault, args.notes, args.line, args.dropped, args.duplicate_of, args.linked)
     except RetireRefused as e:
         print(json.dumps({"error": str(e)}, indent=2))
         return 1
