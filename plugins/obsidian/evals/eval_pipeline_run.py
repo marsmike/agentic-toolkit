@@ -217,6 +217,22 @@ def _mac_sync_phase(pr, sandbox: Path) -> list[str]:
     for note in (mac / "00_Memory" / "dlq").glob("*pipeline-secret-refused*.md"):
         note.unlink()
 
+    # generated navigation changed on both sides (a run rebuilt Now.md; a plugin rewrote it on the
+    # Mac): the run's version wins without a conflict, and a hand-made file beside the maps is kept
+    _git(other, "pull", "-q")
+    (other / "Now.md").write_text("# Now, rebuilt by the run\n", encoding="utf-8")
+    _git(other, "add", "-A")
+    _git(other, "commit", "-q", "-m", "pipeline: Now.md rebuilt")
+    _git(other, "push", "-q")
+    (mac / "Now.md").write_text("# Now, rewritten on the Mac\n", encoding="utf-8")
+    (mac / "Maps").mkdir(exist_ok=True)
+    (mac / "Maps" / "my-sketch.canvas").write_text('{"nodes": [], "edges": []}\n', encoding="utf-8")
+    r = pr.sync(mac, NOW + timedelta(minutes=25))
+    if r.get("status") != "ok" or r.get("restored") != ["Now.md"] \
+            or (mac / "Now.md").read_text(encoding="utf-8") != "# Now, rebuilt by the run\n" \
+            or "Maps/my-sketch.canvas" not in _git(remote, "log", "--name-only", "--format=", "-1"):
+        problems.append(f"phase 10: a local change to generated navigation yields to the run's, a hand-made file is kept; got {r}")
+
     _git(other, "pull", "-q")
     for root, text in ((other, "# cloud rewrote it\n"), (mac, "# Mac rewrote it\n")):
         (root / "04_Resources" / "Eval-Hand-Edit.md").write_text(text, encoding="utf-8")

@@ -535,12 +535,20 @@ def sync(vault: Path, now: datetime) -> dict[str, Any]:
     if holder is not None:
         return {"status": "busy", "detail": f"a run holds the lock since {holder.isoformat()}"}
     try:
+        # Generated navigation is the run's: a local change to it (a plugin rewriting the board, a
+        # stray edit) is overwritten by the next run anyway, and committing it here could only meet
+        # that run's version in a rebase conflict and stop the sync. It goes back to HEAD first; a
+        # daily note's text outside its block is the owner's and is kept. [earned: 2026-10-01]
+        generated = [p for paths in GENERATORS.values() for p in paths if not p.startswith("00_Daily")]
+        restored = _git(vault, "diff", "--name-only", "HEAD", "--", *generated).stdout.split()
+        if restored:
+            _git(vault, "checkout", "HEAD", "--", *restored)
         result = _push(vault, now, message=f"vault: hand edits {now.strftime('%Y-%m-%d %H:%M')} (sync)")
     finally:
         _release(lock, token)
     status = ("ok" if result.get("pushed") else "conflict" if result.get("conflict")
               else "refused" if result.get("secrets") else "failed")
-    return {"status": status, **result}
+    return {"status": status, **result, **({"restored": restored} if restored else {})}
 
 
 def end(vault: Path, now: datetime, distilled: int, dropped: int, failed: list[str], note: str = "",

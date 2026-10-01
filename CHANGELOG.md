@@ -4,6 +4,14 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Mac's sync leaves generated navigation to the run (obsidian 3.7.3).** A local change to a
+  generated file (a plugin rewriting the Kanban board, a stray edit to Now.md) was committed as a
+  hand edit; meeting the cloud run's rebuild of the same file in the rebase, it would stop the sync
+  with a conflict until someone resolved it by hand. `sync` now puts tracked generated files
+  (`GENERATORS`, but not the daily notes, whose text outside the block is the owner's) back to HEAD
+  before it commits; the next run rebuilds them anyway. The log line names what it left to the run.
+  [earned: 2026-10-01 review of the sync job]
+
 - **The Atlas names a domain's kinds as its map groups them (obsidian 3.7.2).** 89 kind values
   (`research` 213 beside `research-finding` 137, `tool-landmark` beside `tool`) made each domain's
   kind chips a list of near-synonyms, and 157 project and area notes, which need no kind, read

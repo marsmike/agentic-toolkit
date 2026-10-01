@@ -49,6 +49,8 @@ if r.get("hand_edits"):
     facts.append("hand edits " + str(r["hand_edits"]))
 if r.get("new_commits"):
     facts.append(str(r["new_commits"]) + " new")
+if r.get("restored"):
+    facts.append("generated file(s) left to the run: " + ", ".join(r["restored"])[:120])
 print(r.get("status", "failed"), "; ".join(facts) or r.get("detail", "") or "up to date")
 ' 2>/dev/null || echo "failed unreadable output")"
 [[ -z "${token}" ]] && detail="${detail}; no GH_TOKEN in ${keys}"
