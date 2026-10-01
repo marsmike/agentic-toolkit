@@ -142,6 +142,8 @@ def run(vault: Path) -> dict:
                 problems.append(f"landscape: the linked notes lead eval-ai's hubs, got {ai['hubs']}")
             if not any(h["t"].startswith("Hub </script>") for h in ai["hubs"]):
                 problems.append(f"landscape: a title comes from the note's H1, got {[h['t'] for h in ai['hubs']]}")
+            if ai["kinds"] != [["no kind", 3]]:
+                problems.append(f"landscape: a resource without a kind counts as 'no kind', got {ai['kinds']}")
             if ai["topics"] != [["claude-code", 2]]:
                 problems.append(f"landscape: topics keep claude-code and drop process tags, got {ai['topics']}")
         tags = {t[0]: t for t in data["tags"]}

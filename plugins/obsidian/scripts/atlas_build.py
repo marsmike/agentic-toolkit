@@ -140,6 +140,15 @@ def collect(vault: Path) -> tuple[list[Note], dict[str, str], dict[str, str], di
     return notes, days, titles, topics, cited
 
 
+def _family(note: Note, cfg: MapConfig | None) -> str:
+    """A note's kind as its map shows it: the `maps.md` section that names the kind (Research holds
+    `research`, `research-finding` and `paper`), else the kind itself; a project or area note
+    without one (they need none) says so instead of "unsorted"."""
+    if not note.kind:
+        return {"02_Projects": "project notes", "03_Areas": "area notes"}.get(note.rel.split("/", 1)[0], "no kind")
+    return next((name for name, kinds in (cfg.sections if cfg else []) if note.kind in kinds), note.kind)
+
+
 def landscape(since: str, notes: list[Note], days: dict[str, str], titles: dict[str, str],
               topics: dict[str, list[str]], configs: dict[str, MapConfig]) -> dict:
     """Domains with their notes, additions per day since `since`, hubs, newest, kinds and topics,
@@ -173,7 +182,7 @@ def landscape(since: str, notes: list[Note], days: dict[str, str], titles: dict[
             "added": dict(sorted(added.items())),
             "hubs": [{"t": titles[n.rel], "p": n.rel, "in": inbound[n.rel]} for n in hubs],
             "newest": [{"t": titles[n.rel], "p": n.rel, "d": days[n.rel]} for n in newest],
-            "kinds": [[k, c] for k, c in Counter(n.kind or "unsorted" for n in group).most_common(KINDS)],
+            "kinds": [[k, c] for k, c in Counter(_family(n, configs.get(d)) for n in group).most_common(KINDS)],
             "topics": [[t, c] for t, c in Counter(t for n in group for t in topics[n.rel]).most_common(DOMAIN_TOPICS)],
         })
     linked = {n.rel for n in notes if links.get(n.rel) or inbound[n.rel]}

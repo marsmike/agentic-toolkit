@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Atlas names a domain's kinds as its map groups them (obsidian 3.7.2).** 89 kind values
+  (`research` 213 beside `research-finding` 137, `tool-landmark` beside `tool`) made each domain's
+  kind chips a list of near-synonyms, and 157 project and area notes, which need no kind, read
+  "unsorted". A kind now shows as the `Config/toolkit/maps.md` section that names it (Research,
+  Tools, Concepts, Guides and references, …), and a project or area note without one as "project
+  notes" or "area notes". [earned: 2026-10-01 quality audit]
+
 - **The Atlas draws the machine and its plan (obsidian 3.7.1).** A "How the machine runs" diagram
   takes the sources, the three cloud routines (each with its schedule and model from
   `cloud/routines.json`, its last run and its next one in the viewer's time), the vault on GitHub and

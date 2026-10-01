@@ -1,6 +1,6 @@
 [project]
 name = "obsidian-plugin-scripts"
-version = "3.7.1"
+version = "3.7.2"
 description = "Standalone scripts for the obsidian plugin — no vendored env, run via `uv run`."
 requires-python = ">=3.11"
 dependencies = [
