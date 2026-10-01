@@ -28,6 +28,8 @@
                   raising must not lose that day's already-fetched items — they are still written)
 10. prune       — day files older than 45 days are removed, the boundary file is kept
 11. contained   — nothing is ever written outside out/sensors/, and the vault itself is untouched
+12. inflate     — a gzip body a server sends unasked is inflated before parsing (capped at
+                  MAX_BYTES); a plain body, or a broken one, comes back as it was
 """
 from __future__ import annotations
 
@@ -88,6 +90,12 @@ def run(vault: Path) -> dict:
     import sensors
 
     problems: list[str] = []
+    import gzip
+    feed = b'<?xml version="1.0"?><rss version="2.0"><channel><title>t</title></channel></rss>'
+    if sensors._inflate(gzip.compress(feed)) != feed or sensors._inflate(feed) != feed \
+            or sensors._inflate(b"\x1f\x8bnot gzip") != b"\x1f\x8bnot gzip" \
+            or len(sensors._inflate(gzip.compress(b"x" * (sensors.MAX_BYTES + 10)))) != sensors.MAX_BYTES:
+        problems.append("inflate: gzip bodies are inflated (capped), plain and broken ones pass through")
     saved_env = {k: os.environ.pop(k, None) for k in (
         "TOOLKIT_RADAR_SENSORS", "TOOLKIT_RADAR_SENSOR_FEEDS", "TOOLKIT_RADAR_SENSOR_GITHUB_TOPICS",
         "TOOLKIT_RADAR_SENSOR_SUBREDDITS", "TOOLKIT_RADAR_SENSOR_KAGI_NEWS", "GITHUB_TOKEN", "GH_TOKEN")}

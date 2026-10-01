@@ -4,6 +4,12 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A feed that answers in gzip unasked still parses (radar 3.10.2).** deepmind.google's blog feed
+  began answering `text/xml` with a gzip body, and the 11:28 UTC Signal Radar run read it as "not
+  XML: not well-formed (invalid token): line 1, column 0" (rss: partial). `sensors._request` now
+  inflates a body that starts with the gzip magic bytes (capped at `MAX_BYTES`) and passes any
+  other body through. [earned: 2026-10-01]
+
 - **Reader's "Unnamed Document" is no title (readwise 3.1.5).** Reader names a page it could not
   title "Unnamed Document" rather than leaving the title empty, so the radar-headline fallback (3.1.3)
   never ran: three radar promotions in a week reached the ledger, the run report and the Atlas as

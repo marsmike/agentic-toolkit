@@ -27,6 +27,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+import zlib
 from datetime import UTC, date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -79,13 +80,25 @@ def _polite(url: str) -> None:
     _host_last[host] = time.monotonic()
 
 
+def _inflate(body: bytes) -> bytes:
+    """A gzip body a server sent unasked, inflated (at most MAX_BYTES); any other body as it came.
+    [earned: 2026-10-01 — deepmind.google's feed answered `text/xml` with gzip bytes, and the 11:28 UTC
+    Signal Radar run read it as "not XML: not well-formed (invalid token): line 1, column 0"]"""
+    if body[:2] != b"\x1f\x8b":
+        return body
+    try:
+        return zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(body, MAX_BYTES)
+    except zlib.error:
+        return body
+
+
 def _request(url: str, headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], bytes]:
     """The one network call in this module. Evals replace it with a stub.
     Returns (status, response headers lower-cased, body); (0, {}, b"") on a network-level failure."""
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*", **(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
-            return resp.status, {k.lower(): v for k, v in resp.headers.items()}, resp.read(MAX_BYTES)
+            return resp.status, {k.lower(): v for k, v in resp.headers.items()}, _inflate(resp.read(MAX_BYTES))
     except urllib.error.HTTPError as e:
         return e.code, {k.lower(): v for k, v in (e.headers.items() if e.headers else [])}, e.read(MAX_BYTES)
     except (urllib.error.URLError, TimeoutError, OSError):
