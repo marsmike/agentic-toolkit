@@ -511,8 +511,9 @@ def render(vault: Path, run: str | None = None, today: date | None = None) -> st
     radar = radar_ledger.load(vault, (today - timedelta(days=83)).isoformat(), today)
     todays = [it for it in radar["items"] if it["day"] == today.isoformat()]
     out.append('<section style="display:grid;gap:12px"><div><h2>What the feeds brought today</h2>'
-               f'<p class="lede">{radar["today"].get("judged", 0)} items judged, {radar["today"].get("strong", 0)} strong, '
-               f'{radar["promoted_today"]} promoted into Reader'
+               f'<p class="lede">{radar["today"].get("judged", 0)} feed items judged, {radar["today"].get("strong", 0)} strong; '
+               f'{radar["promoted_today"]} promoted into Reader today'
+               + (f' ({radar["promoted_today_sensors"]} of them sensor news)' if radar.get("promoted_today_sensors") else "")
                + (" · rising this week: " + ", ".join(escape(radar["interests"].get(i, {}).get("name", i)) for i in radar["rising"][:4])
                   if radar["rising"] else "") + ".</p></div>")
     if todays:

@@ -116,8 +116,10 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
         days        day → {judged, worth, strong, promoted}, oldest first (the Atlas's funnel)
     """
     names = interest_names(vault)
-    promoted_keys = {r.get("canonical") for r in read_jsonl(vault / PROMOTED)}
-    promoted_days = Counter(str(r.get("date") or "")[:10] for r in read_jsonl(vault / PROMOTED))
+    promoted_rows = read_jsonl(vault / PROMOTED)
+    promoted_keys = {r.get("canonical") for r in promoted_rows}
+    promoted_days = Counter(str(r.get("date") or "")[:10] for r in promoted_rows)
+    sensor_days = Counter(str(r.get("date") or "")[:10] for r in promoted_rows if r.get("via") == "sensors")
     per: dict[str, Counter] = defaultdict(Counter)
     weeks: dict[str, Counter] = defaultdict(Counter)
     items: list[dict] = []
@@ -186,4 +188,5 @@ def load(vault: Path, since: str, today: date) -> dict[str, Any]:
     return {"items": items, "interests": interests, "weeks": {w: dict(weeks[w]) for w in week_labels},
             "rising": sorted(rising, key=lambda i: -weeks[this_week].get(i, 0)),
             "counts": dict(counts), "today": dict(today_counts), "promoted_today": promoted_days.get(today.isoformat(), 0),
+            "promoted_today_sensors": sensor_days.get(today.isoformat(), 0),
             "days": {d: {k: per_day[d].get(k, 0) for k in ("judged", "worth", "strong", "promoted")} for d in sorted(per_day)}}

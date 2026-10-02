@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The run report no longer promotes more than it judged (obsidian 3.9.4).** "What the feeds
+  brought today" read "7 items judged, 2 strong, 12 promoted into Reader" on 2026-10-02: the judged
+  and strong counts are the feed judge's for today, the promoted count is every row of
+  `promoted.jsonl` dated today, five of them the Signal Radar's sensor news and some feed items
+  judged on an earlier day. The sentence now says "feed items judged" and names the sensor share;
+  `radar_ledger.load` returns `promoted_today_sensors`.
+
 - **The Atlas's flow fits a phone (obsidian 3.9.3).** "From source to topic" drew at least 760 px
   and scrolled sideways, so at 390 px (the Atlas is mostly opened on a phone) the domains it ends in
   were off-screen (2026-10-02 screenshot). Under 640 px the Sankey now draws at the card's width,
