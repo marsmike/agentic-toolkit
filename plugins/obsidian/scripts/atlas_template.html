@@ -534,14 +534,16 @@ function renderFlow() {
   box.replaceChildren();
   $("flowLegend").replaceChildren();
   if (!R.length) { box.append(el("div", {class: "empty", text: "Nothing came in " + rangeName() + "."})); $("flowHint").textContent = ""; return; }
-  // Topics: the domains this range's notes fed, top TOP_TOPICS by weight, the rest folded.
+  // A phone gets the whole flow at its own width: labels sit inside the columns, fewer domains.
+  const narrow = (box.clientWidth || 1100) < 640, topN = narrow ? 5 : TOP_TOPICS;
+  // Topics: the domains this range's notes fed, top topN by weight, the rest folded.
   const domTitle = Object.fromEntries(DATA.domains.map(d => [d.id, d.title]));
   const weight = {};
   for (const r of R) if ((r.out === "new" || r.out === "enriched") && r.dom.length) for (const d of r.dom) weight[d] = (weight[d] || 0) + 1 / r.dom.length;
   const ranked = Object.keys(weight).sort((a, b) => weight[b] - weight[a]);
-  const top = new Set(ranked.slice(0, TOP_TOPICS));
+  const top = new Set(ranked.slice(0, topN));
   const topicOf = d => top.has(d) ? d : "_other";
-  const topics = [...ranked.slice(0, TOP_TOPICS), ...(ranked.length > TOP_TOPICS ? ["_other"] : [])];
+  const topics = [...ranked.slice(0, topN), ...(ranked.length > topN ? ["_other"] : [])];
   const flowsIntoTopic = R.some(r => (r.out === "new" || r.out === "enriched") && !r.dom.length);
   if (flowsIntoTopic) topics.push("_none");
   const topicName = t => t === "_other" ? "Other domains" : t === "_none" ? "No domain" : domTitle[t] || t;
@@ -563,8 +565,8 @@ function renderFlow() {
   for (const k of outs) val["b:" + k] = R.filter(r => outKey(r.out) === k).length;
   for (const t of topics) val["c:" + t] = Object.entries(L2).filter(([k]) => k.split("|")[1] === t).reduce((s, [, v]) => s + v, 0);
 
-  const W = Math.max(760, box.clientWidth || 1100), H = Math.max(300, Math.min(560, 120 + 26 * Math.max(lanes.length, outs.length, topics.length) * 1.6));
-  const padL = 150, padR = 190, nodeW = 12, gap = 14, top0 = 14, usable = H - 28;
+  const W = narrow ? Math.max(300, box.clientWidth) : Math.max(760, box.clientWidth || 1100), H = Math.max(300, Math.min(560, 120 + 26 * Math.max(lanes.length, outs.length, topics.length) * 1.6));
+  const padL = narrow ? 1 : 150, padR = narrow ? 1 : 190, nodeW = narrow ? 10 : 12, gap = 14, top0 = 14, usable = H - 28;
   const xs = [padL, (padL + W - padR) / 2 - nodeW / 2, W - padR - nodeW];
   const cols = [lanes.map(k => "a:" + k), outs.map(k => "b:" + k), topics.map(k => "c:" + k)];
   const total = R.length;
@@ -606,16 +608,17 @@ function renderFlow() {
     const p = pos[id], isLane = id[0] === "a";
     const fill = isLane ? "var(" + LANE[id.slice(2)].color + ")" : "var(--node)";
     nodes.append(sv("rect", {x: p.x, y: p.y, width: nodeW, height: p.h, rx: 2, fill}));
-    const right = id[0] !== "a";
+    if (narrow && isLane && val[id] < total * 0.04) continue;  // the legend names a thin lane on a phone
+    const right = narrow ? id[0] === "a" : id[0] !== "a";
     const tx = right ? p.x + nodeW + 7 : p.x - 7, ty = p.y + p.h / 2;
-    const t = sv("text", {x: tx, y: ty, "text-anchor": right ? "start" : "end", "dominant-baseline": "middle", "font-size": 13, fill: "var(--text)",
+    const t = sv("text", {x: tx, y: ty, "text-anchor": right ? "start" : "end", "dominant-baseline": "middle", "font-size": narrow ? 11.5 : 13, fill: "var(--text)",
       "paint-order": "stroke", stroke: "var(--surface)", "stroke-width": 4, "stroke-linejoin": "round"});
     t.append(sv("tspan", {text: nodeName(id) + " "}), sv("tspan", {fill: "var(--muted)", text: fmt(val[id])}));
     labels.append(t);
   }
   box.append(svg);
   $("flowHint").textContent = total + " items " + rangeName() + " · bands keep the color of their source";
-  for (const l of lanes) $("flowLegend").append(el("span", {}, el("span", {class: "sw", style: "background:var(" + LANE[l].color + ")"}), LANE[l].name));
+  for (const l of lanes) $("flowLegend").append(el("span", {}, el("span", {class: "sw", style: "background:var(" + LANE[l].color + ")"}), LANE[l].name + (narrow ? " " + fmt(val["a:" + l]) : "")));
 }
 
 /* ---------- inflow: radar funnel ---------- */

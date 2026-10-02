@@ -4,6 +4,13 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Atlas's flow fits a phone (obsidian 3.9.3).** "From source to topic" drew at least 760 px
+  and scrolled sideways, so at 390 px (the Atlas is mostly opened on a phone) the domains it ends in
+  were off-screen (2026-10-02 screenshot). Under 640 px the Sankey now draws at the card's width,
+  labels sit inside the columns (sources right of their bar, outcomes and domains left), the domain
+  column folds after five, and a lane under 4 % carries its count in the legend instead of a label.
+  Desktop is unchanged.
+
 - **Emptying the inbox keeps the inbox (obsidian 3.9.2).** Git keeps no empty directory: on
   2026-10-01 the 15:58 UTC run retired the only capture, the Mac's sync pulled it and removed
   `01_Capture/`, and the folder vanished from Obsidian, where the Capture template writes. `end` now

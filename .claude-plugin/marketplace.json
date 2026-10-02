@@ -12,7 +12,7 @@
     {
       "name": "obsidian",
       "source": "./plugins/obsidian",
-      "version": "3.9.2",
+      "version": "3.9.3",
       "description": "Vault interface: filesystem-first operations and health, search, graph-aware distill, and the unattended pipeline that rebuilds Index, maps and Now."
     },
     {
