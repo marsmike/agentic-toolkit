@@ -128,6 +128,13 @@ def run(vault: Path) -> dict:
         _git(sandbox, "commit", "-q", "--allow-empty", "-m", f"vault: hand edits {run_label} (sync)")
 
         data = atlas_build.build(sandbox, today)
+        # the quality rows: [path, day, title, links in, links out, description chars, names a source]
+        q = {r[0]: r for r in data.get("quality", [])}
+        hub, spoke = q.get("04_Resources/Eval-Atlas-Hub"), q.get("04_Resources/Eval-Atlas-Spoke")
+        if not hub or not spoke or "04_Resources/Eval-Atlas-Old" in q:
+            problems.append(f"quality: a row per note distilled in the window and none for the old note, got {sorted(q)[:8]}")
+        elif hub[3:7] != [1, 0, 1, False] or spoke[3:7] != [0, 2, 1, True]:
+            problems.append(f"quality: Hub has 1 link in and no source, Spoke 2 links out and a source, got {hub[3:7]}, {spoke[3:7]}")
         ai, agents = dom(data, "eval-ai"), dom(data, "eval-agents")
         if not ai or not agents or ai["notes"] != 3 or agents["notes"] != 3:
             problems.append(f"landscape: eval-ai and eval-agents must hold 3 notes each, got {ai and ai['notes']}, {agents and agents['notes']}")

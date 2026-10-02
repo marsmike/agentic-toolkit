@@ -4,6 +4,15 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The Atlas shows how well the new notes were filed (obsidian 3.11.0).** The page counted what
+  came in and what it became, never its quality: the 2026-10-02 audit found 8 new notes no note
+  linked to and half the week's descriptions over the limit, and nothing on the page said so. A new
+  card under the flow, "How well it was filed", measures the notes distilled in the range as they
+  stand now: linked from another note, links to two or more, names its source, a one-line
+  description (≤ 250, distill_check's limit), with green / amber / red at 95 % and 80 %, and lists
+  the newest notes nothing links to. `atlas_build.py` embeds one `quality` row per note in the
+  window; the Atlas eval checks two of them.
+
 - **A tool note goes to `Tools/` (obsidian 3.10.1).** The placement rules never named
   `04_Resources/Tools/`, and their "author/year in the filename → root" rule sent 7 of the 37
   `tool-landmark` notes distilled since 2026-10-01 to the root while 30 went to `Tools/`

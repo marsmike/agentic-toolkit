@@ -82,6 +82,7 @@ DOMAIN_TOPICS = 8
 PROCESS_TAG = re.compile(r"^(readwise|radar|via|source|status|kind|type|project|portfolio|email|service|vehicle)(/|$)"
                          r"|^w\d{2}-\d{4}$|^(wiki|area|book|bookmark|tools|research|clip|newsletter|capture|inbox|"
                          r"tweet|article|video|paper|repo|podcast|moc|index|draft|todo)$")
+DESCRIPTION_MAX = 250  # distill_check's soft limit: a description is the note's one line in Index.md
 ROUTINES = Path("cloud") / "routines.json"  # in the toolkit checkout that holds this script
 ROLE = {"pipeline.prompt.md": "pipeline", "signal.prompt.md": "radar", "watchdog.prompt.md": "watchdog"}
 RADAR_SUBJECT = re.compile(r"^signal radar \d{4}-\d{2}-\d{2} \d{2}:\d{2}: (.+)$")
@@ -116,10 +117,13 @@ def source_key(url: object) -> str:
     return (parts.hostname.removeprefix("www.") + parts.path.rstrip("/") + ("?" + keep if keep else "")).lower()
 
 
-def collect(vault: Path) -> tuple[list[Note], dict[str, str], dict[str, str], dict[str, list[str]], dict[str, list[str]]]:
-    """Every active note (as map_build reads it), with its distilled day, title and topic tags, and
-    which notes cite each source address (`source:` and `sources:`)."""
+def collect(vault: Path) -> tuple[list[Note], dict[str, str], dict[str, str], dict[str, list[str]], dict[str, list[str]],
+                                  dict[str, tuple[int, bool]]]:
+    """Every active note (as map_build reads it), with its distilled day, title and topic tags,
+    which notes cite each source address (`source:` and `sources:`), and each note's description
+    length and whether it names a source (what the quality panel reads)."""
     notes: list[Note] = []
+    meta: dict[str, tuple[int, bool]] = {}
     days: dict[str, str] = {}
     titles: dict[str, str] = {}
     topics: dict[str, list[str]] = {}
@@ -140,11 +144,14 @@ def collect(vault: Path) -> tuple[list[Note], dict[str, str], dict[str, str], di
         topics[rel] = sorted({t for raw in _tags(fm) if not DOMAIN_TAG.match(raw)
                               and (t := raw.lstrip("#").strip().lower()) and not PROCESS_TAG.match(t)})
         titles[rel] = one_line(title_of(fm, body, path.stem), TITLE_CHARS)
-    return notes, days, titles, topics, cited
+        meta[rel] = (len(" ".join(str(fm.get("description") or "").split())),
+                     bool(str(fm.get("source") or "").strip()) and str(fm.get("source")).strip().lower() != "unknown")
+    return notes, days, titles, topics, cited, meta
 
 
 def landscape(since: str, notes: list[Note], days: dict[str, str], titles: dict[str, str],
-              topics: dict[str, list[str]], configs: dict[str, MapConfig]) -> dict:
+              topics: dict[str, list[str]], configs: dict[str, MapConfig],
+              meta: dict[str, tuple[int, bool]] | None = None) -> dict:
     """Domains with their notes, additions per day since `since`, hubs, newest, kinds and topics,
     and the links between domains. A note in several domains counts in each; a link weighs one in
     all, shared evenly across the domain pairs it joins (diagonal: links inside one domain)."""
@@ -191,7 +198,14 @@ def landscape(since: str, notes: list[Note], days: dict[str, str], titles: dict[
     # ranks by any range ("on the move") is among these.
     keep = {t for t, _ in tag_total.most_common(TOPICS)} | {t for t, c in tag_days.items() if sum(c.values()) >= 2}
     tags = [[t, tag_total[t], dict(sorted(tag_days[t].items()))] for t in sorted(keep, key=lambda t: (-tag_total[t], t))]
-    return {"domains": out, "tags": tags, "matrix": [[round(v, 1) for v in row] for row in matrix],
+    # One row per note distilled in the window: [path, day, title, links in, links out, description
+    # characters, names a source]. [earned: 2026-10-02 — the page showed how much came in, never how
+    # well it was filed; 8 of 65 new notes had no inbound link and nothing on the page said so]
+    meta = meta or {}
+    quality = [[n.rel, days[n.rel], titles[n.rel], inbound[n.rel], len(links.get(n.rel) or ()),
+                *(meta.get(n.rel) or (0, False))]
+               for n in sorted(notes, key=lambda n: (days[n.rel], n.rel)) if days[n.rel] and days[n.rel] >= since]
+    return {"domains": out, "tags": tags, "matrix": [[round(v, 1) for v in row] for row in matrix], "quality": quality,
             "totals": {"notes": len(notes), "untagged": sum(1 for n in notes if not n.domains),
                        "links": sum(len(t) for t in links.values()), "unlinked": len(notes) - len(linked)},
             "note_domains": {n.rel: [d for d in n.domains if d in index] for n in notes}}
@@ -342,8 +356,8 @@ def radar_view(radar: dict, today: date) -> dict:
 
 def build(vault: Path, today: date) -> dict:
     since = (today - timedelta(days=WINDOW_DAYS - 1)).isoformat()
-    notes, days, titles, topics, cited = collect(vault)
-    land = landscape(since, notes, days, titles, topics, read_config(vault))
+    notes, days, titles, topics, cited, meta = collect(vault)
+    land = landscape(since, notes, days, titles, topics, read_config(vault), meta)
     runs = imports_log.resolved(vault)
     radar = radar_ledger.load(vault, since, today)
     return {
@@ -352,6 +366,7 @@ def build(vault: Path, today: date) -> dict:
                   "atlas": str(profile_value(vault, "atlas_artifact_url") or "")},
         "inbox": sum(1 for p in contained((vault / "01_Capture").glob("*.md"), vault) if p.is_file()),
         "totals": land["totals"], "domains": land["domains"], "matrix": land["matrix"], "tags": land["tags"],
+        "quality": land["quality"], "description_max": DESCRIPTION_MAX,
         "inflow": inflow(vault, since, runs, land["note_domains"], _resolver(notes), cited),
         "funnel": radar.get("days", {}),
         "radar": radar_view(radar, today),

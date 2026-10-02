@@ -118,6 +118,19 @@ svg text { font-family: var(--sans); }
 .funnel .num { text-align: right; font-variant-numeric: tabular-nums; }
 .funnel .num small { display: block; color: var(--muted); font-size: 11px; }
 .empty { color: var(--muted); font-size: 13px; padding: 18px 0; }
+.qual { display: grid; gap: 10px; }
+.qual .row { display: grid; grid-template-columns: minmax(0, 190px) minmax(0, 1fr) 92px; gap: 12px; align-items: center; font-size: 13px; }
+.qual .name { color: var(--text-2); }
+.qual .track { height: 18px; background: var(--surface-2); border-radius: 4px; position: relative; overflow: hidden; }
+.qual .fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.qual .num { text-align: right; font-variant-numeric: tabular-nums; }
+.qual .num small { color: var(--muted); font-size: 11px; margin-left: 4px; }
+.qual-miss { margin-top: 14px; }
+.qual-miss .sect { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+@media (max-width: 640px) {
+  .qual .row { grid-template-columns: minmax(0, 1fr) 84px; row-gap: 4px; }
+  .qual .track { grid-column: 1 / -1; grid-row: 2; }
+}
 .ints { display: grid; gap: 9px; }
 .ints .row { display: grid; grid-template-columns: minmax(0, 270px) minmax(0, 1fr) 76px 98px; gap: 12px; align-items: center; font-size: 13px; }
 .ints .name { color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -245,6 +258,11 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
         <h3>From source to topic <span class="hint" id="flowHint"></span></h3>
         <div class="flow scroll" id="flow"></div>
         <div class="legend" id="flowLegend"></div>
+      </div>
+      <div class="card span-12">
+        <h3>How well it was filed <span class="hint" id="qualHint"></span></h3>
+        <div class="qual" id="qual"></div>
+        <div class="qual-miss" id="qualMiss"></div>
       </div>
       <div class="card span-5">
         <h3>What the radar read <span class="hint">feed items judged against your interests</span></h3>
@@ -619,6 +637,37 @@ function renderFlow() {
   box.append(svg);
   $("flowHint").textContent = total + " items " + rangeName() + " · bands keep the color of their source";
   for (const l of lanes) $("flowLegend").append(el("span", {}, el("span", {class: "sw", style: "background:var(" + LANE[l].color + ")"}), LANE[l].name + (narrow ? " " + fmt(val["a:" + l]) : "")));
+}
+
+/* ---------- inflow: how well the new notes were filed ---------- */
+function renderQuality() {
+  const Q = (DATA.quality || []).filter(q => inRange(q[1]));
+  const box = $("qual"), miss = $("qualMiss");
+  box.replaceChildren(); miss.replaceChildren();
+  $("qualHint").textContent = Q.length ? Q.length + " note" + (Q.length === 1 ? "" : "s") + " distilled " + rangeName() + ", as they stand now" : "";
+  if (!Q.length) { box.append(el("div", {class: "empty", text: "No note was distilled " + rangeName() + "."})); return; }
+  const max = DATA.description_max || 250;
+  const checks = [
+    ["Linked from another note", q => q[3] > 0],
+    ["Links to two or more notes", q => q[4] >= 2],
+    ["Names its source", q => q[6]],
+    ["One-line description (≤ " + max + ")", q => q[5] > 0 && q[5] <= max],
+  ];
+  for (const [name, pass] of checks) {
+    const n = Q.filter(pass).length, pct = Math.round(100 * n / Q.length);
+    const color = pct >= 95 ? "--good" : pct >= 80 ? "--warning" : "--critical";
+    const fill = el("div", {class: "fill", style: "width:" + Math.max(0.8, 100 * n / Q.length) + "%; background: var(" + color + "); opacity: .75"});
+    const row = el("div", {class: "row"}, el("div", {class: "name", text: name}), el("div", {class: "track"}, fill),
+      el("div", {class: "num"}, fmt(n), el("small", {text: pct + "%"})));
+    hover(row, () => [name, n + " of " + Q.length + " notes (" + pct + "%)" + (n < Q.length ? " · " + (Q.length - n) + " not yet" : "")]);
+    box.append(row);
+  }
+  const orphans = Q.filter(q => !q[3]).reverse();
+  if (orphans.length) {
+    const ul = el("ul", {class: "list"});
+    for (const q of orphans.slice(0, 8)) ul.append(el("li", {}, el("a", {href: obsidian(q[0] + ".md"), text: q[2]}), el("span", {class: "n", text: q[1].slice(5)})));
+    miss.append(el("div", {class: "sect", text: "Nothing links here yet" + (orphans.length > 8 ? " · newest 8 of " + orphans.length : "")}), ul);
+  }
 }
 
 /* ---------- inflow: radar funnel ---------- */
@@ -1118,7 +1167,7 @@ function select(id) {
 function renderAll() {
   for (const b of document.querySelectorAll("#range button")) b.setAttribute("aria-pressed", String(+b.dataset.range === RANGE));
   $("rangeNote").textContent = RANGE === 1 ? "since midnight, your time" : "since " + new Date(since() + "T00:00:00").toLocaleDateString("en-GB", {day: "numeric", month: "short"});
-  renderKPIs(); renderMachine(); renderFlow(); renderFunnel(); renderLanes(); renderInterests(); renderTops(); renderItems();
+  renderKPIs(); renderMachine(); renderFlow(); renderQuality(); renderFunnel(); renderLanes(); renderInterests(); renderTops(); renderItems();
   renderTopicMap(); renderTreemap(); renderDetail(); renderMoves(); renderMultiples(); renderMatrix();
 }
 function applyTheme(choice) {
