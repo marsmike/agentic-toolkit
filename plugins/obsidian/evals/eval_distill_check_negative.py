@@ -169,6 +169,21 @@ def run(vault: Path) -> dict:
                             f"never a failed gate, and a short one none; got pass={long_rep['pass']}, "
                             f"{long_rep['soft'].get('description')}, good={good_rep['soft'].get('description')}")
 
+        # A tool-landmark outside Tools/: a soft placement finding, never a failed gate [earned: 2026-10-02]
+        tool_note = sandbox / "04_Resources" / "Eval-Check-tool-in-root.md"
+        tool_note.write_text(_note({**GOOD_FM, "kind": "tool-landmark"}, GOOD_BODY), encoding="utf-8")
+        index.write_text(index.read_text(encoding="utf-8") +
+                         "\n- [[04_Resources/Eval-Check-tool-in-root|Eval tool-in-root]] — fixture\n", encoding="utf-8")
+        (sandbox / "04_Resources" / "Eval-Check-Hub.md").write_text(
+            (sandbox / "04_Resources" / "Eval-Check-Hub.md").read_text(encoding="utf-8") + "- [[Eval-Check-tool-in-root]]\n",
+            encoding="utf-8")
+        tool_rep = distill_check.check(tool_note, capture, sandbox, asks=[])
+        if not tool_rep["pass"] or tool_rep["soft"].get("placement", {}).get("folder") != "04_Resources" \
+                or "placement" in good_rep["soft"]:
+            problems.append(f"tool-in-root: a tool-landmark outside Tools/ is a soft placement finding and the good note "
+                            f"has none; got pass={tool_rep['pass']}, {tool_rep['soft'].get('placement')}, "
+                            f"good={good_rep['soft'].get('placement')}")
+
         # A capture with no `attachment` field at all (a PDF, since 2026-09-24) must pass the
         # attachment gate on a note that links nothing — there is no stored file to require.
         pdf_capture = sandbox / "01_Capture" / "Eval-Check-PDF-Capture.md"

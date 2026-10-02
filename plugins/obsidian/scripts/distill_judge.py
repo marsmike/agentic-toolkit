@@ -71,6 +71,15 @@ MAX_CANDIDATES = 24
 VIEWS = 1
 
 
+def _provenance(fm: dict) -> set[str]:
+    """A note's own sources as canonical keys: `source:`, each `sources:` entry, `arxiv_id:`."""
+    raw = [fm.get("source"), *(fm.get("sources") if isinstance(fm.get("sources"), list) else [])]
+    keys = {_canonical(str(u)) for u in raw if str(u or "").startswith("http")}
+    if aid := str(fm.get("arxiv_id") or "").strip():
+        keys.add(_canonical(f"https://arxiv.org/abs/{aid}"))
+    return keys - {""}
+
+
 def url_hits(capture: dict, vault: Path, exclude: list[str]) -> dict[str, str]:
     """The dossier's `already_distilled`/`related[].url_hit` fields (references/dossier.md), in
     Python: {note rel path: origin} for every active note that mentions one of the capture's
@@ -78,7 +87,11 @@ def url_hits(capture: dict, vault: Path, exclude: list[str]) -> dict[str, str]:
     source (its frontmatter URL) is "frontmatter", i.e. provenance; a note whose source is a
     URL the capture merely links in its body is "body-cited", and a note that mentions a
     capture URL in prose is "body". [earned: 2026-09-22 acceptance run — a capture linking
-    an example tool made that tool's note read as the capture's canonical distillation]"""
+    an example tool made that tool's note read as the capture's canonical distillation]
+    A note's provenance is its `source:`, every `sources:` entry and its `arxiv_id:`: an
+    enriched note carries its later captures there. [earned: 2026-10-02 — the RLM paper had
+    two notes, one sourced from a tweet with `arxiv_id: 2512.24601`, and a run backlinked both
+    because only `source:` was read]"""
     own = {_canonical(capture["own_source"])} if capture.get("own_source") else set()
     cited = {_canonical(u) for u in capture["source_urls"]} - own
     hits: dict[str, str] = {}
@@ -87,10 +100,10 @@ def url_hits(capture: dict, vault: Path, exclude: list[str]) -> dict[str, str]:
     for path in discover_notes(vault, exclude=exclude):
         fm, body = read_frontmatter(path)
         rel = path.relative_to(vault).as_posix()
-        src = _canonical(str(fm.get("source") or ""))
-        if src and src in own:
+        prov = _provenance(fm)
+        if prov & own:
             hits[rel] = "frontmatter"
-        elif src and src in cited:
+        elif prov & cited:
             hits[rel] = "body-cited"
         elif any(_canonical(u) in own | cited for u in URL_RE.findall(body)):
             hits[rel] = "body"

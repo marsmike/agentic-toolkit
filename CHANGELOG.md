@@ -4,6 +4,16 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **The dossier reads a note's whole provenance; a misplaced tool is a finding (obsidian 3.12.0).**
+  The 2026-10-02 audit found the Recursive Language Models paper in two notes, and that day's 01:13
+  run backlinked both: `url_hits` treated only a note's `source:` as provenance, so a note sourced
+  from the tweet that announced a paper (with `arxiv_id: 2512.24601`) never read as that paper's
+  distillation, nor did a note whose later captures sit in `sources:`. Provenance is now `source:`,
+  every `sources:` entry and `arxiv_id:`, so `already_distilled` says enrich-only instead of
+  inviting a second note; a new `eval_url_hits` fails on the old code. And the 3.10.1 placement rule
+  gets a check: `distill_check` reports a `tool-landmark` outside `04_Resources/Tools/` as a soft
+  `placement` finding (a prose rule alone had let 7 of 37 through).
+
 - **The Atlas shows how well the new notes were filed (obsidian 3.11.0).** The page counted what
   came in and what it became, never its quality: the 2026-10-02 audit found 8 new notes no note
   linked to and half the week's descriptions over the limit, and nothing on the page said so. A new

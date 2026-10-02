@@ -15,7 +15,7 @@ Hard gates (fail the check):
   index         Index.md has a line for the note
   inbound       another note in 02–04 links to it (an L1 backlink from the closest related note)
 Soft gates (reported, never fail): a description over DESCRIPTION_MAX characters (it is the
-note's one line in Index.md and its map); the capture's other URLs not carried by the note (a
+note's one line in Index.md and its map); a `tool-landmark` outside 04_Resources/Tools/; the capture's other URLs not carried by the note (a
 thread's reply links are usually fine to drop; a paper or repo is not), findability of each
 --ask question (top three by widened rerank, plain search without a backend), and the
 preservation check against the capture's kept passages (needs a judgment backend).
@@ -119,6 +119,12 @@ def check(note: Path, capture: Path, vault: Path, asks: list[str]) -> dict:
     if len(desc) > DESCRIPTION_MAX:
         soft["description"] = {"chars": len(desc), "max": DESCRIPTION_MAX,
                                "fix": "one plain sentence: what the note is and why it is kept; the body carries the detail"}
+    # A tool goes to Tools/ whatever its filename (references/rules.md). [earned: 2026-10-02 audit —
+    # 7 of 37 tool-landmark notes since 10-01 landed in the 04_Resources root]
+    if str(fm.get("kind") or "").strip() == "tool-landmark" and rel.startswith("04_Resources/") \
+            and not rel.startswith("04_Resources/Tools/"):
+        soft["placement"] = {"kind": "tool-landmark", "folder": rel.rsplit("/", 1)[0],
+                             "fix": "move it to 04_Resources/Tools/ (git mv) before retiring the capture"}
     if asks:
         target = note.relative_to(vault).as_posix()
         ranks = []
@@ -161,6 +167,9 @@ def main() -> int:
     else:
         for gate, (ok, why) in report["hard"].items():
             print(f"  {'ok  ' if ok else 'FAIL'} {gate:<12} {why}")
+        pl = report["soft"].get("placement")
+        if pl:
+            print(f"  soft placement: a {pl['kind']} in {pl['folder']}: {pl['fix']}")
         d = report["soft"].get("description")
         if d:
             print(f"  soft description: {d['chars']} characters, over {d['max']}: {d['fix']}")

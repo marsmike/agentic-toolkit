@@ -30,6 +30,7 @@ EVAL_MODULES = (
     "eval_graph_context",
     "eval_inferred_candidates",
     "eval_distill_judge",
+    "eval_url_hits",
     "eval_link_adjudication",
     "eval_search_judge",
     "eval_typed_maintenance",
