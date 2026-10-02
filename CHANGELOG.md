@@ -4,6 +4,11 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A tool note goes to `Tools/` (obsidian 3.10.1).** The placement rules never named
+  `04_Resources/Tools/`, and their "author/year in the filename → root" rule sent 7 of the 37
+  `tool-landmark` notes distilled since 2026-10-01 to the root while 30 went to `Tools/`
+  (2026-10-02 audit). rules.md now says a `tool-landmark` goes to `Tools/` whatever its filename.
+
 - **A new note must be linked from somewhere (obsidian 3.10.0).** The 2026-10-02 audit of the 65
   notes distilled since 10-01 found every mechanical gate passing, but 8 notes that no note in 02–04
   linked to, some through four later runs, all from the Signal Radar's sensor news (Janus,

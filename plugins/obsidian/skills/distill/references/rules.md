@@ -24,6 +24,10 @@
 **Decision rule:** 2+ sources, or a filename carrying an author/year/week stamp → root.
 A pure concept extracted as a reusable primitive → `Concepts/`.
 
+**A tool goes to `Tools/`, whatever the filename:** `kind: tool-landmark` (a tool, model,
+plugin, product or release) → `04_Resources/Tools/`. [earned: 2026-10-02 audit — 30 of 37
+tool-landmark notes since 10-01 went to `Tools/`, 7 to the root by the author/year rule above]
+
 ## Cluster mode (multiple captures → one hub, never one note)
 
 **A synthesis never replaces the captures' own notes.** Measured 2026-09-22: five captures
