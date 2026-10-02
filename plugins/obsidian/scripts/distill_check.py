@@ -13,6 +13,7 @@ Hard gates (fail the check):
   attachment    a capture with `attachment:` is linked from the note
   links         no wikilink into 01_Capture/ or 05_Archive/; every wikilink resolves
   index         Index.md has a line for the note
+  inbound       another note in 02–04 links to it (an L1 backlink from the closest related note)
 Soft gates (reported, never fail): a description over DESCRIPTION_MAX characters (it is the
 note's one line in Index.md and its map); the capture's other URLs not carried by the note (a
 thread's reply links are usually fine to drop; a paper or repo is not), findability of each
@@ -52,6 +53,20 @@ def _substantive_urls(capture: dict) -> list[str]:
     return [u for u in capture["source_urls"] if not any(h in u for h in IMAGE_HOSTS) and not re.search(r"\.(png|jpe?g|gif|svg|webp)(\?|$)", u, re.I)]
 
 
+def _links_in(note: Path, notes: list[Path]) -> list[Path]:
+    """The notes among `notes` (other than `note`) with a wikilink to it, by stem or by path."""
+    out = []
+    for p in notes:
+        if p == note:
+            continue
+        text = p.read_text(encoding="utf-8", errors="replace")
+        if note.stem not in text:
+            continue
+        if any(t.strip().split("/")[-1].removesuffix(".md") == note.stem for t in WIKILINK_RE.findall(text)):
+            out.append(p)
+    return out
+
+
 def check(note: Path, capture: Path, vault: Path, asks: list[str]) -> dict:
     fm, body = read_frontmatter(note, strict=False)
     cap_fm, _ = read_frontmatter(capture)
@@ -81,7 +96,8 @@ def check(note: Path, capture: Path, vault: Path, asks: list[str]) -> dict:
     lost = [u for u in _substantive_urls(cap) if _canonical(u) not in note_urls]
     att = str(cap_fm.get("attachment") or "")
     hard["attachment"] = (not att or att in body, f"link the stored document [[{att}]]" if att and att not in body else "ok")
-    stems = {p.stem for p in discover_notes(vault)} | {p.stem for p in vault.rglob("*.pdf")}
+    active = discover_notes(vault)
+    stems = {p.stem for p in active} | {p.stem for p in vault.rglob("*.pdf")}
     forbidden = [t for t in WIKILINK_RE.findall(body) if t.strip().startswith(NEVER_LINK)]
     dangling = [t for t in WIKILINK_RE.findall(body) if t.strip().split("/")[-1].removesuffix(".pdf") not in stems
                 and not (vault / t.strip()).exists()]
@@ -90,6 +106,13 @@ def check(note: Path, capture: Path, vault: Path, asks: list[str]) -> dict:
     rel = note.relative_to(vault).with_suffix("").as_posix()
     index = (vault / "Index.md").read_text(encoding="utf-8", errors="replace") if (vault / "Index.md").is_file() else ""
     hard["index"] = (f"[[{rel}|" in index or f"[[{rel}]]" in index, "add an Index.md line" if f"[[{rel}" not in index else "ok")
+    # A note nothing links to is found only by search: the graph, the maps' hubs and every later
+    # enrichment pass it by. [earned: 2026-10-02 audit — 8 of 65 notes distilled since 10-01 had no
+    # inbound link, some through four later runs; all came from sensor news]
+    inbound = _links_in(note, active)
+    hard["inbound"] = (bool(inbound), "ok" if inbound else
+                       "no note in 02–04 links here: add an L1 backlink in the closest related note's "
+                       "Related/See Also section and name that note with --linked")
 
     soft: dict[str, object] = {"urls_not_in_note": {"count": len(lost), "sample": lost[:5]}}
     desc = " ".join(str(fm.get("description") or "").split())

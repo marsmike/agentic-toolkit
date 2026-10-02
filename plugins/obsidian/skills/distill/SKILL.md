@@ -40,7 +40,9 @@ distilled`, `processed_date`, `description`), a `*Source: …*` line naming the 
 source (one line, never wrapped; an enrichment adds the capture's line beside the note's own), a stored document linked when the capture has one (legacy captures only — a PDF captured
 since 2026-09-24 has no file in the vault to link; its Source line already names the PDF URL,
 so the note cites page ranges against that instead), no wikilink into `01_Capture/`
-or `05_Archive/`, no dangling wikilink, an Index.md line. Soft, reported: a `description` over
+or `05_Archive/`, no dangling wikilink, an Index.md line, and at least one note in 02–04 that
+links to it: a new note gets an L1 backlink from its closest related note, named with `--linked`
+([earned: 2026-10-02, 8 of 65 new notes had no inbound link, all from sensor news]). Soft, reported: a `description` over
 250 characters (it is the note's one line in Index.md and its map, not its summary: one plain
 sentence saying what the note is and why it is kept; the body carries the detail — [earned:
 2026-10-01, descriptions had grown to a median of ~440 characters]), which of the

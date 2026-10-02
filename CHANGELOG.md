@@ -4,6 +4,15 @@ Every release entry links the change to the research or the dated failure that m
 
 ## [Unreleased] — R12, enriched tweets and a dashboard
 
+- **A new note must be linked from somewhere (obsidian 3.10.0).** The 2026-10-02 audit of the 65
+  notes distilled since 10-01 found every mechanical gate passing, but 8 notes that no note in 02–04
+  linked to, some through four later runs, all from the Signal Radar's sensor news (Janus,
+  Perplexity Decider, K2 Horizon, Magnitude, Kumo, ProvenanceGuard …). Such a note is found only by
+  search; the graph, the maps' hubs and later enrichments pass it by. `distill_check.py` has a new
+  hard gate, `inbound`: another active note links to it. The fix it names is the skill's default
+  L1 backlink, recorded with `--linked`. The negative eval gains an orphan; the retire eval's
+  fixtures a hub.
+
 - **The run report no longer promotes more than it judged (obsidian 3.9.4).** "What the feeds
   brought today" read "7 items judged, 2 strong, 12 promoted into Reader" on 2026-10-02: the judged
   and strong counts are the feed judge's for today, the promoted count is every row of

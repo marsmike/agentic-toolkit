@@ -10,6 +10,7 @@ One correct note passes every hard gate; each broken variant fails exactly its g
   attachment    the capture's stored document not linked
   links         a link into 01_Capture/ · a link into 05_Archive/ · a dangling wikilink
   index         no Index.md line
+  inbound       no other note in 02–04 links to it
 
 A note already carrying `updated_at`/`distilled_at`/`ingested_at` (an enriched note, stamped by its
 earlier retirement) passes too: retire_capture.py stamps those after this check, so it gates neither
@@ -112,6 +113,7 @@ VARIANTS: dict[str, tuple[str, dict, str]] = {
     "archive-link": ("links", GOOD_FM, GOOD_BODY + "\nSee [[05_Archive/Old-Thing]].\n"),
     "dangling": ("links", GOOD_FM, GOOD_BODY + "\nSee [[No-Such-Note-Anywhere-In-The-Vault]].\n"),
     "no-index": ("index", GOOD_FM, GOOD_BODY),
+    "orphan": ("inbound", GOOD_FM, GOOD_BODY),  # the only variant the hub below leaves out
 }
 
 
@@ -133,6 +135,9 @@ def run(vault: Path) -> dict:
         (sandbox / "04_Resources" / "Attachments" / "eval-doc.pdf").write_bytes(b"%PDF-1.4 eval\n")
         (sandbox / "05_Archive").mkdir(exist_ok=True)
         (sandbox / "05_Archive" / "Old-Thing.md").write_text("---\nstatus: archived\n---\n# old\n", encoding="utf-8")
+        hub = "".join(f"- [[Eval-Check-{n}]]\n" for n in [*VARIANTS, "long-description", "pdf-no-attachment"] if n != "orphan")
+        (sandbox / "04_Resources" / "Eval-Check-Hub.md").write_text(
+            "---\ndescription: Links every fixture but the orphan.\n---\n# Hub\n\n" + hub, encoding="utf-8")
         index = sandbox / "Index.md"
         lines = []
         for name, (_, fm, body) in VARIANTS.items():

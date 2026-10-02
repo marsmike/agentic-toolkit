@@ -173,6 +173,11 @@ def run(vault: Path) -> dict:
             _capture("clip", STAMP_INGESTED_AT).replace(SOURCE, SOURCE + "-keep"), encoding="utf-8")
         (sandbox / "04_Resources" / "Retire-Eval-Keep.md").write_text(
             ALREADY_STAMPED_NOTE.replace(SOURCE, SOURCE + "-keep"), encoding="utf-8")
+        # distill_check's inbound gate: every note the eval retires into is linked from somewhere
+        (sandbox / "04_Resources" / "Retire-Eval-Hub.md").write_text(
+            "---\ndescription: Links the eval's notes.\n---\n# Hub\n\n" + "".join(
+                f"- [[{n}]]\n" for n in ("Retire-Eval-Good", "Retire-Eval-Good-2", "Retire-Eval-Bad", "Retire-Eval-Stamp",
+                                         "Retire-Eval-Keep", "Retire-Eval-Linked-Main")), encoding="utf-8")
         index = sandbox / "Index.md"
         index.write_text(index.read_text(encoding="utf-8") +
                          "\n- [[04_Resources/Retire-Eval-Good|Retire Eval Good]] — fixture\n"
